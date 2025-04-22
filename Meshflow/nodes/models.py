@@ -1,11 +1,12 @@
+import binascii
+import os
 import uuid
 
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 from common.mesh_node_helpers import meshtastic_id_to_hex
-from constellations.models import Constellation
-from users.models import User
+
 
 class LocationSource(models.TextChoices):
     """Location source types for position reports."""
@@ -25,11 +26,13 @@ class MeshtasticNode(models.Model):
     node_id = models.BigIntegerField(null=False)
     mac_addr = models.CharField(max_length=20, null=True, blank=True)
     constellation = models.ForeignKey(
-        Constellation, on_delete=models.CASCADE, related_name="nodes"
+        "constellations.Constellation", on_delete=models.CASCADE, related_name="nodes"
     )
     owner = models.ForeignKey(
-        "users.User", on_delete=models.CASCADE, related_name="owned_nodes",
-        help_text=_("The user who owns this node")
+        "users.User",
+        on_delete=models.CASCADE,
+        related_name="owned_nodes",
+        help_text=_("The user who owns this node"),
     )
 
     long_name = models.CharField(max_length=50)
@@ -38,7 +41,7 @@ class MeshtasticNode(models.Model):
     hw_model = models.CharField(max_length=50, null=True, blank=True)
     sw_version = models.CharField(max_length=12, null=True, blank=True)
     public_key = models.CharField(max_length=64, null=True, blank=True)
-    
+
     class Meta:
         """Model metadata."""
 
@@ -54,10 +57,70 @@ class MeshtasticNode(models.Model):
 
     def __str__(self):
         """Return a string representation of the node, including user's short name if available."""
+        return f"{self.short_name} ({self.node_id_str})"
 
-        if self.short_name:
-            return f"{self.short_name} [{self.node_id_str}]"
-        return self.node_id_str
+
+class NodeAPIKey(models.Model):
+    """Model for API keys that authenticate nodes to the API."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    key = models.CharField(max_length=64, unique=True)
+    name = models.CharField(max_length=100)
+    constellation = models.ForeignKey(
+        "constellations.Constellation",
+        on_delete=models.CASCADE,
+        related_name="api_keys",
+    )
+    owner = models.ForeignKey(
+        "users.User",
+        on_delete=models.CASCADE,
+        related_name="owned_api_keys",
+        help_text=_("The user who owns this API key"),
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey(
+        "users.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="created_api_keys",
+    )
+    last_used = models.DateTimeField(null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        verbose_name = _("Node API Key")
+        verbose_name_plural = _("Node API Keys")
+
+    def __str__(self):
+        return f"{self.name} ({self.constellation.name})"
+
+    def save(self, *args, **kwargs):
+        if not self.key:
+            self.key = self.generate_key()
+        return super().save(*args, **kwargs)
+
+    @classmethod
+    def generate_key(cls):
+        return binascii.hexlify(os.urandom(20)).decode()
+
+
+class NodeAuth(models.Model):
+    """Model linking API keys to specific nodes they can authenticate."""
+
+    api_key = models.ForeignKey(
+        NodeAPIKey, on_delete=models.CASCADE, related_name="node_links"
+    )
+    node = models.ForeignKey(
+        MeshtasticNode, on_delete=models.CASCADE, related_name="api_key_links"
+    )
+
+    class Meta:
+        unique_together = ("api_key", "node")
+        verbose_name = _("Node authentication")
+        verbose_name_plural = _("Node authentications")
+
+    def __str__(self):
+        return f"{self.api_key.name} - {self.node}"
 
 
 class BaseNodeItem(models.Model):
@@ -93,8 +156,7 @@ class Position(BaseNodeItem):
         verbose_name_plural = _("Positions")
 
     def __str__(self):
-        """Return a string representation of the position report."""
-        return f"{self.node.id} - {self.logged_time}"
+        return f"{self.node} - {self.latitude}, {self.longitude}"
 
 
 class DeviceMetrics(models.Model):
@@ -113,5 +175,4 @@ class DeviceMetrics(models.Model):
     uptime_seconds = models.IntegerField()
 
     def __str__(self):
-        """Return a string representation of the device metrics report."""
-        return f"{self.node.id} - {self.logged_time}"
+        return f"{self.node} - {self.battery_level}%"
