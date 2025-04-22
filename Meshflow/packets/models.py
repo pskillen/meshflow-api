@@ -9,6 +9,31 @@ from django.utils.translation import gettext_lazy as _
 from nodes.models import MeshtasticNode
 
 
+class LocationSource(models.IntegerChoices):
+    """Location source types for position reports."""
+
+    UNSET = 0, "UNSET"
+    MANUAL = 1, "LOC_MANUAL"
+    INTERNAL = 2, "LOC_INTERNAL"
+    EXTERNAL = 3, "LOC_EXTERNAL"
+
+
+class RoleSource(models.IntegerChoices):
+    """Role source types for node roles."""
+
+    CLIENT = 0, "CLIENT"
+    CLIENT_MUTE = 1, "CLIENT_MUTE"
+    CLIENT_HIDDEN = 2, "CLIENT_HIDDEN"
+    TRACKER = 3, "TRACKER"
+    LOST_AND_FOUND = 4, "LOST_AND_FOUND"
+    SENSOR = 5, "SENSOR"
+    TAK = 6, "TAK"
+    TAK_TRACKER = 7, "TAK_TRACKER"
+    REPEATER = 8, "REPEATER"
+    ROUTER = 9, "ROUTER"
+    ROUTER_LATE = 10, "ROUTER_LATE"
+
+
 class RawPacket(models.Model):
     """Base model for storing raw mesh network packets with common attributes."""
 
@@ -24,9 +49,9 @@ class RawPacket(models.Model):
 
     class Meta:
         indexes = [
-            models.Index(fields=['packet_id']),
-            models.Index(fields=['from_int']),
-            models.Index(fields=['to_int']),
+            models.Index(fields=["packet_id"]),
+            models.Index(fields=["from_int"]),
+            models.Index(fields=["to_int"]),
         ]
         verbose_name = _("Raw packet")
         verbose_name_plural = _("Raw packets")
@@ -53,8 +78,13 @@ class PositionPacket(RawPacket):
     longitude = models.FloatField(null=True)
     altitude = models.FloatField(null=True)
     heading = models.FloatField(null=True)
-    location_source = models.CharField(max_length=15, null=True)
+    location_source = models.IntegerField(choices=LocationSource.choices, null=True)
     precision_bits = models.SmallIntegerField(null=True)
+    position_time = models.DateTimeField(
+        null=True
+    )  # Unix timestamp converted to datetime
+    ground_speed = models.FloatField(null=True)  # in m/s
+    ground_track = models.FloatField(null=True)  # in degrees (0-359)
 
     class Meta:
         verbose_name = _("Position packet")
@@ -71,6 +101,7 @@ class NodeInfoPacket(RawPacket):
     sw_version = models.CharField(max_length=12, null=True)
     public_key = models.CharField(max_length=64, null=True)
     mac_address = models.CharField(max_length=20, null=True)
+    role = models.IntegerField(choices=RoleSource.choices, null=True)
 
     class Meta:
         verbose_name = _("Node info packet")

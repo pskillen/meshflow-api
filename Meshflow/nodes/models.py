@@ -8,13 +8,13 @@ from django.utils.translation import gettext_lazy as _
 from common.mesh_node_helpers import meshtastic_id_to_hex
 
 
-class LocationSource(models.TextChoices):
+class LocationSource(models.IntegerChoices):
     """Location source types for position reports."""
 
-    UNSET = "0", _("Unset")
-    MANUAL = "1", _("Manual")
-    INTERNAL = "2", _("Internal")
-    EXTERNAL = "3", _("External")
+    UNSET = 0, "UNSET"
+    MANUAL = 1, "LOC_MANUAL"
+    INTERNAL = 2, "LOC_INTERNAL"
+    EXTERNAL = 3, "LOC_EXTERNAL"
 
 
 class MeshtasticNode(models.Model):
@@ -145,8 +145,7 @@ class Position(BaseNodeItem):
     longitude = models.FloatField()
     altitude = models.FloatField()
     heading = models.FloatField()
-    location_source = models.CharField(
-        max_length=1,
+    location_source = models.IntegerField(
         choices=LocationSource.choices,
         default=LocationSource.UNSET,
     )

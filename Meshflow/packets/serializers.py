@@ -9,6 +9,8 @@ from .models import (
     NodeInfoPacket,
     DeviceMetricsPacket,
     PacketObservation,
+    LocationSource,
+    RoleSource,
 )
 
 
@@ -135,6 +137,42 @@ class PositionPacketSerializer(BasePacketSerializer):
     precision_bits = serializers.IntegerField(
         source="decoded.position.precisionBits", required=False, allow_null=True
     )
+    position_time = serializers.IntegerField(
+        source="decoded.position.time", required=False, allow_null=True
+    )
+    ground_speed = serializers.FloatField(
+        source="decoded.position.groundSpeed", required=False, allow_null=True
+    )
+    ground_track = serializers.FloatField(
+        source="decoded.position.groundTrack", required=False, allow_null=True
+    )
+
+    def to_internal_value(self, data):
+        """Convert camelCase to snake_case for nested fields and handle timestamp and location source conversion."""
+        # First, handle the standard DRF conversion
+        validated_data = super().to_internal_value(data)
+
+        # Convert position_time to a datetime object
+        if "position_time" in validated_data:
+            validated_data["position_time"] = timezone.datetime.fromtimestamp(
+                validated_data["position_time"], tz=timezone.utc
+            )
+
+        # Convert location_source from string to integer using LocationSource
+        if "location_source" in validated_data and validated_data["location_source"]:
+            try:
+                # Find the matching location source in LocationSource
+                for source_choice in LocationSource:
+                    if source_choice.label == validated_data["location_source"]:
+                        validated_data["location_source"] = source_choice.value
+                        break
+                else:
+                    # If no match found, set to None
+                    validated_data["location_source"] = None
+            except (ValueError, TypeError):
+                validated_data["location_source"] = None
+
+        return validated_data
 
     def create(self, validated_data):
         """Create a new PositionPacket instance."""
@@ -154,8 +192,11 @@ class PositionPacketSerializer(BasePacketSerializer):
             longitude=position_data.get("longitude"),
             altitude=position_data.get("altitude"),
             heading=position_data.get("heading"),
-            location_source=position_data.get("locationSource"),
+            location_source=validated_data.get("location_source"),
             precision_bits=position_data.get("precisionBits"),
+            position_time=validated_data.get("position_time"),
+            ground_speed=position_data.get("groundSpeed"),
+            ground_track=position_data.get("groundTrack"),
         )
 
         # Create the observation
@@ -200,6 +241,30 @@ class NodeInfoPacketSerializer(BasePacketSerializer):
     mac_address = serializers.CharField(
         source="decoded.user.macaddr", required=False, allow_null=True
     )
+    role = serializers.CharField(
+        source="decoded.user.role", required=False, allow_null=True
+    )
+
+    def to_internal_value(self, data):
+        """Convert camelCase to snake_case for nested fields and handle role conversion."""
+        # First, handle the standard DRF conversion
+        validated_data = super().to_internal_value(data)
+
+        # Convert role from string to integer using RoleSource
+        if "role" in validated_data and validated_data["role"]:
+            try:
+                # Find the matching role in RoleSource
+                for role_choice in RoleSource:
+                    if role_choice.label == validated_data["role"]:
+                        validated_data["role"] = role_choice.value
+                        break
+                else:
+                    # If no match found, set to None
+                    validated_data["role"] = None
+            except (ValueError, TypeError):
+                validated_data["role"] = None
+
+        return validated_data
 
     def create(self, validated_data):
         """Create a new NodeInfoPacket instance."""
@@ -222,6 +287,7 @@ class NodeInfoPacketSerializer(BasePacketSerializer):
             sw_version=user_data.get("swVersion"),
             public_key=user_data.get("publicKey"),
             mac_address=user_data.get("macaddr"),
+            role=validated_data.get("role"),
         )
 
         # Create the observation

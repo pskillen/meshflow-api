@@ -3,7 +3,7 @@ import secrets
 from rest_framework import serializers
 
 from constellations.models import ConstellationUserMembership
-from .models import NodeAPIKey, NodeAuth
+from .models import NodeAPIKey, NodeAuth, Position, LocationSource
 
 
 class APIKeySerializer(serializers.ModelSerializer):
@@ -109,3 +109,48 @@ class APIKeyCreateSerializer(serializers.ModelSerializer):
                 pass
 
         return api_key
+
+
+class PositionSerializer(serializers.ModelSerializer):
+    """Serializer for position reports."""
+
+    location_source = serializers.CharField(
+        source="get_location_source_display",
+        read_only=True
+    )
+
+    class Meta:
+        model = Position
+        fields = [
+            'id',
+            'node',
+            'logged_time',
+            'reported_time',
+            'latitude',
+            'longitude',
+            'altitude',
+            'heading',
+            'location_source'
+        ]
+        read_only_fields = ['id', 'node', 'logged_time', 'reported_time']
+
+    def to_internal_value(self, data):
+        """Convert location source from string to integer."""
+        # First, handle the standard DRF conversion
+        validated_data = super().to_internal_value(data)
+
+        # Convert location_source from string to integer using LocationSource
+        if "location_source" in validated_data and validated_data["location_source"]:
+            try:
+                # Find the matching location source in LocationSource
+                for source_choice in LocationSource:
+                    if source_choice.label == validated_data["location_source"]:
+                        validated_data["location_source"] = source_choice.value
+                        break
+                else:
+                    # If no match found, set to UNSET
+                    validated_data["location_source"] = LocationSource.UNSET
+            except (ValueError, TypeError):
+                validated_data["location_source"] = LocationSource.UNSET
+
+        return validated_data
