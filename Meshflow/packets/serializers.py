@@ -181,7 +181,7 @@ class PositionPacketSerializer(BasePacketSerializer):
 class NodeInfoPacketSerializer(BasePacketSerializer):
     """Serializer for node info packets."""
 
-    id = serializers.CharField(source="decoded.user.id")
+    node_id = serializers.CharField(source="decoded.user.id")
     short_name = serializers.CharField(
         source="decoded.user.shortName", required=False, allow_null=True
     )
@@ -215,7 +215,7 @@ class NodeInfoPacketSerializer(BasePacketSerializer):
             to_int=validated_data.get("to"),
             to_str=validated_data.get("toId"),
             port_num=decoded_data.get("portnum"),
-            id=user_data.get("id"),
+            node_id=user_data.get("id"),
             short_name=user_data.get("shortName"),
             long_name=user_data.get("longName"),
             hw_model=user_data.get("hwModel"),

@@ -3,7 +3,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .serializers import PacketIngestSerializer
-from ..constellations.authentication import NodeAPIKeyAuthentication
+from constellations.authentication import NodeAPIKeyAuthentication
 
 
 class PacketIngestView(APIView):

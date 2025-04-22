@@ -3,7 +3,7 @@
 import uuid
 from django.utils import timezone
 from django.db import models
-from Meshflow.nodes.models import MeshtasticNode
+from nodes.models import MeshtasticNode
 
 
 class RawPacket(models.Model):
@@ -12,15 +12,19 @@ class RawPacket(models.Model):
     id = models.UUIDField(
         primary_key=True, null=False, default=uuid.uuid4, editable=False
     )
-    packet_id = models.BigIntegerField(null=False, db_index=True)
-    from_int = models.BigIntegerField(null=False, db_index=True)
+    packet_id = models.BigIntegerField(null=False)
+    from_int = models.BigIntegerField(null=False)
     from_str = models.CharField(max_length=9, null=True)
-    to_int = models.BigIntegerField(null=True, db_index=True)
+    to_int = models.BigIntegerField(null=True)
     to_str = models.CharField(max_length=9, null=True)
     port_num = models.CharField(max_length=50, null=True)
 
     class Meta:
-        abstract = True
+        indexes = [
+            models.Index(fields=['packet_id']),
+            models.Index(fields=['from_int']),
+            models.Index(fields=['to_int']),
+        ]
 
 
 class MessagePacket(RawPacket):
@@ -47,8 +51,7 @@ class PositionPacket(RawPacket):
 class NodeInfoPacket(RawPacket):
     """Model for storing node information packets."""
 
-    """The node ID in hex format (!0a1b2c3d)"""
-    id = models.CharField(max_length=9, null=True)
+    node_id = models.CharField(max_length=9, null=True, db_index=True)
     short_name = models.CharField(max_length=5, null=True)
     long_name = models.CharField(max_length=50, null=True)
     hw_model = models.CharField(max_length=50, null=True)
