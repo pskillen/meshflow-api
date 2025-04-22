@@ -153,7 +153,7 @@ class BaseNodeItem(models.Model):
     """Base model for node items."""
 
     node = models.ForeignKey(
-        ObservedNode, on_delete=models.CASCADE, related_name="observations"
+        ObservedNode, on_delete=models.CASCADE
     )
     logged_time = models.DateTimeField()
     reported_time = models.DateTimeField()
@@ -167,13 +167,24 @@ class BaseNodeItem(models.Model):
 class Position(BaseNodeItem):
     """Model representing a position report from a mesh node."""
 
-    latitude = models.FloatField()
-    longitude = models.FloatField()
-    altitude = models.FloatField()
-    heading = models.FloatField()
+    latitude = models.FloatField(null=True, blank=True)
+    longitude = models.FloatField(null=True, blank=True)
+    altitude = models.FloatField(null=True, blank=True)
+    heading = models.FloatField(null=True, blank=True)
     location_source = models.IntegerField(
         choices=LocationSource.choices,
         default=LocationSource.UNSET,
+    )
+    precision_bits = models.SmallIntegerField(null=True, blank=True)
+    ground_speed = models.FloatField(null=True, blank=True, help_text="Speed in m/s")
+    ground_track = models.FloatField(
+        null=True, blank=True, help_text="Track in degrees (0-359)"
+    )
+    sats_in_view = models.SmallIntegerField(
+        null=True, blank=True, help_text="Number of satellites in view"
+    )
+    pdop = models.FloatField(
+        null=True, blank=True, help_text="Position Dilution of Precision"
     )
 
     class Meta:
@@ -184,20 +195,22 @@ class Position(BaseNodeItem):
         return f"Position [{self.latitude}, {self.longitude}]"
 
 
-class DeviceMetrics(models.Model):
+class DeviceMetrics(BaseNodeItem):
     """Model representing device metrics reported by a mesh node."""
+
+    battery_level = models.FloatField(help_text="Battery level as a percentage")
+    voltage = models.FloatField(help_text="Battery voltage in volts")
+    channel_utilization = models.FloatField(
+        help_text="Channel utilization as a percentage"
+    )
+    air_util_tx = models.FloatField(help_text="Air utilization for transmission")
+    uptime_seconds = models.BigIntegerField(help_text="Device uptime in seconds")
 
     class Meta:
         """Model metadata."""
 
         verbose_name = _("Device metrics")
         verbose_name_plural = _("Device metrics")
-
-    battery_level = models.IntegerField()
-    voltage = models.FloatField()
-    channel_utilization = models.FloatField()
-    air_util_tx = models.FloatField()
-    uptime_seconds = models.IntegerField()
 
     def __str__(self):
         return f"Device metrics [{self.battery_level}%, {self.voltage}V, {self.uptime_seconds}s]"

@@ -2,7 +2,10 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .authentication import PacketIngestNodeAPIKeyAuthentication, NodeAPIKeyAuthentication
+from .authentication import (
+    PacketIngestNodeAPIKeyAuthentication,
+    NodeAPIKeyAuthentication,
+)
 from .serializers import PacketIngestSerializer, NodeSerializer
 
 
@@ -37,12 +40,12 @@ class PacketIngestView(APIView):
                 packet = serializer.save()
                 return Response(
                     {"status": "success", "message": "Packet ingested successfully"},
-                    status=status.HTTP_201_CREATED
+                    status=status.HTTP_201_CREATED,
                 )
             except Exception as e:
                 return Response(
                     {"status": "error", "message": str(e)},
-                    status=status.HTTP_400_BAD_REQUEST
+                    status=status.HTTP_400_BAD_REQUEST,
                 )
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -80,13 +83,17 @@ class NodeUpsertView(APIView):
             try:
                 serializer.save()
                 return Response(
-                    {"status": "success", "message": "Node updated successfully"},
-                    status=status.HTTP_200_OK
+                    {
+                        "status": "success",
+                        "message": "Node updated successfully",
+                        "node": serializer.data,
+                    },
+                    status=status.HTTP_200_OK,
                 )
             except Exception as e:
                 return Response(
                     {"status": "error", "message": str(e)},
-                    status=status.HTTP_400_BAD_REQUEST
+                    status=status.HTTP_400_BAD_REQUEST,
                 )
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

@@ -37,3 +37,12 @@ Stores structured messages
 ### Tests
 
 * [ ] Add example JSON for each packet type
+
+
+
+### TODO
+
+- [ ] We need to support a POST /node with a Node API key auth
+    - This will probably be via adding a 
+- [ ] Add an auth mechanism for the frontend
+- [ ] Add an auth mechanism for Postman
