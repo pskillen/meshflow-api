@@ -17,7 +17,43 @@ class LocationSource(models.IntegerChoices):
     EXTERNAL = 3, "LOC_EXTERNAL"
 
 
-class MeshtasticNode(models.Model):
+class ManagedNode(models.Model):
+    """Model representing a mesh network node."""
+
+    internal_id = models.UUIDField(
+        primary_key=True, null=False, default=uuid.uuid4, editable=False
+    )
+    node_id = models.BigIntegerField(null=False)
+    owner = models.ForeignKey(
+        "users.User",
+        on_delete=models.CASCADE,
+        related_name="owned_nodes",
+        help_text=_("The user who owns this node"),
+    )
+    constellation = models.ForeignKey(
+        "constellations.Constellation", on_delete=models.CASCADE, related_name="nodes"
+    )
+    name = models.CharField(max_length=100, null=False, blank=False)
+
+    class Meta:
+        """Model metadata."""
+
+        verbose_name = _("Managed node")
+        verbose_name_plural = _("Managed nodes")
+
+    @property
+    def node_id_str(self) -> str:
+        """Return the node ID in hex format."""
+        if not self.node_id:
+            return None
+        return meshtastic_id_to_hex(self.node_id)
+
+    def __str__(self):
+        """Return a string representation of the node, including user's short name if available."""
+        return f"{self.node_id_str} {self.name} ({self.owner.username})"
+
+
+class ObservedNode(models.Model):
     """Model representing a mesh network node."""
 
     internal_id = models.UUIDField(
@@ -25,16 +61,6 @@ class MeshtasticNode(models.Model):
     )
     node_id = models.BigIntegerField(null=False)
     mac_addr = models.CharField(max_length=20, null=True, blank=True)
-    constellation = models.ForeignKey(
-        "constellations.Constellation", on_delete=models.CASCADE, related_name="nodes"
-    )
-    owner = models.ForeignKey(
-        "users.User",
-        on_delete=models.CASCADE,
-        related_name="owned_nodes",
-        help_text=_("The user who owns this node"),
-    )
-
     long_name = models.CharField(max_length=50)
     short_name = models.CharField(max_length=5)
 
@@ -45,8 +71,8 @@ class MeshtasticNode(models.Model):
     class Meta:
         """Model metadata."""
 
-        verbose_name = _("Node")
-        verbose_name_plural = _("Nodes")
+        verbose_name = _("Observed node")
+        verbose_name_plural = _("Observed nodes")
 
     @property
     def node_id_str(self) -> str:
@@ -111,7 +137,7 @@ class NodeAuth(models.Model):
         NodeAPIKey, on_delete=models.CASCADE, related_name="node_links"
     )
     node = models.ForeignKey(
-        MeshtasticNode, on_delete=models.CASCADE, related_name="api_key_links"
+        ManagedNode, on_delete=models.CASCADE, related_name="api_key_links"
     )
 
     class Meta:
@@ -127,7 +153,7 @@ class BaseNodeItem(models.Model):
     """Base model for node items."""
 
     node = models.ForeignKey(
-        MeshtasticNode, on_delete=models.CASCADE, related_name="base_node_item_list"
+        ObservedNode, on_delete=models.CASCADE, related_name="observations"
     )
     logged_time = models.DateTimeField()
     reported_time = models.DateTimeField()
@@ -155,7 +181,7 @@ class Position(BaseNodeItem):
         verbose_name_plural = _("Positions")
 
     def __str__(self):
-        return f"{self.node} - {self.latitude}, {self.longitude}"
+        return f"Position [{self.latitude}, {self.longitude}]"
 
 
 class DeviceMetrics(models.Model):
@@ -174,4 +200,4 @@ class DeviceMetrics(models.Model):
     uptime_seconds = models.IntegerField()
 
     def __str__(self):
-        return f"{self.node} - {self.battery_level}%"
+        return f"Device metrics [{self.battery_level}%, {self.voltage}V, {self.uptime_seconds}s]"

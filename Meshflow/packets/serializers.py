@@ -3,6 +3,7 @@
 from django.utils import timezone
 from rest_framework import serializers
 
+from nodes.models import ObservedNode
 from .models import (
     MessagePacket,
     PositionPacket,
@@ -471,3 +472,74 @@ class PacketIngestSerializer(serializers.Serializer):
 
         # Create the packet using the selected serializer
         return serializer.create(validated_data)
+
+
+class PositionSerializer(serializers.Serializer):
+    logged_time = serializers.DateTimeField()
+    reported_time = serializers.DateTimeField()
+    latitude = serializers.FloatField()
+    longitude = serializers.FloatField()
+    altitude = serializers.FloatField()
+    location_source = serializers.CharField()
+
+
+class DeviceMetricsSerializer(serializers.Serializer):
+    logged_time = serializers.DateTimeField()
+    battery_level = serializers.FloatField()
+    voltage = serializers.FloatField()
+    channel_utilization = serializers.FloatField()
+    air_util_tx = serializers.FloatField()
+    uptime_seconds = serializers.IntegerField()
+
+
+class NodeSerializer(serializers.ModelSerializer):
+    position = PositionSerializer(required=False, allow_null=True)
+    device_metrics = DeviceMetricsSerializer(required=False, allow_null=True)
+    user = serializers.SerializerMethodField()
+    id = serializers.IntegerField(source="node_id")
+    macaddr = serializers.CharField(source="mac_address")
+
+    class Meta:
+        model = ObservedNode
+        fields = [
+            "id",
+            "macaddr",
+            "hw_model",
+            "public_key",
+            "user",
+            "position",
+            "device_metrics",
+        ]
+
+    def get_user(self, obj):
+        return {"long_name": obj.long_name, "short_name": obj.short_name}
+
+    def update(self, instance, validated_data):
+        # Handle position data
+        position_data = validated_data.pop("position", None)
+        if position_data:
+            instance.position_logged_time = position_data.get("logged_time")
+            instance.position_reported_time = position_data.get("reported_time")
+            instance.latitude = position_data.get("latitude")
+            instance.longitude = position_data.get("longitude")
+            instance.altitude = position_data.get("altitude")
+            instance.location_source = position_data.get("location_source")
+
+        # Handle device metrics data
+        device_metrics_data = validated_data.pop("device_metrics", None)
+        if device_metrics_data:
+            instance.device_metrics_logged_time = device_metrics_data.get("logged_time")
+            instance.battery_level = device_metrics_data.get("battery_level")
+            instance.voltage = device_metrics_data.get("voltage")
+            instance.channel_utilization = device_metrics_data.get(
+                "channel_utilization"
+            )
+            instance.air_util_tx = device_metrics_data.get("air_util_tx")
+            instance.uptime_seconds = device_metrics_data.get("uptime_seconds")
+
+        # Update basic fields
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+
+        instance.save()
+        return instance

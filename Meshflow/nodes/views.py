@@ -2,9 +2,8 @@ from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from constellations.models import ConstellationUserMembership, Constellation
-from constellations.views import IsConstellationAdminOrEditor
-from nodes.models import NodeAPIKey, NodeAuth
+from constellations.models import ConstellationUserMembership
+from nodes.models import NodeAPIKey, NodeAuth, ObservedNode, ManagedNode
 from nodes.serializers import APIKeyCreateSerializer, APIKeyDetailSerializer, APIKeySerializer
 
 
@@ -15,25 +14,17 @@ class APIKeyViewSet(viewsets.ModelViewSet):
     Allows users to create, view, update, and delete API keys for constellations
     they have admin or editor access to.
     """
-
-    permission_classes = [permissions.IsAuthenticated, IsConstellationAdminOrEditor]
+    permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
         """
-        Filter API keys to only show those for the specified constellation.
+        Filter API keys to only show those for constellations the user has access to.
         """
         user = self.request.user
-        constellation_id = self.kwargs.get('constellation_id')
-
-        # Check if the user is a member of the constellation
-        if not ConstellationUserMembership.objects.filter(
-            user=user,
-            constellation_id=constellation_id
-        ).exists():
-            return NodeAPIKey.objects.none()
-
-        # Return API keys for the specified constellation
-        return NodeAPIKey.objects.filter(constellation_id=constellation_id)
+        return NodeAPIKey.objects.filter(
+            constellation__memberships__user=user,
+            constellation__memberships__role__in=['admin', 'editor']
+        ).distinct()
 
     def get_serializer_class(self):
         """
@@ -47,11 +38,21 @@ class APIKeyViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         """
-        Create a new API key for the specified constellation.
+        Create a new API key and ensure the user has proper permissions.
         """
-        constellation_id = self.kwargs.get('constellation_id')
-        constellation = Constellation.objects.get(id=constellation_id)
-        serializer.save(constellation=constellation, created_by=self.request.user)
+        constellation = serializer.validated_data['constellation']
+
+        # Check if user has permission to create API keys for this constellation
+        if not ConstellationUserMembership.objects.filter(
+            user=self.request.user,
+            constellation=constellation,
+            role__in=['admin', 'editor']
+        ).exists():
+            raise permissions.PermissionDenied(
+                "You don't have permission to create API keys for this constellation."
+            )
+
+        serializer.save(owner=self.request.user, created_by=self.request.user)
 
     @action(detail=True, methods=['post'])
     def add_node(self, request, pk=None):
@@ -67,9 +68,6 @@ class APIKeyViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Import here to avoid circular imports
-        from nodes.models import MeshtasticNode
-
         try:
             node = MeshtasticNode.objects.get(node_id=node_id)
         except MeshtasticNode.DoesNotExist:
@@ -78,10 +76,17 @@ class APIKeyViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_404_NOT_FOUND
             )
 
+        # Check if the node belongs to the same constellation as the API key
+        if node.constellation != api_key.constellation:
+            return Response(
+                {'error': f'Node does not belong to the same constellation as the API key'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         # Check if the node is already linked to this API key
         if NodeAuth.objects.filter(api_key=api_key, node=node).exists():
             return Response(
-                {'error': f'Node with ID {node_id} is already linked to this API key'},
+                {'error': f'Node is already linked to this API key'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -89,7 +94,7 @@ class APIKeyViewSet(viewsets.ModelViewSet):
         NodeAuth.objects.create(api_key=api_key, node=node)
 
         return Response(
-            {'success': f'Node with ID {node_id} added to API key'},
+            {'success': f'Node added to API key'},
             status=status.HTTP_201_CREATED
         )
 
@@ -107,9 +112,6 @@ class APIKeyViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Import here to avoid circular imports
-        from nodes.models import MeshtasticNode
-
         try:
             node = MeshtasticNode.objects.get(node_id=node_id)
         except MeshtasticNode.DoesNotExist:
@@ -122,7 +124,7 @@ class APIKeyViewSet(viewsets.ModelViewSet):
         link = NodeAuth.objects.filter(api_key=api_key, node=node).first()
         if not link:
             return Response(
-                {'error': f'Node with ID {node_id} is not linked to this API key'},
+                {'error': f'Node is not linked to this API key'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -130,6 +132,213 @@ class APIKeyViewSet(viewsets.ModelViewSet):
         link.delete()
 
         return Response(
-            {'success': f'Node with ID {node_id} removed from API key'},
+            {'success': f'Node removed from API key'},
+            status=status.HTTP_200_OK
+        )
+
+
+class ObservedNodeViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for managing observed nodes.
+    """
+    queryset = ObservedNode.objects.all()
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        """
+        Filter nodes based on user permissions.
+        """
+        user = self.request.user
+        return ObservedNode.objects.filter(
+            constellation__memberships__user=user,
+            constellation__memberships__role__in=['admin', 'editor']
+        ).distinct()
+
+    def perform_create(self, serializer):
+        """
+        Create a new node and ensure the user has proper permissions.
+        """
+        constellation = serializer.validated_data['constellation']
+
+        # Check if user has permission to add nodes to this constellation
+        if not ConstellationUserMembership.objects.filter(
+            user=self.request.user,
+            constellation=constellation,
+            role__in=['admin', 'editor']
+        ).exists():
+            raise permissions.PermissionDenied(
+                "You don't have permission to add nodes to this constellation."
+            )
+
+        serializer.save()
+
+    @action(detail=True, methods=['post'])
+    def add_api_key(self, request, pk=None):
+        """
+        Add an API key to a node.
+        """
+        node = self.get_object()
+        api_key_id = request.data.get('api_key_id')
+
+        if not api_key_id:
+            return Response(
+                {'error': 'api_key_id is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            api_key = NodeAPIKey.objects.get(id=api_key_id)
+        except NodeAPIKey.DoesNotExist:
+            return Response(
+                {'error': f'API key with ID {api_key_id} does not exist'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Check if the API key is already linked to this node
+        if NodeAuth.objects.filter(api_key=api_key, node=node).exists():
+            return Response(
+                {'error': f'API key is already linked to this node'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Link the API key to the node
+        NodeAuth.objects.create(api_key=api_key, node=node)
+
+        return Response(
+            {'success': f'API key added to node'},
+            status=status.HTTP_201_CREATED
+        )
+
+    @action(detail=True, methods=['post'])
+    def remove_api_key(self, request, pk=None):
+        """
+        Remove an API key from a node.
+        """
+        node = self.get_object()
+        api_key_id = request.data.get('api_key_id')
+
+        if not api_key_id:
+            return Response(
+                {'error': 'api_key_id is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            api_key = NodeAPIKey.objects.get(id=api_key_id)
+        except NodeAPIKey.DoesNotExist:
+            return Response(
+                {'error': f'API key with ID {api_key_id} does not exist'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Check if the API key is linked to this node
+        link = NodeAuth.objects.filter(api_key=api_key, node=node).first()
+        if not link:
+            return Response(
+                {'error': f'API key is not linked to this node'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Remove the link
+        link.delete()
+
+        return Response(
+            {'success': f'API key removed from node'},
+            status=status.HTTP_200_OK
+        )
+
+
+class ManagedNodeViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for managing owned nodes.
+    """
+    queryset = ManagedNode.objects.all()
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        """
+        Filter nodes based on user ownership.
+        """
+        user = self.request.user
+        return ManagedNode.objects.filter(owner=user)
+
+    def perform_create(self, serializer):
+        """
+        Create a new managed node and set the owner.
+        """
+        serializer.save(owner=self.request.user)
+
+    @action(detail=True, methods=['post'])
+    def add_api_key(self, request, pk=None):
+        """
+        Add an API key to a managed node.
+        """
+        node = self.get_object()
+        api_key_id = request.data.get('api_key_id')
+
+        if not api_key_id:
+            return Response(
+                {'error': 'api_key_id is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            api_key = NodeAPIKey.objects.get(id=api_key_id)
+        except NodeAPIKey.DoesNotExist:
+            return Response(
+                {'error': f'API key with ID {api_key_id} does not exist'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Check if the API key is already linked to this node
+        if NodeAuth.objects.filter(api_key=api_key, node=node).exists():
+            return Response(
+                {'error': f'API key is already linked to this node'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Link the API key to the node
+        NodeAuth.objects.create(api_key=api_key, node=node)
+
+        return Response(
+            {'success': f'API key added to node'},
+            status=status.HTTP_201_CREATED
+        )
+
+    @action(detail=True, methods=['post'])
+    def remove_api_key(self, request, pk=None):
+        """
+        Remove an API key from a managed node.
+        """
+        node = self.get_object()
+        api_key_id = request.data.get('api_key_id')
+
+        if not api_key_id:
+            return Response(
+                {'error': 'api_key_id is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            api_key = NodeAPIKey.objects.get(id=api_key_id)
+        except NodeAPIKey.DoesNotExist:
+            return Response(
+                {'error': f'API key with ID {api_key_id} does not exist'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Check if the API key is linked to this node
+        link = NodeAuth.objects.filter(api_key=api_key, node=node).first()
+        if not link:
+            return Response(
+                {'error': f'API key is not linked to this node'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Remove the link
+        link.delete()
+
+        return Response(
+            {'success': f'API key removed from node'},
             status=status.HTTP_200_OK
         )

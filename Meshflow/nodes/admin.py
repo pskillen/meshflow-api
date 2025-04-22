@@ -5,7 +5,7 @@ from django.db import transaction
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 
-from .models import MeshtasticNode, NodeAPIKey, NodeAuth
+from .models import ManagedNode, NodeAPIKey, NodeAuth, ObservedNode
 
 
 class CopyToClipboardWidget(forms.Widget):
@@ -39,7 +39,7 @@ class CopyToClipboardWidget(forms.Widget):
                     const input = button.previousElementSibling;
                     input.select();
                     document.execCommand('copy');
-                    
+
                     // Show feedback
                     const originalText = button.innerHTML;
                     button.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-check" viewBox="0 0 16 16"><path d="M10.97 4.97a.75.75 0 0 1 1.07 1.05l-3.99 4.99a.75.75 0 0 1-1.08.02L4.324 8.384a.75.75 0 1 1 1.06-1.06l2.094 2.093 3.473-4.425a.267.267 0 0 1 .02-.022z"/></svg>';
@@ -78,7 +78,7 @@ class NodeAPIKeyForm(forms.ModelForm):
     """Form for NodeAPIKey that handles node selection."""
 
     nodes = forms.ModelMultipleChoiceField(
-        queryset=MeshtasticNode.objects.none(),  # Start with empty queryset
+        queryset=ManagedNode.objects.none(),  # Start with empty queryset
         required=False,
         widget=FilteredSelectMultiple(_("Nodes"), is_stacked=False),
         label=_("Authorized Nodes"),
@@ -116,7 +116,7 @@ class NodeAPIKeyForm(forms.ModelForm):
 
         # Set up the nodes for existing keys
         constellation = self.instance.constellation
-        self.fields["nodes"].queryset = constellation.nodes.all().order_by("short_name")
+        self.fields["nodes"].queryset = constellation.nodes.all().order_by("name")
         self.fields["nodes"].initial = self.instance.node_links.values_list(
             "node", flat=True
         )
@@ -167,64 +167,35 @@ class NodeAPIKeyForm(forms.ModelForm):
         return instance
 
 
-@admin.register(MeshtasticNode)
-class MeshtasticNodeAdmin(admin.ModelAdmin):
+@admin.register(ManagedNode)
+class ManagedNodeAdmin(admin.ModelAdmin):
     list_display = (
-        "short_name",
-        "long_name",
+        "node_id",
         "node_id_str",
-        "constellation",
+        "name",
         "owner",
-        "hw_model",
-        "sw_version",
+        "constellation",
     )
     list_filter = (
-        "constellation",
         "owner",
-        "hw_model",
+        "constellation",
     )
     search_fields = (
-        "short_name",
-        "long_name",
         "node_id",
-        "mac_addr",
-        "hw_model",
-        "sw_version",
+        "node_id_str",
+        "name",
         "owner__username",
         "owner__email",
     )
-    readonly_fields = (
-        "internal_id",
-        "node_id_str",
-        "mac_addr",
-        "public_key",
-    )
-    fieldsets = (
-        (
-            None,
-            {
-                "fields": (
-                    "constellation",
-                    "owner",
-                    "short_name",
-                    "long_name",
-                    "node_id",
-                    "node_id_str",
-                )
-            },
-        ),
-        (
-            _("Hardware Information"),
-            {
-                "fields": (
-                    "hw_model",
-                    "sw_version",
-                    "mac_addr",
-                    "public_key",
-                )
-            },
-        )
-    )
+
+    def get_fields(self, request, obj=None):
+        fields = [
+            "node_id",
+            "name",
+            "owner",
+            "constellation",
+        ]
+        return fields
 
 
 @admin.register(NodeAPIKey)
@@ -275,3 +246,49 @@ class NodeAPIKeyAdmin(admin.ModelAdmin):
         if obj:  # Editing an existing object
             return self.readonly_fields + ("constellation",)
         return self.readonly_fields
+
+
+@admin.register(ObservedNode)
+class ObservedNodeAdmin(admin.ModelAdmin):
+    list_display = (
+        "short_name",
+        "long_name",
+        "node_id",
+        "node_id_str",
+        "hw_model",
+        "sw_version",
+    )
+    list_filter = (
+        "hw_model",
+        "sw_version",
+    )
+    search_fields = (
+        "short_name",
+        "long_name",
+        "node_id",
+        "node_id_str",
+        "mac_addr",
+        "hw_model",
+        "sw_version",
+        "public_key",
+    )
+    readonly_fields = (
+        "internal_id",
+        "node_id",
+        "node_id_str",
+        "mac_addr",
+        "public_key",
+    )
+
+    def get_fields(self, request, obj=None):
+        """Show all fields for observed nodes."""
+        fields = [
+            "node_id",
+            "mac_addr",
+            "long_name",
+            "short_name",
+            "hw_model",
+            "sw_version",
+            "public_key",
+        ]
+        return fields

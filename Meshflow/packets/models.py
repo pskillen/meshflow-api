@@ -6,7 +6,7 @@ from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
-from nodes.models import MeshtasticNode
+from nodes.models import ManagedNode
 
 
 class LocationSource(models.IntegerChoices):
@@ -167,7 +167,7 @@ class PacketObservation(models.Model):
     """Relates packets to node(s) which observed the packet."""
 
     packet = models.ForeignKey(RawPacket, on_delete=models.CASCADE)
-    node = models.ForeignKey(MeshtasticNode, on_delete=models.CASCADE)
+    observer = models.ForeignKey(ManagedNode, on_delete=models.CASCADE)
 
     channel = models.SmallIntegerField(null=True)
     hop_limit = models.SmallIntegerField(null=True)
