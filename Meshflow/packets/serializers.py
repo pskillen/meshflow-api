@@ -480,7 +480,7 @@ class PacketIngestSerializer(serializers.Serializer):
 
 class PositionSerializer(serializers.Serializer):
     logged_time = serializers.DateTimeField(default=timezone.now)
-    reported_time = serializers.DateTimeField()
+    reported_time = serializers.DateTimeField(required=True)
     latitude = serializers.FloatField()
     longitude = serializers.FloatField()
     altitude = serializers.FloatField()
@@ -515,7 +515,7 @@ class PositionSerializer(serializers.Serializer):
 
 class DeviceMetricsSerializer(serializers.Serializer):
     logged_time = serializers.DateTimeField(default=timezone.now)
-    reported_time = serializers.DateTimeField()
+    reported_time = serializers.DateTimeField(required=True)
     battery_level = serializers.FloatField()
     voltage = serializers.FloatField()
     channel_utilization = serializers.FloatField()
@@ -524,10 +524,12 @@ class DeviceMetricsSerializer(serializers.Serializer):
 
 
 class NodeSerializer(serializers.ModelSerializer):
-    position = PositionSerializer(required=False, allow_null=True)
-    device_metrics = DeviceMetricsSerializer(required=False, allow_null=True)
+    position = PositionSerializer(required=False, allow_null=True, write_only=True)
+    device_metrics = DeviceMetricsSerializer(required=False, allow_null=True, write_only=True)
     id = serializers.IntegerField(source="node_id")
     macaddr = serializers.CharField(source="mac_addr")
+    long_name = serializers.CharField(required=False)
+    short_name = serializers.CharField(required=False)
 
     class Meta:
         model = ObservedNode
@@ -543,37 +545,45 @@ class NodeSerializer(serializers.ModelSerializer):
             "device_metrics",
         ]
 
+    def to_internal_value(self, data):
+        # Handle the nested user data
+        if "user" in data:
+            user_data = data.pop("user")
+            data["long_name"] = user_data.get("long_name")
+            data["short_name"] = user_data.get("short_name")
+        return super().to_internal_value(data)
+
     def create(self, validated_data):
         # Handle position data
         position_data = validated_data.pop("position", None)
         device_metrics_data = validated_data.pop("device_metrics", None)
-        
+
         # Map macaddr to mac_addr
         if "macaddr" in validated_data:
             validated_data["mac_addr"] = validated_data.pop("macaddr")
-        
+
         # Create the node
         node = ObservedNode.objects.create(**validated_data)
-        
+
         # Handle position data if present
         if position_data:
             # Create position record
             Position.objects.create(
                 node=node,
-                logged_time=position_data.get("logged_time"),
+                logged_time=position_data.get("logged_time", timezone.now()),
                 reported_time=position_data.get("reported_time"),
                 latitude=position_data.get("latitude"),
                 longitude=position_data.get("longitude"),
                 altitude=position_data.get("altitude"),
                 location_source=position_data.get("location_source")
             )
-        
+
         # Handle device metrics data if present
         if device_metrics_data:
             # Create device metrics record
             DeviceMetrics.objects.create(
                 node=node,
-                logged_time=device_metrics_data.get("logged_time"),
+                logged_time=device_metrics_data.get("logged_time", timezone.now()),
                 reported_time=device_metrics_data.get("reported_time"),
                 battery_level=device_metrics_data.get("battery_level"),
                 voltage=device_metrics_data.get("voltage"),
@@ -581,14 +591,14 @@ class NodeSerializer(serializers.ModelSerializer):
                 air_util_tx=device_metrics_data.get("air_util_tx"),
                 uptime_seconds=device_metrics_data.get("uptime_seconds")
             )
-        
+
         return node
 
     def update(self, instance, validated_data):
         # Handle position data
         position_data = validated_data.pop("position", None)
         if position_data:
-            instance.position_logged_time = position_data.get("logged_time")
+            instance.position_logged_time = position_data.get("logged_time", timezone.now())
             instance.position_reported_time = position_data.get("reported_time")
             instance.latitude = position_data.get("latitude")
             instance.longitude = position_data.get("longitude")
@@ -598,7 +608,7 @@ class NodeSerializer(serializers.ModelSerializer):
         # Handle device metrics data
         device_metrics_data = validated_data.pop("device_metrics", None)
         if device_metrics_data:
-            instance.device_metrics_logged_time = device_metrics_data.get("logged_time")
+            instance.device_metrics_logged_time = device_metrics_data.get("logged_time", timezone.now())
             instance.battery_level = device_metrics_data.get("battery_level")
             instance.voltage = device_metrics_data.get("voltage")
             instance.channel_utilization = device_metrics_data.get(
