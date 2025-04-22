@@ -1,3 +1,5 @@
+import uuid
+
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
@@ -22,9 +24,14 @@ class Constellation(models.Model):
 class MeshtasticNode(models.Model):
     """Model representing a mesh network node."""
 
-    id = models.BigIntegerField(primary_key=True, null=False)
-    macaddr = models.CharField(max_length=20, null=True, blank=True)
-    constellation = models.ForeignKey(Constellation, on_delete=models.CASCADE, related_name="nodes")
+    internal_id = models.UUIDField(
+        primary_key=True, null=False, default=uuid.uuid4, editable=False
+    )
+    node_id = models.BigIntegerField(null=False)
+    mac_addr = models.CharField(max_length=20, null=True, blank=True)
+    constellation = models.ForeignKey(
+        Constellation, on_delete=models.CASCADE, related_name="nodes"
+    )
 
     long_name = models.CharField(max_length=50)
     short_name = models.CharField(max_length=5)
@@ -39,22 +46,24 @@ class MeshtasticNode(models.Model):
         verbose_name = "Node"
 
     @property
-    def id_str(self) -> str:
+    def node_id_str(self) -> str:
         """Return the node ID in hex format."""
-        return meshtastic_id_to_hex(self.id)
+        return meshtastic_id_to_hex(self.node_id)
 
     def __str__(self):
         """Return a string representation of the node, including user's short name if available."""
 
         if self.short_name:
-            return f"{self.short_name} [{self.id_str}]"
-        return self.id_str
+            return f"{self.short_name} [{self.node_id_str}]"
+        return self.node_id_str
 
 
 class BaseNodeItem(models.Model):
     """Base model for node items."""
 
-    node = models.ForeignKey(MeshtasticNode, on_delete=models.CASCADE, related_name="base_node_item_list")
+    node = models.ForeignKey(
+        MeshtasticNode, on_delete=models.CASCADE, related_name="base_node_item_list"
+    )
     logged_time = models.DateTimeField()
     reported_time = models.DateTimeField()
 
