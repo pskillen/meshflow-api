@@ -29,7 +29,7 @@ class MessagePacket(RawPacket):
     message_text = models.TextField(null=False)
 
     # Used for replies
-    reply_packet_id = models.BigIntegerField(null=False, db_index=True)
+    reply_packet_id = models.BigIntegerField(null=True, db_index=True)
     emoji = models.BooleanField(null=True)
 
 
