@@ -13,15 +13,30 @@ class LocationSource(models.TextChoices):
     EXTERNAL = "3", _("External")
 
 
+class Constellation(models.Model):
+    """Model representing a constellation of mesh nodes."""
+
+    name = models.CharField(max_length=50)
+
+
 class MeshtasticNode(models.Model):
     """Model representing a mesh network node."""
 
     id = models.BigIntegerField(primary_key=True, null=False)
+    macaddr = models.CharField(max_length=20, null=True, blank=True)
+    constellation = models.ForeignKey(Constellation, on_delete=models.CASCADE, related_name="nodes")
+
     long_name = models.CharField(max_length=50)
     short_name = models.CharField(max_length=5)
-    macaddr = models.CharField(max_length=20, null=True, blank=True)
+
     hw_model = models.CharField(max_length=50, null=True, blank=True)
+    sw_version = models.CharField(max_length=12, null=True, blank=True)
     public_key = models.CharField(max_length=64, null=True, blank=True)
+
+    class Meta:
+        """Model metadata."""
+
+        verbose_name = "Node"
 
     @property
     def id_str(self) -> str:

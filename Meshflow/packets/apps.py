@@ -1,6 +1,6 @@
 from django.apps import AppConfig
 
 
-class NodesConfig(AppConfig):
+class PacketsConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
-    name = 'Nodes'
+    name = 'packets'

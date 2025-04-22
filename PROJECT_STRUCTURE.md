@@ -5,15 +5,17 @@
 
 ### Users
 
-* Provides User (??), Region
+* Models: User (??), Region, Constellation, XX memberships
 
 ### Nodes
 
-* Models: MeshtasticNode, DeviceMetrics, 
+* Models: MeshtasticNode, DeviceMetrics, NodePosition
 
 ### Messages
 
 Stores structured messages
+
+* Modes: TextMessage
 
 ### Packets
 
