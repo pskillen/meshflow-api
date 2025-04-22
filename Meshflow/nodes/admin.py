@@ -11,11 +11,13 @@ class MeshtasticNodeAdmin(admin.ModelAdmin):
         "long_name",
         "node_id_str",
         "constellation",
+        "owner",
         "hw_model",
         "sw_version",
     )
     list_filter = (
         "constellation",
+        "owner",
         "hw_model",
     )
     search_fields = (
@@ -25,6 +27,8 @@ class MeshtasticNodeAdmin(admin.ModelAdmin):
         "mac_addr",
         "hw_model",
         "sw_version",
+        "owner__username",
+        "owner__email",
     )
     readonly_fields = (
         "internal_id",
@@ -37,6 +41,7 @@ class MeshtasticNodeAdmin(admin.ModelAdmin):
         (None, {
             "fields": (
                 "constellation",
+                "owner",
                 "short_name",
                 "long_name",
             )

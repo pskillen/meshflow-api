@@ -53,6 +53,10 @@ class NodeAPIKey(models.Model):
     constellation = models.ForeignKey(
         Constellation, on_delete=models.CASCADE, related_name="api_keys"
     )
+    owner = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="owned_api_keys",
+        help_text=_("The user who owns this API key")
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     created_by = models.ForeignKey(
         User, on_delete=models.SET_NULL, null=True, related_name="created_api_keys"
@@ -61,8 +65,8 @@ class NodeAPIKey(models.Model):
     is_active = models.BooleanField(default=True)
 
     class Meta:
-        verbose_name = "Node API Key"
-        verbose_name_plural = "Node API Keys"
+        verbose_name = _("Node API Key")
+        verbose_name_plural = _("Node API Keys")
 
     def __str__(self):
         return f"{self.name} ({self.constellation.name})"

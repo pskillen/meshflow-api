@@ -5,7 +5,7 @@ from django.utils.translation import gettext_lazy as _
 
 from common.mesh_node_helpers import meshtastic_id_to_hex
 from constellations.models import Constellation
-
+from users.models import User
 
 class LocationSource(models.TextChoices):
     """Location source types for position reports."""
@@ -27,6 +27,10 @@ class MeshtasticNode(models.Model):
     constellation = models.ForeignKey(
         Constellation, on_delete=models.CASCADE, related_name="nodes"
     )
+    owner = models.ForeignKey(
+        "users.User", on_delete=models.CASCADE, related_name="owned_nodes",
+        help_text=_("The user who owns this node")
+    )
 
     long_name = models.CharField(max_length=50)
     short_name = models.CharField(max_length=5)
@@ -34,7 +38,7 @@ class MeshtasticNode(models.Model):
     hw_model = models.CharField(max_length=50, null=True, blank=True)
     sw_version = models.CharField(max_length=12, null=True, blank=True)
     public_key = models.CharField(max_length=64, null=True, blank=True)
-
+    
     class Meta:
         """Model metadata."""
 
@@ -44,6 +48,8 @@ class MeshtasticNode(models.Model):
     @property
     def node_id_str(self) -> str:
         """Return the node ID in hex format."""
+        if not self.node_id:
+            return None
         return meshtastic_id_to_hex(self.node_id)
 
     def __str__(self):

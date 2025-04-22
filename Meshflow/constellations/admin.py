@@ -239,29 +239,45 @@ class NodeAPIKeyAdmin(admin.ModelAdmin):
     list_display = (
         "name",
         "constellation",
+        "owner",
         "key",
         "created_at",
         "last_used",
         "is_active",
     )
-    list_filter = ("constellation", "is_active")
-    search_fields = ("name", "key", "constellation__name")
-    readonly_fields = ("created_at", "last_used")
-
+    list_filter = (
+        "constellation",
+        "owner",
+        "is_active",
+    )
+    search_fields = (
+        "name",
+        "key",
+        "constellation__name",
+        "owner__username",
+        "owner__email",
+    )
+    readonly_fields = (
+        "key",
+        "created_at",
+        "last_used",
+    )
+    
     def get_fields(self, request, obj=None):
         """Only show nodes field for existing objects."""
         fields = [
             "name",
             "constellation",
+            "owner",
             "key",
             "is_active",
             "created_at",
             "last_used",
         ]
         if obj and obj.pk and obj.constellation_id:
-            fields.insert(2, "nodes")  # Insert nodes after constellation
+            fields.insert(3, "nodes")  # Insert nodes after owner
         return fields
-
+    
     def get_readonly_fields(self, request, obj=None):
         if obj:  # Editing an existing object
             return self.readonly_fields + ("constellation",)
