@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     "corsheaders",
     "Meshflow",
     "users",
+    "constellations",
     "nodes",
     "packets",
 ]
@@ -136,7 +137,7 @@ USE_TZ = True
 STATIC_URL = "static/"
 
 STATICFILES_DIRS = [
-    BASE_DIR / "MeshtasticBotManager" / "static",
+    BASE_DIR / "Meshflow" / "static",
 ]
 
 STATIC_ROOT = BASE_DIR / "staticfiles"

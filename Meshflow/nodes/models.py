@@ -4,6 +4,7 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 from common.mesh_node_helpers import meshtastic_id_to_hex
+from constellations.models import Constellation
 
 
 class LocationSource(models.TextChoices):
@@ -13,12 +14,6 @@ class LocationSource(models.TextChoices):
     MANUAL = "1", _("Manual")
     INTERNAL = "2", _("Internal")
     EXTERNAL = "3", _("External")
-
-
-class Constellation(models.Model):
-    """Model representing a constellation of mesh nodes."""
-
-    name = models.CharField(max_length=50)
 
 
 class MeshtasticNode(models.Model):

@@ -3,6 +3,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .serializers import PacketIngestSerializer
+from ..constellations.authentication import NodeAPIKeyAuthentication
 
 
 class PacketIngestView(APIView):
@@ -11,7 +12,12 @@ class PacketIngestView(APIView):
 
     This endpoint accepts JSON data representing a packet and processes it
     based on the packet type determined by the 'portnum' field.
+
+    Authentication is required using an API key that is linked to the node
+    specified in the 'from' field of the packet.
     """
+
+    authentication_classes = [NodeAPIKeyAuthentication]
 
     def post(self, request, format=None):
         """
