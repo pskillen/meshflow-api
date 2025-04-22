@@ -29,3 +29,11 @@ Stores structured messages
     * MessagePacket -> TextMessage (+/- TextMessageReply)
 
 
+### Security
+
+* Need individual API keys per node
+* Must validate incoming node ID matches API key 
+
+### Tests
+
+* [ ] Add example JSON for each packet type

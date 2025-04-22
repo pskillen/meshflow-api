@@ -38,7 +38,8 @@ class MeshtasticNode(models.Model):
     class Meta:
         """Model metadata."""
 
-        verbose_name = "Node"
+        verbose_name = _("Node")
+        verbose_name_plural = _("Nodes")
 
     @property
     def node_id_str(self) -> str:
@@ -81,6 +82,10 @@ class Position(BaseNodeItem):
         default=LocationSource.UNSET,
     )
 
+    class Meta:
+        verbose_name = _("Position")
+        verbose_name_plural = _("Positions")
+
     def __str__(self):
         """Return a string representation of the position report."""
         return f"{self.node.id} - {self.logged_time}"
@@ -92,8 +97,8 @@ class DeviceMetrics(models.Model):
     class Meta:
         """Model metadata."""
 
-        verbose_name = "Device metrics"
-        verbose_name_plural = "Device metrics"
+        verbose_name = _("Device metrics")
+        verbose_name_plural = _("Device metrics")
 
     battery_level = models.IntegerField()
     voltage = models.FloatField()

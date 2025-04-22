@@ -1,8 +1,11 @@
 """Models for storing and managing different types of mesh network packets."""
 
 import uuid
-from django.utils import timezone
+
 from django.db import models
+from django.utils import timezone
+from django.utils.translation import gettext_lazy as _
+
 from nodes.models import MeshtasticNode
 
 
@@ -25,6 +28,8 @@ class RawPacket(models.Model):
             models.Index(fields=['from_int']),
             models.Index(fields=['to_int']),
         ]
+        verbose_name = _("Raw packet")
+        verbose_name_plural = _("Raw packets")
 
 
 class MessagePacket(RawPacket):
@@ -35,6 +40,10 @@ class MessagePacket(RawPacket):
     # Used for replies
     reply_packet_id = models.BigIntegerField(null=True, db_index=True)
     emoji = models.BooleanField(null=True)
+
+    class Meta:
+        verbose_name = _("Message packet")
+        verbose_name_plural = _("Message packets")
 
 
 class PositionPacket(RawPacket):
@@ -47,6 +56,10 @@ class PositionPacket(RawPacket):
     location_source = models.CharField(max_length=15, null=True)
     precision_bits = models.SmallIntegerField(null=True)
 
+    class Meta:
+        verbose_name = _("Position packet")
+        verbose_name_plural = _("Position packets")
+
 
 class NodeInfoPacket(RawPacket):
     """Model for storing node information packets."""
@@ -58,6 +71,10 @@ class NodeInfoPacket(RawPacket):
     sw_version = models.CharField(max_length=12, null=True)
     public_key = models.CharField(max_length=64, null=True)
     mac_address = models.CharField(max_length=20, null=True)
+
+    class Meta:
+        verbose_name = _("Node info packet")
+        verbose_name_plural = _("Node info packets")
 
 
 class BaseTelemetryPacket(RawPacket):
@@ -78,6 +95,10 @@ class DeviceMetricsPacket(BaseTelemetryPacket):
     air_util_tx = models.FloatField(null=True)
     uptime_seconds = models.BigIntegerField(null=True)
 
+    class Meta:
+        verbose_name = _("Device metrics packet")
+        verbose_name_plural = _("Device metrics packets")
+
 
 class LocalStatsPacket(BaseTelemetryPacket):
     """Model for storing local network statistics."""
@@ -92,6 +113,10 @@ class LocalStatsPacket(BaseTelemetryPacket):
     num_total_nodes = models.IntegerField(null=True)
     num_rx_dupe = models.BigIntegerField(null=True)
 
+    class Meta:
+        verbose_name = _("Local stats packet")
+        verbose_name_plural = _("Local stats packets")
+
 
 class EnvironmentMetricsPacket(BaseTelemetryPacket):
     """Model for storing environmental sensor data."""
@@ -101,6 +126,10 @@ class EnvironmentMetricsPacket(BaseTelemetryPacket):
     barometric_pressure = models.FloatField(null=True)
     gas_resistance = models.FloatField(null=True)
     iaq = models.FloatField(null=True)
+
+    class Meta:
+        verbose_name = _("Environment metrics packet")
+        verbose_name_plural = _("Environment metrics packets")
 
 
 class PacketObservation(models.Model):
@@ -117,5 +146,8 @@ class PacketObservation(models.Model):
     rx_rssi = models.FloatField(null=True)
     rx_snr = models.FloatField(null=True)
     upload_time = models.DateTimeField(null=False, default=timezone.now)
-
     relay_node = models.BigIntegerField(null=True)
+
+    class Meta:
+        verbose_name = _("Packet observation")
+        verbose_name_plural = _("Packet observations")

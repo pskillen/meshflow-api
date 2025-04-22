@@ -1,6 +1,6 @@
 """Helper functions for working with Meshtastic node IDs and timestamps."""
 
-from datetime import datetime, timezone
+import base64
 
 BROADCAST_ID = 0xFFFFFFFF
 
@@ -20,3 +20,9 @@ def meshtastic_hex_to_int(node_id: str) -> int:
 
     return int(node_id[1:], 16)
 
+
+def parse_b64_mac_address(mac_b64: str) -> str:
+    """Parse a base64 encoded MAC address."""
+    mac_bytes = base64.b64decode(mac_b64)
+    mac_str = ":".join(f"{b:02x}" for b in mac_bytes)
+    return mac_str
