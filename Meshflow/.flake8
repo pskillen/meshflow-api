@@ -1,3 +1,15 @@
 [flake8]
 max-line-length = 120
-extend-ignore = E203
+extend-ignore = E203, W503
+inline-quotes = double
+multiline-quotes = double
+docstring-quotes = double
+exclude = 
+    venv-*,
+    .git,
+    __pycache__,
+    build,
+    dist,
+    migrations
+per-file-ignores =
+    __init__.py:F401

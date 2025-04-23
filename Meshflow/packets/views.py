@@ -20,8 +20,7 @@ class PacketIngestView(APIView):
     authentication_classes = [PacketIngestNodeAPIKeyAuthentication]
 
     def post(self, request, format=None):
-        """
-        Process a packet ingestion request.
+        """Process a packet ingestion request.
 
         Args:
             request: The HTTP request object containing the packet data.
@@ -34,7 +33,7 @@ class PacketIngestView(APIView):
 
         if serializer.is_valid():
             try:
-                packet = serializer.save()
+                serializer.save()
                 return Response(
                     {"status": "success", "message": "Packet ingested successfully"},
                     status=status.HTTP_201_CREATED,
