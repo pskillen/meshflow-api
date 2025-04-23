@@ -7,11 +7,20 @@ from .models import User
 
 class UserSerializer(serializers.ModelSerializer):
     """Serializer for users."""
+    password = serializers.CharField(write_only=True, required=True)
 
     class Meta:
         model = User
-        fields = ["id", "username", "email", "display_name"]
+        fields = ["id", "username", "email", "display_name", "password"]
         read_only_fields = ["id"]
+
+    def create(self, validated_data):
+        """Create and return a new user."""
+        password = validated_data.pop('password')
+        user = User.objects.create_user(**validated_data)
+        user.set_password(password)
+        user.save()
+        return user
 
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
