@@ -80,7 +80,7 @@ This project is under initial development. Once bootstrapped, the following will
 cd Meshflow
 
 # Install dependencies
-pip install -r requirements/dev.txt
+pip install -r requirements.txt
 
 # Run migrations
 python manage.py migrate
