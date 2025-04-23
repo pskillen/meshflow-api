@@ -140,6 +140,7 @@ STATIC_URL = "static/"
 STATICFILES_DIRS = [
     BASE_DIR / "Meshflow" / "static",
 ]
+os.makedirs(BASE_DIR / "staticfiles", exist_ok=True)
 
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
