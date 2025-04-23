@@ -1,14 +1,10 @@
-from rest_framework import viewsets, permissions, status
+from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from constellations.models import ConstellationUserMembership
-from nodes.models import NodeAPIKey, NodeAuth, ObservedNode, ManagedNode
-from nodes.serializers import (
-    APIKeyCreateSerializer,
-    APIKeyDetailSerializer,
-    APIKeySerializer,
-)
+from nodes.models import ManagedNode, NodeAPIKey, NodeAuth, ObservedNode
+from nodes.serializers import APIKeyCreateSerializer, APIKeyDetailSerializer, APIKeySerializer
 
 
 class APIKeyViewSet(viewsets.ModelViewSet):

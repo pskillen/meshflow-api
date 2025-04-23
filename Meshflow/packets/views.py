@@ -2,11 +2,8 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .authentication import (
-    PacketIngestNodeAPIKeyAuthentication,
-    NodeAPIKeyAuthentication,
-)
-from .serializers import PacketIngestSerializer, NodeSerializer
+from .authentication import NodeAPIKeyAuthentication, PacketIngestNodeAPIKeyAuthentication
+from .serializers import NodeSerializer, PacketIngestSerializer
 
 
 class PacketIngestView(APIView):

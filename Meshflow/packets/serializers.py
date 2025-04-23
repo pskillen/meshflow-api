@@ -1,16 +1,18 @@
 """Serializers for the packets app."""
 
 from django.utils import timezone
+
 from rest_framework import serializers
 
-from nodes.models import ObservedNode, DeviceMetrics, Position
+from nodes.models import DeviceMetrics, ObservedNode, Position
+
 from .models import (
-    MessagePacket,
-    PositionPacket,
-    NodeInfoPacket,
     DeviceMetricsPacket,
-    PacketObservation,
     LocationSource,
+    MessagePacket,
+    NodeInfoPacket,
+    PacketObservation,
+    PositionPacket,
     RoleSource,
 )
 

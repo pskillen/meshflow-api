@@ -3,7 +3,8 @@ import secrets
 from rest_framework import serializers
 
 from constellations.models import ConstellationUserMembership
-from .models import NodeAPIKey, NodeAuth, Position, LocationSource
+
+from .models import LocationSource, NodeAPIKey, NodeAuth, Position
 
 
 class APIKeySerializer(serializers.ModelSerializer):
