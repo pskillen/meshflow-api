@@ -73,7 +73,7 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_EVENT_PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          HEALTH_CHECK_URL="http://localhost:8000/health/"
+          HEALTH_CHECK_URL="http://localhost:8000/api/status/"
           MAX_RETRIES=5
           RETRY_COUNT=0
 
