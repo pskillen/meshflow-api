@@ -1,0 +1,48 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: meshflow
+      POSTGRES_USER: meshflow
+      POSTGRES_PASSWORD: meshflow
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U meshflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  migrations:
+    image: ghcr.io/${GITHUB_REPOSITORY}:pr-${GITHUB_EVENT_PULL_REQUEST_NUMBER}-migrations
+    environment:
+      - DJANGO_SETTINGS_MODULE=Meshflow.settings
+      - DJANGO_SECRET_KEY=test_secret_key
+      - DJANGO_DEBUG=True
+      - POSTGRES_DB=meshflow
+      - POSTGRES_USER=meshflow
+      - POSTGRES_PASSWORD=meshflow
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    image: ghcr.io/${GITHUB_REPOSITORY}:pr-${GITHUB_EVENT_PULL_REQUEST_NUMBER}
+    environment:
+      - DJANGO_SETTINGS_MODULE=Meshflow.settings
+      - DJANGO_SECRET_KEY=test_secret_key
+      - DJANGO_DEBUG=True
+      - POSTGRES_DB=meshflow
+      - POSTGRES_USER=meshflow
+      - POSTGRES_PASSWORD=meshflow
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+    ports:
+      - "8000:8000"
+    depends_on:
+      migrations:
+        condition: service_completed_successfully
+      db:
+        condition: service_healthy 
