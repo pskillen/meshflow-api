@@ -9,7 +9,7 @@
 
 ### Nodes
 
-* Models: MeshtasticNode, DeviceMetrics, NodePosition
+* Models: ManagedNode, ObservedNode, DeviceMetrics, NodePosition
 
 ### Messages
 

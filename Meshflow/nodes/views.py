@@ -65,8 +65,8 @@ class APIKeyViewSet(viewsets.ModelViewSet):
             return Response({"error": "node_id is required"}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            node = MeshtasticNode.objects.get(node_id=node_id)
-        except MeshtasticNode.DoesNotExist:
+            node = ManagedNode.objects.get(node_id=node_id)
+        except ManagedNode.DoesNotExist:
             return Response(
                 {"error": f"Node with ID {node_id} does not exist"},
                 status=status.HTTP_404_NOT_FOUND,
@@ -103,8 +103,8 @@ class APIKeyViewSet(viewsets.ModelViewSet):
             return Response({"error": "node_id is required"}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            node = MeshtasticNode.objects.get(node_id=node_id)
-        except MeshtasticNode.DoesNotExist:
+            node = ManagedNode.objects.get(node_id=node_id)
+        except ManagedNode.DoesNotExist:
             return Response(
                 {"error": f"Node with ID {node_id} does not exist"},
                 status=status.HTTP_404_NOT_FOUND,

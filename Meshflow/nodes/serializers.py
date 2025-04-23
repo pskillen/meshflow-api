@@ -4,7 +4,7 @@ from rest_framework import serializers
 
 from constellations.models import ConstellationUserMembership
 
-from .models import LocationSource, NodeAPIKey, NodeAuth, Position
+from .models import LocationSource, ManagedNode, NodeAPIKey, NodeAuth, Position
 
 
 class APIKeySerializer(serializers.ModelSerializer):
@@ -101,13 +101,11 @@ class APIKeyCreateSerializer(serializers.ModelSerializer):
         api_key = NodeAPIKey.objects.create(**validated_data)
 
         # Link the API key to nodes
-        from nodes.models import MeshtasticNode
-
         for node_id in nodes:
             try:
-                node = MeshtasticNode.objects.get(node_id=node_id)
+                node = ManagedNode.objects.get(node_id=node_id)
                 NodeAuth.objects.create(api_key=api_key, node=node)
-            except MeshtasticNode.DoesNotExist:
+            except ManagedNode.DoesNotExist:
                 # Skip nodes that don't exist
                 pass
 
