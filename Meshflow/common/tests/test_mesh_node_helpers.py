@@ -39,5 +39,10 @@ def test_parse_b64_mac_address():
     
     # Test empty MAC address
     mac_b64 = ""  # Base64 for empty bytes
-    with pytest.raises(Exception):
+    with pytest.raises(ValueError, match="Empty MAC address"):
+        parse_b64_mac_address(mac_b64)
+        
+    # Test invalid base64
+    mac_b64 = "invalid_base64"
+    with pytest.raises(ValueError, match="Invalid MAC address"):
         parse_b64_mac_address(mac_b64) 
