@@ -29,6 +29,7 @@ services:
     container_name: meshflow-migrations
     restart: no
     environment:
+      DEBUG: true
       POSTGRES_DB: meshflow
       POSTGRES_USER: meshflow
       POSTGRES_PASSWORD: meshflow
@@ -40,7 +41,7 @@ services:
     networks:
       - meshflow_net
 
-  meshflow-manager:
+  api:
     build:
       context: .
       dockerfile: Dockerfile
@@ -66,4 +67,4 @@ volumes:
   pg_data:
 
 networks:
-  meshflow_net: 
+  meshflow_net:
