@@ -1,9 +1,7 @@
-from rest_framework import viewsets, permissions
+from rest_framework import permissions, viewsets
 
-from .models import ConstellationUserMembership, Constellation
-from .serializers import (
-    ConstellationSerializer,
-)
+from .models import Constellation, ConstellationUserMembership
+from .serializers import ConstellationSerializer
 
 
 class IsConstellationAdminOrEditor(permissions.BasePermission):
@@ -17,27 +15,25 @@ class IsConstellationAdminOrEditor(permissions.BasePermission):
             return True
 
         # For other methods, check if the user is an admin or editor of the constellation
-        constellation_id = request.data.get('constellation')
+        constellation_id = request.data.get("constellation")
         if not constellation_id:
             return False
 
         return ConstellationUserMembership.objects.filter(
             user=request.user,
             constellation_id=constellation_id,
-            role__in=['admin', 'editor']
+            role__in=["admin", "editor"],
         ).exists()
 
     def has_object_permission(self, request, view, obj):
         # Check if the user is an admin or editor of the constellation
-        if hasattr(obj, 'constellation'):
+        if hasattr(obj, "constellation"):
             constellation = obj.constellation
         else:
             constellation = obj
 
         return ConstellationUserMembership.objects.filter(
-            user=request.user,
-            constellation=constellation,
-            role__in=['admin', 'editor']
+            user=request.user, constellation=constellation, role__in=["admin", "editor"]
         ).exists()
 
 
@@ -59,9 +55,9 @@ class ConstellationViewSet(viewsets.ModelViewSet):
         user = self.request.user
 
         # Get the constellations the user is a member of
-        constellation_ids = ConstellationUserMembership.objects.filter(
-            user=user
-        ).values_list('constellation_id', flat=True)
+        constellation_ids = ConstellationUserMembership.objects.filter(user=user).values_list(
+            "constellation_id", flat=True
+        )
 
         # Return those constellations
         return Constellation.objects.filter(id__in=constellation_ids)
@@ -73,8 +69,4 @@ class ConstellationViewSet(viewsets.ModelViewSet):
         constellation = serializer.save(created_by=self.request.user)
 
         # Add the user as an admin of the constellation
-        ConstellationUserMembership.objects.create(
-            user=self.request.user,
-            constellation=constellation,
-            role='admin'
-        )
+        ConstellationUserMembership.objects.create(user=self.request.user, constellation=constellation, role="admin")

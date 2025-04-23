@@ -1,0 +1,57 @@
+---
+
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: meshflow
+      POSTGRES_PASSWORD: meshflow
+      POSTGRES_DB: meshflow
+    ports:
+      - "5432:5432"
+    networks:
+      - meshflow_net
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U meshflow" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  migrations:
+    image: ghcr.io/${GITHUB_REPOSITORY}:pr-${GITHUB_EVENT_PULL_REQUEST_NUMBER}-migrations
+    container_name: meshflow-migrations
+    environment:
+      DEBUG: true
+      POSTGRES_DB: meshflow
+      POSTGRES_USER: meshflow
+      POSTGRES_PASSWORD: meshflow
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - meshflow_net
+
+  api:
+    image: ghcr.io/${GITHUB_REPOSITORY}:pr-${GITHUB_EVENT_PULL_REQUEST_NUMBER}
+    environment:
+      DEBUG: true
+      POSTGRES_DB: meshflow
+      POSTGRES_USER: meshflow
+      POSTGRES_PASSWORD: meshflow
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+    ports:
+      - "8000:8000"
+    depends_on:
+      migrations:
+        condition: service_completed_successfully
+      db:
+        condition: service_healthy
+    networks:
+      - meshflow_net
+
+
+networks:
+  meshflow_net:

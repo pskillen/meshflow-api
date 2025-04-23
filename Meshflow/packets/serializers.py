@@ -1,16 +1,18 @@
 """Serializers for the packets app."""
 
 from django.utils import timezone
+
 from rest_framework import serializers
 
-from nodes.models import ObservedNode, DeviceMetrics, Position
+from nodes.models import DeviceMetrics, ObservedNode, Position
+
 from .models import (
-    MessagePacket,
-    PositionPacket,
-    NodeInfoPacket,
     DeviceMetricsPacket,
-    PacketObservation,
     LocationSource,
+    MessagePacket,
+    NodeInfoPacket,
+    PacketObservation,
+    PositionPacket,
     RoleSource,
 )
 
@@ -28,18 +30,12 @@ class BasePacketSerializer(serializers.Serializer):
 
     # Fields for PacketObservation
     channel = serializers.IntegerField(required=False, allow_null=True)
-    hop_limit = serializers.IntegerField(
-        source="hopLimit", required=False, allow_null=True
-    )
-    hop_start = serializers.IntegerField(
-        source="hopStart", required=False, allow_null=True
-    )
+    hop_limit = serializers.IntegerField(source="hopLimit", required=False, allow_null=True)
+    hop_start = serializers.IntegerField(source="hopStart", required=False, allow_null=True)
     rx_time = serializers.IntegerField(source="rxTime")
     rx_rssi = serializers.FloatField(source="rxRssi", required=False, allow_null=True)
     rx_snr = serializers.FloatField(source="rxSnr", required=False, allow_null=True)
-    relay_node = serializers.IntegerField(
-        source="relayNode", required=False, allow_null=True
-    )
+    relay_node = serializers.IntegerField(source="relayNode", required=False, allow_null=True)
 
     def to_internal_value(self, data):
         """Convert camelCase to snake_case for nested fields."""
@@ -48,9 +44,7 @@ class BasePacketSerializer(serializers.Serializer):
 
         # Convert rxTime to a datetime object
         if "rx_time" in validated_data:
-            validated_data["rx_time"] = timezone.datetime.fromtimestamp(
-                validated_data["rx_time"], tz=timezone.utc
-            )
+            validated_data["rx_time"] = timezone.datetime.fromtimestamp(validated_data["rx_time"], tz=timezone.utc)
 
         return validated_data
 
@@ -59,12 +53,8 @@ class MessagePacketSerializer(BasePacketSerializer):
     """Serializer for text message packets."""
 
     message_text = serializers.CharField(source="decoded.text")
-    reply_packet_id = serializers.IntegerField(
-        source="decoded.reply_id", required=False
-    )
-    emoji = serializers.IntegerField(
-        source="decoded.emoji", required=False, allow_null=True
-    )
+    reply_packet_id = serializers.IntegerField(source="decoded.reply_id", required=False)
+    emoji = serializers.IntegerField(source="decoded.emoji", required=False, allow_null=True)
 
     def to_internal_value(self, data):
         """Convert camelCase to snake_case for nested fields and handle emoji conversion."""
@@ -73,9 +63,7 @@ class MessagePacketSerializer(BasePacketSerializer):
 
         # Convert rxTime to a datetime object
         if "rx_time" in validated_data:
-            validated_data["rx_time"] = timezone.datetime.fromtimestamp(
-                validated_data["rx_time"], tz=timezone.utc
-            )
+            validated_data["rx_time"] = timezone.datetime.fromtimestamp(validated_data["rx_time"], tz=timezone.utc)
 
         # Convert emoji from int to boolean
         if "emoji" in validated_data:
@@ -126,27 +114,13 @@ class PositionPacketSerializer(BasePacketSerializer):
 
     latitude = serializers.FloatField(source="decoded.position.latitude")
     longitude = serializers.FloatField(source="decoded.position.longitude")
-    altitude = serializers.FloatField(
-        source="decoded.position.altitude", required=False, allow_null=True
-    )
-    heading = serializers.FloatField(
-        source="decoded.position.heading", required=False, allow_null=True
-    )
-    location_source = serializers.CharField(
-        source="decoded.position.locationSource", required=False, allow_null=True
-    )
-    precision_bits = serializers.IntegerField(
-        source="decoded.position.precisionBits", required=False, allow_null=True
-    )
-    position_time = serializers.IntegerField(
-        source="decoded.position.time", required=False, allow_null=True
-    )
-    ground_speed = serializers.FloatField(
-        source="decoded.position.groundSpeed", required=False, allow_null=True
-    )
-    ground_track = serializers.FloatField(
-        source="decoded.position.groundTrack", required=False, allow_null=True
-    )
+    altitude = serializers.FloatField(source="decoded.position.altitude", required=False, allow_null=True)
+    heading = serializers.FloatField(source="decoded.position.heading", required=False, allow_null=True)
+    location_source = serializers.CharField(source="decoded.position.locationSource", required=False, allow_null=True)
+    precision_bits = serializers.IntegerField(source="decoded.position.precisionBits", required=False, allow_null=True)
+    position_time = serializers.IntegerField(source="decoded.position.time", required=False, allow_null=True)
+    ground_speed = serializers.FloatField(source="decoded.position.groundSpeed", required=False, allow_null=True)
+    ground_track = serializers.FloatField(source="decoded.position.groundTrack", required=False, allow_null=True)
 
     def to_internal_value(self, data):
         """Convert camelCase to snake_case for nested fields and handle timestamp and location source conversion."""
@@ -228,27 +202,13 @@ class NodeInfoPacketSerializer(BasePacketSerializer):
     """Serializer for node info packets."""
 
     node_id = serializers.CharField(source="decoded.user.id")
-    short_name = serializers.CharField(
-        source="decoded.user.shortName", required=False, allow_null=True
-    )
-    long_name = serializers.CharField(
-        source="decoded.user.longName", required=False, allow_null=True
-    )
-    hw_model = serializers.CharField(
-        source="decoded.user.hwModel", required=False, allow_null=True
-    )
-    sw_version = serializers.CharField(
-        source="decoded.user.swVersion", required=False, allow_null=True
-    )
-    public_key = serializers.CharField(
-        source="decoded.user.publicKey", required=False, allow_null=True
-    )
-    mac_address = serializers.CharField(
-        source="decoded.user.macaddr", required=False, allow_null=True
-    )
-    role = serializers.CharField(
-        source="decoded.user.role", required=False, allow_null=True
-    )
+    short_name = serializers.CharField(source="decoded.user.shortName", required=False, allow_null=True)
+    long_name = serializers.CharField(source="decoded.user.longName", required=False, allow_null=True)
+    hw_model = serializers.CharField(source="decoded.user.hwModel", required=False, allow_null=True)
+    sw_version = serializers.CharField(source="decoded.user.swVersion", required=False, allow_null=True)
+    public_key = serializers.CharField(source="decoded.user.publicKey", required=False, allow_null=True)
+    mac_address = serializers.CharField(source="decoded.user.macaddr", required=False, allow_null=True)
+    role = serializers.CharField(source="decoded.user.role", required=False, allow_null=True)
 
     def to_internal_value(self, data):
         """Convert camelCase to snake_case for nested fields and handle role conversion."""
@@ -422,21 +382,14 @@ class PacketIngestSerializer(serializers.Serializer):
             serializer = NodeInfoPacketSerializer(data=data)
         elif port_num == "TELEMETRY_APP":
             # Check if it's a device metrics packet
-            if (
-                "telemetry" in data["decoded"]
-                and "deviceMetrics" in data["decoded"]["telemetry"]
-            ):
+            if "telemetry" in data["decoded"] and "deviceMetrics" in data["decoded"]["telemetry"]:
                 serializer = DeviceMetricsPacketSerializer(data=data)
             else:
                 # Handle other telemetry types if needed
-                raise serializers.ValidationError(
-                    {"decoded": "Unsupported telemetry type"}
-                )
+                raise serializers.ValidationError({"decoded": "Unsupported telemetry type"})
         else:
             # Handle other packet types or raise an error
-            raise serializers.ValidationError(
-                {"decoded": f"Unsupported packet type: {port_num}"}
-            )
+            raise serializers.ValidationError({"decoded": f"Unsupported packet type: {port_num}"})
 
         # Validate the data using the selected serializer
         if serializer.is_valid(raise_exception=True):
@@ -458,21 +411,14 @@ class PacketIngestSerializer(serializers.Serializer):
             serializer = NodeInfoPacketSerializer()
         elif port_num == "TELEMETRY_APP":
             # Check if it's a device metrics packet
-            if (
-                "telemetry" in validated_data["decoded"]
-                and "deviceMetrics" in validated_data["decoded"]["telemetry"]
-            ):
+            if "telemetry" in validated_data["decoded"] and "deviceMetrics" in validated_data["decoded"]["telemetry"]:
                 serializer = DeviceMetricsPacketSerializer()
             else:
                 # Handle other telemetry types if needed
-                raise serializers.ValidationError(
-                    {"decoded": "Unsupported telemetry type"}
-                )
+                raise serializers.ValidationError({"decoded": "Unsupported telemetry type"})
         else:
             # Handle other packet types or raise an error
-            raise serializers.ValidationError(
-                {"decoded": f"Unsupported packet type: {port_num}"}
-            )
+            raise serializers.ValidationError({"decoded": f"Unsupported packet type: {port_num}"})
 
         # Create the packet using the selected serializer
         return serializer.create(validated_data)
@@ -575,7 +521,7 @@ class NodeSerializer(serializers.ModelSerializer):
                 latitude=position_data.get("latitude"),
                 longitude=position_data.get("longitude"),
                 altitude=position_data.get("altitude"),
-                location_source=position_data.get("location_source")
+                location_source=position_data.get("location_source"),
             )
 
         # Handle device metrics data if present
@@ -589,7 +535,7 @@ class NodeSerializer(serializers.ModelSerializer):
                 voltage=device_metrics_data.get("voltage"),
                 channel_utilization=device_metrics_data.get("channel_utilization"),
                 air_util_tx=device_metrics_data.get("air_util_tx"),
-                uptime_seconds=device_metrics_data.get("uptime_seconds")
+                uptime_seconds=device_metrics_data.get("uptime_seconds"),
             )
 
         return node
@@ -611,9 +557,7 @@ class NodeSerializer(serializers.ModelSerializer):
             instance.device_metrics_logged_time = device_metrics_data.get("logged_time", timezone.now())
             instance.battery_level = device_metrics_data.get("battery_level")
             instance.voltage = device_metrics_data.get("voltage")
-            instance.channel_utilization = device_metrics_data.get(
-                "channel_utilization"
-            )
+            instance.channel_utilization = device_metrics_data.get("channel_utilization")
             instance.air_util_tx = device_metrics_data.get("air_util_tx")
             instance.uptime_seconds = device_metrics_data.get("uptime_seconds")
 

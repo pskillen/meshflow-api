@@ -2,5 +2,5 @@ from django.apps import AppConfig
 
 
 class ConstellationsConfig(AppConfig):
-    default_auto_field = 'django.db.models.BigAutoField'
-    name = 'constellations'
+    default_auto_field = "django.db.models.BigAutoField"
+    name = "constellations"

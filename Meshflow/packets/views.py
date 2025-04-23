@@ -2,11 +2,8 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .authentication import (
-    PacketIngestNodeAPIKeyAuthentication,
-    NodeAPIKeyAuthentication,
-)
-from .serializers import PacketIngestSerializer, NodeSerializer
+from .authentication import NodeAPIKeyAuthentication, PacketIngestNodeAPIKeyAuthentication
+from .serializers import NodeSerializer, PacketIngestSerializer
 
 
 class PacketIngestView(APIView):
@@ -23,8 +20,7 @@ class PacketIngestView(APIView):
     authentication_classes = [PacketIngestNodeAPIKeyAuthentication]
 
     def post(self, request, format=None):
-        """
-        Process a packet ingestion request.
+        """Process a packet ingestion request.
 
         Args:
             request: The HTTP request object containing the packet data.
@@ -37,7 +33,7 @@ class PacketIngestView(APIView):
 
         if serializer.is_valid():
             try:
-                packet = serializer.save()
+                serializer.save()
                 return Response(
                     {"status": "success", "message": "Packet ingested successfully"},
                     status=status.HTTP_201_CREATED,

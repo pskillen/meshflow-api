@@ -1,6 +1,6 @@
 from django.utils import timezone
-from rest_framework import authentication
-from rest_framework import exceptions
+
+from rest_framework import authentication, exceptions
 
 from .models import NodeAPIKey
 
@@ -15,7 +15,7 @@ class NodeAPIKeyAuthentication(authentication.BaseAuthentication):
 
     def authenticate(self, request):
         # Get the Authorization header
-        auth_header = request.META.get('HTTP_X_API_KEY', '')
+        auth_header = request.META.get("HTTP_X_API_KEY", "")
 
         if not auth_header:
             return None
@@ -29,13 +29,13 @@ class NodeAPIKeyAuthentication(authentication.BaseAuthentication):
 
             # Update the last_used timestamp
             api_key.last_used = timezone.now()
-            api_key.save(update_fields=['last_used'])
+            api_key.save(update_fields=["last_used"])
 
             # Return the constellation as the authenticated user
             # This allows us to use request.user to access the constellation in views
             return (api_key.constellation, api_key)
         except NodeAPIKey.DoesNotExist:
-            raise exceptions.AuthenticationFailed('Invalid API key')
+            raise exceptions.AuthenticationFailed("Invalid API key")
 
     def authenticate_header(self, request):
-        return 'X-API-KEY'
+        return "X-API-KEY"

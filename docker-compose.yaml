@@ -1,0 +1,70 @@
+---
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    # TODO: always change these in a real working environment
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./deploy/docker/initdb:/docker-entrypoint-initdb.d
+    ports:
+      - "5432:5432"
+    networks:
+      - meshflow_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  migrations:
+    build:
+      context: .
+      dockerfile: Dockerfile-migrations
+    container_name: meshflow-migrations
+    restart: no
+    environment:
+      DEBUG: true
+      POSTGRES_DB: meshflow
+      POSTGRES_USER: meshflow
+      POSTGRES_PASSWORD: meshflow
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - meshflow_net
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: meshflow-manager
+    restart: unless-stopped
+    environment:
+      DEBUG: true
+      POSTGRES_DB: meshflow
+      POSTGRES_USER: meshflow
+      POSTGRES_PASSWORD: meshflow
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      ALLOWED_HOSTS: meshflow-manager
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - meshflow_net
+
+volumes:
+  pg_data:
+
+networks:
+  meshflow_net:

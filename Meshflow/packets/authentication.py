@@ -28,21 +28,13 @@ class PacketIngestNodeAPIKeyAuthentication(NodeAPIKeyAuthentication):
                 from_int = request.data.get("from")
 
                 if from_int is None:
-                    raise exceptions.AuthenticationFailed(
-                        "Missing node ID in request data"
-                    )
+                    raise exceptions.AuthenticationFailed("Missing node ID in request data")
 
                 # Check if the API key is linked to this node
-                if not NodeAuth.objects.filter(
-                    api_key=api_key, node__node_id=from_int
-                ).exists():
-                    raise exceptions.AuthenticationFailed(
-                        "API key not authorized for this node"
-                    )
+                if not NodeAuth.objects.filter(api_key=api_key, node__node_id=from_int).exists():
+                    raise exceptions.AuthenticationFailed("API key not authorized for this node")
 
             except Exception as e:
-                raise exceptions.AuthenticationFailed(
-                    f"Error validating node: {str(e)}"
-                )
+                raise exceptions.AuthenticationFailed(f"Error validating node: {str(e)}")
 
         return auth_result
