@@ -3,6 +3,7 @@ import os
 import uuid
 
 from django.db import models
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from common.mesh_node_helpers import meshtastic_id_to_hex
@@ -155,13 +156,21 @@ class BaseNodeItem(models.Model):
     node = models.ForeignKey(
         ObservedNode, on_delete=models.CASCADE
     )
-    logged_time = models.DateTimeField()
-    reported_time = models.DateTimeField()
+    logged_time = models.DateTimeField(default=timezone.now)
+    reported_time = models.DateTimeField(default=timezone.now)
 
     class Meta:
         """Model metadata."""
 
         abstract = True
+
+    def save(self, *args, **kwargs):
+        """Ensure timezone-aware datetimes."""
+        if self.logged_time and timezone.is_naive(self.logged_time):
+            self.logged_time = timezone.make_aware(self.logged_time)
+        if self.reported_time and timezone.is_naive(self.reported_time):
+            self.reported_time = timezone.make_aware(self.reported_time)
+        super().save(*args, **kwargs)
 
 
 class Position(BaseNodeItem):
