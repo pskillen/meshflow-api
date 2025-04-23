@@ -6,7 +6,12 @@ User = get_user_model()
 
 @pytest.fixture
 def user_data():
-    return {"username": "testuser", "email": "test@example.com", "password": "testpass123", "display_name": "Test User"}
+    return {
+        "username": "testuser",
+        "email": "test@example.com",
+        "password": "testpass123",
+        "display_name": "Test User",
+    }
 
 
 @pytest.fixture

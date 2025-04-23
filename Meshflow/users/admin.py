@@ -32,39 +32,51 @@ class CustomUserAdmin(UserAdmin):
     )
     fieldsets = (
         (None, {"fields": ("username", "password")}),
-        (_("Personal info"), {
-            "fields": (
-                "display_name",
-                "first_name",
-                "last_name",
-                "email",
-            )
-        }),
-        (_("Permissions"), {
-            "fields": (
-                "is_active",
-                "is_staff",
-                "is_superuser",
-                "groups",
-                "user_permissions",
-            ),
-            "classes": ("collapse",),
-        }),
-        (_("Important dates"), {
-            "fields": ("last_login", "date_joined"),
-            "classes": ("collapse",),
-        }),
+        (
+            _("Personal info"),
+            {
+                "fields": (
+                    "display_name",
+                    "first_name",
+                    "last_name",
+                    "email",
+                )
+            },
+        ),
+        (
+            _("Permissions"),
+            {
+                "fields": (
+                    "is_active",
+                    "is_staff",
+                    "is_superuser",
+                    "groups",
+                    "user_permissions",
+                ),
+                "classes": ("collapse",),
+            },
+        ),
+        (
+            _("Important dates"),
+            {
+                "fields": ("last_login", "date_joined"),
+                "classes": ("collapse",),
+            },
+        ),
     )
     add_fieldsets = (
-        (None, {
-            "classes": ("wide",),
-            "fields": (
-                "username",
-                "password1",
-                "password2",
-                "display_name",
-                "email",
-            ),
-        }),
+        (
+            None,
+            {
+                "classes": ("wide",),
+                "fields": (
+                    "username",
+                    "password1",
+                    "password2",
+                    "display_name",
+                    "email",
+                ),
+            },
+        ),
     )
     ordering = ("username",)

@@ -164,7 +164,9 @@ class PositionPacketSerializer(BasePacketSerializer):
             try:
                 # First try to convert directly to int if it's a numeric string
                 try:
-                    validated_data["location_source"] = int(validated_data["location_source"])
+                    validated_data["location_source"] = int(
+                        validated_data["location_source"]
+                    )
                 except (ValueError, TypeError):
                     # If not a number, look up the string value
                     for source_choice in LocationSource:
@@ -497,7 +499,9 @@ class PositionSerializer(serializers.Serializer):
             try:
                 # First try to convert directly to int if it's a numeric string
                 try:
-                    validated_data["location_source"] = int(validated_data["location_source"])
+                    validated_data["location_source"] = int(
+                        validated_data["location_source"]
+                    )
                 except (ValueError, TypeError):
                     # If not a number, look up the string value
                     for source_choice in LocationSource:
@@ -525,7 +529,9 @@ class DeviceMetricsSerializer(serializers.Serializer):
 
 class NodeSerializer(serializers.ModelSerializer):
     position = PositionSerializer(required=False, allow_null=True, write_only=True)
-    device_metrics = DeviceMetricsSerializer(required=False, allow_null=True, write_only=True)
+    device_metrics = DeviceMetricsSerializer(
+        required=False, allow_null=True, write_only=True
+    )
     id = serializers.IntegerField(source="node_id")
     macaddr = serializers.CharField(source="mac_addr")
     long_name = serializers.CharField(required=False)
@@ -575,7 +581,7 @@ class NodeSerializer(serializers.ModelSerializer):
                 latitude=position_data.get("latitude"),
                 longitude=position_data.get("longitude"),
                 altitude=position_data.get("altitude"),
-                location_source=position_data.get("location_source")
+                location_source=position_data.get("location_source"),
             )
 
         # Handle device metrics data if present
@@ -589,7 +595,7 @@ class NodeSerializer(serializers.ModelSerializer):
                 voltage=device_metrics_data.get("voltage"),
                 channel_utilization=device_metrics_data.get("channel_utilization"),
                 air_util_tx=device_metrics_data.get("air_util_tx"),
-                uptime_seconds=device_metrics_data.get("uptime_seconds")
+                uptime_seconds=device_metrics_data.get("uptime_seconds"),
             )
 
         return node
@@ -598,7 +604,9 @@ class NodeSerializer(serializers.ModelSerializer):
         # Handle position data
         position_data = validated_data.pop("position", None)
         if position_data:
-            instance.position_logged_time = position_data.get("logged_time", timezone.now())
+            instance.position_logged_time = position_data.get(
+                "logged_time", timezone.now()
+            )
             instance.position_reported_time = position_data.get("reported_time")
             instance.latitude = position_data.get("latitude")
             instance.longitude = position_data.get("longitude")
@@ -608,7 +616,9 @@ class NodeSerializer(serializers.ModelSerializer):
         # Handle device metrics data
         device_metrics_data = validated_data.pop("device_metrics", None)
         if device_metrics_data:
-            instance.device_metrics_logged_time = device_metrics_data.get("logged_time", timezone.now())
+            instance.device_metrics_logged_time = device_metrics_data.get(
+                "logged_time", timezone.now()
+            )
             instance.battery_level = device_metrics_data.get("battery_level")
             instance.voltage = device_metrics_data.get("voltage")
             instance.channel_utilization = device_metrics_data.get(

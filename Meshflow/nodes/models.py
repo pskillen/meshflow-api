@@ -153,9 +153,7 @@ class NodeAuth(models.Model):
 class BaseNodeItem(models.Model):
     """Base model for node items."""
 
-    node = models.ForeignKey(
-        ObservedNode, on_delete=models.CASCADE
-    )
+    node = models.ForeignKey(ObservedNode, on_delete=models.CASCADE)
     logged_time = models.DateTimeField(default=timezone.now)
     reported_time = models.DateTimeField(default=timezone.now)
 

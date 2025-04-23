@@ -8,13 +8,13 @@ class ConstellationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Constellation
-        fields = ['id', 'name', 'description', 'created_by']
-        read_only_fields = ['created_by']
+        fields = ["id", "name", "description", "created_by"]
+        read_only_fields = ["created_by"]
 
     def create(self, validated_data):
         """Create a new constellation."""
         # Add the current user as the creator
-        validated_data['created_by'] = self.context['request'].user
+        validated_data["created_by"] = self.context["request"].user
 
         # Create the constellation
         return super().create(validated_data)

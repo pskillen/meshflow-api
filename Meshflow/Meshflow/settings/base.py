@@ -24,7 +24,9 @@ VERSION = os.environ.get("APP_VERSION", "development")
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-_non_prod_secret_key = "django-insecure-fp!lzv7u#%2wn=0wno1&q-2bzz6=(9-sl6x@7w*-7g3mt#*i3z"
+_non_prod_secret_key = (
+    "django-insecure-fp!lzv7u#%2wn=0wno1&q-2bzz6=(9-sl6x@7w*-7g3mt#*i3z"
+)
 SECRET_KEY = os.environ.get("SECRET_KEY", _non_prod_secret_key)
 
 # SECURITY WARNING: don't run with debug turned on in production!

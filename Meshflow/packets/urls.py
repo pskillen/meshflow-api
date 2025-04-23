@@ -5,6 +5,6 @@ from django.urls import path
 from .views import PacketIngestView, NodeUpsertView
 
 urlpatterns = [
-    path('ingest/', PacketIngestView.as_view(), name='packet-ingest'),
-    path('nodes/', NodeUpsertView.as_view(), name='node-upsert'),
+    path("ingest/", PacketIngestView.as_view(), name="packet-ingest"),
+    path("nodes/", NodeUpsertView.as_view(), name="node-upsert"),
 ]

@@ -10,8 +10,9 @@ class UserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'display_name']
-        read_only_fields = ['id']
+        fields = ["id", "username", "email", "display_name"]
+        read_only_fields = ["id"]
+
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     @classmethod
@@ -19,12 +20,13 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         token = super().get_token(user)
 
         # Add custom claims
-        token['username'] = user.username
-        token['email'] = user.email
-        token['is_staff'] = user.is_staff
-        token['is_superuser'] = user.is_superuser
+        token["username"] = user.username
+        token["email"] = user.email
+        token["is_staff"] = user.is_staff
+        token["is_superuser"] = user.is_superuser
 
         return token
+
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
