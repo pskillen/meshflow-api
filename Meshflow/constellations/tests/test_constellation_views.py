@@ -2,7 +2,7 @@ import pytest
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIClient
-from constellations.models import Constellation
+from constellations.models import Constellation, ConstellationUserMembership
 
 
 @pytest.mark.django_db
@@ -13,16 +13,18 @@ def test_constellation_list_view(create_constellation, create_user):
     client.force_authenticate(user=user)
     
     # Create some test constellations
-    constellation1 = create_constellation(owner=user)
-    constellation2 = create_constellation(owner=user)
+    constellation1 = create_constellation(created_by=user)
+    constellation2 = create_constellation(created_by=user)
     
     url = reverse('constellation-list')
     response = client.get(url)
     
     assert response.status_code == status.HTTP_200_OK
-    assert len(response.data) == 2
-    assert response.data[0]['name'] == constellation1.name
-    assert response.data[1]['name'] == constellation2.name
+    assert response.data['count'] == 2
+    results = response.data['results']
+    assert len(results) == 2
+    assert results[0]['name'] == constellation1.name
+    assert results[1]['name'] == constellation2.name
 
 
 @pytest.mark.django_db
@@ -32,7 +34,7 @@ def test_constellation_detail_view(create_constellation, create_user):
     user = create_user()
     client.force_authenticate(user=user)
     
-    constellation = create_constellation(owner=user)
+    constellation = create_constellation(created_by=user)
     url = reverse('constellation-detail', kwargs={'pk': constellation.pk})
     response = client.get(url)
     
@@ -60,7 +62,7 @@ def test_constellation_create_view(create_user):
     assert Constellation.objects.count() == 1
     constellation = Constellation.objects.first()
     assert constellation.name == "New Constellation"
-    assert constellation.owner == user
+    assert constellation.created_by == user
 
 
 @pytest.mark.django_db
@@ -70,7 +72,7 @@ def test_constellation_update_view(create_constellation, create_user):
     user = create_user()
     client.force_authenticate(user=user)
     
-    constellation = create_constellation(owner=user)
+    constellation = create_constellation(created_by=user)
     data = {
         "name": "Updated Constellation",
         "description": "Updated Description"
@@ -92,7 +94,7 @@ def test_constellation_delete_view(create_constellation, create_user):
     user = create_user()
     client.force_authenticate(user=user)
     
-    constellation = create_constellation(owner=user)
+    constellation = create_constellation(created_by=user)
     url = reverse('constellation-detail', kwargs={'pk': constellation.pk})
     response = client.delete(url)
     
@@ -107,28 +109,45 @@ def test_constellation_members_view(create_constellation, create_user):
     user = create_user()
     client.force_authenticate(user=user)
     
-    constellation = create_constellation(owner=user)
-    user1 = create_user(username="user1")
-    user2 = create_user(username="user2")
+    constellation = create_constellation(created_by=user)
+    user1 = create_user()
+    user2 = create_user()
     
     # Add members
     url = reverse('constellation-members', kwargs={'pk': constellation.pk})
-    data = {"members": [user1.id, user2.id]}
-    response = client.post(url, data)
+    data = {
+        "members": [
+            {"user": user1.id, "role": "viewer"},
+            {"user": user2.id, "role": "editor"}
+        ]
+    }
+    response = client.post(url, data, format='json')
     
     assert response.status_code == status.HTTP_200_OK
-    assert constellation.members.count() == 2
-    assert user1 in constellation.members.all()
-    assert user2 in constellation.members.all()
+    memberships = ConstellationUserMembership.objects.filter(constellation=constellation)
+    assert memberships.count() == 3  # Including the admin user
     
-    # Remove member
-    data = {"members": [user2.id]}
-    response = client.post(url, data)
+    user1_membership = memberships.get(user=user1)
+    assert user1_membership.role == "viewer"
+    
+    user2_membership = memberships.get(user=user2)
+    assert user2_membership.role == "editor"
+    
+    # Update memberships
+    data = {
+        "members": [
+            {"user": user2.id, "role": "viewer"}
+        ]
+    }
+    response = client.post(url, data, format='json')
     
     assert response.status_code == status.HTTP_200_OK
-    assert constellation.members.count() == 1
-    assert user1 not in constellation.members.all()
-    assert user2 in constellation.members.all()
+    memberships = ConstellationUserMembership.objects.filter(constellation=constellation)
+    assert memberships.count() == 2  # Only admin and user2 remain
+    assert not ConstellationUserMembership.objects.filter(user=user1, constellation=constellation).exists()
+    
+    user2_membership = memberships.get(user=user2)
+    assert user2_membership.role == "viewer"
 
 
 @pytest.mark.django_db
