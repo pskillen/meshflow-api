@@ -49,9 +49,7 @@ class APIKeyViewSet(viewsets.ModelViewSet):
             constellation=constellation,
             role__in=["admin", "editor"],
         ).exists():
-            raise permissions.PermissionDenied(
-                "You don't have permission to create API keys for this constellation."
-            )
+            raise permissions.PermissionDenied("You don't have permission to create API keys for this constellation.")
 
         serializer.save(owner=self.request.user, created_by=self.request.user)
 
@@ -64,9 +62,7 @@ class APIKeyViewSet(viewsets.ModelViewSet):
         node_id = request.data.get("node_id")
 
         if not node_id:
-            return Response(
-                {"error": "node_id is required"}, status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"error": "node_id is required"}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             node = MeshtasticNode.objects.get(node_id=node_id)
@@ -79,9 +75,7 @@ class APIKeyViewSet(viewsets.ModelViewSet):
         # Check if the node belongs to the same constellation as the API key
         if node.constellation != api_key.constellation:
             return Response(
-                {
-                    "error": f"Node does not belong to the same constellation as the API key"
-                },
+                {"error": f"Node does not belong to the same constellation as the API key"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -95,9 +89,7 @@ class APIKeyViewSet(viewsets.ModelViewSet):
         # Link the node to the API key
         NodeAuth.objects.create(api_key=api_key, node=node)
 
-        return Response(
-            {"success": f"Node added to API key"}, status=status.HTTP_201_CREATED
-        )
+        return Response({"success": f"Node added to API key"}, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=["post"])
     def remove_node(self, request, pk=None):
@@ -108,9 +100,7 @@ class APIKeyViewSet(viewsets.ModelViewSet):
         node_id = request.data.get("node_id")
 
         if not node_id:
-            return Response(
-                {"error": "node_id is required"}, status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"error": "node_id is required"}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             node = MeshtasticNode.objects.get(node_id=node_id)
@@ -131,9 +121,7 @@ class APIKeyViewSet(viewsets.ModelViewSet):
         # Remove the link
         link.delete()
 
-        return Response(
-            {"success": f"Node removed from API key"}, status=status.HTTP_200_OK
-        )
+        return Response({"success": f"Node removed from API key"}, status=status.HTTP_200_OK)
 
 
 class ObservedNodeViewSet(viewsets.ModelViewSet):
@@ -166,9 +154,7 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
             constellation=constellation,
             role__in=["admin", "editor"],
         ).exists():
-            raise permissions.PermissionDenied(
-                "You don't have permission to add nodes to this constellation."
-            )
+            raise permissions.PermissionDenied("You don't have permission to add nodes to this constellation.")
 
         serializer.save()
 
@@ -181,9 +167,7 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
         api_key_id = request.data.get("api_key_id")
 
         if not api_key_id:
-            return Response(
-                {"error": "api_key_id is required"}, status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"error": "api_key_id is required"}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             api_key = NodeAPIKey.objects.get(id=api_key_id)
@@ -203,9 +187,7 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
         # Link the API key to the node
         NodeAuth.objects.create(api_key=api_key, node=node)
 
-        return Response(
-            {"success": f"API key added to node"}, status=status.HTTP_201_CREATED
-        )
+        return Response({"success": f"API key added to node"}, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=["post"])
     def remove_api_key(self, request, pk=None):
@@ -216,9 +198,7 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
         api_key_id = request.data.get("api_key_id")
 
         if not api_key_id:
-            return Response(
-                {"error": "api_key_id is required"}, status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"error": "api_key_id is required"}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             api_key = NodeAPIKey.objects.get(id=api_key_id)
@@ -239,9 +219,7 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
         # Remove the link
         link.delete()
 
-        return Response(
-            {"success": f"API key removed from node"}, status=status.HTTP_200_OK
-        )
+        return Response({"success": f"API key removed from node"}, status=status.HTTP_200_OK)
 
 
 class ManagedNodeViewSet(viewsets.ModelViewSet):
@@ -274,9 +252,7 @@ class ManagedNodeViewSet(viewsets.ModelViewSet):
         api_key_id = request.data.get("api_key_id")
 
         if not api_key_id:
-            return Response(
-                {"error": "api_key_id is required"}, status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"error": "api_key_id is required"}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             api_key = NodeAPIKey.objects.get(id=api_key_id)
@@ -296,9 +272,7 @@ class ManagedNodeViewSet(viewsets.ModelViewSet):
         # Link the API key to the node
         NodeAuth.objects.create(api_key=api_key, node=node)
 
-        return Response(
-            {"success": f"API key added to node"}, status=status.HTTP_201_CREATED
-        )
+        return Response({"success": f"API key added to node"}, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=["post"])
     def remove_api_key(self, request, pk=None):
@@ -309,9 +283,7 @@ class ManagedNodeViewSet(viewsets.ModelViewSet):
         api_key_id = request.data.get("api_key_id")
 
         if not api_key_id:
-            return Response(
-                {"error": "api_key_id is required"}, status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"error": "api_key_id is required"}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             api_key = NodeAPIKey.objects.get(id=api_key_id)
@@ -332,6 +304,4 @@ class ManagedNodeViewSet(viewsets.ModelViewSet):
         # Remove the link
         link.delete()
 
-        return Response(
-            {"success": f"API key removed from node"}, status=status.HTTP_200_OK
-        )
+        return Response({"success": f"API key removed from node"}, status=status.HTTP_200_OK)

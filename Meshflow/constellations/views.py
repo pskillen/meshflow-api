@@ -55,9 +55,9 @@ class ConstellationViewSet(viewsets.ModelViewSet):
         user = self.request.user
 
         # Get the constellations the user is a member of
-        constellation_ids = ConstellationUserMembership.objects.filter(
-            user=user
-        ).values_list("constellation_id", flat=True)
+        constellation_ids = ConstellationUserMembership.objects.filter(user=user).values_list(
+            "constellation_id", flat=True
+        )
 
         # Return those constellations
         return Constellation.objects.filter(id__in=constellation_ids)
@@ -69,6 +69,4 @@ class ConstellationViewSet(viewsets.ModelViewSet):
         constellation = serializer.save(created_by=self.request.user)
 
         # Add the user as an admin of the constellation
-        ConstellationUserMembership.objects.create(
-            user=self.request.user, constellation=constellation, role="admin"
-        )
+        ConstellationUserMembership.objects.create(user=self.request.user, constellation=constellation, role="admin")

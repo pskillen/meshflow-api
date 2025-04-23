@@ -21,9 +21,7 @@ class LocationSource(models.IntegerChoices):
 class ManagedNode(models.Model):
     """Model representing a mesh network node."""
 
-    internal_id = models.UUIDField(
-        primary_key=True, null=False, default=uuid.uuid4, editable=False
-    )
+    internal_id = models.UUIDField(primary_key=True, null=False, default=uuid.uuid4, editable=False)
     node_id = models.BigIntegerField(null=False)
     owner = models.ForeignKey(
         "users.User",
@@ -31,9 +29,7 @@ class ManagedNode(models.Model):
         related_name="owned_nodes",
         help_text=_("The user who owns this node"),
     )
-    constellation = models.ForeignKey(
-        "constellations.Constellation", on_delete=models.CASCADE, related_name="nodes"
-    )
+    constellation = models.ForeignKey("constellations.Constellation", on_delete=models.CASCADE, related_name="nodes")
     name = models.CharField(max_length=100, null=False, blank=False)
 
     class Meta:
@@ -57,9 +53,7 @@ class ManagedNode(models.Model):
 class ObservedNode(models.Model):
     """Model representing a mesh network node."""
 
-    internal_id = models.UUIDField(
-        primary_key=True, null=False, default=uuid.uuid4, editable=False
-    )
+    internal_id = models.UUIDField(primary_key=True, null=False, default=uuid.uuid4, editable=False)
     node_id = models.BigIntegerField(null=False)
     mac_addr = models.CharField(max_length=20, null=True, blank=True)
     long_name = models.CharField(max_length=50)
@@ -134,12 +128,8 @@ class NodeAPIKey(models.Model):
 class NodeAuth(models.Model):
     """Model linking API keys to specific nodes they can authenticate."""
 
-    api_key = models.ForeignKey(
-        NodeAPIKey, on_delete=models.CASCADE, related_name="node_links"
-    )
-    node = models.ForeignKey(
-        ManagedNode, on_delete=models.CASCADE, related_name="api_key_links"
-    )
+    api_key = models.ForeignKey(NodeAPIKey, on_delete=models.CASCADE, related_name="node_links")
+    node = models.ForeignKey(ManagedNode, on_delete=models.CASCADE, related_name="api_key_links")
 
     class Meta:
         unique_together = ("api_key", "node")
@@ -184,15 +174,9 @@ class Position(BaseNodeItem):
     )
     precision_bits = models.SmallIntegerField(null=True, blank=True)
     ground_speed = models.FloatField(null=True, blank=True, help_text="Speed in m/s")
-    ground_track = models.FloatField(
-        null=True, blank=True, help_text="Track in degrees (0-359)"
-    )
-    sats_in_view = models.SmallIntegerField(
-        null=True, blank=True, help_text="Number of satellites in view"
-    )
-    pdop = models.FloatField(
-        null=True, blank=True, help_text="Position Dilution of Precision"
-    )
+    ground_track = models.FloatField(null=True, blank=True, help_text="Track in degrees (0-359)")
+    sats_in_view = models.SmallIntegerField(null=True, blank=True, help_text="Number of satellites in view")
+    pdop = models.FloatField(null=True, blank=True, help_text="Position Dilution of Precision")
 
     class Meta:
         verbose_name = _("Position")
@@ -207,9 +191,7 @@ class DeviceMetrics(BaseNodeItem):
 
     battery_level = models.FloatField(help_text="Battery level as a percentage")
     voltage = models.FloatField(help_text="Battery voltage in volts")
-    channel_utilization = models.FloatField(
-        help_text="Channel utilization as a percentage"
-    )
+    channel_utilization = models.FloatField(help_text="Channel utilization as a percentage")
     air_util_tx = models.FloatField(help_text="Air utilization for transmission")
     uptime_seconds = models.BigIntegerField(help_text="Device uptime in seconds")
 

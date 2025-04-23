@@ -117,9 +117,7 @@ class NodeAPIKeyForm(forms.ModelForm):
         # Set up the nodes for existing keys
         constellation = self.instance.constellation
         self.fields["nodes"].queryset = constellation.nodes.all().order_by("name")
-        self.fields["nodes"].initial = self.instance.node_links.values_list(
-            "node", flat=True
-        )
+        self.fields["nodes"].initial = self.instance.node_links.values_list("node", flat=True)
 
     def clean(self):
         cleaned_data = super().clean()
@@ -131,9 +129,7 @@ class NodeAPIKeyForm(forms.ModelForm):
             valid_nodes = constellation.nodes.all()
             for node in selected_nodes:
                 if node not in valid_nodes:
-                    raise forms.ValidationError(
-                        f"Node {node} does not belong to constellation {constellation}"
-                    )
+                    raise forms.ValidationError(f"Node {node} does not belong to constellation {constellation}")
 
         return cleaned_data
 

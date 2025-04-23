@@ -63,9 +63,7 @@ class APIKeyDetailSerializer(APIKeySerializer):
 class APIKeyCreateSerializer(serializers.ModelSerializer):
     """Serializer for creating API keys."""
 
-    nodes = serializers.ListField(
-        child=serializers.IntegerField(), required=False, write_only=True
-    )
+    nodes = serializers.ListField(child=serializers.IntegerField(), required=False, write_only=True)
 
     class Meta:
         model = NodeAPIKey
@@ -81,9 +79,7 @@ class APIKeyCreateSerializer(serializers.ModelSerializer):
         ).first()
 
         if not membership:
-            raise serializers.ValidationError(
-                "You don't have permission to create API keys for this constellation."
-            )
+            raise serializers.ValidationError("You don't have permission to create API keys for this constellation.")
 
         return value
 
@@ -121,9 +117,7 @@ class APIKeyCreateSerializer(serializers.ModelSerializer):
 class PositionSerializer(serializers.ModelSerializer):
     """Serializer for position reports."""
 
-    location_source = serializers.CharField(
-        source="get_location_source_display", read_only=True
-    )
+    location_source = serializers.CharField(source="get_location_source_display", read_only=True)
 
     class Meta:
         model = Position

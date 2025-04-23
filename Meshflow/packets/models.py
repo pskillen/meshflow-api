@@ -37,9 +37,7 @@ class RoleSource(models.IntegerChoices):
 class RawPacket(models.Model):
     """Base model for storing raw mesh network packets with common attributes."""
 
-    id = models.UUIDField(
-        primary_key=True, null=False, default=uuid.uuid4, editable=False
-    )
+    id = models.UUIDField(primary_key=True, null=False, default=uuid.uuid4, editable=False)
     packet_id = models.BigIntegerField(null=False)
     from_int = models.BigIntegerField(null=False)
     from_str = models.CharField(max_length=9, null=True)
@@ -80,9 +78,7 @@ class PositionPacket(RawPacket):
     heading = models.FloatField(null=True)
     location_source = models.IntegerField(choices=LocationSource.choices, null=True)
     precision_bits = models.SmallIntegerField(null=True)
-    position_time = models.DateTimeField(
-        null=True
-    )  # Unix timestamp converted to datetime
+    position_time = models.DateTimeField(null=True)  # Unix timestamp converted to datetime
     ground_speed = models.FloatField(null=True)  # in m/s
     ground_track = models.FloatField(null=True)  # in degrees (0-359)
 
