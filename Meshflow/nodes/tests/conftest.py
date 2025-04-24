@@ -1,6 +1,16 @@
 import pytest
-from nodes.models import ManagedNode, ObservedNode, NodeAPIKey, NodeAuth
-from users.tests.conftest import create_user
+
+from constellations.tests.conftest import create_constellation  # noqa: F401
+from nodes.models import ManagedNode, NodeAPIKey, NodeAuth, ObservedNode
+from users.tests.conftest import create_user  # noqa: F401
+
+
+@pytest.fixture
+def constellation_data():
+    return {
+        "name": "Test Constellation",
+        "description": "Test Description",
+    }
 
 
 @pytest.fixture
@@ -24,15 +34,16 @@ def observed_node_data():
 
 
 @pytest.fixture
-def create_managed_node(create_user, managed_node_data):
+def create_managed_node(managed_node_data, create_user, create_constellation):  # noqa: F811
     def make_managed_node(**kwargs):
         data = managed_node_data.copy()
         data.update(kwargs)
         if "owner" not in data:
             data["owner"] = create_user()
         if "constellation" not in data:
-            data["constellation"] = create_user().constellations.first()
+            data["constellation"] = create_constellation(created_by=data["owner"])
         return ManagedNode.objects.create(**data)
+
     return make_managed_node
 
 
@@ -42,28 +53,31 @@ def create_observed_node(observed_node_data):
         data = observed_node_data.copy()
         data.update(kwargs)
         return ObservedNode.objects.create(**data)
+
     return make_observed_node
 
 
 @pytest.fixture
-def create_node_api_key(create_user):
-    def make_api_key(**kwargs):
-        if "constellation" not in kwargs:
-            kwargs["constellation"] = create_user().constellations.first()
+def create_node_api_key(create_user, create_constellation):  # noqa: F811
+    def make_node_api_key(**kwargs):
         if "owner" not in kwargs:
             kwargs["owner"] = create_user()
-        if "created_by" not in kwargs:
-            kwargs["created_by"] = kwargs["owner"]
+        if "constellation" not in kwargs:
+            kwargs["constellation"] = create_constellation(created_by=kwargs["owner"])
+        if "name" not in kwargs:
+            kwargs["name"] = "Test API Key"
         return NodeAPIKey.objects.create(**kwargs)
-    return make_api_key
+
+    return make_node_api_key
 
 
 @pytest.fixture
-def create_node_auth(create_managed_node, create_node_api_key):
+def create_node_auth(create_node_api_key, create_managed_node):
     def make_node_auth(**kwargs):
         if "api_key" not in kwargs:
             kwargs["api_key"] = create_node_api_key()
         if "node" not in kwargs:
-            kwargs["node"] = create_managed_node()
+            kwargs["node"] = create_managed_node(owner=kwargs["api_key"].owner)
         return NodeAuth.objects.create(**kwargs)
-    return make_node_auth 
+
+    return make_node_auth

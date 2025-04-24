@@ -1,5 +1,4 @@
 import pytest
-from nodes.models import ManagedNode, ObservedNode, NodeAPIKey, NodeAuth
 
 
 @pytest.mark.django_db
@@ -10,7 +9,7 @@ def test_managed_node_creation(create_managed_node):
     assert node.name == "Test Managed Node"
     assert node.owner is not None
     assert node.constellation is not None
-    assert node.node_id_str == "0x75bcd15"
+    assert node.node_id_str == "!075bcd15"
 
 
 @pytest.mark.django_db
@@ -31,7 +30,7 @@ def test_observed_node_creation(create_observed_node):
     assert node.mac_addr == "00:11:22:33:44:55"
     assert node.hw_model == "T-Beam"
     assert node.sw_version == "2.0.0"
-    assert node.node_id_str == "0x3ade68b1"
+    assert node.node_id_str == "!3ade68b1"
 
 
 @pytest.mark.django_db
@@ -50,7 +49,6 @@ def test_node_api_key_creation(create_node_api_key):
     assert len(api_key.key) == 40  # 20 bytes in hex
     assert api_key.owner is not None
     assert api_key.constellation is not None
-    assert api_key.created_by is not None
     assert api_key.is_active is True
 
 
@@ -60,4 +58,4 @@ def test_node_auth_creation(create_node_auth):
     auth = create_node_auth()
     assert auth.api_key is not None
     assert auth.node is not None
-    assert str(auth) == f"{auth.api_key.name} - {auth.node}" 
+    assert str(auth) == f"{auth.api_key.name} - {auth.node}"

@@ -4,7 +4,7 @@ from rest_framework import serializers
 
 from constellations.models import ConstellationUserMembership
 
-from .models import LocationSource, ManagedNode, NodeAPIKey, NodeAuth, Position
+from .models import LocationSource, ManagedNode, NodeAPIKey, NodeAuth, ObservedNode, Position
 
 
 class APIKeySerializer(serializers.ModelSerializer):
@@ -113,6 +113,21 @@ class APIKeyCreateSerializer(serializers.ModelSerializer):
         return api_key
 
 
+class ManagedNodeSerializer(serializers.ModelSerializer):
+    """Serializer for managed nodes."""
+
+    class Meta:
+        model = ManagedNode
+        fields = [
+            "internal_id",
+            "node_id",
+            "owner",
+            "constellation",
+            "name",
+        ]
+        read_only_fields = ["internal_id", "owner"]
+
+
 class PositionSerializer(serializers.ModelSerializer):
     """Serializer for position reports."""
 
@@ -131,10 +146,9 @@ class PositionSerializer(serializers.ModelSerializer):
             "heading",
             "location_source",
         ]
-        read_only_fields = ["id", "node", "logged_time", "reported_time"]
 
     def to_internal_value(self, data):
-        """Convert location source from string to integer."""
+        """Convert location source from string to integer and handle node field."""
         # First, handle the standard DRF conversion
         validated_data = super().to_internal_value(data)
 
@@ -152,4 +166,27 @@ class PositionSerializer(serializers.ModelSerializer):
             except (ValueError, TypeError):
                 validated_data["location_source"] = LocationSource.UNSET
 
+        # Handle node field
+        if "node" in data and isinstance(data["node"], ObservedNode):
+            validated_data["node"] = data["node"]
+
         return validated_data
+
+
+class ObservedNodeSerializer(serializers.ModelSerializer):
+    """Serializer for observed nodes."""
+
+    class Meta:
+        model = ObservedNode
+        fields = [
+            "internal_id",
+            "node_id",
+            "node_id_str",
+            "mac_addr",
+            "long_name",
+            "short_name",
+            "hw_model",
+            "sw_version",
+            "public_key",
+        ]
+        read_only_fields = ["internal_id", "node_id_str"]
