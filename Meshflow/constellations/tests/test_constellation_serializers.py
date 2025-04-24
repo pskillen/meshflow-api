@@ -1,7 +1,8 @@
 import pytest
 from rest_framework.test import APIRequestFactory
-from constellations.serializers import ConstellationSerializer
+
 from constellations.models import ConstellationUserMembership
+from constellations.serializers import ConstellationSerializer
 
 
 @pytest.mark.django_db
@@ -21,14 +22,14 @@ def test_constellation_serializer_create(create_user):
     """Test ConstellationSerializer create method."""
     user = create_user()
     factory = APIRequestFactory()
-    request = factory.post('/api/constellations/')
+    request = factory.post("/api/constellations/")
     request.user = user
 
     data = {
         "name": "New Constellation",
         "description": "New Description",
     }
-    serializer = ConstellationSerializer(data=data, context={'request': request})
+    serializer = ConstellationSerializer(data=data, context={"request": request})
     assert serializer.is_valid()
     constellation = serializer.save()
 
@@ -41,10 +42,7 @@ def test_constellation_serializer_create(create_user):
 def test_constellation_serializer_update(create_constellation):
     """Test ConstellationSerializer update method."""
     constellation = create_constellation()
-    data = {
-        "name": "Updated Constellation",
-        "description": "Updated Description"
-    }
+    data = {"name": "Updated Constellation", "description": "Updated Description"}
     serializer = ConstellationSerializer(constellation, data=data, partial=True)
     assert serializer.is_valid()
     updated_constellation = serializer.save()
@@ -62,16 +60,8 @@ def test_constellation_serializer_members(create_constellation, create_user):
     user2 = create_user()
 
     # Add members through ConstellationUserMembership
-    ConstellationUserMembership.objects.create(
-        user=user1,
-        constellation=constellation,
-        role="viewer"
-    )
-    ConstellationUserMembership.objects.create(
-        user=user2,
-        constellation=constellation,
-        role="editor"
-    )
+    ConstellationUserMembership.objects.create(user=user1, constellation=constellation, role="viewer")
+    ConstellationUserMembership.objects.create(user=user2, constellation=constellation, role="editor")
 
     # Refresh the constellation instance to get the latest data
     constellation.refresh_from_db()

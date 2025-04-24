@@ -1,9 +1,11 @@
 from rest_framework import serializers
+
 from .models import Constellation, ConstellationUserMembership
 
 
 class ConstellationSerializer(serializers.ModelSerializer):
     """Serializer for constellations."""
+
     members = serializers.SerializerMethodField()
 
     class Meta:
@@ -13,13 +15,7 @@ class ConstellationSerializer(serializers.ModelSerializer):
 
     def get_members(self, obj):
         memberships = ConstellationUserMembership.objects.filter(constellation=obj)
-        return [
-            {
-                "username": membership.user.username,
-                "role": membership.role
-            }
-            for membership in memberships
-        ]
+        return [{"username": membership.user.username, "role": membership.role} for membership in memberships]
 
     def create(self, validated_data):
         """Create a new constellation."""

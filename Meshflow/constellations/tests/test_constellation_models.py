@@ -1,5 +1,6 @@
 import pytest
-from constellations.models import Constellation, ConstellationUserMembership
+
+from constellations.models import Constellation, ConstellationUserMembership  # noqa F401
 
 
 @pytest.mark.django_db
@@ -26,16 +27,8 @@ def test_constellation_members(create_constellation, create_user):
     user2 = create_user()
 
     # Add members
-    ConstellationUserMembership.objects.create(
-        user=user1,
-        constellation=constellation,
-        role="viewer"
-    )
-    ConstellationUserMembership.objects.create(
-        user=user2,
-        constellation=constellation,
-        role="editor"
-    )
+    ConstellationUserMembership.objects.create(user=user1, constellation=constellation, role="viewer")
+    ConstellationUserMembership.objects.create(user=user2, constellation=constellation, role="editor")
 
     # Check memberships
     memberships = ConstellationUserMembership.objects.filter(constellation=constellation)
