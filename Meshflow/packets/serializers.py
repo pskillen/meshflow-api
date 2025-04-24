@@ -22,7 +22,7 @@ class BasePacketSerializer(serializers.Serializer):
     """Base serializer for all packet types."""
 
     # Common fields from the JSON packet
-    id = serializers.IntegerField(source="packet_id")
+    packet_id = serializers.IntegerField(source="id")
     from_int = serializers.IntegerField(source="from")
     from_str = serializers.CharField(source="fromId")
     to_int = serializers.IntegerField(source="to", required=False, allow_null=True)
@@ -134,8 +134,8 @@ class PositionPacketSerializer(BasePacketSerializer):
         # First, handle the standard DRF conversion
         validated_data = super().to_internal_value(data)
 
-        # Convert position_time to a datetime object
-        if "position_time" in validated_data:
+        # Convert position_time to a datetime object if it exists
+        if "position_time" in validated_data and validated_data["position_time"] is not None:
             validated_data["position_time"] = timezone.datetime.fromtimestamp(
                 validated_data["position_time"], tz=timezone.utc
             )
