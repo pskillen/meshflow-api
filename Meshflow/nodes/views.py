@@ -21,8 +21,7 @@ class APIKeyViewSet(viewsets.ModelViewSet):
         """Filter API keys to only show those for constellations the user has access to."""
         user = self.request.user
         return NodeAPIKey.objects.filter(
-            constellation__memberships__user=user,
-            constellation__memberships__role__in=["admin", "editor"],
+            owner=user
         ).distinct()
 
     def get_serializer_class(self):
@@ -45,7 +44,7 @@ class APIKeyViewSet(viewsets.ModelViewSet):
         ).exists():
             raise permissions.PermissionDenied("You don't have permission to create API keys for this constellation.")
 
-        serializer.save(owner=self.request.user, created_by=self.request.user)
+        serializer.save(owner=self.request.user)
 
     @action(detail=True, methods=["post"])
     def add_node(self, request, pk=None):
@@ -125,10 +124,7 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """Filter nodes based on user permissions."""
         user = self.request.user
-        return ObservedNode.objects.filter(
-            constellation__memberships__user=user,
-            constellation__memberships__role__in=["admin", "editor"],
-        ).distinct()
+        return ObservedNode.objects.all()
 
     def perform_create(self, serializer):
         """Create a new node and ensure the user has proper permissions."""

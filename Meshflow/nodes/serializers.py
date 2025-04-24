@@ -18,11 +18,11 @@ class APIKeySerializer(serializers.ModelSerializer):
             "name",
             "constellation",
             "created_at",
-            "created_by",
+            "owner",
             "last_used",
             "is_active",
         ]
-        read_only_fields = ["id", "key", "created_at", "created_by", "last_used"]
+        read_only_fields = ["id", "key", "created_at", "owner", "last_used"]
 
     def create(self, validated_data):
         """Create a new API key with a randomly generated key."""
@@ -32,8 +32,8 @@ class APIKeySerializer(serializers.ModelSerializer):
         # Add the key to the validated data
         validated_data["key"] = key
 
-        # Add the current user as the creator
-        validated_data["created_by"] = self.context["request"].user
+        # Add the current user as the owner
+        validated_data["owner"] = self.context["request"].user
 
         # Create the API key
         return super().create(validated_data)
@@ -94,8 +94,9 @@ class APIKeyCreateSerializer(serializers.ModelSerializer):
         # Add the key to the validated data
         validated_data["key"] = key
 
-        # Add the current user as the creator
-        validated_data["created_by"] = self.context["request"].user
+        # Add the current user as the owner
+        user = self.context["request"].user
+        validated_data["owner"] = user
 
         # Create the API key
         api_key = NodeAPIKey.objects.create(**validated_data)

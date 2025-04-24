@@ -99,12 +99,6 @@ class NodeAPIKey(models.Model):
         help_text=_("The user who owns this API key"),
     )
     created_at = models.DateTimeField(auto_now_add=True)
-    created_by = models.ForeignKey(
-        "users.User",
-        on_delete=models.SET_NULL,
-        null=True,
-        related_name="created_api_keys",
-    )
     last_used = models.DateTimeField(null=True, blank=True)
     is_active = models.BooleanField(default=True)
 
