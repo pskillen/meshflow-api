@@ -9,8 +9,8 @@ User = get_user_model()
 def test_create_user(create_user):
     """Test creating a user with valid data."""
     user = create_user()
-    assert user.username == "testuser"
-    assert user.email == "test@example.com"
+    assert user.username.startswith("testuser_")
+    assert user.email.startswith("testuser_") and user.email.endswith("@example.com")
     assert user.display_name == "Test User"
     assert user.check_password("testpass123")
     assert not user.is_staff
@@ -29,7 +29,7 @@ def test_create_superuser(create_user):
 def test_user_str_method(create_user):
     """Test the string representation of a user."""
     user = create_user()
-    assert str(user) == "testuser"
+    assert str(user) == user.username
 
 
 @pytest.mark.django_db

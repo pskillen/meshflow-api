@@ -2,11 +2,11 @@ from django.urls import include, path
 
 from rest_framework.routers import DefaultRouter
 
-from .views import APIKeyViewSet, ManagedNodeViewSet, ObservedNodeViewSet
+from nodes.views import APIKeyViewSet, ManagedNodeViewSet, ObservedNodeViewSet
 
 # Create a router and register our viewsets with it
 router = DefaultRouter()
-router.register(r"nodes", ObservedNodeViewSet, basename="nodes")
+router.register(r"observed-nodes", ObservedNodeViewSet, basename="observed-node")
 router.register(r"managed-nodes", ManagedNodeViewSet, basename="managed-nodes")
 router.register(r"api-keys", APIKeyViewSet, basename="api-keys")
 

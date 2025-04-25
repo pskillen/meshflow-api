@@ -11,8 +11,8 @@ def test_user_serializer_valid_data(create_user):
 
     data = serializer.data
     assert data["id"] == user.id
-    assert data["username"] == "testuser"
-    assert data["email"] == "test@example.com"
+    assert data["username"] == user.username
+    assert data["email"] == user.email
     assert data["display_name"] == "Test User"
 
 
