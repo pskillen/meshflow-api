@@ -14,6 +14,7 @@ from .models import (
     PacketObservation,
     PositionPacket,
     RoleSource,
+    LocalStatsPacket,
 )
 
 
@@ -367,67 +368,158 @@ class DeviceMetricsPacketSerializer(BasePacketSerializer):
         )
 
 
+class LocalStatsPacketSerializer(BasePacketSerializer):
+    """Serializer for local stats telemetry packets."""
+
+    uptime_seconds = serializers.IntegerField(
+        source="decoded.telemetry.localStats.uptimeSeconds",
+        required=False,
+        allow_null=True,
+    )
+    channel_utilization = serializers.FloatField(
+        source="decoded.telemetry.localStats.channelUtilization",
+        required=False,
+        allow_null=True,
+    )
+    air_util_tx = serializers.FloatField(
+        source="decoded.telemetry.localStats.airUtilTx",
+        required=False,
+        allow_null=True,
+    )
+    num_packets_tx = serializers.IntegerField(
+        source="decoded.telemetry.localStats.numPacketsTx",
+        required=False,
+        allow_null=True,
+    )
+    num_packets_rx = serializers.IntegerField(
+        source="decoded.telemetry.localStats.numPacketsRx",
+        required=False,
+        allow_null=True,
+    )
+    num_packets_rx_bad = serializers.IntegerField(
+        source="decoded.telemetry.localStats.numPacketsRxBad",
+        required=False,
+        allow_null=True,
+    )
+    num_online_nodes = serializers.IntegerField(
+        source="decoded.telemetry.localStats.numOnlineNodes",
+        required=False,
+        allow_null=True,
+    )
+    num_total_nodes = serializers.IntegerField(
+        source="decoded.telemetry.localStats.numTotalNodes",
+        required=False,
+        allow_null=True,
+    )
+    num_rx_dupe = serializers.IntegerField(
+        source="decoded.telemetry.localStats.numRxDupe",
+        required=False,
+        allow_null=True,
+    )
+    reading_time = serializers.IntegerField(source="decoded.telemetry.time")
+
+    def to_internal_value(self, data):
+        """Convert camelCase to snake_case for nested fields and handle timestamp conversion."""
+        # First, handle the standard DRF conversion
+        validated_data = super().to_internal_value(data)
+
+        # Convert reading_time to a datetime object if it exists
+        if "reading_time" in validated_data and validated_data["reading_time"] is not None:
+            validated_data["reading_time"] = timezone.datetime.fromtimestamp(
+                validated_data["reading_time"], tz=timezone.utc
+            )
+
+        return validated_data
+
+    def create(self, validated_data):
+        """Create a new LocalStatsPacket instance."""
+        # Extract nested data
+        decoded_data = validated_data.pop("decoded", {})
+        telemetry_data = decoded_data.pop("telemetry", {})
+        local_stats_data = telemetry_data.pop("localStats", {})
+
+        # Create the packet
+        packet = LocalStatsPacket.objects.create(
+            packet_id=validated_data.get("packet_id"),
+            from_int=validated_data.get("from"),
+            from_str=validated_data.get("fromId"),
+            to_int=validated_data.get("to"),
+            to_str=validated_data.get("toId"),
+            port_num=decoded_data.get("portnum"),
+            uptime_seconds=local_stats_data.get("uptimeSeconds"),
+            channel_utilization=local_stats_data.get("channelUtilization"),
+            air_util_tx=local_stats_data.get("airUtilTx"),
+            num_packets_tx=local_stats_data.get("numPacketsTx"),
+            num_packets_rx=local_stats_data.get("numPacketsRx"),
+            num_packets_rx_bad=local_stats_data.get("numPacketsRxBad"),
+            num_online_nodes=local_stats_data.get("numOnlineNodes"),
+            num_total_nodes=local_stats_data.get("numTotalNodes"),
+            num_rx_dupe=local_stats_data.get("numRxDupe"),
+            reading_time=validated_data.get("reading_time"),
+        )
+
+        # Create the observation
+        self._create_observation(packet, validated_data)
+
+        return packet
+
+    def _create_observation(self, packet, validated_data):
+        """Create a PacketObservation for the packet."""
+        PacketObservation.objects.create(
+            packet=packet,
+            node=None,  # This would need to be set based on the node that received the packet
+            channel=validated_data.get("channel"),
+            hop_limit=validated_data.get("hopLimit"),
+            hop_start=validated_data.get("hopStart"),
+            rx_time=validated_data.get("rx_time"),
+            rx_rssi=validated_data.get("rxRssi"),
+            rx_snr=validated_data.get("rxSnr"),
+            relay_node=validated_data.get("relayNode"),
+        )
+
+
 class PacketIngestSerializer(serializers.Serializer):
     """Serializer for ingesting packets of any type."""
 
     def to_internal_value(self, data):
-        """Determine the packet type and use the appropriate serializer."""
-        # Check if the required fields are present
-        if "decoded" not in data or "portnum" not in data["decoded"]:
-            raise serializers.ValidationError({"decoded": "Missing 'portnum' field"})
-
+        """Convert the incoming packet data to the appropriate packet type."""
         # Determine the packet type based on the portnum
-        port_num = data["decoded"]["portnum"]
-
-        # Use the appropriate serializer based on the port_num
-        if port_num == "TEXT_MESSAGE_APP":
-            serializer = MessagePacketSerializer(data=data)
-        elif port_num == "POSITION_APP":
-            serializer = PositionPacketSerializer(data=data)
-        elif port_num == "NODEINFO_APP":
-            serializer = NodeInfoPacketSerializer(data=data)
-        elif port_num == "TELEMETRY_APP":
-            # Check if it's a device metrics packet
-            if "telemetry" in data["decoded"] and "deviceMetrics" in data["decoded"]["telemetry"]:
-                serializer = DeviceMetricsPacketSerializer(data=data)
-            else:
-                # Handle other telemetry types if needed
-                raise serializers.ValidationError({"decoded": "Unsupported telemetry type"})
-        else:
-            # Handle other packet types or raise an error
-            raise serializers.ValidationError({"decoded": f"Unsupported packet type: {port_num}"})
-
-        # Validate the data using the selected serializer
-        if serializer.is_valid(raise_exception=True):
-            return serializer.validated_data
-
-        return {}
+        portnum = data.get("decoded", {}).get("portnum")
+        
+        if portnum == "TEXT_MESSAGE_APP":
+            return MessagePacketSerializer().to_internal_value(data)
+        elif portnum == "NODEINFO_APP":
+            return NodeInfoPacketSerializer().to_internal_value(data)
+        elif portnum == "POSITION_APP":
+            return PositionPacketSerializer().to_internal_value(data)
+        elif portnum == "TELEMETRY_APP":
+            # Check if it's device metrics or local stats
+            if "deviceMetrics" in data.get("decoded", {}).get("telemetry", {}):
+                return DeviceMetricsPacketSerializer().to_internal_value(data)
+            elif "localStats" in data.get("decoded", {}).get("telemetry", {}):
+                return LocalStatsPacketSerializer().to_internal_value(data)
+        
+        raise serializers.ValidationError(f"Unknown packet type: {portnum}")
 
     def create(self, validated_data):
-        """Create a new packet instance based on the packet type."""
+        """Create the appropriate packet type based on the validated data."""
         # Determine the packet type based on the portnum
-        port_num = validated_data["decoded"]["portnum"]
-
-        # Use the appropriate serializer based on the port_num
-        if port_num == "TEXT_MESSAGE_APP":
-            serializer = MessagePacketSerializer()
-        elif port_num == "POSITION_APP":
-            serializer = PositionPacketSerializer()
-        elif port_num == "NODEINFO_APP":
-            serializer = NodeInfoPacketSerializer()
-        elif port_num == "TELEMETRY_APP":
-            # Check if it's a device metrics packet
-            if "telemetry" in validated_data["decoded"] and "deviceMetrics" in validated_data["decoded"]["telemetry"]:
-                serializer = DeviceMetricsPacketSerializer()
-            else:
-                # Handle other telemetry types if needed
-                raise serializers.ValidationError({"decoded": "Unsupported telemetry type"})
-        else:
-            # Handle other packet types or raise an error
-            raise serializers.ValidationError({"decoded": f"Unsupported packet type: {port_num}"})
-
-        # Create the packet using the selected serializer
-        return serializer.create(validated_data)
+        portnum = validated_data.get("port_num")
+        
+        if portnum == "TEXT_MESSAGE_APP":
+            return MessagePacketSerializer().create(validated_data)
+        elif portnum == "NODEINFO_APP":
+            return NodeInfoPacketSerializer().create(validated_data)
+        elif portnum == "POSITION_APP":
+            return PositionPacketSerializer().create(validated_data)
+        elif portnum == "TELEMETRY_APP":
+            # Check if it's device metrics or local stats
+            if "battery_level" in validated_data:
+                return DeviceMetricsPacketSerializer().create(validated_data)
+            elif "num_packets_tx" in validated_data:
+                return LocalStatsPacketSerializer().create(validated_data)
+        
+        raise serializers.ValidationError(f"Unknown packet type: {portnum}")
 
 
 class PositionSerializer(serializers.Serializer):
@@ -476,6 +568,8 @@ class DeviceMetricsSerializer(serializers.Serializer):
 
 
 class NodeSerializer(serializers.ModelSerializer):
+    """Serializer for node information updates."""
+
     position = PositionSerializer(required=False, allow_null=True, write_only=True)
     device_metrics = DeviceMetricsSerializer(required=False, allow_null=True, write_only=True)
     internal_id = serializers.IntegerField(source="id", read_only=True)
@@ -505,30 +599,53 @@ class NodeSerializer(serializers.ModelSerializer):
         ]
 
     def to_internal_value(self, data):
+        """Convert the incoming data to the appropriate format."""
         # Handle the nested user data
         if "user" in data:
             user_data = data.pop("user")
-            data["long_name"] = user_data.get("longName")
-            data["short_name"] = user_data.get("shortName")
-            data["hw_model"] = user_data.get("hwModel")
-            data["sw_version"] = user_data.get("swVersion")
-            data["public_key"] = user_data.get("publicKey")
+            data.update({
+                "long_name": user_data.get("longName"),
+                "short_name": user_data.get("shortName"),
+            })
+
+        # Handle position data
+        if "position" in data:
+            position_data = data.pop("position")
+            data["position"] = {
+                "reported_time": position_data.get("reportedTime"),
+                "latitude": position_data.get("latitude"),
+                "longitude": position_data.get("longitude"),
+                "altitude": position_data.get("altitude"),
+                "location_source": position_data.get("locationSource"),
+            }
+
+        # Handle device metrics
+        if "deviceMetrics" in data:
+            metrics_data = data.pop("deviceMetrics")
+            data["device_metrics"] = {
+                "reported_time": metrics_data.get("reportedTime"),
+                "battery_level": metrics_data.get("batteryLevel"),
+                "voltage": metrics_data.get("voltage"),
+                "channel_utilization": metrics_data.get("channelUtilization"),
+                "air_util_tx": metrics_data.get("airUtilTx"),
+                "uptime_seconds": metrics_data.get("uptimeSeconds"),
+            }
+
         return super().to_internal_value(data)
 
     def create(self, validated_data):
+        """Create a new node instance."""
         # Handle position data
         position_data = validated_data.pop("position", None)
         device_metrics_data = validated_data.pop("device_metrics", None)
 
         # Create the node
-        node = ObservedNode.objects.create(**validated_data)
+        node = super().create(validated_data)
 
-        # Handle position data if present
+        # Create position if provided
         if position_data:
-            # Create position record
             Position.objects.create(
                 node=node,
-                logged_time=position_data.get("logged_time", timezone.now()),
                 reported_time=position_data.get("reported_time"),
                 latitude=position_data.get("latitude"),
                 longitude=position_data.get("longitude"),
@@ -536,12 +653,10 @@ class NodeSerializer(serializers.ModelSerializer):
                 location_source=position_data.get("location_source"),
             )
 
-        # Handle device metrics data if present
+        # Create device metrics if provided
         if device_metrics_data:
-            # Create device metrics record
             DeviceMetrics.objects.create(
                 node=node,
-                logged_time=device_metrics_data.get("logged_time", timezone.now()),
                 reported_time=device_metrics_data.get("reported_time"),
                 battery_level=device_metrics_data.get("battery_level"),
                 voltage=device_metrics_data.get("voltage"),
@@ -553,29 +668,39 @@ class NodeSerializer(serializers.ModelSerializer):
         return node
 
     def update(self, instance, validated_data):
+        """Update an existing node instance."""
         # Handle position data
         position_data = validated_data.pop("position", None)
-        if position_data:
-            instance.position_logged_time = position_data.get("logged_time", timezone.now())
-            instance.position_reported_time = position_data.get("reported_time")
-            instance.latitude = position_data.get("latitude")
-            instance.longitude = position_data.get("longitude")
-            instance.altitude = position_data.get("altitude")
-            instance.location_source = position_data.get("location_source")
-
-        # Handle device metrics data
         device_metrics_data = validated_data.pop("device_metrics", None)
+
+        # Update the node
+        node = super().update(instance, validated_data)
+
+        # Update or create position if provided
+        if position_data:
+            Position.objects.update_or_create(
+                node=node,
+                defaults={
+                    "reported_time": position_data.get("reported_time"),
+                    "latitude": position_data.get("latitude"),
+                    "longitude": position_data.get("longitude"),
+                    "altitude": position_data.get("altitude"),
+                    "location_source": position_data.get("location_source"),
+                },
+            )
+
+        # Update or create device metrics if provided
         if device_metrics_data:
-            instance.device_metrics_logged_time = device_metrics_data.get("logged_time", timezone.now())
-            instance.battery_level = device_metrics_data.get("battery_level")
-            instance.voltage = device_metrics_data.get("voltage")
-            instance.channel_utilization = device_metrics_data.get("channel_utilization")
-            instance.air_util_tx = device_metrics_data.get("air_util_tx")
-            instance.uptime_seconds = device_metrics_data.get("uptime_seconds")
+            DeviceMetrics.objects.update_or_create(
+                node=node,
+                defaults={
+                    "reported_time": device_metrics_data.get("reported_time"),
+                    "battery_level": device_metrics_data.get("battery_level"),
+                    "voltage": device_metrics_data.get("voltage"),
+                    "channel_utilization": device_metrics_data.get("channel_utilization"),
+                    "air_util_tx": device_metrics_data.get("air_util_tx"),
+                    "uptime_seconds": device_metrics_data.get("uptime_seconds"),
+                },
+            )
 
-        # Update basic fields
-        for attr, value in validated_data.items():
-            setattr(instance, attr, value)
-
-        instance.save()
-        return instance
+        return node
