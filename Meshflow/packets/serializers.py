@@ -37,6 +37,12 @@ class BasePacketSerializer(serializers.Serializer):
     rx_snr = serializers.FloatField(source="rxSnr", required=False, allow_null=True)
     relay_node = serializers.IntegerField(source="relayNode", required=False, allow_null=True)
 
+    # Additional fields from OpenAPI spec
+    pki_encrypted = serializers.BooleanField(source="pkiEncrypted", required=False, allow_null=True)
+    next_hop = serializers.IntegerField(source="nextHop", required=False, allow_null=True)
+    priority = serializers.CharField(required=False, allow_null=True)
+    raw = serializers.CharField(required=False)
+
     def to_internal_value(self, data):
         """Convert camelCase to snake_case for nested fields."""
         # First, handle the standard DRF conversion
@@ -472,16 +478,23 @@ class DeviceMetricsSerializer(serializers.Serializer):
 class NodeSerializer(serializers.ModelSerializer):
     position = PositionSerializer(required=False, allow_null=True, write_only=True)
     device_metrics = DeviceMetricsSerializer(required=False, allow_null=True, write_only=True)
-    id = serializers.IntegerField(source="node_id")
-    macaddr = serializers.CharField(source="mac_addr")
-    long_name = serializers.CharField(required=False)
-    short_name = serializers.CharField(required=False)
+    internal_id = serializers.IntegerField(source="id", read_only=True)
+    node_id = serializers.IntegerField()
+    node_id_str = serializers.CharField(source="node_id_str", required=False)
+    mac_addr = serializers.CharField()
+    long_name = serializers.CharField(required=False, allow_null=True)
+    short_name = serializers.CharField(required=False, allow_null=True)
+    hw_model = serializers.CharField(required=False, allow_null=True)
+    sw_version = serializers.CharField(required=False, allow_null=True)
+    public_key = serializers.CharField(required=False, allow_null=True)
 
     class Meta:
         model = ObservedNode
         fields = [
-            "id",
-            "macaddr",
+            "internal_id",
+            "node_id",
+            "node_id_str",
+            "mac_addr",
             "long_name",
             "short_name",
             "hw_model",
@@ -495,18 +508,17 @@ class NodeSerializer(serializers.ModelSerializer):
         # Handle the nested user data
         if "user" in data:
             user_data = data.pop("user")
-            data["long_name"] = user_data.get("long_name")
-            data["short_name"] = user_data.get("short_name")
+            data["long_name"] = user_data.get("longName")
+            data["short_name"] = user_data.get("shortName")
+            data["hw_model"] = user_data.get("hwModel")
+            data["sw_version"] = user_data.get("swVersion")
+            data["public_key"] = user_data.get("publicKey")
         return super().to_internal_value(data)
 
     def create(self, validated_data):
         # Handle position data
         position_data = validated_data.pop("position", None)
         device_metrics_data = validated_data.pop("device_metrics", None)
-
-        # Map macaddr to mac_addr
-        if "macaddr" in validated_data:
-            validated_data["mac_addr"] = validated_data.pop("macaddr")
 
         # Create the node
         node = ObservedNode.objects.create(**validated_data)
