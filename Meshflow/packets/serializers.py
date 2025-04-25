@@ -49,11 +49,35 @@ class BasePacketSerializer(serializers.Serializer):
         # First, handle the standard DRF conversion
         validated_data = super().to_internal_value(data)
 
-        # Convert rxTime to a datetime object
+        # Convert rxTime to a datetime object with validation
         if "rx_time" in validated_data:
-            validated_data["rx_time"] = timezone.datetime.fromtimestamp(validated_data["rx_time"], tz=timezone.utc)
+            try:
+                validated_data["rx_time"] = timezone.datetime.fromtimestamp(validated_data["rx_time"], tz=timezone.utc)
+            except (ValueError, TypeError, OSError) as e:
+                raise serializers.ValidationError({
+                    "rx_time": f"Invalid timestamp: {str(e)}"
+                })
 
         return validated_data
+
+    def _create_observation(self, packet, validated_data):
+        """Create a PacketObservation for the packet."""
+        # Get the observer from the request context
+        observer = self.context.get('observer')
+        if not observer:
+            raise serializers.ValidationError("No observer found in request context")
+
+        PacketObservation.objects.create(
+            packet=packet,
+            observer=observer,
+            channel=validated_data.get("channel"),
+            hop_limit=validated_data.get("hop_limit"),
+            hop_start=validated_data.get("hop_start"),
+            rx_time=validated_data.get("rx_time"),
+            rx_rssi=validated_data.get("rx_rssi"),
+            rx_snr=validated_data.get("rx_snr"),
+            relay_node=validated_data.get("relay_node"),
+        )
 
 
 class MessagePacketSerializer(BasePacketSerializer):
@@ -100,20 +124,6 @@ class MessagePacketSerializer(BasePacketSerializer):
         self._create_observation(packet, validated_data)
 
         return packet
-
-    def _create_observation(self, packet, validated_data):
-        """Create a PacketObservation for the packet."""
-        PacketObservation.objects.create(
-            packet=packet,
-            node=None,  # This would need to be set based on the node that received the packet
-            channel=validated_data.get("channel"),
-            hop_limit=validated_data.get("hopLimit"),
-            hop_start=validated_data.get("hopStart"),
-            rx_time=validated_data.get("rx_time"),
-            rx_rssi=validated_data.get("rxRssi"),
-            rx_snr=validated_data.get("rxSnr"),
-            relay_node=validated_data.get("relayNode"),
-        )
 
 
 class PositionPacketSerializer(BasePacketSerializer):
@@ -190,20 +200,6 @@ class PositionPacketSerializer(BasePacketSerializer):
 
         return packet
 
-    def _create_observation(self, packet, validated_data):
-        """Create a PacketObservation for the packet."""
-        PacketObservation.objects.create(
-            packet=packet,
-            node=None,  # This would need to be set based on the node that received the packet
-            channel=validated_data.get("channel"),
-            hop_limit=validated_data.get("hopLimit"),
-            hop_start=validated_data.get("hopStart"),
-            rx_time=validated_data.get("rx_time"),
-            rx_rssi=validated_data.get("rxRssi"),
-            rx_snr=validated_data.get("rxSnr"),
-            relay_node=validated_data.get("relayNode"),
-        )
-
 
 class NodeInfoPacketSerializer(BasePacketSerializer):
     """Serializer for node info packets."""
@@ -266,20 +262,6 @@ class NodeInfoPacketSerializer(BasePacketSerializer):
         self._create_observation(packet, validated_data)
 
         return packet
-
-    def _create_observation(self, packet, validated_data):
-        """Create a PacketObservation for the packet."""
-        PacketObservation.objects.create(
-            packet=packet,
-            node=None,  # This would need to be set based on the node that received the packet
-            channel=validated_data.get("channel"),
-            hop_limit=validated_data.get("hopLimit"),
-            hop_start=validated_data.get("hopStart"),
-            rx_time=validated_data.get("rx_time"),
-            rx_rssi=validated_data.get("rxRssi"),
-            rx_snr=validated_data.get("rxSnr"),
-            relay_node=validated_data.get("relayNode"),
-        )
 
 
 class DeviceMetricsPacketSerializer(BasePacketSerializer):
@@ -352,20 +334,6 @@ class DeviceMetricsPacketSerializer(BasePacketSerializer):
         self._create_observation(packet, validated_data)
 
         return packet
-
-    def _create_observation(self, packet, validated_data):
-        """Create a PacketObservation for the packet."""
-        PacketObservation.objects.create(
-            packet=packet,
-            node=None,  # This would need to be set based on the node that received the packet
-            channel=validated_data.get("channel"),
-            hop_limit=validated_data.get("hopLimit"),
-            hop_start=validated_data.get("hopStart"),
-            rx_time=validated_data.get("rx_time"),
-            rx_rssi=validated_data.get("rxRssi"),
-            rx_snr=validated_data.get("rxSnr"),
-            relay_node=validated_data.get("relayNode"),
-        )
 
 
 class LocalStatsPacketSerializer(BasePacketSerializer):
@@ -463,20 +431,6 @@ class LocalStatsPacketSerializer(BasePacketSerializer):
 
         return packet
 
-    def _create_observation(self, packet, validated_data):
-        """Create a PacketObservation for the packet."""
-        PacketObservation.objects.create(
-            packet=packet,
-            node=None,  # This would need to be set based on the node that received the packet
-            channel=validated_data.get("channel"),
-            hop_limit=validated_data.get("hopLimit"),
-            hop_start=validated_data.get("hopStart"),
-            rx_time=validated_data.get("rx_time"),
-            rx_rssi=validated_data.get("rxRssi"),
-            rx_snr=validated_data.get("rxSnr"),
-            relay_node=validated_data.get("relayNode"),
-        )
-
 
 class PacketIngestSerializer(serializers.Serializer):
     """Serializer for ingesting packets of any type."""
@@ -487,19 +441,21 @@ class PacketIngestSerializer(serializers.Serializer):
         portnum = data.get("decoded", {}).get("portnum")
         
         if portnum == "TEXT_MESSAGE_APP":
-            return MessagePacketSerializer().to_internal_value(data)
+            validated_data = MessagePacketSerializer().to_internal_value(data)
         elif portnum == "NODEINFO_APP":
-            return NodeInfoPacketSerializer().to_internal_value(data)
+            validated_data = NodeInfoPacketSerializer().to_internal_value(data)
         elif portnum == "POSITION_APP":
-            return PositionPacketSerializer().to_internal_value(data)
+            validated_data = PositionPacketSerializer().to_internal_value(data)
         elif portnum == "TELEMETRY_APP":
             # Check if it's device metrics or local stats
             if "deviceMetrics" in data.get("decoded", {}).get("telemetry", {}):
-                return DeviceMetricsPacketSerializer().to_internal_value(data)
+                validated_data = DeviceMetricsPacketSerializer().to_internal_value(data)
             elif "localStats" in data.get("decoded", {}).get("telemetry", {}):
-                return LocalStatsPacketSerializer().to_internal_value(data)
-        
-        raise serializers.ValidationError(f"Unknown packet type: {portnum}")
+                validated_data = LocalStatsPacketSerializer().to_internal_value(data)
+        else:
+            raise serializers.ValidationError(f"Unknown packet type: {portnum}")
+
+        return validated_data
 
     def create(self, validated_data):
         """Create the appropriate packet type based on the validated data."""
@@ -507,19 +463,21 @@ class PacketIngestSerializer(serializers.Serializer):
         portnum = validated_data.get("port_num")
         
         if portnum == "TEXT_MESSAGE_APP":
-            return MessagePacketSerializer().create(validated_data)
+            packet = MessagePacketSerializer(context=self.context).create(validated_data)
         elif portnum == "NODEINFO_APP":
-            return NodeInfoPacketSerializer().create(validated_data)
+            packet = NodeInfoPacketSerializer(context=self.context).create(validated_data)
         elif portnum == "POSITION_APP":
-            return PositionPacketSerializer().create(validated_data)
+            packet = PositionPacketSerializer(context=self.context).create(validated_data)
         elif portnum == "TELEMETRY_APP":
             # Check if it's device metrics or local stats
             if "battery_level" in validated_data:
-                return DeviceMetricsPacketSerializer().create(validated_data)
+                packet = DeviceMetricsPacketSerializer(context=self.context).create(validated_data)
             elif "num_packets_tx" in validated_data:
-                return LocalStatsPacketSerializer().create(validated_data)
-        
-        raise serializers.ValidationError(f"Unknown packet type: {portnum}")
+                packet = LocalStatsPacketSerializer(context=self.context).create(validated_data)
+        else:
+            raise serializers.ValidationError(f"Unknown packet type: {portnum}")
+
+        return packet
 
 
 class PositionSerializer(serializers.Serializer):

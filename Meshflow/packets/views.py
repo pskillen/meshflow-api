@@ -29,7 +29,18 @@ class PacketIngestView(APIView):
         Returns:
             Response: A DRF Response object with the result of the ingestion.
         """
-        serializer = PacketIngestSerializer(data=request.data)
+        # Get the authenticated node from the request
+        observer = request.auth.node if hasattr(request.auth, 'node') else None
+        if not observer:
+            return Response(
+                {"status": "error", "message": "No authenticated node found"},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        serializer = PacketIngestSerializer(
+            data=request.data,
+            context={'observer': observer}
+        )
 
         if serializer.is_valid():
             try:
