@@ -1,13 +1,12 @@
 """Serializers for the packets app."""
 
 from datetime import datetime, timezone
-from django.utils import timezone as django_timezone
 
+from django.utils import timezone as django_timezone
 from rest_framework import serializers
 
-from nodes.models import DeviceMetrics, ObservedNode, Position
 from common.mesh_node_helpers import meshtastic_id_to_hex
-
+from nodes.models import DeviceMetrics, ObservedNode, Position
 from .models import (
     DeviceMetricsPacket,
     LocationSource,
@@ -151,6 +150,7 @@ class PositionPacketSerializer(BasePacketSerializer):
 
     class DecodedSerializer(serializers.Serializer):
         """Serializer for position packet decoded data."""
+
         class PositionSerializer(serializers.Serializer):
             latitude = serializers.FloatField()
             longitude = serializers.FloatField()
@@ -234,6 +234,7 @@ class NodeInfoPacketSerializer(BasePacketSerializer):
 
     class DecodedSerializer(serializers.Serializer):
         """Serializer for node info packet decoded data."""
+
         class UserSerializer(serializers.Serializer):
             id = serializers.CharField(source="node_id")
             shortName = serializers.CharField(source="short_name", required=False, allow_null=True)
@@ -305,11 +306,13 @@ class DeviceMetricsPacketSerializer(BasePacketSerializer):
 
     class DecodedSerializer(serializers.Serializer):
         """Serializer for device metrics packet decoded data."""
+
         class TelemetrySerializer(serializers.Serializer):
             class DeviceMetricsSerializer(serializers.Serializer):
                 batteryLevel = serializers.FloatField(source="battery_level", required=False, allow_null=True)
                 voltage = serializers.FloatField(required=False, allow_null=True)
-                channelUtilization = serializers.FloatField(source="channel_utilization", required=False, allow_null=True)
+                channelUtilization = serializers.FloatField(source="channel_utilization", required=False,
+                                                            allow_null=True)
                 airUtilTx = serializers.FloatField(source="air_util_tx", required=False, allow_null=True)
                 uptimeSeconds = serializers.IntegerField(source="uptime_seconds", required=False, allow_null=True)
 
@@ -374,10 +377,12 @@ class LocalStatsPacketSerializer(BasePacketSerializer):
 
     class DecodedSerializer(serializers.Serializer):
         """Serializer for local stats packet decoded data."""
+
         class TelemetrySerializer(serializers.Serializer):
             class LocalStatsSerializer(serializers.Serializer):
                 uptimeSeconds = serializers.IntegerField(source="uptime_seconds", required=False, allow_null=True)
-                channelUtilization = serializers.FloatField(source="channel_utilization", required=False, allow_null=True)
+                channelUtilization = serializers.FloatField(source="channel_utilization", required=False,
+                                                            allow_null=True)
                 airUtilTx = serializers.FloatField(source="air_util_tx", required=False, allow_null=True)
                 numPacketsTx = serializers.IntegerField(source="num_packets_tx", required=False, allow_null=True)
                 numPacketsRx = serializers.IntegerField(source="num_packets_rx", required=False, allow_null=True)
@@ -466,8 +471,14 @@ class PacketIngestSerializer(serializers.Serializer):
                 validated_data = DeviceMetricsPacketSerializer().to_internal_value(data)
             elif "localStats" in data.get("decoded", {}).get("telemetry", {}):
                 validated_data = LocalStatsPacketSerializer().to_internal_value(data)
+            else:
+                raise serializers.ValidationError({
+                    "decoded.telemetry": "Must contain either deviceMetrics or localStats"
+                })
         else:
-            raise serializers.ValidationError(f"Unknown packet type: {portnum}")
+            raise serializers.ValidationError({
+                "decoded.portnum": f"Unknown packet type: {portnum}"
+            })
 
         return validated_data
 
@@ -488,8 +499,14 @@ class PacketIngestSerializer(serializers.Serializer):
                 packet = DeviceMetricsPacketSerializer(context=self.context).create(validated_data)
             elif "num_packets_tx" in validated_data:
                 packet = LocalStatsPacketSerializer(context=self.context).create(validated_data)
+            else:
+                raise serializers.ValidationError({
+                    "decoded.telemetry": "Must contain either deviceMetrics or localStats"
+                })
         else:
-            raise serializers.ValidationError(f"Unknown packet type: {portnum}")
+            raise serializers.ValidationError({
+                "decoded.portnum": f"Unknown packet type: {portnum}"
+            })
 
         return packet
 

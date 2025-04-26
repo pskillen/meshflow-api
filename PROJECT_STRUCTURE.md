@@ -37,7 +37,8 @@ Stores structured messages
 
 ### Tests
 
-* [ ] Add example JSON for each packet type
+* [ ] Add example JSON for each packet 
+* [ ] verify !hex from and to values are set on packet ingestion 
 
 
 
