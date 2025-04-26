@@ -162,7 +162,7 @@ class EnvironmentMetricsPacket(BaseTelemetryPacket):
 class PacketObservation(models.Model):
     """Relates packets to node(s) which observed the packet."""
 
-    packet = models.ForeignKey(RawPacket, on_delete=models.CASCADE)
+    packet = models.ForeignKey(RawPacket, on_delete=models.CASCADE, related_name="observations")
     observer = models.ForeignKey(ManagedNode, on_delete=models.CASCADE)
 
     channel = models.SmallIntegerField(null=True)
