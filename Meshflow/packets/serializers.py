@@ -110,10 +110,18 @@ class MessagePacketSerializer(BasePacketSerializer):
     decoded = DecodedSerializer(source="*")
 
     def to_internal_value(self, data):
-        """Convert emoji from int to boolean."""
+        """Flatten decoded data and convert emoji from int to boolean."""
         validated_data = super().to_internal_value(data)
+
+        # Flatten the decoded data
+        if "decoded" in validated_data:
+            decoded_data = validated_data.pop("decoded")
+            validated_data.update(decoded_data)
+
+        # Convert emoji from int to boolean
         if "emoji" in validated_data:
             validated_data["emoji"] = bool(validated_data["emoji"])
+
         return validated_data
 
     def create(self, validated_data):
@@ -159,8 +167,13 @@ class PositionPacketSerializer(BasePacketSerializer):
     decoded = DecodedSerializer(source="*")
 
     def to_internal_value(self, data):
-        """Handle timestamp and location source conversion."""
+        """Handle timestamp and location source conversion, and flatten nested data."""
         validated_data = super().to_internal_value(data)
+
+        # Flatten the nested position data
+        if "position" in validated_data:
+            position_data = validated_data.pop("position")
+            validated_data.update(position_data)
 
         # Convert position_time to a datetime object if it exists
         if "position_time" in validated_data and validated_data["position_time"] is not None:
@@ -229,15 +242,20 @@ class NodeInfoPacketSerializer(BasePacketSerializer):
             swVersion = serializers.CharField(source="sw_version", required=False, allow_null=True)
             publicKey = serializers.CharField(source="public_key", required=False, allow_null=True)
             macaddr = serializers.CharField(source="mac_address", required=False, allow_null=True)
-            role = serializers.CharField(source="role", required=False, allow_null=True)
+            role = serializers.CharField(required=False, allow_null=True)
 
         user = UserSerializer()
 
     decoded = DecodedSerializer(source="*")
 
     def to_internal_value(self, data):
-        """Handle role conversion."""
+        """Handle role conversion and flatten nested user data."""
         validated_data = super().to_internal_value(data)
+
+        # Flatten the nested user data
+        if "user" in validated_data:
+            user_data = validated_data.pop("user")
+            validated_data.update(user_data)
 
         # Convert role from string to integer using RoleSource
         if "role" in validated_data and validated_data["role"]:
@@ -303,8 +321,20 @@ class DeviceMetricsPacketSerializer(BasePacketSerializer):
     decoded = DecodedSerializer(source="*")
 
     def to_internal_value(self, data):
-        """Handle timestamp conversion."""
+        """Handle timestamp conversion and flatten nested data."""
         validated_data = super().to_internal_value(data)
+
+        # Flatten the nested telemetry and device metrics data
+        if "telemetry" in validated_data:
+            telemetry_data = validated_data.pop("telemetry")
+            if "deviceMetrics" in telemetry_data:
+                device_metrics_data = telemetry_data.pop("deviceMetrics")
+                validated_data.update(device_metrics_data)
+            if "time" in telemetry_data:
+                validated_data["reading_time"] = telemetry_data["time"]
+
+            # add the rest of the telemetry data
+            validated_data.update(telemetry_data)
 
         # Convert reading_time to a datetime object
         if "reading_time" in validated_data:
@@ -364,8 +394,20 @@ class LocalStatsPacketSerializer(BasePacketSerializer):
     decoded = DecodedSerializer(source="*")
 
     def to_internal_value(self, data):
-        """Handle timestamp conversion."""
+        """Handle timestamp conversion and flatten nested data."""
         validated_data = super().to_internal_value(data)
+
+        # Flatten the nested telemetry and local stats data
+        if "telemetry" in validated_data:
+            telemetry_data = validated_data.pop("telemetry")
+            if "localStats" in telemetry_data:
+                local_stats_data = telemetry_data.pop("localStats")
+                validated_data.update(local_stats_data)
+            if "time" in telemetry_data:
+                validated_data["reading_time"] = telemetry_data["time"]
+
+            # add the rest of the telemetry data
+            validated_data.update(telemetry_data)
 
         # Convert reading_time to a datetime object if it exists
         if "reading_time" in validated_data and validated_data["reading_time"] is not None:
