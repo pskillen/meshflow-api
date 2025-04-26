@@ -27,6 +27,7 @@ Stores structured messages
     * DeviceMetricsPacket -> DeviceMetrics
     * PositionPacket -> NodePosition
     * MessagePacket -> TextMessage (+/- TextMessageReply)
+    * [ ] if "from" node doesn't exist, create it
 
 
 ### Security
@@ -46,3 +47,4 @@ Stores structured messages
     - This will probably be via adding a 
 - [ ] Add an auth mechanism for the frontend
 - [ ] Add an auth mechanism for Postman
+- [ ] Write down the logic + assumptions for the packet ingestion logic

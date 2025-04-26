@@ -1,6 +1,7 @@
 """Serializers for the packets app."""
 
-from django.utils import timezone
+from datetime import datetime, timezone
+from django.utils import timezone as django_timezone
 
 from rest_framework import serializers
 
@@ -22,25 +23,27 @@ class BasePacketSerializer(serializers.Serializer):
     """Base serializer for all packet types."""
 
     # Common fields from the JSON packet
-    packet_id = serializers.IntegerField(source="id")
-    from_int = serializers.IntegerField(source="from")
-    from_str = serializers.CharField(source="fromId")
-    to_int = serializers.IntegerField(source="to", required=False, allow_null=True)
-    to_str = serializers.CharField(source="toId", required=False, allow_null=True)
-    port_num = serializers.CharField(source="decoded.portnum")
+    id = serializers.IntegerField(source="packet_id")
+    # 'from' is a reserved word in Python, so we use vars() to access it
+    vars()['from'] = serializers.IntegerField(source="from_int")
+    fromId = serializers.CharField(source="from_str")
+    to = serializers.IntegerField(source="to_int", required=False, allow_null=True)
+    toId = serializers.CharField(source="to_str", required=False, allow_null=True)
+    decoded = serializers.JSONField()  # Will be overridden by child classes
+    portnum = serializers.CharField(source="port_num", read_only=True)
 
     # Fields for PacketObservation
     channel = serializers.IntegerField(required=False, allow_null=True)
-    hop_limit = serializers.IntegerField(source="hopLimit", required=False, allow_null=True)
-    hop_start = serializers.IntegerField(source="hopStart", required=False, allow_null=True)
-    rx_time = serializers.IntegerField(source="rxTime")
-    rx_rssi = serializers.FloatField(source="rxRssi", required=False, allow_null=True)
-    rx_snr = serializers.FloatField(source="rxSnr", required=False, allow_null=True)
-    relay_node = serializers.IntegerField(source="relayNode", required=False, allow_null=True)
+    hopLimit = serializers.IntegerField(source="hop_limit", required=False, allow_null=True)
+    hopStart = serializers.IntegerField(source="hop_start", required=False, allow_null=True)
+    rxTime = serializers.IntegerField(source="rx_time")
+    rxRssi = serializers.FloatField(source="rx_rssi", required=False, allow_null=True)
+    rxSnr = serializers.FloatField(source="rx_snr", required=False, allow_null=True)
+    relayNode = serializers.IntegerField(source="relay_node", required=False, allow_null=True)
 
     # Additional fields from OpenAPI spec
-    pki_encrypted = serializers.BooleanField(source="pkiEncrypted", required=False, allow_null=True)
-    next_hop = serializers.IntegerField(source="nextHop", required=False, allow_null=True)
+    pkiEncrypted = serializers.BooleanField(source="pki_encrypted", required=False, allow_null=True)
+    nextHop = serializers.IntegerField(source="next_hop", required=False, allow_null=True)
     priority = serializers.CharField(required=False, allow_null=True)
     raw = serializers.CharField(required=False)
 
@@ -49,10 +52,14 @@ class BasePacketSerializer(serializers.Serializer):
         # First, handle the standard DRF conversion
         validated_data = super().to_internal_value(data)
 
+        # Extract portnum from decoded structure
+        if "decoded" in data and "portnum" in data["decoded"]:
+            validated_data["port_num"] = data["decoded"]["portnum"]
+
         # Convert rxTime to a datetime object with validation
         if "rx_time" in validated_data:
             try:
-                validated_data["rx_time"] = timezone.datetime.fromtimestamp(validated_data["rx_time"], tz=timezone.utc)
+                validated_data["rx_time"] = datetime.fromtimestamp(validated_data["rx_time"], tz=timezone.utc)
             except (ValueError, TypeError, OSError) as e:
                 raise serializers.ValidationError({
                     "rx_time": f"Invalid timestamp: {str(e)}"
@@ -83,23 +90,19 @@ class BasePacketSerializer(serializers.Serializer):
 class MessagePacketSerializer(BasePacketSerializer):
     """Serializer for text message packets."""
 
-    message_text = serializers.CharField(source="decoded.text")
-    reply_packet_id = serializers.IntegerField(source="decoded.reply_id", required=False)
-    emoji = serializers.IntegerField(source="decoded.emoji", required=False, allow_null=True)
+    class DecodedSerializer(serializers.Serializer):
+        """Serializer for message packet decoded data."""
+        text = serializers.CharField(source="message_text")
+        replyId = serializers.IntegerField(source="reply_packet_id", required=False)
+        emoji = serializers.IntegerField(required=False, allow_null=True)
+
+    decoded = DecodedSerializer(source="*")
 
     def to_internal_value(self, data):
-        """Convert camelCase to snake_case for nested fields and handle emoji conversion."""
-        # First, handle the standard DRF conversion
+        """Convert emoji from int to boolean."""
         validated_data = super().to_internal_value(data)
-
-        # Convert rxTime to a datetime object
-        if "rx_time" in validated_data:
-            validated_data["rx_time"] = timezone.datetime.fromtimestamp(validated_data["rx_time"], tz=timezone.utc)
-
-        # Convert emoji from int to boolean
         if "emoji" in validated_data:
             validated_data["emoji"] = bool(validated_data["emoji"])
-
         return validated_data
 
     def create(self, validated_data):
@@ -110,7 +113,7 @@ class MessagePacketSerializer(BasePacketSerializer):
         # Create the packet
         packet = MessagePacket.objects.create(
             packet_id=validated_data.get("packet_id"),
-            from_int=validated_data.get("from"),
+            from_int=validated_data.get("from_"),
             from_str=validated_data.get("fromId"),
             to_int=validated_data.get("to"),
             to_str=validated_data.get("toId"),
@@ -129,24 +132,30 @@ class MessagePacketSerializer(BasePacketSerializer):
 class PositionPacketSerializer(BasePacketSerializer):
     """Serializer for position packets."""
 
-    latitude = serializers.FloatField(source="decoded.position.latitude")
-    longitude = serializers.FloatField(source="decoded.position.longitude")
-    altitude = serializers.FloatField(source="decoded.position.altitude", required=False, allow_null=True)
-    heading = serializers.FloatField(source="decoded.position.heading", required=False, allow_null=True)
-    location_source = serializers.CharField(source="decoded.position.locationSource", required=False, allow_null=True)
-    precision_bits = serializers.IntegerField(source="decoded.position.precisionBits", required=False, allow_null=True)
-    position_time = serializers.IntegerField(source="decoded.position.time", required=False, allow_null=True)
-    ground_speed = serializers.FloatField(source="decoded.position.groundSpeed", required=False, allow_null=True)
-    ground_track = serializers.FloatField(source="decoded.position.groundTrack", required=False, allow_null=True)
+    class DecodedSerializer(serializers.Serializer):
+        """Serializer for position packet decoded data."""
+        class PositionSerializer(serializers.Serializer):
+            latitude = serializers.FloatField()
+            longitude = serializers.FloatField()
+            altitude = serializers.FloatField(required=False, allow_null=True)
+            heading = serializers.FloatField(required=False, allow_null=True)
+            locationSource = serializers.CharField(source="location_source", required=False, allow_null=True)
+            precisionBits = serializers.IntegerField(source="precision_bits", required=False, allow_null=True)
+            time = serializers.IntegerField(source="position_time", required=False, allow_null=True)
+            groundSpeed = serializers.FloatField(source="ground_speed", required=False, allow_null=True)
+            groundTrack = serializers.FloatField(source="ground_track", required=False, allow_null=True)
+
+        position = PositionSerializer()
+
+    decoded = DecodedSerializer(source="*")
 
     def to_internal_value(self, data):
-        """Convert camelCase to snake_case for nested fields and handle timestamp and location source conversion."""
-        # First, handle the standard DRF conversion
+        """Handle timestamp and location source conversion."""
         validated_data = super().to_internal_value(data)
 
         # Convert position_time to a datetime object if it exists
         if "position_time" in validated_data and validated_data["position_time"] is not None:
-            validated_data["position_time"] = timezone.datetime.fromtimestamp(
+            validated_data["position_time"] = datetime.fromtimestamp(
                 validated_data["position_time"], tz=timezone.utc
             )
 
@@ -179,7 +188,7 @@ class PositionPacketSerializer(BasePacketSerializer):
         # Create the packet
         packet = PositionPacket.objects.create(
             packet_id=validated_data.get("packet_id"),
-            from_int=validated_data.get("from"),
+            from_int=validated_data.get("from_"),
             from_str=validated_data.get("fromId"),
             to_int=validated_data.get("to"),
             to_str=validated_data.get("toId"),
@@ -204,18 +213,24 @@ class PositionPacketSerializer(BasePacketSerializer):
 class NodeInfoPacketSerializer(BasePacketSerializer):
     """Serializer for node info packets."""
 
-    node_id = serializers.CharField(source="decoded.user.id")
-    short_name = serializers.CharField(source="decoded.user.shortName", required=False, allow_null=True)
-    long_name = serializers.CharField(source="decoded.user.longName", required=False, allow_null=True)
-    hw_model = serializers.CharField(source="decoded.user.hwModel", required=False, allow_null=True)
-    sw_version = serializers.CharField(source="decoded.user.swVersion", required=False, allow_null=True)
-    public_key = serializers.CharField(source="decoded.user.publicKey", required=False, allow_null=True)
-    mac_address = serializers.CharField(source="decoded.user.macaddr", required=False, allow_null=True)
-    role = serializers.CharField(source="decoded.user.role", required=False, allow_null=True)
+    class DecodedSerializer(serializers.Serializer):
+        """Serializer for node info packet decoded data."""
+        class UserSerializer(serializers.Serializer):
+            id = serializers.CharField(source="node_id")
+            shortName = serializers.CharField(source="short_name", required=False, allow_null=True)
+            longName = serializers.CharField(source="long_name", required=False, allow_null=True)
+            hwModel = serializers.CharField(source="hw_model", required=False, allow_null=True)
+            swVersion = serializers.CharField(source="sw_version", required=False, allow_null=True)
+            publicKey = serializers.CharField(source="public_key", required=False, allow_null=True)
+            macaddr = serializers.CharField(source="mac_address", required=False, allow_null=True)
+            role = serializers.CharField(source="role", required=False, allow_null=True)
+
+        user = UserSerializer()
+
+    decoded = DecodedSerializer(source="*")
 
     def to_internal_value(self, data):
-        """Convert camelCase to snake_case for nested fields and handle role conversion."""
-        # First, handle the standard DRF conversion
+        """Handle role conversion."""
         validated_data = super().to_internal_value(data)
 
         # Convert role from string to integer using RoleSource
@@ -243,7 +258,7 @@ class NodeInfoPacketSerializer(BasePacketSerializer):
         # Create the packet
         packet = NodeInfoPacket.objects.create(
             packet_id=validated_data.get("packet_id"),
-            from_int=validated_data.get("from"),
+            from_int=validated_data.get("from_"),
             from_str=validated_data.get("fromId"),
             to_int=validated_data.get("to"),
             to_str=validated_data.get("toId"),
@@ -267,41 +282,30 @@ class NodeInfoPacketSerializer(BasePacketSerializer):
 class DeviceMetricsPacketSerializer(BasePacketSerializer):
     """Serializer for device metrics packets."""
 
-    battery_level = serializers.FloatField(
-        source="decoded.telemetry.deviceMetrics.batteryLevel",
-        required=False,
-        allow_null=True,
-    )
-    voltage = serializers.FloatField(
-        source="decoded.telemetry.deviceMetrics.voltage",
-        required=False,
-        allow_null=True,
-    )
-    channel_utilization = serializers.FloatField(
-        source="decoded.telemetry.deviceMetrics.channelUtilization",
-        required=False,
-        allow_null=True,
-    )
-    air_util_tx = serializers.FloatField(
-        source="decoded.telemetry.deviceMetrics.airUtilTx",
-        required=False,
-        allow_null=True,
-    )
-    uptime_seconds = serializers.IntegerField(
-        source="decoded.telemetry.deviceMetrics.uptimeSeconds",
-        required=False,
-        allow_null=True,
-    )
-    reading_time = serializers.IntegerField(source="decoded.telemetry.time")
+    class DecodedSerializer(serializers.Serializer):
+        """Serializer for device metrics packet decoded data."""
+        class TelemetrySerializer(serializers.Serializer):
+            class DeviceMetricsSerializer(serializers.Serializer):
+                batteryLevel = serializers.FloatField(source="battery_level", required=False, allow_null=True)
+                voltage = serializers.FloatField(required=False, allow_null=True)
+                channelUtilization = serializers.FloatField(source="channel_utilization", required=False, allow_null=True)
+                airUtilTx = serializers.FloatField(source="air_util_tx", required=False, allow_null=True)
+                uptimeSeconds = serializers.IntegerField(source="uptime_seconds", required=False, allow_null=True)
+
+            deviceMetrics = DeviceMetricsSerializer()
+            time = serializers.IntegerField(source="reading_time")
+
+        telemetry = TelemetrySerializer()
+
+    decoded = DecodedSerializer(source="*")
 
     def to_internal_value(self, data):
-        """Convert camelCase to snake_case for nested fields."""
-        # First, handle the standard conversion
+        """Handle timestamp conversion."""
         validated_data = super().to_internal_value(data)
 
         # Convert reading_time to a datetime object
         if "reading_time" in validated_data:
-            validated_data["reading_time"] = timezone.datetime.fromtimestamp(
+            validated_data["reading_time"] = datetime.fromtimestamp(
                 validated_data["reading_time"], tz=timezone.utc
             )
 
@@ -317,7 +321,7 @@ class DeviceMetricsPacketSerializer(BasePacketSerializer):
         # Create the packet
         packet = DeviceMetricsPacket.objects.create(
             packet_id=validated_data.get("packet_id"),
-            from_int=validated_data.get("from"),
+            from_int=validated_data.get("from_"),
             from_str=validated_data.get("fromId"),
             to_int=validated_data.get("to"),
             to_str=validated_data.get("toId"),
@@ -339,61 +343,34 @@ class DeviceMetricsPacketSerializer(BasePacketSerializer):
 class LocalStatsPacketSerializer(BasePacketSerializer):
     """Serializer for local stats telemetry packets."""
 
-    uptime_seconds = serializers.IntegerField(
-        source="decoded.telemetry.localStats.uptimeSeconds",
-        required=False,
-        allow_null=True,
-    )
-    channel_utilization = serializers.FloatField(
-        source="decoded.telemetry.localStats.channelUtilization",
-        required=False,
-        allow_null=True,
-    )
-    air_util_tx = serializers.FloatField(
-        source="decoded.telemetry.localStats.airUtilTx",
-        required=False,
-        allow_null=True,
-    )
-    num_packets_tx = serializers.IntegerField(
-        source="decoded.telemetry.localStats.numPacketsTx",
-        required=False,
-        allow_null=True,
-    )
-    num_packets_rx = serializers.IntegerField(
-        source="decoded.telemetry.localStats.numPacketsRx",
-        required=False,
-        allow_null=True,
-    )
-    num_packets_rx_bad = serializers.IntegerField(
-        source="decoded.telemetry.localStats.numPacketsRxBad",
-        required=False,
-        allow_null=True,
-    )
-    num_online_nodes = serializers.IntegerField(
-        source="decoded.telemetry.localStats.numOnlineNodes",
-        required=False,
-        allow_null=True,
-    )
-    num_total_nodes = serializers.IntegerField(
-        source="decoded.telemetry.localStats.numTotalNodes",
-        required=False,
-        allow_null=True,
-    )
-    num_rx_dupe = serializers.IntegerField(
-        source="decoded.telemetry.localStats.numRxDupe",
-        required=False,
-        allow_null=True,
-    )
-    reading_time = serializers.IntegerField(source="decoded.telemetry.time")
+    class DecodedSerializer(serializers.Serializer):
+        """Serializer for local stats packet decoded data."""
+        class TelemetrySerializer(serializers.Serializer):
+            class LocalStatsSerializer(serializers.Serializer):
+                uptimeSeconds = serializers.IntegerField(source="uptime_seconds", required=False, allow_null=True)
+                channelUtilization = serializers.FloatField(source="channel_utilization", required=False, allow_null=True)
+                airUtilTx = serializers.FloatField(source="air_util_tx", required=False, allow_null=True)
+                numPacketsTx = serializers.IntegerField(source="num_packets_tx", required=False, allow_null=True)
+                numPacketsRx = serializers.IntegerField(source="num_packets_rx", required=False, allow_null=True)
+                numPacketsRxBad = serializers.IntegerField(source="num_packets_rx_bad", required=False, allow_null=True)
+                numOnlineNodes = serializers.IntegerField(source="num_online_nodes", required=False, allow_null=True)
+                numTotalNodes = serializers.IntegerField(source="num_total_nodes", required=False, allow_null=True)
+                numRxDupe = serializers.IntegerField(source="num_rx_dupe", required=False, allow_null=True)
+
+            localStats = LocalStatsSerializer()
+            time = serializers.IntegerField(source="reading_time")
+
+        telemetry = TelemetrySerializer()
+
+    decoded = DecodedSerializer(source="*")
 
     def to_internal_value(self, data):
-        """Convert camelCase to snake_case for nested fields and handle timestamp conversion."""
-        # First, handle the standard DRF conversion
+        """Handle timestamp conversion."""
         validated_data = super().to_internal_value(data)
 
         # Convert reading_time to a datetime object if it exists
         if "reading_time" in validated_data and validated_data["reading_time"] is not None:
-            validated_data["reading_time"] = timezone.datetime.fromtimestamp(
+            validated_data["reading_time"] = datetime.fromtimestamp(
                 validated_data["reading_time"], tz=timezone.utc
             )
 
@@ -409,7 +386,7 @@ class LocalStatsPacketSerializer(BasePacketSerializer):
         # Create the packet
         packet = LocalStatsPacket.objects.create(
             packet_id=validated_data.get("packet_id"),
-            from_int=validated_data.get("from"),
+            from_int=validated_data.get("from_"),
             from_str=validated_data.get("fromId"),
             to_int=validated_data.get("to"),
             to_str=validated_data.get("toId"),
@@ -481,13 +458,13 @@ class PacketIngestSerializer(serializers.Serializer):
 
 
 class PositionSerializer(serializers.Serializer):
-    logged_time = serializers.DateTimeField(default=timezone.now)
-    reported_time = serializers.DateTimeField(required=True)
+    loggedTime = serializers.DateTimeField(source="logged_time", default=django_timezone.now)
+    reportedTime = serializers.DateTimeField(source="reported_time", required=True)
     latitude = serializers.FloatField()
     longitude = serializers.FloatField()
     altitude = serializers.FloatField()
     heading = serializers.FloatField()
-    location_source = serializers.CharField()
+    locationSource = serializers.CharField(source="location_source")
 
     def to_internal_value(self, data):
         """Convert location source from string to integer."""
@@ -516,44 +493,44 @@ class PositionSerializer(serializers.Serializer):
 
 
 class DeviceMetricsSerializer(serializers.Serializer):
-    logged_time = serializers.DateTimeField(default=timezone.now)
-    reported_time = serializers.DateTimeField(required=True)
-    battery_level = serializers.FloatField()
+    loggedTime = serializers.DateTimeField(source="logged_time", default=django_timezone.now)
+    reportedTime = serializers.DateTimeField(source="reported_time", required=True)
+    batteryLevel = serializers.FloatField(source="battery_level")
     voltage = serializers.FloatField()
-    channel_utilization = serializers.FloatField()
-    air_util_tx = serializers.FloatField()
-    uptime_seconds = serializers.IntegerField()
+    channelUtilization = serializers.FloatField(source="channel_utilization")
+    airUtilTx = serializers.FloatField(source="air_util_tx")
+    uptimeSeconds = serializers.IntegerField(source="uptime_seconds")
 
 
 class NodeSerializer(serializers.ModelSerializer):
     """Serializer for node information updates."""
 
     position = PositionSerializer(required=False, allow_null=True, write_only=True)
-    device_metrics = DeviceMetricsSerializer(required=False, allow_null=True, write_only=True)
-    internal_id = serializers.IntegerField(source="id", read_only=True)
-    node_id = serializers.IntegerField()
-    node_id_str = serializers.CharField(source="node_id_str", required=False)
-    mac_addr = serializers.CharField()
-    long_name = serializers.CharField(required=False, allow_null=True)
-    short_name = serializers.CharField(required=False, allow_null=True)
-    hw_model = serializers.CharField(required=False, allow_null=True)
-    sw_version = serializers.CharField(required=False, allow_null=True)
-    public_key = serializers.CharField(required=False, allow_null=True)
+    deviceMetrics = DeviceMetricsSerializer(source="device_metrics", required=False, allow_null=True, write_only=True)
+    internalId = serializers.IntegerField(source="id", read_only=True)
+    nodeId = serializers.IntegerField(source="node_id")
+    nodeIdStr = serializers.CharField(source="node_id_str", required=False)
+    macAddr = serializers.CharField(source="mac_addr")
+    longName = serializers.CharField(source="long_name", required=False, allow_null=True)
+    shortName = serializers.CharField(source="short_name", required=False, allow_null=True)
+    hwModel = serializers.CharField(source="hw_model", required=False, allow_null=True)
+    swVersion = serializers.CharField(source="sw_version", required=False, allow_null=True)
+    publicKey = serializers.CharField(source="public_key", required=False, allow_null=True)
 
     class Meta:
         model = ObservedNode
         fields = [
-            "internal_id",
-            "node_id",
-            "node_id_str",
-            "mac_addr",
-            "long_name",
-            "short_name",
-            "hw_model",
-            "sw_version",
-            "public_key",
+            "internalId",
+            "nodeId",
+            "nodeIdStr",
+            "macAddr",
+            "longName",
+            "shortName",
+            "hwModel",
+            "swVersion",
+            "publicKey",
             "position",
-            "device_metrics",
+            "deviceMetrics",
         ]
 
     def to_internal_value(self, data):
@@ -562,31 +539,31 @@ class NodeSerializer(serializers.ModelSerializer):
         if "user" in data:
             user_data = data.pop("user")
             data.update({
-                "long_name": user_data.get("longName"),
-                "short_name": user_data.get("shortName"),
+                "longName": user_data.get("longName"),
+                "shortName": user_data.get("shortName"),
             })
 
         # Handle position data
         if "position" in data:
             position_data = data.pop("position")
             data["position"] = {
-                "reported_time": position_data.get("reportedTime"),
+                "reportedTime": position_data.get("reportedTime"),
                 "latitude": position_data.get("latitude"),
                 "longitude": position_data.get("longitude"),
                 "altitude": position_data.get("altitude"),
-                "location_source": position_data.get("locationSource"),
+                "locationSource": position_data.get("locationSource"),
             }
 
         # Handle device metrics
         if "deviceMetrics" in data:
             metrics_data = data.pop("deviceMetrics")
-            data["device_metrics"] = {
-                "reported_time": metrics_data.get("reportedTime"),
-                "battery_level": metrics_data.get("batteryLevel"),
+            data["deviceMetrics"] = {
+                "reportedTime": metrics_data.get("reportedTime"),
+                "batteryLevel": metrics_data.get("batteryLevel"),
                 "voltage": metrics_data.get("voltage"),
-                "channel_utilization": metrics_data.get("channelUtilization"),
-                "air_util_tx": metrics_data.get("airUtilTx"),
-                "uptime_seconds": metrics_data.get("uptimeSeconds"),
+                "channelUtilization": metrics_data.get("channelUtilization"),
+                "airUtilTx": metrics_data.get("airUtilTx"),
+                "uptimeSeconds": metrics_data.get("uptimeSeconds"),
             }
 
         return super().to_internal_value(data)
@@ -620,7 +597,7 @@ class NodeSerializer(serializers.ModelSerializer):
                 voltage=device_metrics_data.get("voltage"),
                 channel_utilization=device_metrics_data.get("channel_utilization"),
                 air_util_tx=device_metrics_data.get("air_util_tx"),
-                uptime_seconds=device_metrics_data.get("uptime_seconds"),
+                uptime_seconds=device_metrics_data.get("uptimeSeconds"),
             )
 
         return node
@@ -657,7 +634,7 @@ class NodeSerializer(serializers.ModelSerializer):
                     "voltage": device_metrics_data.get("voltage"),
                     "channel_utilization": device_metrics_data.get("channel_utilization"),
                     "air_util_tx": device_metrics_data.get("air_util_tx"),
-                    "uptime_seconds": device_metrics_data.get("uptime_seconds"),
+                    "uptime_seconds": device_metrics_data.get("uptimeSeconds"),
                 },
             )
 
