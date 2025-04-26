@@ -10,8 +10,8 @@ from constellations.models import Constellation
 from nodes.models import ManagedNode, ObservedNode
 from packets.models import (
     DeviceMetricsPacket,
-    LocationSource,
     LocalStatsPacket,
+    LocationSource,
     MessagePacket,
     NodeInfoPacket,
     PositionPacket,
@@ -29,12 +29,14 @@ from packets.serializers import (
 
 User = get_user_model()
 
+
 def assert_serializer_valid(serializer):
     """Assert that a serializer is valid."""
     valid = serializer.is_valid()
     if not valid:
         print(serializer.errors)
     assert valid
+
 
 class BasePacketSerializerTestCase(TestCase):
     """Base test case for packet serializers."""
@@ -43,31 +45,17 @@ class BasePacketSerializerTestCase(TestCase):
     def setUpTestData(cls):
         """Set up test data for all test cases."""
         # Create a test user
-        cls.user = User.objects.create_user(
-            username="testuser",
-            password="testpass123",
-            email="test@example.com"
-        )
+        cls.user = User.objects.create_user(username="testuser", password="testpass123", email="test@example.com")
 
         # Create a test constellation
-        cls.constellation = Constellation.objects.create(
-            name="Test Constellation",
-            created_by=cls.user
-        )
+        cls.constellation = Constellation.objects.create(name="Test Constellation", created_by=cls.user)
 
         # Create a test observer node
         cls.observer = ManagedNode.objects.create(
-            internal_id=uuid4(),
-            node_id=123456,
-            name="Test Node",
-            constellation_id=cls.constellation.id,
-            owner=cls.user
+            internal_id=uuid4(), node_id=123456, name="Test Node", constellation_id=cls.constellation.id, owner=cls.user
         )
 
-        cls.from_node = ObservedNode.objects.create(
-            node_id=456789,
-            long_name="From Node"
-        )
+        cls.from_node = ObservedNode.objects.create(node_id=456789, long_name="From Node")
 
     def setUp(self):
         """Set up test context."""

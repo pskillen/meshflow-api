@@ -2,9 +2,8 @@ from django.utils import timezone
 
 import pytest
 
+from constellations.tests.conftest import constellation_data, create_constellation  # noqa: F401
 from nodes.tests.conftest import create_managed_node, managed_node_data  # noqa: F401
-from constellations.tests.conftest import create_constellation, constellation_data  # noqa: F401
-from users.tests.conftest import create_user  # noqa: F401
 from packets.models import (
     DeviceMetricsPacket,
     EnvironmentMetricsPacket,
@@ -17,6 +16,7 @@ from packets.models import (
     RawPacket,
     RoleSource,
 )
+from users.tests.conftest import create_user  # noqa: F401
 
 
 @pytest.fixture
@@ -216,7 +216,7 @@ def create_environment_metrics_packet(environment_metrics_packet_data):
 
 
 @pytest.fixture
-def create_packet_observation(create_raw_packet, create_managed_node):
+def create_packet_observation(create_raw_packet, create_managed_node):  # noqa: F811
     def make_observation(**kwargs):
         packet = kwargs.pop("packet", create_raw_packet())
         observer = kwargs.pop("observer", create_managed_node())

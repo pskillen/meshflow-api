@@ -3,19 +3,21 @@
 from datetime import datetime, timezone
 
 from django.utils import timezone as django_timezone
+
 from rest_framework import serializers
 
 from common.mesh_node_helpers import meshtastic_id_to_hex
 from nodes.models import DeviceMetrics, ObservedNode, Position
+
 from .models import (
     DeviceMetricsPacket,
+    LocalStatsPacket,
     LocationSource,
     MessagePacket,
     NodeInfoPacket,
     PacketObservation,
     PositionPacket,
     RoleSource,
-    LocalStatsPacket,
 )
 
 
@@ -25,7 +27,7 @@ class BasePacketSerializer(serializers.Serializer):
     # Common fields from the JSON packet
     id = serializers.IntegerField(source="packet_id")
     # 'from' is a reserved word in Python, so we use vars() to access it
-    vars()['from'] = serializers.IntegerField(source="from_int")
+    vars()["from"] = serializers.IntegerField(source="from_int")
     fromId = serializers.CharField(source="from_str")
     to = serializers.IntegerField(source="to_int", required=False, allow_null=True)
     toId = serializers.CharField(source="to_str", required=False, allow_null=True)
@@ -71,16 +73,14 @@ class BasePacketSerializer(serializers.Serializer):
             try:
                 validated_data["rx_time"] = datetime.fromtimestamp(validated_data["rx_time"], tz=timezone.utc)
             except (ValueError, TypeError, OSError) as e:
-                raise serializers.ValidationError({
-                    "rx_time": f"Invalid timestamp: {str(e)}"
-                })
+                raise serializers.ValidationError({"rx_time": f"Invalid timestamp: {str(e)}"})
 
         return validated_data
 
     def _create_observation(self, packet, validated_data):
         """Create a PacketObservation for the packet."""
         # Get the observer from the request context
-        observer = self.context.get('observer')
+        observer = self.context.get("observer")
         if not observer:
             raise serializers.ValidationError("No observer found in request context")
 
@@ -102,6 +102,7 @@ class MessagePacketSerializer(BasePacketSerializer):
 
     class DecodedSerializer(serializers.Serializer):
         """Serializer for message packet decoded data."""
+
         text = serializers.CharField(source="message_text")
         replyId = serializers.IntegerField(source="reply_packet_id", required=False)
         emoji = serializers.IntegerField(required=False, allow_null=True)
@@ -177,9 +178,7 @@ class PositionPacketSerializer(BasePacketSerializer):
 
         # Convert position_time to a datetime object if it exists
         if "position_time" in validated_data and validated_data["position_time"] is not None:
-            validated_data["position_time"] = datetime.fromtimestamp(
-                validated_data["position_time"], tz=timezone.utc
-            )
+            validated_data["position_time"] = datetime.fromtimestamp(validated_data["position_time"], tz=timezone.utc)
 
         # Convert location_source from string to integer using LocationSource
         if "location_source" in validated_data and validated_data["location_source"]:
@@ -311,8 +310,9 @@ class DeviceMetricsPacketSerializer(BasePacketSerializer):
             class DeviceMetricsSerializer(serializers.Serializer):
                 batteryLevel = serializers.FloatField(source="battery_level", required=False, allow_null=True)
                 voltage = serializers.FloatField(required=False, allow_null=True)
-                channelUtilization = serializers.FloatField(source="channel_utilization", required=False,
-                                                            allow_null=True)
+                channelUtilization = serializers.FloatField(
+                    source="channel_utilization", required=False, allow_null=True
+                )
                 airUtilTx = serializers.FloatField(source="air_util_tx", required=False, allow_null=True)
                 uptimeSeconds = serializers.IntegerField(source="uptime_seconds", required=False, allow_null=True)
 
@@ -341,9 +341,7 @@ class DeviceMetricsPacketSerializer(BasePacketSerializer):
 
         # Convert reading_time to a datetime object
         if "reading_time" in validated_data:
-            validated_data["reading_time"] = datetime.fromtimestamp(
-                validated_data["reading_time"], tz=timezone.utc
-            )
+            validated_data["reading_time"] = datetime.fromtimestamp(validated_data["reading_time"], tz=timezone.utc)
 
         return validated_data
 
@@ -381,8 +379,9 @@ class LocalStatsPacketSerializer(BasePacketSerializer):
         class TelemetrySerializer(serializers.Serializer):
             class LocalStatsSerializer(serializers.Serializer):
                 uptimeSeconds = serializers.IntegerField(source="uptime_seconds", required=False, allow_null=True)
-                channelUtilization = serializers.FloatField(source="channel_utilization", required=False,
-                                                            allow_null=True)
+                channelUtilization = serializers.FloatField(
+                    source="channel_utilization", required=False, allow_null=True
+                )
                 airUtilTx = serializers.FloatField(source="air_util_tx", required=False, allow_null=True)
                 numPacketsTx = serializers.IntegerField(source="num_packets_tx", required=False, allow_null=True)
                 numPacketsRx = serializers.IntegerField(source="num_packets_rx", required=False, allow_null=True)
@@ -416,9 +415,7 @@ class LocalStatsPacketSerializer(BasePacketSerializer):
 
         # Convert reading_time to a datetime object if it exists
         if "reading_time" in validated_data and validated_data["reading_time"] is not None:
-            validated_data["reading_time"] = datetime.fromtimestamp(
-                validated_data["reading_time"], tz=timezone.utc
-            )
+            validated_data["reading_time"] = datetime.fromtimestamp(validated_data["reading_time"], tz=timezone.utc)
 
         return validated_data
 
@@ -472,13 +469,11 @@ class PacketIngestSerializer(serializers.Serializer):
             elif "localStats" in data.get("decoded", {}).get("telemetry", {}):
                 validated_data = LocalStatsPacketSerializer().to_internal_value(data)
             else:
-                raise serializers.ValidationError({
-                    "decoded.telemetry": "Must contain either deviceMetrics or localStats"
-                })
+                raise serializers.ValidationError(
+                    {"decoded.telemetry": "Must contain either deviceMetrics or localStats"}
+                )
         else:
-            raise serializers.ValidationError({
-                "decoded.portnum": f"Unknown packet type: {portnum}"
-            })
+            raise serializers.ValidationError({"decoded.portnum": f"Unknown packet type: {portnum}"})
 
         return validated_data
 
@@ -500,13 +495,11 @@ class PacketIngestSerializer(serializers.Serializer):
             elif "num_packets_tx" in validated_data:
                 packet = LocalStatsPacketSerializer(context=self.context).create(validated_data)
             else:
-                raise serializers.ValidationError({
-                    "decoded.telemetry": "Must contain either deviceMetrics or localStats"
-                })
+                raise serializers.ValidationError(
+                    {"decoded.telemetry": "Must contain either deviceMetrics or localStats"}
+                )
         else:
-            raise serializers.ValidationError({
-                "decoded.portnum": f"Unknown packet type: {portnum}"
-            })
+            raise serializers.ValidationError({"decoded.portnum": f"Unknown packet type: {portnum}"})
 
         return packet
 
@@ -592,10 +585,12 @@ class NodeSerializer(serializers.ModelSerializer):
         # Handle the nested user data
         if "user" in data:
             user_data = data.pop("user")
-            data.update({
-                "longName": user_data.get("longName"),
-                "shortName": user_data.get("shortName"),
-            })
+            data.update(
+                {
+                    "longName": user_data.get("longName"),
+                    "shortName": user_data.get("shortName"),
+                }
+            )
 
         # Handle position data
         if "position" in data:
