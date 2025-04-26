@@ -6,6 +6,7 @@ from django.utils import timezone as django_timezone
 from rest_framework import serializers
 
 from nodes.models import DeviceMetrics, ObservedNode, Position
+from common.mesh_node_helpers import meshtastic_id_to_hex
 
 from .models import (
     DeviceMetricsPacket,
@@ -51,6 +52,16 @@ class BasePacketSerializer(serializers.Serializer):
         """Convert camelCase to snake_case for nested fields."""
         # First, handle the standard DRF conversion
         validated_data = super().to_internal_value(data)
+
+        # override the hex node_id with the integer node_id
+        if "from" in validated_data:
+            from_int = validated_data["from_int"]
+            from_str = meshtastic_id_to_hex(from_int)
+            validated_data["from_str"] = from_str
+        if "to" in validated_data:
+            to_int = validated_data["to_int"]
+            to_str = meshtastic_id_to_hex(to_int)
+            validated_data["to_str"] = to_str
 
         # Extract portnum from decoded structure
         if "decoded" in data and "portnum" in data["decoded"]:
@@ -107,20 +118,18 @@ class MessagePacketSerializer(BasePacketSerializer):
 
     def create(self, validated_data):
         """Create a new MessagePacket instance."""
-        # Extract nested data
-        decoded_data = validated_data.pop("decoded", {})
 
         # Create the packet
         packet = MessagePacket.objects.create(
             packet_id=validated_data.get("packet_id"),
-            from_int=validated_data.get("from_"),
-            from_str=validated_data.get("fromId"),
-            to_int=validated_data.get("to"),
-            to_str=validated_data.get("toId"),
-            port_num=decoded_data.get("portnum"),
-            message_text=decoded_data.get("text"),
-            reply_packet_id=validated_data.get("reply_packet_id", 0),
-            emoji=validated_data.get("emoji"),
+            from_int=validated_data.get("from_int"),
+            from_str=validated_data.get("from_str"),
+            to_int=validated_data.get("to_int"),
+            to_str=validated_data.get("to_str"),
+            port_num=validated_data.get("port_num"),
+            message_text=validated_data.get("message_text"),
+            reply_packet_id=validated_data.get("reply_packet_id"),
+            emoji=validated_data.get("emoji", False),
         )
 
         # Create the observation
@@ -181,27 +190,24 @@ class PositionPacketSerializer(BasePacketSerializer):
 
     def create(self, validated_data):
         """Create a new PositionPacket instance."""
-        # Extract nested data
-        decoded_data = validated_data.pop("decoded", {})
-        position_data = decoded_data.pop("position", {})
 
         # Create the packet
         packet = PositionPacket.objects.create(
             packet_id=validated_data.get("packet_id"),
-            from_int=validated_data.get("from_"),
-            from_str=validated_data.get("fromId"),
-            to_int=validated_data.get("to"),
-            to_str=validated_data.get("toId"),
-            port_num=decoded_data.get("portnum"),
-            latitude=position_data.get("latitude"),
-            longitude=position_data.get("longitude"),
-            altitude=position_data.get("altitude"),
-            heading=position_data.get("heading"),
+            from_int=validated_data.get("from_int"),
+            from_str=validated_data.get("from_str"),
+            to_int=validated_data.get("to_int"),
+            to_str=validated_data.get("to_str"),
+            port_num=validated_data.get("port_num"),
+            latitude=validated_data.get("latitude"),
+            longitude=validated_data.get("longitude"),
+            altitude=validated_data.get("altitude"),
+            heading=validated_data.get("heading"),
             location_source=validated_data.get("location_source"),
-            precision_bits=position_data.get("precisionBits"),
+            precision_bits=validated_data.get("precision_bits"),
             position_time=validated_data.get("position_time"),
-            ground_speed=position_data.get("groundSpeed"),
-            ground_track=position_data.get("groundTrack"),
+            ground_speed=validated_data.get("ground_speed"),
+            ground_track=validated_data.get("ground_track"),
         )
 
         # Create the observation
@@ -251,25 +257,22 @@ class NodeInfoPacketSerializer(BasePacketSerializer):
 
     def create(self, validated_data):
         """Create a new NodeInfoPacket instance."""
-        # Extract nested data
-        decoded_data = validated_data.pop("decoded", {})
-        user_data = decoded_data.pop("user", {})
 
         # Create the packet
         packet = NodeInfoPacket.objects.create(
             packet_id=validated_data.get("packet_id"),
-            from_int=validated_data.get("from_"),
-            from_str=validated_data.get("fromId"),
-            to_int=validated_data.get("to"),
-            to_str=validated_data.get("toId"),
-            port_num=decoded_data.get("portnum"),
-            node_id=user_data.get("id"),
-            short_name=user_data.get("shortName"),
-            long_name=user_data.get("longName"),
-            hw_model=user_data.get("hwModel"),
-            sw_version=user_data.get("swVersion"),
-            public_key=user_data.get("publicKey"),
-            mac_address=user_data.get("macaddr"),
+            from_int=validated_data.get("from_int"),
+            from_str=validated_data.get("from_str"),
+            to_int=validated_data.get("to_int"),
+            to_str=validated_data.get("to_str"),
+            port_num=validated_data.get("port_num"),
+            node_id=validated_data.get("node_id"),
+            short_name=validated_data.get("short_name"),
+            long_name=validated_data.get("long_name"),
+            hw_model=validated_data.get("hw_model"),
+            sw_version=validated_data.get("sw_version"),
+            public_key=validated_data.get("public_key"),
+            mac_address=validated_data.get("mac_address"),
             role=validated_data.get("role"),
         )
 
@@ -313,25 +316,21 @@ class DeviceMetricsPacketSerializer(BasePacketSerializer):
 
     def create(self, validated_data):
         """Create a new DeviceMetricsPacket instance."""
-        # Extract nested data
-        decoded_data = validated_data.pop("decoded", {})
-        telemetry_data = decoded_data.pop("telemetry", {})
-        device_metrics_data = telemetry_data.pop("deviceMetrics", {})
 
         # Create the packet
         packet = DeviceMetricsPacket.objects.create(
             packet_id=validated_data.get("packet_id"),
-            from_int=validated_data.get("from_"),
-            from_str=validated_data.get("fromId"),
-            to_int=validated_data.get("to"),
-            to_str=validated_data.get("toId"),
-            port_num=decoded_data.get("portnum"),
+            from_int=validated_data.get("from_int"),
+            from_str=validated_data.get("from_str"),
+            to_int=validated_data.get("to_int"),
+            to_str=validated_data.get("to_str"),
+            port_num=validated_data.get("port_num"),
             reading_time=validated_data.get("reading_time"),
-            battery_level=device_metrics_data.get("batteryLevel"),
-            voltage=device_metrics_data.get("voltage"),
-            channel_utilization=device_metrics_data.get("channelUtilization"),
-            air_util_tx=device_metrics_data.get("airUtilTx"),
-            uptime_seconds=device_metrics_data.get("uptimeSeconds"),
+            battery_level=validated_data.get("battery_level"),
+            voltage=validated_data.get("voltage"),
+            channel_utilization=validated_data.get("channel_utilization"),
+            air_util_tx=validated_data.get("air_util_tx"),
+            uptime_seconds=validated_data.get("uptime_seconds"),
         )
 
         # Create the observation
@@ -378,28 +377,24 @@ class LocalStatsPacketSerializer(BasePacketSerializer):
 
     def create(self, validated_data):
         """Create a new LocalStatsPacket instance."""
-        # Extract nested data
-        decoded_data = validated_data.pop("decoded", {})
-        telemetry_data = decoded_data.pop("telemetry", {})
-        local_stats_data = telemetry_data.pop("localStats", {})
 
         # Create the packet
         packet = LocalStatsPacket.objects.create(
             packet_id=validated_data.get("packet_id"),
-            from_int=validated_data.get("from_"),
-            from_str=validated_data.get("fromId"),
-            to_int=validated_data.get("to"),
-            to_str=validated_data.get("toId"),
-            port_num=decoded_data.get("portnum"),
-            uptime_seconds=local_stats_data.get("uptimeSeconds"),
-            channel_utilization=local_stats_data.get("channelUtilization"),
-            air_util_tx=local_stats_data.get("airUtilTx"),
-            num_packets_tx=local_stats_data.get("numPacketsTx"),
-            num_packets_rx=local_stats_data.get("numPacketsRx"),
-            num_packets_rx_bad=local_stats_data.get("numPacketsRxBad"),
-            num_online_nodes=local_stats_data.get("numOnlineNodes"),
-            num_total_nodes=local_stats_data.get("numTotalNodes"),
-            num_rx_dupe=local_stats_data.get("numRxDupe"),
+            from_int=validated_data.get("from_int"),
+            from_str=validated_data.get("from_str"),
+            to_int=validated_data.get("to_int"),
+            to_str=validated_data.get("to_str"),
+            port_num=validated_data.get("port_num"),
+            uptime_seconds=validated_data.get("uptime_seconds"),
+            channel_utilization=validated_data.get("channel_utilization"),
+            air_util_tx=validated_data.get("air_util_tx"),
+            num_packets_tx=validated_data.get("num_packets_tx"),
+            num_packets_rx=validated_data.get("num_packets_rx"),
+            num_packets_rx_bad=validated_data.get("num_packets_rx_bad"),
+            num_online_nodes=validated_data.get("num_online_nodes"),
+            num_total_nodes=validated_data.get("num_total_nodes"),
+            num_rx_dupe=validated_data.get("num_rx_dupe"),
             reading_time=validated_data.get("reading_time"),
         )
 
@@ -416,7 +411,7 @@ class PacketIngestSerializer(serializers.Serializer):
         """Convert the incoming packet data to the appropriate packet type."""
         # Determine the packet type based on the portnum
         portnum = data.get("decoded", {}).get("portnum")
-        
+
         if portnum == "TEXT_MESSAGE_APP":
             validated_data = MessagePacketSerializer().to_internal_value(data)
         elif portnum == "NODEINFO_APP":
@@ -438,7 +433,7 @@ class PacketIngestSerializer(serializers.Serializer):
         """Create the appropriate packet type based on the validated data."""
         # Determine the packet type based on the portnum
         portnum = validated_data.get("port_num")
-        
+
         if portnum == "TEXT_MESSAGE_APP":
             packet = MessagePacketSerializer(context=self.context).create(validated_data)
         elif portnum == "NODEINFO_APP":
