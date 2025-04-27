@@ -137,12 +137,11 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 
-STATICFILES_DIRS = [
-    BASE_DIR / "Meshflow" / "static",
-]
-os.makedirs(BASE_DIR / "staticfiles", exist_ok=True)
-
 STATIC_ROOT = BASE_DIR / "staticfiles"
+os.makedirs(STATIC_ROOT, exist_ok=True)
+STATICFILES_DIRS = []
+for d in STATICFILES_DIRS:
+    os.makedirs(d, exist_ok=True)
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
