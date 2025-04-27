@@ -6,7 +6,7 @@ from django.utils import timezone as django_timezone
 
 from rest_framework import serializers
 
-from common.mesh_node_helpers import meshtastic_id_to_hex
+from common.mesh_node_helpers import meshtastic_hex_to_int, meshtastic_id_to_hex
 from nodes.models import DeviceMetrics, ObservedNode, Position
 
 from .models import (
@@ -574,6 +574,24 @@ class NodeSerializer(serializers.ModelSerializer):
 
     def to_internal_value(self, data):
         """Convert the incoming data to the appropriate format."""
+
+        # Some clients _may_ send the node_id as a string, so we need to convert it to an integer
+        if "id" in data:
+            node_id = data["id"]
+            # Add a warning if it's a hex string
+            if isinstance(node_id, str) and node_id.startswith("!"):
+                warnings = self.context.get("warnings", [])
+                warnings.append("node id should be provided as an integer, not a hex string")
+                self.context["warnings"] = warnings
+                data["id"] = meshtastic_hex_to_int(node_id)
+            elif isinstance(node_id, str):
+                try:
+                    data["id"] = int(node_id)
+                except ValueError:
+                    raise serializers.ValidationError({"id": "Invalid node ID format"})
+            else:
+                data["id"] = node_id
+
         # Handle the nested user data
         if "user" in data:
             user_data = data.pop("user")

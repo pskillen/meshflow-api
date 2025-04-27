@@ -2,6 +2,7 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from common.mesh_node_helpers import meshtastic_hex_to_int
 from nodes.models import ObservedNode
 
 from .authentication import NodeAPIKeyAuthentication, PacketIngestNodeAPIKeyAuthentication
@@ -81,13 +82,28 @@ class NodeUpsertView(APIView):
         Returns:
             Response: A DRF Response object with the result of the upsert operation.
         """
-        # Get node_id from request data
+        # Get node_id from request data and sanitize it
         node_id = request.data.get("id")
         if not node_id:
             return Response(
                 {"status": "error", "message": "Node ID is required"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+        # Handle different node_id formats
+        warnings = []
+        if isinstance(node_id, str):
+            if node_id.startswith("!"):
+                warnings.append("node id should be provided as an integer, not a hex string")
+                node_id = meshtastic_hex_to_int(node_id)
+            else:
+                try:
+                    node_id = int(node_id)
+                except ValueError:
+                    return Response(
+                        {"status": "error", "message": "Invalid node ID format"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
 
         # Check if node exists
         try:
@@ -100,12 +116,24 @@ class NodeUpsertView(APIView):
         if serializer.is_valid():
             try:
                 serializer.save()
+
+                # Create the response data
+                node_data = serializer.data
+                node_data.pop("position")
+                node_data.pop("device_metrics")
+
+                response_data = {
+                    "status": "success",
+                    "message": "Node updated successfully" if node else "Node created successfully",
+                    "node": node_data,
+                }
+
+                # If there are warnings, add them to the response
+                if warnings:
+                    response_data["warnings"] = warnings
+
                 return Response(
-                    {
-                        "status": "success",
-                        "message": "Node updated successfully" if node else "Node created successfully",
-                        "node": serializer.data,
-                    },
+                    response_data,
                     status=status.HTTP_200_OK,
                 )
             except Exception as e:
