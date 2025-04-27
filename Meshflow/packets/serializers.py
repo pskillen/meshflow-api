@@ -21,6 +21,31 @@ from .models import (
 )
 
 
+def convert_timestamp(timestamp):
+    """Convert a Unix timestamp to a datetime object."""
+    try:
+        return datetime.fromtimestamp(timestamp, tz=timezone.utc)
+    except (ValueError, TypeError, OSError) as e:
+        raise serializers.ValidationError({"timestamp": f"Invalid timestamp: {str(e)}"})
+
+
+def convert_location_source(source):
+    """Convert a location source string to its integer value."""
+    if not source:
+        return LocationSource.UNSET
+
+    try:
+        # Try to convert directly to int if it's a numeric string
+        return int(source)
+    except (ValueError, TypeError):
+        # If not a number, look up the string value
+        for source_choice in LocationSource:
+            if source_choice.label == source:
+                return source_choice.value
+        # If no match found, set to UNSET
+        return LocationSource.UNSET
+
+
 class BasePacketSerializer(serializers.Serializer):
     """Base serializer for all packet types."""
 
@@ -70,10 +95,7 @@ class BasePacketSerializer(serializers.Serializer):
 
         # Convert rxTime to a datetime object with validation
         if "rx_time" in validated_data:
-            try:
-                validated_data["rx_time"] = datetime.fromtimestamp(validated_data["rx_time"], tz=timezone.utc)
-            except (ValueError, TypeError, OSError) as e:
-                raise serializers.ValidationError({"rx_time": f"Invalid timestamp: {str(e)}"})
+            validated_data["rx_time"] = convert_timestamp(validated_data["rx_time"])
 
         return validated_data
 
@@ -178,25 +200,11 @@ class PositionPacketSerializer(BasePacketSerializer):
 
         # Convert position_time to a datetime object if it exists
         if "position_time" in validated_data and validated_data["position_time"] is not None:
-            validated_data["position_time"] = datetime.fromtimestamp(validated_data["position_time"], tz=timezone.utc)
+            validated_data["position_time"] = convert_timestamp(validated_data["position_time"])
 
         # Convert location_source from string to integer using LocationSource
         if "location_source" in validated_data and validated_data["location_source"]:
-            try:
-                # First try to convert directly to int if it's a numeric string
-                try:
-                    validated_data["location_source"] = int(validated_data["location_source"])
-                except (ValueError, TypeError):
-                    # If not a number, look up the string value
-                    for source_choice in LocationSource:
-                        if source_choice.label == validated_data["location_source"]:
-                            validated_data["location_source"] = source_choice.value
-                            break
-                    else:
-                        # If no match found, set to UNSET
-                        validated_data["location_source"] = LocationSource.UNSET
-            except (ValueError, TypeError):
-                validated_data["location_source"] = LocationSource.UNSET
+            validated_data["location_source"] = convert_location_source(validated_data["location_source"])
 
         return validated_data
 
@@ -341,7 +349,7 @@ class DeviceMetricsPacketSerializer(BasePacketSerializer):
 
         # Convert reading_time to a datetime object
         if "reading_time" in validated_data:
-            validated_data["reading_time"] = datetime.fromtimestamp(validated_data["reading_time"], tz=timezone.utc)
+            validated_data["reading_time"] = convert_timestamp(validated_data["reading_time"])
 
         return validated_data
 
@@ -415,7 +423,7 @@ class LocalStatsPacketSerializer(BasePacketSerializer):
 
         # Convert reading_time to a datetime object if it exists
         if "reading_time" in validated_data and validated_data["reading_time"] is not None:
-            validated_data["reading_time"] = datetime.fromtimestamp(validated_data["reading_time"], tz=timezone.utc)
+            validated_data["reading_time"] = convert_timestamp(validated_data["reading_time"])
 
         return validated_data
 
@@ -505,13 +513,13 @@ class PacketIngestSerializer(serializers.Serializer):
 
 
 class PositionSerializer(serializers.Serializer):
-    loggedTime = serializers.DateTimeField(source="logged_time", default=django_timezone.now)
-    reportedTime = serializers.DateTimeField(source="reported_time", required=True)
+    logged_time = serializers.DateTimeField(read_only=True, default=django_timezone.now)
+    reported_time = serializers.DateTimeField(required=True)
     latitude = serializers.FloatField()
     longitude = serializers.FloatField()
     altitude = serializers.FloatField()
     heading = serializers.FloatField()
-    locationSource = serializers.CharField(source="location_source")
+    location_source = serializers.CharField()
 
     def to_internal_value(self, data):
         """Convert location source from string to integer."""
@@ -520,64 +528,48 @@ class PositionSerializer(serializers.Serializer):
 
         # Convert location_source from string to integer using LocationSource
         if "location_source" in validated_data and validated_data["location_source"]:
-            try:
-                # First try to convert directly to int if it's a numeric string
-                try:
-                    validated_data["location_source"] = int(validated_data["location_source"])
-                except (ValueError, TypeError):
-                    # If not a number, look up the string value
-                    for source_choice in LocationSource:
-                        if source_choice.label == validated_data["location_source"]:
-                            validated_data["location_source"] = source_choice.value
-                            break
-                    else:
-                        # If no match found, set to UNSET
-                        validated_data["location_source"] = LocationSource.UNSET
-            except (ValueError, TypeError):
-                validated_data["location_source"] = LocationSource.UNSET
+            validated_data["location_source"] = convert_location_source(validated_data["location_source"])
 
         return validated_data
 
 
 class DeviceMetricsSerializer(serializers.Serializer):
-    loggedTime = serializers.DateTimeField(source="logged_time", default=django_timezone.now)
-    reportedTime = serializers.DateTimeField(source="reported_time", required=True)
-    batteryLevel = serializers.FloatField(source="battery_level")
+    logged_time = serializers.DateTimeField(read_only=True, default=django_timezone.now)
+    reported_time = serializers.DateTimeField(required=True)
+    battery_level = serializers.FloatField()
     voltage = serializers.FloatField()
-    channelUtilization = serializers.FloatField(source="channel_utilization")
-    airUtilTx = serializers.FloatField(source="air_util_tx")
-    uptimeSeconds = serializers.IntegerField(source="uptime_seconds")
+    channel_utilization = serializers.FloatField()
+    air_util_tx = serializers.FloatField()
+    uptime_seconds = serializers.IntegerField()
 
 
 class NodeSerializer(serializers.ModelSerializer):
     """Serializer for node information updates."""
 
-    position = PositionSerializer(required=False, allow_null=True, write_only=True)
-    deviceMetrics = DeviceMetricsSerializer(source="device_metrics", required=False, allow_null=True, write_only=True)
-    internalId = serializers.IntegerField(source="id", read_only=True)
-    nodeId = serializers.IntegerField(source="node_id")
-    nodeIdStr = serializers.CharField(source="node_id_str", required=False)
-    macAddr = serializers.CharField(source="mac_addr")
-    longName = serializers.CharField(source="long_name", required=False, allow_null=True)
-    shortName = serializers.CharField(source="short_name", required=False, allow_null=True)
-    hwModel = serializers.CharField(source="hw_model", required=False, allow_null=True)
-    swVersion = serializers.CharField(source="sw_version", required=False, allow_null=True)
-    publicKey = serializers.CharField(source="public_key", required=False, allow_null=True)
+    class UserSerializer(serializers.Serializer):
+        long_name = serializers.CharField(required=False, allow_null=True)
+        short_name = serializers.CharField(required=False, allow_null=True)
+
+    id = serializers.IntegerField(source="node_id")
+    macaddr = serializers.CharField(source="mac_addr")
+    hw_model = serializers.CharField(required=False, allow_null=True)
+    public_key = serializers.CharField(required=False, allow_null=True)
+    user = UserSerializer(required=False)
+    position = PositionSerializer(required=False, allow_null=True)
+    device_metrics = DeviceMetricsSerializer(required=False, allow_null=True)
 
     class Meta:
         model = ObservedNode
         fields = [
-            "internalId",
-            "nodeId",
-            "nodeIdStr",
-            "macAddr",
-            "longName",
-            "shortName",
-            "hwModel",
-            "swVersion",
-            "publicKey",
+            "id",
+            "macaddr",
+            "hw_model",
+            "public_key",
+            "user",
             "position",
-            "deviceMetrics",
+            "device_metrics",
+            "long_name",
+            "short_name",
         ]
 
     def to_internal_value(self, data):
@@ -587,8 +579,8 @@ class NodeSerializer(serializers.ModelSerializer):
             user_data = data.pop("user")
             data.update(
                 {
-                    "longName": user_data.get("longName"),
-                    "shortName": user_data.get("shortName"),
+                    "long_name": user_data.get("long_name"),
+                    "short_name": user_data.get("short_name"),
                 }
             )
 
@@ -596,36 +588,29 @@ class NodeSerializer(serializers.ModelSerializer):
         if "position" in data:
             position_data = data.pop("position")
             data["position"] = {
-                "reportedTime": position_data.get("reportedTime"),
+                "reported_time": position_data.get("reported_time"),
                 "latitude": position_data.get("latitude"),
                 "longitude": position_data.get("longitude"),
                 "altitude": position_data.get("altitude"),
-                "locationSource": position_data.get("locationSource"),
+                "location_source": position_data.get("location_source"),
             }
 
         # Handle device metrics
-        if "deviceMetrics" in data:
-            metrics_data = data.pop("deviceMetrics")
-            data["deviceMetrics"] = {
-                "reportedTime": metrics_data.get("reportedTime"),
-                "batteryLevel": metrics_data.get("batteryLevel"),
+        if "device_metrics" in data:
+            metrics_data = data.pop("device_metrics")
+            data["device_metrics"] = {
+                "reported_time": metrics_data.get("reported_time"),
+                "battery_level": metrics_data.get("battery_level"),
                 "voltage": metrics_data.get("voltage"),
-                "channelUtilization": metrics_data.get("channelUtilization"),
-                "airUtilTx": metrics_data.get("airUtilTx"),
-                "uptimeSeconds": metrics_data.get("uptimeSeconds"),
+                "channel_utilization": metrics_data.get("channel_utilization"),
+                "air_util_tx": metrics_data.get("air_util_tx"),
+                "uptime_seconds": metrics_data.get("uptime_seconds"),
             }
 
         return super().to_internal_value(data)
 
-    def create(self, validated_data):
-        """Create a new node instance."""
-        # Handle position data
-        position_data = validated_data.pop("position", None)
-        device_metrics_data = validated_data.pop("device_metrics", None)
-
-        # Create the node
-        node = super().create(validated_data)
-
+    def _create_related_objects(self, node, position_data, device_metrics_data):
+        """Create position and device metrics records for a node."""
         # Create position if provided
         if position_data:
             Position.objects.create(
@@ -646,45 +631,35 @@ class NodeSerializer(serializers.ModelSerializer):
                 voltage=device_metrics_data.get("voltage"),
                 channel_utilization=device_metrics_data.get("channel_utilization"),
                 air_util_tx=device_metrics_data.get("air_util_tx"),
-                uptime_seconds=device_metrics_data.get("uptimeSeconds"),
+                uptime_seconds=device_metrics_data.get("uptime_seconds"),
             )
+
+    def create(self, validated_data):
+        """Create a new node instance."""
+        # Handle position and device metrics data
+        position_data = validated_data.pop("position", None)
+        device_metrics_data = validated_data.pop("device_metrics", None)
+
+        # Create the node
+        node = ObservedNode.objects.create(**validated_data)
+
+        # Create related objects
+        self._create_related_objects(node, position_data, device_metrics_data)
 
         return node
 
     def update(self, instance, validated_data):
         """Update an existing node instance."""
-        # Handle position data
+        # Handle position and device metrics data
         position_data = validated_data.pop("position", None)
         device_metrics_data = validated_data.pop("device_metrics", None)
 
         # Update the node
-        node = super().update(instance, validated_data)
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
 
-        # Update or create position if provided
-        if position_data:
-            Position.objects.update_or_create(
-                node=node,
-                defaults={
-                    "reported_time": position_data.get("reported_time"),
-                    "latitude": position_data.get("latitude"),
-                    "longitude": position_data.get("longitude"),
-                    "altitude": position_data.get("altitude"),
-                    "location_source": position_data.get("location_source"),
-                },
-            )
+        # Create related objects
+        self._create_related_objects(instance, position_data, device_metrics_data)
 
-        # Update or create device metrics if provided
-        if device_metrics_data:
-            DeviceMetrics.objects.update_or_create(
-                node=node,
-                defaults={
-                    "reported_time": device_metrics_data.get("reported_time"),
-                    "battery_level": device_metrics_data.get("battery_level"),
-                    "voltage": device_metrics_data.get("voltage"),
-                    "channel_utilization": device_metrics_data.get("channel_utilization"),
-                    "air_util_tx": device_metrics_data.get("air_util_tx"),
-                    "uptime_seconds": device_metrics_data.get("uptimeSeconds"),
-                },
-            )
-
-        return node
+        return instance

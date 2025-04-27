@@ -547,6 +547,10 @@ components:
               format: date-time
               readOnly: true
               description: The time the device metrics were logged with the API (set by the server)
+            reported_time:
+              type: string
+              format: date-time
+              description: The time the device metrics were reported by the node
             battery_level:
               type: number
               description: The battery level of the node

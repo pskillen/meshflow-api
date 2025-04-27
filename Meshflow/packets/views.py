@@ -2,6 +2,8 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from nodes.models import ObservedNode
+
 from .authentication import NodeAPIKeyAuthentication, PacketIngestNodeAPIKeyAuthentication
 from .serializers import NodeSerializer, PacketIngestSerializer
 
@@ -79,9 +81,21 @@ class NodeUpsertView(APIView):
         Returns:
             Response: A DRF Response object with the result of the upsert operation.
         """
+        # Get node_id from request data
+        node_id = request.data.get("id")
+        if not node_id:
+            return Response(
+                {"status": "error", "message": "Node ID is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
-        # Update the node with the provided data
-        serializer = NodeSerializer(data=request.data, partial=True)
+        # Check if node exists
+        try:
+            node = ObservedNode.objects.get(node_id=node_id)
+            serializer = NodeSerializer(instance=node, data=request.data, partial=True)
+        except ObservedNode.DoesNotExist:
+            node = None
+            serializer = NodeSerializer(data=request.data, partial=True)
 
         if serializer.is_valid():
             try:
@@ -89,7 +103,7 @@ class NodeUpsertView(APIView):
                 return Response(
                     {
                         "status": "success",
-                        "message": "Node updated successfully",
+                        "message": "Node updated successfully" if node else "Node created successfully",
                         "node": serializer.data,
                     },
                     status=status.HTTP_200_OK,
