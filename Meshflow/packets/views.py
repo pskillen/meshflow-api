@@ -3,9 +3,10 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from common.mesh_node_helpers import meshtastic_hex_to_int
+from nodes.authentication import NodeAPIKeyAuthentication
 from nodes.models import ObservedNode
+from nodes.permissions import NodeAuthorizationPermission
 
-from .authentication import NodeAPIKeyAuthentication, PacketIngestNodeAPIKeyAuthentication
 from .serializers import NodeSerializer, PacketIngestSerializer
 
 
@@ -20,13 +21,15 @@ class PacketIngestView(APIView):
     specified in the 'from' field of the packet.
     """
 
-    authentication_classes = [PacketIngestNodeAPIKeyAuthentication]
+    authentication_classes = [NodeAPIKeyAuthentication]
+    permission_classes = [NodeAuthorizationPermission]
 
-    def post(self, request, format=None):
+    def post(self, request, node_id, format=None):
         """Process a packet ingestion request.
 
         Args:
             request: The HTTP request object containing the packet data.
+            node_id: The node ID from the URL.
             format: The format of the request data (not used).
 
         Returns:
@@ -40,7 +43,7 @@ class PacketIngestView(APIView):
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
-        serializer = PacketIngestSerializer(data=request.data, context={"observer": observer})
+        serializer = PacketIngestSerializer(data=request.data, context={"observer": observer, "node_id": node_id})
 
         if serializer.is_valid():
             try:
@@ -69,25 +72,30 @@ class NodeUpsertView(APIView):
     """
 
     authentication_classes = [NodeAPIKeyAuthentication]
-    permission_classes = []
+    permission_classes = [NodeAuthorizationPermission]
 
-    def post(self, request, format=None):
+    def post(self, request, node_id, format=None):
         """
         Process a node upsert request.
 
         Args:
             request: The HTTP request object containing the node data.
+            node_id: The node ID from the URL.
             format: The format of the request data (not used).
 
         Returns:
             Response: A DRF Response object with the result of the upsert operation.
         """
         # Get node_id from request data and sanitize it
-        node_id = request.data.get("id")
         if not node_id:
             return Response(
                 {"status": "error", "message": "Node ID is required"},
                 status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not request.auth.node.node_id == node_id:
+            return Response(
+                {"status": "error", "message": "Node ID does not match authenticated node"},
+                status=status.HTTP_403_FORBIDDEN,
             )
 
         # Handle different node_id formats
