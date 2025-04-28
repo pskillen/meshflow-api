@@ -1,0 +1,31 @@
+{
+    "from": 862209696,
+    "to": 4294967295,
+    "channel": 1,
+    "decoded": {
+        "portnum": "POSITION_APP",
+        "payload": "b'\\r\\x00\\x00T!\\x15\\x00\\x00\\x84\\xfd\\x18y(\\x01x\\x00\\x80\\x01\\x00\\xb8\\x01\\r'",
+        "bitfield": 0,
+        "position": {
+            "latitudeI": 559153152,
+            "longitudeI": -41680896,
+            "altitude": 121,
+            "locationSource": "LOC_MANUAL",
+            "groundSpeed": 0,
+            "groundTrack": 0,
+            "precisionBits": 13,
+            "raw": "latitude_i: 559153152\nlongitude_i: -41680896\naltitude: 121\nlocation_source: LOC_MANUAL\nground_speed: 0\nground_track: 0\nprecision_bits: 13\n",
+            "latitude": 55.9153152,
+            "longitude": -4.1680896
+        }
+    },
+    "id": 1840173332,
+    "rxTime": 1745330889,
+    "rxSnr": -14.75,
+    "hopLimit": 2,
+    "rxRssi": -119,
+    "hopStart": 3,
+    "raw": "from: 862209696\nto: 4294967295\nchannel: 1\ndecoded {\n  portnum: POSITION_APP\n  payload: \"\\r\\000\\000T!\\025\\000\\000\\204\\375\\030y(\\001x\\000\\200\\001\\000\\270\\001\\r\"\n  bitfield: 0\n}\nid: 1840173332\nrx_time: 1745330889\nrx_snr: -14.75\nhop_limit: 2\nrx_rssi: -119\nhop_start: 3\n",
+    "fromId": "!336446a0",
+    "toId": "^all"
+}

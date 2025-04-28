@@ -1,0 +1,29 @@
+{
+    "from": 1128088724,
+    "to": 4294967295,
+    "channel": 1,
+    "decoded": {
+        "portnum": "NODEINFO_APP",
+        "payload": "b'\\n\\t!433d4494\\x12\\x1bPaddy Meshsense \\xf0\\x9f\\x94\\x87\\xf0\\x9f\\x97\\xba\\xef\\xb8\\x8f\\x1a\\x04PDYm\"\\x06H\\xcaC=D\\x94(+8\\x01B sS\\x82{\\xdd\\xc3\\xae\\xb2p\\xb4\\xf2\\x82\\xe5R[\\x9d\\xe2H\\xac\\xad\\xfb[\\x11\\xc1g#\\xe4\\xad\\x84\\xc8\\xfe|'",
+        "bitfield": 0,
+        "user": {
+            "id": "!433d4494",
+            "longName": "Paddy Meshsense \ud83d\udd07\ud83d\uddfa\ufe0f",
+            "shortName": "PDYm",
+            "macaddr": "SMpDPUSU",
+            "hwModel": "HELTEC_V3",
+            "role": "CLIENT_MUTE",
+            "publicKey": "c1OCe93DrrJwtPKC5VJbneJIrK37WxHBZyPkrYTI/nw=",
+            "raw": "id: \"!433d4494\"\nlong_name: \"Paddy Meshsense \ud83d\udd07\ud83d\uddfa\ufe0f\"\nshort_name: \"PDYm\"\nmacaddr: \"H\\312C=D\\224\"\nhw_model: HELTEC_V3\nrole: CLIENT_MUTE\npublic_key: \"sS\\202{\\335\\303\\256\\262p\\264\\362\\202\\345R[\\235\\342H\\254\\255\\373[\\021\\301g#\\344\\255\\204\\310\\376|\"\n"
+        }
+    },
+    "id": 1002277110,
+    "rxTime": 1745331000,
+    "rxSnr": 6.5,
+    "hopLimit": 4,
+    "hopStart": 4,
+    "relayNode": 148,
+    "raw": "from: 1128088724\nto: 4294967295\nchannel: 1\ndecoded {\n  portnum: NODEINFO_APP\n  payload: \"\\n\\t!433d4494\\022\\033Paddy Meshsense \\360\\237\\224\\207\\360\\237\\227\\272\\357\\270\\217\\032\\004PDYm\"\\006H\\312C=D\\224(+8\\001B sS\\202{\\335\\303\\256\\262p\\264\\362\\202\\345R[\\235\\342H\\254\\255\\373[\\021\\301g#\\344\\255\\204\\310\\376|\"\n  bitfield: 0\n}\nid: 1002277110\nrx_time: 1745331000\nrx_snr: 6.5\nhop_limit: 4\nhop_start: 4\nrelay_node: 148\n",
+    "fromId": "!433d4494",
+    "toId": "^all"
+}

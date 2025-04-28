@@ -1,0 +1,32 @@
+{
+    "from": 600968203,
+    "to": 4294967295,
+    "channel": 1,
+    "decoded": {
+        "portnum": "POSITION_APP",
+        "payload": "b'\\r\\x00\\x00\\x84!\\x15\\x00\\x00\\x1c\\xfe\\x18\\xd2\\x01%\\x01\\xa3\\x07h(\\x01x\\x00\\x80\\x01\\x00\\xb8\\x01\\r'",
+        "bitfield": 0,
+        "position": {
+            "latitudeI": 562298880,
+            "longitudeI": -31719424,
+            "altitude": 210,
+            "time": 1745330945,
+            "locationSource": "LOC_MANUAL",
+            "groundSpeed": 0,
+            "groundTrack": 0,
+            "precisionBits": 13,
+            "raw": "latitude_i: 562298880\nlongitude_i: -31719424\naltitude: 210\ntime: 1745330945\nlocation_source: LOC_MANUAL\nground_speed: 0\nground_track: 0\nprecision_bits: 13\n",
+            "latitude": 56.229888,
+            "longitude": -3.1719424
+        }
+    },
+    "id": 684300476,
+    "rxTime": 1745330951,
+    "rxSnr": -15.25,
+    "hopLimit": 2,
+    "rxRssi": -118,
+    "hopStart": 5,
+    "raw": "from: 600968203\nto: 4294967295\nchannel: 1\ndecoded {\n  portnum: POSITION_APP\n  payload: \"\\r\\000\\000\\204!\\025\\000\\000\\034\\376\\030\\322\\001%\\001\\243\\007h(\\001x\\000\\200\\001\\000\\270\\001\\r\"\n  bitfield: 0\n}\nid: 684300476\nrx_time: 1745330951\nrx_snr: -15.25\nhop_limit: 2\nrx_rssi: -118\nhop_start: 5\n",
+    "fromId": "!23d20c0b",
+    "toId": "^all"
+}

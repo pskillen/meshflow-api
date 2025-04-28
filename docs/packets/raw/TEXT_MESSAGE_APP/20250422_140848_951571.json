@@ -1,0 +1,20 @@
+{
+    "from": 2867367949,
+    "to": 4294967295,
+    "decoded": {
+        "portnum": "TEXT_MESSAGE_APP",
+        "payload": "b'!ping'",
+        "bitfield": 0,
+        "text": "!ping"
+    },
+    "id": 2056158276,
+    "rxTime": 1745330928,
+    "rxSnr": 6.25,
+    "hopLimit": 6,
+    "rxRssi": -44,
+    "hopStart": 6,
+    "relayNode": 13,
+    "raw": "from: 2867367949\nto: 4294967295\ndecoded {\n  portnum: TEXT_MESSAGE_APP\n  payload: \"!ping\"\n  bitfield: 0\n}\nid: 2056158276\nrx_time: 1745330928\nrx_snr: 6.25\nhop_limit: 6\nrx_rssi: -44\nhop_start: 6\nrelay_node: 13\n",
+    "fromId": "!aae8900d",
+    "toId": "^all"
+}

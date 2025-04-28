@@ -1,0 +1,29 @@
+{
+    "from": 1127973616,
+    "to": 4294967295,
+    "decoded": {
+        "portnum": "TELEMETRY_APP",
+        "payload": "b'\\r\\xc0\\xa2\\x07h\\x12\\x15\\x08_\\x15X9\\x84@\\x1d:m\\x80@%\\xcd\\xccL=(\\xcb\\x97\\x10'",
+        "bitfield": 0,
+        "telemetry": {
+            "time": 1745330880,
+            "deviceMetrics": {
+                "batteryLevel": 95,
+                "voltage": 4.132,
+                "channelUtilization": 4.0133333,
+                "airUtilTx": 0.05,
+                "uptimeSeconds": 265163
+            },
+            "raw": "time: 1745330880\ndevice_metrics {\n  battery_level: 95\n  voltage: 4.132\n  channel_utilization: 4.01333332\n  air_util_tx: 0.05\n  uptime_seconds: 265163\n}\n"
+        }
+    },
+    "id": 4123563612,
+    "rxTime": 1745330880,
+    "hopLimit": 4,
+    "priority": "BACKGROUND",
+    "hopStart": 4,
+    "relayNode": 240,
+    "raw": "from: 1127973616\nto: 4294967295\ndecoded {\n  portnum: TELEMETRY_APP\n  payload: \"\\r\\300\\242\\007h\\022\\025\\010_\\025X9\\204@\\035:m\\200@%\\315\\314L=(\\313\\227\\020\"\n  bitfield: 0\n}\nid: 4123563612\nrx_time: 1745330880\nhop_limit: 4\npriority: BACKGROUND\nhop_start: 4\nrelay_node: 240\n",
+    "fromId": "!433b82f0",
+    "toId": "^all"
+}

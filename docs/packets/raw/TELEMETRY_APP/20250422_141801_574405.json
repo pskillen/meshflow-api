@@ -1,0 +1,30 @@
+{
+    "from": 1127973616,
+    "to": 4294967295,
+    "decoded": {
+        "portnum": "TELEMETRY_APP",
+        "payload": "b'\\r\\x18\\xa5\\x07h2!\\x08\\xa3\\x9c\\x10\\x15\\xd0i\\xa3@\\x1d\\xec\\x9dB> \\xee\\x02(\\x87\\xf4\\x010\\x95\\x0480@\\xa6\\x01H\\xde\\x8d\\x01'",
+        "telemetry": {
+            "time": 1745331480,
+            "localStats": {
+                "uptimeSeconds": 265763,
+                "channelUtilization": 5.1066666,
+                "airUtilTx": 0.19005555,
+                "numPacketsTx": 366,
+                "numPacketsRx": 31239,
+                "numPacketsRxBad": 533,
+                "numOnlineNodes": 48,
+                "numTotalNodes": 166,
+                "numRxDupe": 18142
+            },
+            "raw": "time: 1745331480\nlocal_stats {\n  uptime_seconds: 265763\n  channel_utilization: 5.10666656\n  air_util_tx: 0.190055549\n  num_packets_tx: 366\n  num_packets_rx: 31239\n  num_packets_rx_bad: 533\n  num_online_nodes: 48\n  num_total_nodes: 166\n  num_rx_dupe: 18142\n}\n"
+        }
+    },
+    "id": 2824837738,
+    "rxTime": 1745331480,
+    "hopLimit": 4,
+    "priority": "BACKGROUND",
+    "raw": "from: 1127973616\nto: 4294967295\ndecoded {\n  portnum: TELEMETRY_APP\n  payload: \"\\r\\030\\245\\007h2!\\010\\243\\234\\020\\025\\320i\\243@\\035\\354\\235B> \\356\\002(\\207\\364\\0010\\225\\00480@\\246\\001H\\336\\215\\001\"\n}\nid: 2824837738\nrx_time: 1745331480\nhop_limit: 4\npriority: BACKGROUND\n",
+    "fromId": "!433b82f0",
+    "toId": "^all"
+}

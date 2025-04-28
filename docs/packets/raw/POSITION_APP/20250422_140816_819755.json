@@ -1,0 +1,25 @@
+{
+    "from": 2669502761,
+    "to": 4294967295,
+    "channel": 1,
+    "decoded": {
+        "portnum": "POSITION_APP",
+        "payload": "b'\\r\\x90\\x16V!\\x150K\\x13\\xfe\\xb8\\x01 '",
+        "position": {
+            "latitudeI": 559290000,
+            "longitudeI": -32290000,
+            "precisionBits": 32,
+            "raw": "latitude_i: 559290000\nlongitude_i: -32290000\nprecision_bits: 32\n",
+            "latitude": 55.929,
+            "longitude": -3.229
+        }
+    },
+    "id": 542559928,
+    "rxTime": 1745330896,
+    "rxSnr": -15.25,
+    "rxRssi": -119,
+    "hopStart": 3,
+    "raw": "from: 2669502761\nto: 4294967295\nchannel: 1\ndecoded {\n  portnum: POSITION_APP\n  payload: \"\\r\\220\\026V!\\0250K\\023\\376\\270\\001 \"\n}\nid: 542559928\nrx_time: 1745330896\nrx_snr: -15.25\nrx_rssi: -119\nhop_start: 3\n",
+    "fromId": "!9f1d6129",
+    "toId": "^all"
+}

@@ -1,0 +1,19 @@
+{
+    "from": 1127944380,
+    "to": 4294967295,
+    "channel": 1,
+    "decoded": {
+        "portnum": 345,
+        "payload": "b'\\x08\\x02\\x10\\x05(\\xc5\\x01\\xa1\\x01K\\xe3\\x17^I\\xf8K@\\xa9\\x01p\\x96\\x92\\xe5$t\\t\\xc0\\xf0\\x01\\xb7\\x01'",
+        "bitfield": 0
+    },
+    "id": 2975058505,
+    "rxTime": 1745331647,
+    "rxSnr": -16.25,
+    "hopLimit": 4,
+    "rxRssi": -119,
+    "hopStart": 7,
+    "raw": "from: 1127944380\nto: 4294967295\nchannel: 1\ndecoded {\n  portnum: 345\n  payload: \"\\010\\002\\020\\005(\\305\\001\\241\\001K\\343\\027^I\\370K@\\251\\001p\\226\\222\\345$t\\t\\300\\360\\001\\267\\001\"\n  bitfield: 0\n}\nid: 2975058505\nrx_time: 1745331647\nrx_snr: -16.25\nhop_limit: 4\nrx_rssi: -119\nhop_start: 7\n",
+    "fromId": "!433b10bc",
+    "toId": "^all"
+}
