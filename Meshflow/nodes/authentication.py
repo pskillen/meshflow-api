@@ -9,16 +9,27 @@ class NodeAPIKeyAuthentication(authentication.BaseAuthentication):
     """
     Custom authentication class for API keys.
 
-    This class authenticates requests using API keys provided in the Authorization header.
-    The header should be in the format: "Authorization: ApiKey <key>"
+    This class authenticates requests using API keys provided in either:
+    1. X-API-KEY header
+    2. Authorization: Token <key> header
     """
 
     def authenticate(self, request):
-        # Get the Authorization header
+        # Try to get the API key from X-API-KEY header first
         auth_header = request.META.get("HTTP_X_API_KEY", "")
 
-        if not auth_header:
-            return None
+        # If not found, try the Authorization header
+        if not auth_header or auth_header.strip() == "":
+            auth_header = request.META.get("HTTP_AUTHORIZATION", "")
+            if auth_header.startswith("Token "):
+                auth_header = auth_header.split(" ")[1]
+            else:
+                raise exceptions.AuthenticationFailed(
+                    "Invalid authorization header: use Token <key> (or preferably x-api-key)"
+                )
+
+        if not auth_header or auth_header.strip() == "":
+            raise exceptions.AuthenticationFailed("API key is required (x-api-key or authorization header)")
 
         # Extract the key
         key = auth_header
@@ -31,9 +42,9 @@ class NodeAPIKeyAuthentication(authentication.BaseAuthentication):
             api_key.last_used = timezone.now()
             api_key.save(update_fields=["last_used"])
 
-            # Return the constellation as the authenticated user
-            # This allows us to use request.user to access the constellation in views
-            return (api_key.constellation, api_key)
+            # Return the user as the authenticated user
+            # This allows us to use request.user to access the user in views
+            return (api_key.owner, api_key)
         except NodeAPIKey.DoesNotExist:
             raise exceptions.AuthenticationFailed("Invalid API key")
 

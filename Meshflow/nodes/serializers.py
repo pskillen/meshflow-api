@@ -188,5 +188,6 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
             "hw_model",
             "sw_version",
             "public_key",
+            "last_heard",
         ]
-        read_only_fields = ["internal_id", "node_id_str"]
+        read_only_fields = ["internal_id", "node_id_str", "last_heard"]

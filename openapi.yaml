@@ -98,7 +98,7 @@ components:
         hopStart:
           type: integer
           nullable: true
-          description: The initial number of hops the packet had when it was sent 
+          description: The initial number of hops the packet had when it was sent
         relayNode:
           type: integer
           nullable: true
@@ -173,7 +173,7 @@ components:
                       description: The ID of the node in Meshastic !hex format
                     shortName:
                       type: string
-                      nullable: true  
+                      nullable: true
                       description: The short name of the node
                     longName:
                       type: string
@@ -433,6 +433,11 @@ components:
           type: string
           description: The public key of the node
           nullable: true
+        last_heard:
+          type: string
+          format: date-time
+          description: The timestamp when the node was last heard from
+          nullable: true
 
     NodeAPIKey:
       type: object
@@ -499,6 +504,11 @@ components:
           type: string
           nullable: true
           description: The public key of the node
+        last_heard:
+          type: string
+          format: date-time
+          description: The timestamp when the node was last heard from
+          nullable: true
         user:
           type: object
           properties:
@@ -547,6 +557,10 @@ components:
               format: date-time
               readOnly: true
               description: The time the device metrics were logged with the API (set by the server)
+            reported_time:
+              type: string
+              format: date-time
+              description: The time the device metrics were reported by the node
             battery_level:
               type: number
               description: The battery level of the node
@@ -593,6 +607,25 @@ components:
           type: string
           description: Node ID in hex format
           readOnly: true
+
+    PaginatedResponse:
+      type: object
+      description: Standard Django REST Framework paginated response
+      properties:
+        count:
+          type: integer
+          description: Total number of items across all pages
+        next:
+          type: string
+          nullable: true
+          description: URL to the next page of results, if available
+        previous:
+          type: string
+          nullable: true
+          description: URL to the previous page of results, if available
+        results:
+          type: array
+          description: Array of items for the current page
 
 paths:
   /status:
@@ -749,9 +782,14 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Constellation'
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedResponse'
+                  - type: object
+                    properties:
+                      results:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Constellation'
 
     post:
       summary: Create a new constellation
@@ -873,7 +911,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Constellation'
-      
+
   /constellations/{id}/members/{user_id}:
     put:
       summary: Update member role
@@ -893,7 +931,7 @@ paths:
             type: integer
       requestBody:
         required: true
-        content:  
+        content:
           application/json:
             schema:
               type: object
@@ -941,9 +979,14 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/ObservedNode'
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedResponse'
+                  - type: object
+                    properties:
+                      results:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ObservedNode'
 
     post:
       summary: Create observed node
@@ -1037,9 +1080,14 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/ManagedNode'
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedResponse'
+                  - type: object
+                    properties:
+                      results:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ManagedNode'
 
     post:
       summary: Create managed node
@@ -1144,9 +1192,14 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/NodeAPIKey'
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedResponse'
+                  - type: object
+                    properties:
+                      results:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/NodeAPIKey'
 
     post:
       summary: Create API key

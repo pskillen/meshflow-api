@@ -1,0 +1,22 @@
+{
+    "from": 1129933592,
+    "to": 4294967295,
+    "decoded": {
+        "portnum": "TEXT_MESSAGE_APP",
+        "payload": "b'\\xf0\\x9f\\x91\\x82'",
+        "replyId": 2056158277,
+        "emoji": 1,
+        "bitfield": 0,
+        "text": "\ud83d\udc42"
+    },
+    "id": 3807585350,
+    "rxTime": 1745330938,
+    "rxSnr": 6.75,
+    "hopLimit": 4,
+    "rxRssi": -55,
+    "hopStart": 4,
+    "relayNode": 24,
+    "raw": "from: 1129933592\nto: 4294967295\ndecoded {\n  portnum: TEXT_MESSAGE_APP\n  payload: \"\\360\\237\\221\\202\"\n  reply_id: 2056158277\n  emoji: 1\n  bitfield: 0\n}\nid: 3807585350\nrx_time: 1745330938\nrx_snr: 6.75\nhop_limit: 4\nrx_rssi: -55\nhop_start: 4\nrelay_node: 24\n",
+    "fromId": "!43596b18",
+    "toId": "^all"
+}

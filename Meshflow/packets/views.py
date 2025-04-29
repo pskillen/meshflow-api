@@ -2,7 +2,11 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .authentication import NodeAPIKeyAuthentication, PacketIngestNodeAPIKeyAuthentication
+from common.mesh_node_helpers import meshtastic_hex_to_int
+from nodes.authentication import NodeAPIKeyAuthentication
+from nodes.models import ObservedNode
+from nodes.permissions import NodeAuthorizationPermission
+
 from .serializers import NodeSerializer, PacketIngestSerializer
 
 
@@ -17,13 +21,15 @@ class PacketIngestView(APIView):
     specified in the 'from' field of the packet.
     """
 
-    authentication_classes = [PacketIngestNodeAPIKeyAuthentication]
+    authentication_classes = [NodeAPIKeyAuthentication]
+    permission_classes = [NodeAuthorizationPermission]
 
-    def post(self, request, format=None):
+    def post(self, request, node_id, format=None):
         """Process a packet ingestion request.
 
         Args:
             request: The HTTP request object containing the packet data.
+            node_id: The node ID from the URL.
             format: The format of the request data (not used).
 
         Returns:
@@ -37,7 +43,7 @@ class PacketIngestView(APIView):
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
-        serializer = PacketIngestSerializer(data=request.data, context={"observer": observer})
+        serializer = PacketIngestSerializer(data=request.data, context={"observer": observer, "node_id": node_id})
 
         if serializer.is_valid():
             try:
@@ -66,32 +72,96 @@ class NodeUpsertView(APIView):
     """
 
     authentication_classes = [NodeAPIKeyAuthentication]
-    permission_classes = []
+    permission_classes = [NodeAuthorizationPermission]
 
-    def post(self, request, format=None):
+    def post(self, request, node_id, format=None):
         """
         Process a node upsert request.
 
         Args:
             request: The HTTP request object containing the node data.
+            node_id: The node ID from the URL.
             format: The format of the request data (not used).
 
         Returns:
             Response: A DRF Response object with the result of the upsert operation.
         """
+        # Get node_id from request data and sanitize it
+        if not node_id:
+            return Response(
+                {"status": "error", "message": "Node ID is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not request.auth.node.node_id == node_id:
+            return Response(
+                {"status": "error", "message": "Node ID does not match authenticated node"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
 
-        # Update the node with the provided data
-        serializer = NodeSerializer(data=request.data, partial=True)
+        # Handle different node_id formats
+        warnings = []
+        if isinstance(node_id, str):
+            if node_id.startswith("!"):
+                warnings.append("node id should be provided as an integer, not a hex string")
+                node_id = meshtastic_hex_to_int(node_id)
+            else:
+                try:
+                    node_id = int(node_id)
+                except ValueError:
+                    return Response(
+                        {"status": "error", "message": "Invalid node ID format"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+        # Check if node exists
+        observed_node_id = request.data.get("id")
+        if not observed_node_id:
+            return Response(
+                {"status": "error", "message": "Node ID is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if isinstance(observed_node_id, str):
+            if observed_node_id.startswith("!"):
+                warnings.append("node id should be provided as an integer, not a hex string")
+                observed_node_id = meshtastic_hex_to_int(observed_node_id)
+            else:
+                try:
+                    observed_node_id = int(observed_node_id)
+                except ValueError:
+                    return Response(
+                        {"status": "error", "message": "Invalid node ID format"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+        q = ObservedNode.objects.filter(node_id=observed_node_id)
+        if q.exists():
+            node = q.first()
+            serializer = NodeSerializer(instance=node, data=request.data, partial=True)
+        else:
+            node = None
+            serializer = NodeSerializer(data=request.data, partial=True)
 
         if serializer.is_valid():
             try:
                 serializer.save()
+
+                # Create the response data
+                node_data = serializer.data
+                node_data.pop("position")
+                node_data.pop("device_metrics")
+
+                response_data = {
+                    "status": "success",
+                    "message": "Node updated successfully" if node else "Node created successfully",
+                    "node": node_data,
+                }
+
+                # If there are warnings, add them to the response
+                if warnings:
+                    response_data["warnings"] = warnings
+
                 return Response(
-                    {
-                        "status": "success",
-                        "message": "Node updated successfully",
-                        "node": serializer.data,
-                    },
+                    response_data,
                     status=status.HTTP_200_OK,
                 )
             except Exception as e:

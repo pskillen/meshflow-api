@@ -1,0 +1,15 @@
+{
+    "from": 3815521676,
+    "to": 4294967295,
+    "channel": 85,
+    "encrypted": "Y9kjRDRsZGxj4oeYorGOrfUbCOB0HaACdw9rjyMhB0t5Vg==",
+    "id": 2595593136,
+    "rxTime": 1745330920,
+    "rxSnr": -15.75,
+    "hopLimit": 1,
+    "rxRssi": -119,
+    "hopStart": 6,
+    "raw": "from: 3815521676\nto: 4294967295\nchannel: 85\nencrypted: \"c\\331#D4ldlc\\342\\207\\230\\242\\261\\216\\255\\365\\033\\010\\340t\\035\\240\\002w\\017k\\217#!\\007KyV\"\nid: 2595593136\nrx_time: 1745330920\nrx_snr: -15.75\nhop_limit: 1\nrx_rssi: -119\nhop_start: 6\n",
+    "fromId": "!e36c3d8c",
+    "toId": "^all"
+}

@@ -1,0 +1,20 @@
+{
+    "from": 2867367949,
+    "to": 4294967295,
+    "decoded": {
+        "portnum": "TEXT_MESSAGE_APP",
+        "payload": "b'Testing foo'",
+        "bitfield": 0,
+        "text": "Testing foo"
+    },
+    "id": 2056158277,
+    "rxTime": 1745330933,
+    "rxSnr": 7.0,
+    "hopLimit": 6,
+    "rxRssi": -45,
+    "hopStart": 6,
+    "relayNode": 13,
+    "raw": "from: 2867367949\nto: 4294967295\ndecoded {\n  portnum: TEXT_MESSAGE_APP\n  payload: \"Testing foo\"\n  bitfield: 0\n}\nid: 2056158277\nrx_time: 1745330933\nrx_snr: 7\nhop_limit: 6\nrx_rssi: -45\nhop_start: 6\nrelay_node: 13\n",
+    "fromId": "!aae8900d",
+    "toId": "^all"
+}
