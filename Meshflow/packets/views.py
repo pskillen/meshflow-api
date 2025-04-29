@@ -133,7 +133,6 @@ class NodeUpsertView(APIView):
                         status=status.HTTP_400_BAD_REQUEST,
                     )
 
-
         q = ObservedNode.objects.filter(node_id=observed_node_id)
         if q.exists():
             node = q.first()
