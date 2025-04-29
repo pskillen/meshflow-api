@@ -4,7 +4,7 @@ from rest_framework import serializers
 
 from constellations.models import ConstellationUserMembership
 
-from .models import LocationSource, ManagedNode, NodeAPIKey, NodeAuth, ObservedNode, Position
+from .models import DeviceMetrics, LocationSource, ManagedNode, NodeAPIKey, NodeAuth, ObservedNode, Position
 
 
 class APIKeySerializer(serializers.ModelSerializer):
@@ -145,6 +145,11 @@ class PositionSerializer(serializers.ModelSerializer):
             "altitude",
             "heading",
             "location_source",
+            "precision_bits",
+            "ground_speed",
+            "ground_track",
+            "sats_in_view",
+            "pdop",
         ]
 
     def to_internal_value(self, data):
@@ -173,8 +178,29 @@ class PositionSerializer(serializers.ModelSerializer):
         return validated_data
 
 
+class DeviceMetricsSerializer(serializers.ModelSerializer):
+    """Serializer for device metrics."""
+
+    class Meta:
+        model = DeviceMetrics
+        fields = [
+            "id",
+            "node",
+            "logged_time",
+            "reported_time",
+            "battery_level",
+            "voltage",
+            "channel_utilization",
+            "air_util_tx",
+            "uptime_seconds",
+        ]
+
+
 class ObservedNodeSerializer(serializers.ModelSerializer):
     """Serializer for observed nodes."""
+
+    latest_position = serializers.SerializerMethodField()
+    latest_device_metrics = serializers.SerializerMethodField()
 
     class Meta:
         model = ObservedNode
@@ -189,5 +215,21 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
             "sw_version",
             "public_key",
             "last_heard",
+            "latest_position",
+            "latest_device_metrics",
         ]
-        read_only_fields = ["internal_id", "node_id_str", "last_heard"]
+        read_only_fields = ["internal_id", "node_id_str", "last_heard", "latest_position", "latest_device_metrics"]
+
+    def get_latest_position(self, obj):
+        """Get the latest position for this node."""
+        latest_position = Position.objects.filter(node=obj).order_by("-reported_time").first()
+        if latest_position:
+            return PositionSerializer(latest_position).data
+        return None
+
+    def get_latest_device_metrics(self, obj):
+        """Get the latest device metrics for this node."""
+        latest_metrics = DeviceMetrics.objects.filter(node=obj).order_by("-reported_time").first()
+        if latest_metrics:
+            return DeviceMetricsSerializer(latest_metrics).data
+        return None

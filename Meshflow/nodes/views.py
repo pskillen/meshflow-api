@@ -1,15 +1,19 @@
+from django.utils import timezone
+
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from constellations.models import ConstellationUserMembership
-from nodes.models import ManagedNode, NodeAPIKey, NodeAuth, ObservedNode
+from nodes.models import DeviceMetrics, ManagedNode, NodeAPIKey, NodeAuth, ObservedNode, Position
 from nodes.serializers import (
     APIKeyCreateSerializer,
     APIKeyDetailSerializer,
     APIKeySerializer,
+    DeviceMetricsSerializer,
     ManagedNodeSerializer,
     ObservedNodeSerializer,
+    PositionSerializer,
 )
 
 
@@ -27,7 +31,7 @@ class APIKeyViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """Filter API keys to only show those for constellations the user has access to."""
         user = self.request.user
-        return NodeAPIKey.objects.filter(owner=user).distinct().order_by('id')
+        return NodeAPIKey.objects.filter(owner=user).distinct().order_by("id")
 
     def get_serializer_class(self):
         """Return different serializers based on the action."""
@@ -123,18 +127,110 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
     ViewSet for managing observed nodes.
     """
 
-    queryset = ObservedNode.objects.all().order_by('node_id')
+    queryset = ObservedNode.objects.all().order_by("node_id")
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = ObservedNodeSerializer
     lookup_field = "node_id"
 
     def get_queryset(self):
         """Filter nodes based on user permissions."""
-        return ObservedNode.objects.all().order_by('node_id')
+        return ObservedNode.objects.all().order_by("node_id")
 
     def perform_create(self, serializer):
         """Create a new node."""
         serializer.save()
+
+    @action(detail=True, methods=["get"])
+    def positions(self, request, node_id=None):
+        """
+        Get positions for a specific node with optional date filtering.
+
+        Query parameters:
+        - start_date: Filter positions after this date (format: YYYY-MM-DD)
+        - end_date: Filter positions before this date (format: YYYY-MM-DD)
+        """
+        node = self.get_object()
+
+        # Get query parameters
+        start_date = request.query_params.get("start_date")
+        end_date = request.query_params.get("end_date")
+
+        # Filter positions by node
+        positions = Position.objects.filter(node=node).order_by("-reported_time")
+
+        # Apply date filters if provided
+        if start_date:
+            try:
+                start_datetime = timezone.datetime.strptime(start_date, "%Y-%m-%d")
+                start_datetime = timezone.make_aware(start_datetime)
+                positions = positions.filter(reported_time__gte=start_datetime)
+            except ValueError:
+                return Response(
+                    {"error": "Invalid start_date format. Use YYYY-MM-DD."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        if end_date:
+            try:
+                end_datetime = timezone.datetime.strptime(end_date, "%Y-%m-%d")
+                # Set time to end of day
+                end_datetime = end_datetime.replace(hour=23, minute=59, second=59)
+                end_datetime = timezone.make_aware(end_datetime)
+                positions = positions.filter(reported_time__lte=end_datetime)
+            except ValueError:
+                return Response(
+                    {"error": "Invalid end_date format. Use YYYY-MM-DD."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        serializer = PositionSerializer(positions, many=True)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=["get"])
+    def device_metrics(self, request, node_id=None):
+        """
+        Get device metrics for a specific node with optional date filtering.
+
+        Query parameters:
+        - start_date: Filter metrics after this date (format: YYYY-MM-DD)
+        - end_date: Filter metrics before this date (format: YYYY-MM-DD)
+        """
+        node = self.get_object()
+
+        # Get query parameters
+        start_date = request.query_params.get("start_date")
+        end_date = request.query_params.get("end_date")
+
+        # Filter device metrics by node
+        metrics = DeviceMetrics.objects.filter(node=node).order_by("-reported_time")
+
+        # Apply date filters if provided
+        if start_date:
+            try:
+                start_datetime = timezone.datetime.strptime(start_date, "%Y-%m-%d")
+                start_datetime = timezone.make_aware(start_datetime)
+                metrics = metrics.filter(reported_time__gte=start_datetime)
+            except ValueError:
+                return Response(
+                    {"error": "Invalid start_date format. Use YYYY-MM-DD."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        if end_date:
+            try:
+                end_datetime = timezone.datetime.strptime(end_date, "%Y-%m-%d")
+                # Set time to end of day
+                end_datetime = end_datetime.replace(hour=23, minute=59, second=59)
+                end_datetime = timezone.make_aware(end_datetime)
+                metrics = metrics.filter(reported_time__lte=end_datetime)
+            except ValueError:
+                return Response(
+                    {"error": "Invalid end_date format. Use YYYY-MM-DD."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        serializer = DeviceMetricsSerializer(metrics, many=True)
+        return Response(serializer.data)
 
 
 class ManagedNodeViewSet(viewsets.ModelViewSet):
@@ -142,7 +238,7 @@ class ManagedNodeViewSet(viewsets.ModelViewSet):
     ViewSet for managing owned nodes.
     """
 
-    queryset = ManagedNode.objects.all().order_by('node_id')
+    queryset = ManagedNode.objects.all().order_by("node_id")
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = ManagedNodeSerializer
     lookup_field = "node_id"
@@ -150,7 +246,7 @@ class ManagedNodeViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """Filter nodes based on user ownership."""
         user = self.request.user
-        return ManagedNode.objects.filter(owner=user).order_by('node_id')
+        return ManagedNode.objects.filter(owner=user).order_by("node_id")
 
     def perform_create(self, serializer):
         """Create a new managed node and set the owner."""
