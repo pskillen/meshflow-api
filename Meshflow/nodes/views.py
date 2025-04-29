@@ -27,7 +27,7 @@ class APIKeyViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """Filter API keys to only show those for constellations the user has access to."""
         user = self.request.user
-        return NodeAPIKey.objects.filter(owner=user).distinct()
+        return NodeAPIKey.objects.filter(owner=user).distinct().order_by('id')
 
     def get_serializer_class(self):
         """Return different serializers based on the action."""
@@ -123,14 +123,14 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
     ViewSet for managing observed nodes.
     """
 
-    queryset = ObservedNode.objects.all()
+    queryset = ObservedNode.objects.all().order_by('node_id')
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = ObservedNodeSerializer
     lookup_field = "node_id"
 
     def get_queryset(self):
         """Filter nodes based on user permissions."""
-        return ObservedNode.objects.all()
+        return ObservedNode.objects.all().order_by('node_id')
 
     def perform_create(self, serializer):
         """Create a new node."""
@@ -142,7 +142,7 @@ class ManagedNodeViewSet(viewsets.ModelViewSet):
     ViewSet for managing owned nodes.
     """
 
-    queryset = ManagedNode.objects.all()
+    queryset = ManagedNode.objects.all().order_by('node_id')
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = ManagedNodeSerializer
     lookup_field = "node_id"
@@ -150,7 +150,7 @@ class ManagedNodeViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """Filter nodes based on user ownership."""
         user = self.request.user
-        return ManagedNode.objects.filter(owner=user)
+        return ManagedNode.objects.filter(owner=user).order_by('node_id')
 
     def perform_create(self, serializer):
         """Create a new managed node and set the owner."""
