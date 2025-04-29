@@ -118,6 +118,16 @@ class BasePacketSerializer(serializers.Serializer):
             relay_node=validated_data.get("relay_node"),
         )
 
+        # Update the last_heard field of the ObservedNode that sent the packet
+        if "from_int" in validated_data and validated_data.get("rx_time"):
+            try:
+                node = ObservedNode.objects.get(node_id=validated_data.get("from_int"))
+                node.last_heard = validated_data.get("rx_time")
+                node.save(update_fields=["last_heard"])
+            except ObservedNode.DoesNotExist:
+                # If the node doesn't exist, we don't need to update it
+                pass
+
 
 class MessagePacketSerializer(BasePacketSerializer):
     """Serializer for text message packets."""
@@ -570,6 +580,7 @@ class NodeSerializer(serializers.ModelSerializer):
             "device_metrics",
             "long_name",
             "short_name",
+            "last_heard",
         ]
 
     def to_internal_value(self, data):

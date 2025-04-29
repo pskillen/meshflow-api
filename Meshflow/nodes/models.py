@@ -62,6 +62,7 @@ class ObservedNode(models.Model):
     hw_model = models.CharField(max_length=50, null=True, blank=True)
     sw_version = models.CharField(max_length=12, null=True, blank=True)
     public_key = models.CharField(max_length=64, null=True, blank=True)
+    last_heard = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         """Model metadata."""

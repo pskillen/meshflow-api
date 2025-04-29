@@ -98,7 +98,7 @@ components:
         hopStart:
           type: integer
           nullable: true
-          description: The initial number of hops the packet had when it was sent 
+          description: The initial number of hops the packet had when it was sent
         relayNode:
           type: integer
           nullable: true
@@ -173,7 +173,7 @@ components:
                       description: The ID of the node in Meshastic !hex format
                     shortName:
                       type: string
-                      nullable: true  
+                      nullable: true
                       description: The short name of the node
                     longName:
                       type: string
@@ -433,6 +433,11 @@ components:
           type: string
           description: The public key of the node
           nullable: true
+        last_heard:
+          type: string
+          format: date-time
+          description: The timestamp when the node was last heard from
+          nullable: true
 
     NodeAPIKey:
       type: object
@@ -499,6 +504,11 @@ components:
           type: string
           nullable: true
           description: The public key of the node
+        last_heard:
+          type: string
+          format: date-time
+          description: The timestamp when the node was last heard from
+          nullable: true
         user:
           type: object
           properties:
@@ -901,7 +911,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Constellation'
-      
+
   /constellations/{id}/members/{user_id}:
     put:
       summary: Update member role
@@ -921,7 +931,7 @@ paths:
             type: integer
       requestBody:
         required: true
-        content:  
+        content:
           application/json:
             schema:
               type: object
