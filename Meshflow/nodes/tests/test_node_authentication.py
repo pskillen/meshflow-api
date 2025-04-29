@@ -13,7 +13,7 @@ def test_node_api_key_authentication_valid_key(create_node_api_key):
     request = type("Request", (), {"META": {"HTTP_X_API_KEY": api_key.key}})()
     user, auth_key = auth.authenticate(request)
 
-    assert user == api_key.user
+    assert user == api_key.owner
     assert auth_key == api_key
 
 
@@ -27,7 +27,7 @@ def test_node_api_key_authentication_valid_token(create_node_api_key):
     request = type("Request", (), {"META": {"HTTP_AUTHORIZATION": f"Token {api_key.key}"}})()
     user, auth_key = auth.authenticate(request)
 
-    assert user == api_key.user
+    assert user == api_key.owner
     assert auth_key == api_key
 
 
@@ -67,7 +67,7 @@ def test_node_api_key_authentication_missing_key():
     with pytest.raises(Exception) as exc_info:
         auth.authenticate(request)
 
-    assert "API key is required" in str(exc_info.value)
+    assert "Invalid authorization header: use Token <key> (or preferably x-api-key)" in str(exc_info.value)
 
 
 @pytest.mark.django_db
@@ -80,7 +80,7 @@ def test_node_api_key_authentication_empty_key():
     with pytest.raises(Exception) as exc_info:
         auth.authenticate(request)
 
-    assert "API key is required" in str(exc_info.value)
+    assert "Invalid authorization header: use Token <key> (or preferably x-api-key)" in str(exc_info.value)
 
 
 @pytest.mark.django_db
@@ -145,5 +145,5 @@ def test_node_api_key_authentication_prefer_x_api_key(create_node_api_key):
     )()
     user, auth_key = auth.authenticate(request)
 
-    assert user == api_key.user
+    assert user == api_key.owner
     assert auth_key == api_key
