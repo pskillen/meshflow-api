@@ -114,10 +114,31 @@ class NodeUpsertView(APIView):
                     )
 
         # Check if node exists
-        try:
-            node = ObservedNode.objects.get(node_id=node_id)
+        observed_node_id = request.data.get("id")
+        if not observed_node_id:
+            return Response(
+                {"status": "error", "message": "Node ID is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if isinstance(observed_node_id, str):
+            if observed_node_id.startswith("!"):
+                warnings.append("node id should be provided as an integer, not a hex string")
+                observed_node_id = meshtastic_hex_to_int(observed_node_id)
+            else:
+                try:
+                    observed_node_id = int(observed_node_id)
+                except ValueError:
+                    return Response(
+                        {"status": "error", "message": "Invalid node ID format"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+
+        q = ObservedNode.objects.filter(node_id=observed_node_id)
+        if q.exists():
+            node = q.first()
             serializer = NodeSerializer(instance=node, data=request.data, partial=True)
-        except ObservedNode.DoesNotExist:
+        else:
             node = None
             serializer = NodeSerializer(data=request.data, partial=True)
 

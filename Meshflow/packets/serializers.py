@@ -52,8 +52,8 @@ class BasePacketSerializer(serializers.Serializer):
     # Common fields from the JSON packet
     id = serializers.IntegerField(source="packet_id")
     # 'from' is a reserved word in Python, so we use vars() to access it
-    vars()["from"] = serializers.IntegerField(source="from_int")
-    fromId = serializers.CharField(source="from_str")
+    vars()["from"] = serializers.IntegerField(source="from_int", required=True, allow_null=False)
+    fromId = serializers.CharField(source="from_str", required=False, allow_null=True)
     to = serializers.IntegerField(source="to_int", required=False, allow_null=True)
     toId = serializers.CharField(source="to_str", required=False, allow_null=True)
     decoded = serializers.JSONField()  # Will be overridden by child classes
@@ -246,9 +246,9 @@ class NodeInfoPacketSerializer(BasePacketSerializer):
             id = serializers.CharField(source="node_id")
             shortName = serializers.CharField(source="short_name", required=False, allow_null=True)
             longName = serializers.CharField(source="long_name", required=False, allow_null=True)
-            hwModel = serializers.CharField(source="hw_model", required=False, allow_null=True)
-            swVersion = serializers.CharField(source="sw_version", required=False, allow_null=True)
-            publicKey = serializers.CharField(source="public_key", required=False, allow_null=True)
+            hwModel = serializers.CharField(source="hw_model", required=False, allow_null=True, allow_blank=True)
+            swVersion = serializers.CharField(source="sw_version", required=False, allow_null=True, allow_blank=True)
+            publicKey = serializers.CharField(source="public_key", required=False, allow_null=True, allow_blank=True)
             macaddr = serializers.CharField(source="mac_address", required=False, allow_null=True)
             role = serializers.CharField(required=False, allow_null=True)
 
@@ -551,9 +551,9 @@ class NodeSerializer(serializers.ModelSerializer):
         short_name = serializers.CharField(required=False, allow_null=True)
 
     id = serializers.IntegerField(source="node_id")
-    macaddr = serializers.CharField(source="mac_addr")
-    hw_model = serializers.CharField(required=False, allow_null=True)
-    public_key = serializers.CharField(required=False, allow_null=True)
+    macaddr = serializers.CharField(source="mac_addr", allow_null=True, allow_blank=True)
+    hw_model = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    public_key = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     user = UserSerializer(required=False)
     position = PositionSerializer(required=False, allow_null=True)
     device_metrics = DeviceMetricsSerializer(required=False, allow_null=True)
