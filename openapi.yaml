@@ -598,6 +598,25 @@ components:
           description: Node ID in hex format
           readOnly: true
 
+    PaginatedResponse:
+      type: object
+      description: Standard Django REST Framework paginated response
+      properties:
+        count:
+          type: integer
+          description: Total number of items across all pages
+        next:
+          type: string
+          nullable: true
+          description: URL to the next page of results, if available
+        previous:
+          type: string
+          nullable: true
+          description: URL to the previous page of results, if available
+        results:
+          type: array
+          description: Array of items for the current page
+
 paths:
   /status:
     get:
@@ -753,9 +772,14 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Constellation'
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedResponse'
+                  - type: object
+                    properties:
+                      results:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Constellation'
 
     post:
       summary: Create a new constellation
@@ -945,9 +969,14 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/ObservedNode'
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedResponse'
+                  - type: object
+                    properties:
+                      results:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ObservedNode'
 
     post:
       summary: Create observed node
@@ -1041,9 +1070,14 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/ManagedNode'
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedResponse'
+                  - type: object
+                    properties:
+                      results:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ManagedNode'
 
     post:
       summary: Create managed node
@@ -1148,9 +1182,14 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/NodeAPIKey'
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedResponse'
+                  - type: object
+                    properties:
+                      results:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/NodeAPIKey'
 
     post:
       summary: Create API key
