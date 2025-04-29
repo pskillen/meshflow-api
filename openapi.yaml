@@ -439,96 +439,9 @@ components:
           description: The timestamp when the node was last heard from
           nullable: true
         latest_position:
-          type: object
-          description: The most recent position report for this node
-          nullable: true
-          properties:
-            id:
-              type: integer
-              description: The ID of the position record
-            node:
-              type: integer
-              description: The ID of the node this position belongs to
-            logged_time:
-              type: string
-              format: date-time
-              description: The time the position was logged with the API
-            reported_time:
-              type: string
-              format: date-time
-              description: The time the position was reported by the node
-            latitude:
-              type: number
-              description: The latitude of the node
-            longitude:
-              type: number
-              description: The longitude of the node
-            altitude:
-              type: number
-              description: The altitude of the node
-              nullable: true
-            heading:
-              type: number
-              description: The heading of the node
-              nullable: true
-            location_source:
-              type: string
-              description: The source of the location data
-              enum: [INTERNAL, EXTERNAL, MANUAL, UNKNOWN]
-            precision_bits:
-              type: integer
-              description: The precision of the location data in bits
-              nullable: true
-            ground_speed:
-              type: number
-              description: The ground speed of the node in m/s
-              nullable: true
-            ground_track:
-              type: number
-              description: The ground track of the node in degrees
-              nullable: true
-            sats_in_view:
-              type: integer
-              description: The number of satellites in view
-              nullable: true
-            pdop:
-              type: number
-              description: The position dilution of precision
-              nullable: true
+          $ref: '#/components/schemas/Position'
         latest_device_metrics:
-          type: object
-          description: The most recent device metrics for this node
-          nullable: true
-          properties:
-            id:
-              type: integer
-              description: The ID of the device metrics record
-            node:
-              type: integer
-              description: The ID of the node these metrics belong to
-            logged_time:
-              type: string
-              format: date-time
-              description: The time the metrics were logged with the API
-            reported_time:
-              type: string
-              format: date-time
-              description: The time the metrics were reported by the node
-            battery_level:
-              type: number
-              description: The battery level as a percentage
-            voltage:
-              type: number
-              description: The battery voltage in volts
-            channel_utilization:
-              type: number
-              description: The channel utilization as a percentage
-            air_util_tx:
-              type: number
-              description: The air utilization for transmission
-            uptime_seconds:
-              type: integer
-              description: The device uptime in seconds
+          $ref: '#/components/schemas/DeviceMetrics'
 
     NodeAPIKey:
       type: object
@@ -612,61 +525,9 @@ components:
               nullable: true
               description: The short name of the node
         position:
-          type: object
-          nullable: true
-          description: An optional position for the node, if known
-          properties:
-            logged_time:
-              type: string
-              format: date-time
-              readOnly: true
-              description: The time the position was logged with the API (set by the server)
-            reported_time:
-              type: string
-              format: date-time
-              description: The time the position was reported by the node
-            latitude:
-              type: number
-              description: The latitude of the node
-            longitude:
-              type: number
-              description: The longitude of the node
-            altitude:
-              type: number
-              description: The altitude of the node
-            location_source:
-              type: string
-              description: The source of the location data
-              enum: [INTERNAL, EXTERNAL, MANUAL, UNKNOWN]
+          $ref: '#/components/schemas/Position'
         device_metrics:
-          type: object
-          nullable: true
-          description: The most recent device metrics from the node, if available
-          properties:
-            logged_time:
-              type: string
-              format: date-time
-              readOnly: true
-              description: The time the device metrics were logged with the API (set by the server)
-            reported_time:
-              type: string
-              format: date-time
-              description: The time the device metrics were reported by the node
-            battery_level:
-              type: number
-              description: The battery level of the node
-            voltage:
-              type: number
-              description: The voltage of the node
-            channel_utilization:
-              type: number
-              description: The channel utilization as observed by the node
-            air_util_tx:
-              type: number
-              description: The air time utilization of the node
-            uptime_seconds:
-              type: integer
-              description: The uptime of the node in seconds
+          $ref: '#/components/schemas/DeviceMetrics'
 
     ManagedNode:
       type: object
@@ -717,6 +578,110 @@ components:
         results:
           type: array
           description: Array of items for the current page
+
+    Position:
+      type: object
+      description: A position record for a node
+      properties:
+        id:
+          type: integer
+          description: The ID of the position record
+        node:
+          type: integer
+          description: The ID of the node this position belongs to
+        logged_time:
+          type: string
+          format: date-time
+          description: The time the position was logged with the API
+        reported_time:
+          type: string
+          format: date-time
+          description: The time the position was reported by the node
+        latitude:
+          type: number
+          description: The latitude of the node
+        longitude:
+          type: number
+          description: The longitude of the node
+        altitude:
+          type: number
+          description: The altitude of the node
+          nullable: true
+        heading:
+          type: number
+          description: The heading of the node
+          nullable: true
+        location_source:
+          type: string
+          description: The source of the location data
+          enum: [INTERNAL, EXTERNAL, MANUAL, UNKNOWN]
+        precision_bits:
+          type: integer
+          description: The precision of the location data in bits
+          nullable: true
+        ground_speed:
+          type: number
+          description: The ground speed of the node in m/s
+          nullable: true
+        ground_track:
+          type: number
+          description: The ground track of the node in degrees
+          nullable: true
+        sats_in_view:
+          type: integer
+          description: The number of satellites in view
+          nullable: true
+        pdop:
+          type: number
+          description: The position dilution of precision
+          nullable: true
+
+    DeviceMetrics:
+      type: object
+      description: Device metrics for a node
+      properties:
+        id:
+          type: integer
+          description: The ID of the device metrics record
+        node:
+          type: integer
+          description: The ID of the node these metrics belong to
+        logged_time:
+          type: string
+          format: date-time
+          description: The time the metrics were logged with the API
+        reported_time:
+          type: string
+          format: date-time
+          description: The time the metrics were reported by the node
+        battery_level:
+          type: number
+          description: The battery level as a percentage
+        voltage:
+          type: number
+          description: The battery voltage in volts
+        channel_utilization:
+          type: number
+          description: The channel utilization as a percentage
+        air_util_tx:
+          type: number
+          description: The air utilization for transmission
+        uptime_seconds:
+          type: integer
+          description: The device uptime in seconds
+
+    DateRangeQuery:
+      type: object
+      description: Query parameters for date range filtering
+      properties:
+        start_date:
+          type: string
+          format: date
+          description: Filter after this date (format YYYY-MM-DD)
+        end_date:
+          type: string
+          format: date
+          description: Filter before this date (format YYYY-MM-DD)
 
 paths:
   /status:
@@ -1171,20 +1136,7 @@ paths:
           required: true
           schema:
             type: integer
-        - name: start_date
-          in: query
-          required: false
-          schema:
-            type: string
-            format: date
-          description: Filter positions after this date (format YYYY-MM-DD)
-        - name: end_date
-          in: query
-          required: false
-          schema:
-            type: string
-            format: date
-          description: Filter positions before this date (format YYYY-MM-DD)
+        - $ref: '#/components/schemas/DateRangeQuery'
       responses:
         '200':
           description: List of positions for the node
@@ -1193,70 +1145,13 @@ paths:
               schema:
                 type: array
                 items:
-                  type: object
-                  properties:
-                    id:
-                      type: integer
-                      description: The ID of the position record
-                    node:
-                      type: integer
-                      description: The ID of the node this position belongs to
-                    logged_time:
-                      type: string
-                      format: date-time
-                      description: The time the position was logged with the API
-                    reported_time:
-                      type: string
-                      format: date-time
-                      description: The time the position was reported by the node
-                    latitude:
-                      type: number
-                      description: The latitude of the node
-                    longitude:
-                      type: number
-                      description: The longitude of the node
-                    altitude:
-                      type: number
-                      description: The altitude of the node
-                      nullable: true
-                    heading:
-                      type: number
-                      description: The heading of the node
-                      nullable: true
-                    location_source:
-                      type: string
-                      description: The source of the location data
-                      enum: [INTERNAL, EXTERNAL, MANUAL, UNKNOWN]
-                    precision_bits:
-                      type: integer
-                      description: The precision of the location data in bits
-                      nullable: true
-                    ground_speed:
-                      type: number
-                      description: The ground speed of the node in m/s
-                      nullable: true
-                    ground_track:
-                      type: number
-                      description: The ground track of the node in degrees
-                      nullable: true
-                    sats_in_view:
-                      type: integer
-                      description: The number of satellites in view
-                      nullable: true
-                    pdop:
-                      type: number
-                      description: The position dilution of precision
-                      nullable: true
+                  $ref: '#/components/schemas/Position'
         '400':
           description: Invalid request parameters
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                    description: Error message
+                $ref: '#/components/schemas/Error'
 
   /nodes/observed-nodes/{node_id}/device-metrics:
     get:
@@ -1271,20 +1166,7 @@ paths:
           required: true
           schema:
             type: integer
-        - name: start_date
-          in: query
-          required: false
-          schema:
-            type: string
-            format: date
-          description: Filter metrics after this date (format YYYY-MM-DD)
-        - name: end_date
-          in: query
-          required: false
-          schema:
-            type: string
-            format: date
-          description: Filter metrics before this date (format YYYY-MM-DD)
+        - $ref: '#/components/schemas/DateRangeQuery'
       responses:
         '200':
           description: List of device metrics for the node
@@ -1293,48 +1175,13 @@ paths:
               schema:
                 type: array
                 items:
-                  type: object
-                  properties:
-                    id:
-                      type: integer
-                      description: The ID of the device metrics record
-                    node:
-                      type: integer
-                      description: The ID of the node these metrics belong to
-                    logged_time:
-                      type: string
-                      format: date-time
-                      description: The time the metrics were logged with the API
-                    reported_time:
-                      type: string
-                      format: date-time
-                      description: The time the metrics were reported by the node
-                    battery_level:
-                      type: number
-                      description: The battery level as a percentage
-                    voltage:
-                      type: number
-                      description: The battery voltage in volts
-                    channel_utilization:
-                      type: number
-                      description: The channel utilization as a percentage
-                    air_util_tx:
-                      type: number
-                      description: The air utilization for transmission
-                    uptime_seconds:
-                      type: integer
-                      description: The device uptime in seconds
+                  $ref: '#/components/schemas/DeviceMetrics'
         '400':
           description: Invalid request parameters
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                    description: Error message
-
+                $ref: '#/components/schemas/Error'
 
   /nodes/managed-nodes:
     get:
