@@ -106,7 +106,18 @@ class BasePacketSerializer(serializers.Serializer):
         if not observer:
             raise serializers.ValidationError("No observer found in request context")
 
-        PacketObservation.objects.create(
+        # Check if this observer has already reported this packet
+        existing_observation = PacketObservation.objects.filter(
+            packet=packet,
+            observer=observer
+        ).first()
+
+        if existing_observation:
+            # If the same observer reports the same packet again, ignore it
+            return existing_observation
+
+        # Create new observation
+        observation = PacketObservation.objects.create(
             packet=packet,
             observer=observer,
             channel=validated_data.get("channel"),
@@ -127,6 +138,8 @@ class BasePacketSerializer(serializers.Serializer):
             except ObservedNode.DoesNotExist:
                 # If the node doesn't exist, we don't need to update it
                 pass
+
+        return observation
 
 
 class MessagePacketSerializer(BasePacketSerializer):
@@ -158,6 +171,14 @@ class MessagePacketSerializer(BasePacketSerializer):
 
     def create(self, validated_data):
         """Create a new MessagePacket instance."""
+        # Check if packet already exists
+        packet_id = validated_data.get("packet_id")
+        existing_packet = MessagePacket.objects.filter(packet_id=packet_id).first()
+
+        if existing_packet:
+            # If packet exists, just create the observation
+            self._create_observation(existing_packet, validated_data)
+            return existing_packet
 
         # Create the packet
         packet = MessagePacket.objects.create(
@@ -220,6 +241,14 @@ class PositionPacketSerializer(BasePacketSerializer):
 
     def create(self, validated_data):
         """Create a new PositionPacket instance."""
+        # Check if packet already exists
+        packet_id = validated_data.get("packet_id")
+        existing_packet = PositionPacket.objects.filter(packet_id=packet_id).first()
+
+        if existing_packet:
+            # If packet exists, just create the observation
+            self._create_observation(existing_packet, validated_data)
+            return existing_packet
 
         # Create the packet
         packet = PositionPacket.objects.create(
@@ -293,6 +322,14 @@ class NodeInfoPacketSerializer(BasePacketSerializer):
 
     def create(self, validated_data):
         """Create a new NodeInfoPacket instance."""
+        # Check if packet already exists
+        packet_id = validated_data.get("packet_id")
+        existing_packet = NodeInfoPacket.objects.filter(packet_id=packet_id).first()
+
+        if existing_packet:
+            # If packet exists, just create the observation
+            self._create_observation(existing_packet, validated_data)
+            return existing_packet
 
         # Create the packet
         packet = NodeInfoPacket.objects.create(
@@ -365,6 +402,14 @@ class DeviceMetricsPacketSerializer(BasePacketSerializer):
 
     def create(self, validated_data):
         """Create a new DeviceMetricsPacket instance."""
+        # Check if packet already exists
+        packet_id = validated_data.get("packet_id")
+        existing_packet = DeviceMetricsPacket.objects.filter(packet_id=packet_id).first()
+
+        if existing_packet:
+            # If packet exists, just create the observation
+            self._create_observation(existing_packet, validated_data)
+            return existing_packet
 
         # Create the packet
         packet = DeviceMetricsPacket.objects.create(
@@ -439,6 +484,14 @@ class LocalStatsPacketSerializer(BasePacketSerializer):
 
     def create(self, validated_data):
         """Create a new LocalStatsPacket instance."""
+        # Check if packet already exists
+        packet_id = validated_data.get("packet_id")
+        existing_packet = LocalStatsPacket.objects.filter(packet_id=packet_id).first()
+
+        if existing_packet:
+            # If packet exists, just create the observation
+            self._create_observation(existing_packet, validated_data)
+            return existing_packet
 
         # Create the packet
         packet = LocalStatsPacket.objects.create(
