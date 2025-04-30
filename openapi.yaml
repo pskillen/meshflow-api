@@ -443,6 +443,31 @@ components:
         latest_device_metrics:
           $ref: '#/components/schemas/DeviceMetrics'
 
+    ObservedNodeSearch:
+      type: object
+      description: >
+        A subset of ObservedNode fields returned by the search endpoint.
+      properties:
+        node_id:
+          type: integer
+          description: The ID of the node in the mesh network
+        node_id_str:
+          type: string
+          description: The ID of the node in Meshastic !hex format
+        long_name:
+          type: string
+          description: The long name of the node
+          nullable: true
+        short_name:
+          type: string
+          description: The short name of the node
+          nullable: true
+        last_heard:
+          type: string
+          format: date-time
+          description: The timestamp when the node was last heard from
+          nullable: true
+
     NodeAPIKey:
       type: object
       description: >
@@ -1062,6 +1087,36 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ObservedNode'
+
+  /nodes/observed-nodes/search:
+    get:
+      summary: Search observed nodes
+      description: Search for observed nodes by node_id_str, short_name, long_name, or node_id
+      tags: [Nodes]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+            description: Search term to match against node_id_str, short_name, long_name, or node_id
+      responses:
+        '200':
+          description: List of matching nodes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ObservedNodeSearch'
+        '400':
+          description: Invalid request parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
   /nodes/observed-nodes/{node_id}:
     get:
