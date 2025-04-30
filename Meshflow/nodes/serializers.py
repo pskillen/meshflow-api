@@ -2,10 +2,10 @@ import secrets
 
 from rest_framework import serializers
 
+from common.mesh_node_helpers import meshtastic_id_to_hex
 from constellations.models import ConstellationUserMembership
 
 from .models import DeviceMetrics, LocationSource, ManagedNode, NodeAPIKey, NodeAuth, ObservedNode, Position
-from common.mesh_node_helpers import meshtastic_id_to_hex
 
 
 class APIKeySerializer(serializers.ModelSerializer):

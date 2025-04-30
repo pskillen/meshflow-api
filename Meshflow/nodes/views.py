@@ -6,7 +6,6 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from common.mesh_node_helpers import meshtastic_hex_to_int
-
 from constellations.models import ConstellationUserMembership
 from nodes.models import DeviceMetrics, ManagedNode, NodeAPIKey, NodeAuth, ObservedNode, Position
 from nodes.serializers import (
@@ -15,8 +14,8 @@ from nodes.serializers import (
     APIKeySerializer,
     DeviceMetricsSerializer,
     ManagedNodeSerializer,
-    ObservedNodeSerializer,
     ObservedNodeSearchSerializer,
+    ObservedNodeSerializer,
     PositionSerializer,
 )
 

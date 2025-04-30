@@ -56,9 +56,9 @@ class BasePacketSerializerTestCase(TestCase):
             internal_id=uuid4(), node_id=123456, name="Test Node", constellation_id=cls.constellation.id, owner=cls.user
         )
 
-        cls.from_node = ObservedNode.objects.create(node_id=456789,
-                                                    node_id_str=meshtastic_id_to_hex(456789),
-                                                    long_name="From Node")
+        cls.from_node = ObservedNode.objects.create(
+            node_id=456789, node_id_str=meshtastic_id_to_hex(456789), long_name="From Node"
+        )
 
     def setUp(self):
         """Set up test context."""
