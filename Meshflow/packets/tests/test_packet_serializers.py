@@ -6,6 +6,7 @@ from uuid import uuid4
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
+from common.mesh_node_helpers import meshtastic_id_to_hex
 from constellations.models import Constellation
 from nodes.models import ManagedNode, ObservedNode
 from packets.models import (
@@ -55,7 +56,9 @@ class BasePacketSerializerTestCase(TestCase):
             internal_id=uuid4(), node_id=123456, name="Test Node", constellation_id=cls.constellation.id, owner=cls.user
         )
 
-        cls.from_node = ObservedNode.objects.create(node_id=456789, long_name="From Node")
+        cls.from_node = ObservedNode.objects.create(node_id=456789,
+                                                    node_id_str=meshtastic_id_to_hex(456789),
+                                                    long_name="From Node")
 
     def setUp(self):
         """Set up test context."""
