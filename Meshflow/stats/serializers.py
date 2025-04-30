@@ -1,7 +1,6 @@
 from rest_framework import serializers
 
 
-
 class NodeStatsSerializer(serializers.Serializer):
     """Serializer for node stats response."""
 
@@ -10,6 +9,7 @@ class NodeStatsSerializer(serializers.Serializer):
 
         class PacketTypeCountSerializer(serializers.Serializer):
             """Serializer for packet type counts."""
+
             packet_type = serializers.CharField()
             count = serializers.IntegerField()
 
@@ -22,12 +22,12 @@ class NodeStatsSerializer(serializers.Serializer):
     intervals = IntervalSerializer(many=True)
 
 
-
 class GlobalStatsSerializer(serializers.Serializer):
     """Serializer for global stats response."""
 
     class IntervalSerializer(serializers.Serializer):
         """Serializer for global stats interval data."""
+
         start_date = serializers.DateTimeField()
         end_date = serializers.DateTimeField()
         packets = serializers.IntegerField()
