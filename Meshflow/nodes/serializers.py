@@ -233,3 +233,19 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
         if latest_metrics:
             return DeviceMetricsSerializer(latest_metrics).data
         return None
+
+
+class ObservedNodeSearchSerializer(serializers.ModelSerializer):
+    """Simplified serializer for observed nodes search results."""
+
+    class Meta:
+        model = ObservedNode
+        fields = [
+            "internal_id",
+            "node_id",
+            "node_id_str",
+            "long_name",
+            "short_name",
+            "last_heard",
+        ]
+        read_only_fields = ["internal_id", "node_id_str", "last_heard"]

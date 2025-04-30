@@ -1,8 +1,11 @@
+from django.db.models import Q
 from django.utils import timezone
 
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
+
+from common.mesh_node_helpers import meshtastic_hex_to_int
 
 from constellations.models import ConstellationUserMembership
 from nodes.models import DeviceMetrics, ManagedNode, NodeAPIKey, NodeAuth, ObservedNode, Position
@@ -13,6 +16,7 @@ from nodes.serializers import (
     DeviceMetricsSerializer,
     ManagedNodeSerializer,
     ObservedNodeSerializer,
+    ObservedNodeSearchSerializer,
     PositionSerializer,
 )
 
@@ -139,6 +143,51 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         """Create a new node."""
         serializer.save()
+
+    @action(detail=False, methods=["get"], url_path="search")
+    def search(self, request):
+        """
+        Search for observed nodes by node_id_str, short_name, long_name, or node_id.
+
+        Query parameters:
+        - q: Search term to match against node_id_str, short_name, long_name, or node_id
+        """
+        query = request.query_params.get("q", "")
+        if not query:
+            return Response(
+                {"error": "Search query parameter 'q' is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Initialize an empty Q object for our conditions
+        conditions = Q()
+
+        # Check if query is a node_id_str (hex format starting with !)
+        if query.startswith("!") and len(query) == 9:
+            try:
+                # Convert hex node_id_str to integer node_id
+                node_id = meshtastic_hex_to_int(query)
+                conditions |= Q(node_id=node_id)
+            except ValueError:
+                # If conversion fails, just continue with other search methods
+                pass
+
+        # Try to convert query to integer for node_id search if it's numeric
+        try:
+            node_id_query = int(query)
+            conditions |= Q(node_id=node_id_query)
+        except (ValueError, TypeError):
+            pass
+
+        # Add conditions for text fields
+        conditions |= Q(short_name__icontains=query)
+        conditions |= Q(long_name__icontains=query)
+
+        # Search for nodes matching the query
+        nodes = ObservedNode.objects.filter(conditions).order_by("node_id")
+
+        serializer = ObservedNodeSearchSerializer(nodes, many=True)
+        return Response(serializer.data)
 
     @action(detail=True, methods=["get"])
     def positions(self, request, node_id=None):
