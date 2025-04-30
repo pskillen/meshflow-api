@@ -52,7 +52,7 @@ class ConstellationViewSet(viewsets.ModelViewSet):
 
     serializer_class = ConstellationSerializer
     permission_classes = [permissions.IsAuthenticated, IsConstellationAdminOrEditor]
-    queryset = Constellation.objects.all()
+    queryset = Constellation.objects.all().order_by("id")
 
     def get_queryset(self):
         """
@@ -60,10 +60,12 @@ class ConstellationViewSet(viewsets.ModelViewSet):
         """
         if self.action == "retrieve":
             # For single object retrieval, return all constellations to let permission classes handle access
-            return Constellation.objects.all()
+            return Constellation.objects.all().order_by("id")
 
         # For list view, only return constellations the user is a member of
-        return Constellation.objects.filter(constellationusermembership__user=self.request.user).distinct()
+        return (
+            Constellation.objects.filter(constellationusermembership__user=self.request.user).distinct().order_by("id")
+        )
 
     def perform_create(self, serializer):
         """

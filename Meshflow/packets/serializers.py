@@ -561,6 +561,7 @@ class NodeSerializer(serializers.ModelSerializer):
         short_name = serializers.CharField(required=False, allow_null=True)
 
     id = serializers.IntegerField(source="node_id")
+    id_str = serializers.CharField(source="node_id_str")
     macaddr = serializers.CharField(source="mac_addr", allow_null=True, allow_blank=True)
     hw_model = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     public_key = serializers.CharField(required=False, allow_null=True, allow_blank=True)
@@ -572,6 +573,7 @@ class NodeSerializer(serializers.ModelSerializer):
         model = ObservedNode
         fields = [
             "id",
+            "id_str",
             "macaddr",
             "hw_model",
             "public_key",
@@ -602,6 +604,8 @@ class NodeSerializer(serializers.ModelSerializer):
                     raise serializers.ValidationError({"id": "Invalid node ID format"})
             else:
                 data["id"] = node_id
+
+            data["id_str"] = meshtastic_id_to_hex(data["id"])
 
         # Handle the nested user data
         if "user" in data:
