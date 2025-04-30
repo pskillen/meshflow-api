@@ -171,6 +171,8 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
             except ValueError:
                 # If conversion fails, just continue with other search methods
                 pass
+        else:
+            conditions |= Q(node_id_str__icontains=query)
 
         # Try to convert query to integer for node_id search if it's numeric
         try:

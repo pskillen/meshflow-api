@@ -1,5 +1,6 @@
 import pytest
 
+from common.mesh_node_helpers import meshtastic_id_to_hex
 from constellations.tests.conftest import create_constellation  # noqa: F401
 from nodes.models import ManagedNode, NodeAPIKey, NodeAuth, ObservedNode
 from users.tests.conftest import create_user  # noqa: F401
@@ -51,6 +52,7 @@ def create_managed_node(managed_node_data, create_user, create_constellation):  
 def create_observed_node(observed_node_data):
     def make_observed_node(**kwargs):
         data = observed_node_data.copy()
+        data["node_id_str"] = meshtastic_id_to_hex(data["node_id"])
         data.update(kwargs)
         return ObservedNode.objects.create(**data)
 

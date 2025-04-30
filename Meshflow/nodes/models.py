@@ -54,7 +54,8 @@ class ObservedNode(models.Model):
     """Model representing a mesh network node."""
 
     internal_id = models.UUIDField(primary_key=True, null=False, default=uuid.uuid4, editable=False)
-    node_id = models.BigIntegerField(null=False)
+    node_id = models.BigIntegerField(null=False, db_index=True)
+    node_id_str = models.CharField(null=False, blank=False, max_length=9, db_index=True)
     mac_addr = models.CharField(max_length=20, null=True, blank=True)
     long_name = models.CharField(max_length=50)
     short_name = models.CharField(max_length=5)
@@ -69,13 +70,6 @@ class ObservedNode(models.Model):
 
         verbose_name = _("Observed node")
         verbose_name_plural = _("Observed nodes")
-
-    @property
-    def node_id_str(self) -> str:
-        """Return the node ID in hex format."""
-        if not self.node_id:
-            return None
-        return meshtastic_id_to_hex(self.node_id)
 
     def __str__(self):
         """Return a string representation of the node, including user's short name if available."""

@@ -5,6 +5,7 @@ from rest_framework import serializers
 from constellations.models import ConstellationUserMembership
 
 from .models import DeviceMetrics, LocationSource, ManagedNode, NodeAPIKey, NodeAuth, ObservedNode, Position
+from common.mesh_node_helpers import meshtastic_id_to_hex
 
 
 class APIKeySerializer(serializers.ModelSerializer):
@@ -199,8 +200,16 @@ class DeviceMetricsSerializer(serializers.ModelSerializer):
 class ObservedNodeSerializer(serializers.ModelSerializer):
     """Serializer for observed nodes."""
 
+    node_id_str = serializers.CharField(read_only=True)
+
     latest_position = serializers.SerializerMethodField()
     latest_device_metrics = serializers.SerializerMethodField()
+
+    def to_internal_value(self, data):
+        """Convert node_id_str to node_id."""
+        if "node_id" in data:
+            data["node_id_str"] = meshtastic_id_to_hex(data["node_id"])
+        return super().to_internal_value(data)
 
     class Meta:
         model = ObservedNode
