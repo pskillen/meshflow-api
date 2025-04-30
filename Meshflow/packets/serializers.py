@@ -107,10 +107,7 @@ class BasePacketSerializer(serializers.Serializer):
             raise serializers.ValidationError("No observer found in request context")
 
         # Check if this observer has already reported this packet
-        existing_observation = PacketObservation.objects.filter(
-            packet=packet,
-            observer=observer
-        ).first()
+        existing_observation = PacketObservation.objects.filter(packet=packet, observer=observer).first()
 
         if existing_observation:
             # If the same observer reports the same packet again, ignore it
@@ -129,15 +126,12 @@ class BasePacketSerializer(serializers.Serializer):
             relay_node=validated_data.get("relay_node"),
         )
 
-        # Update the last_heard field of the ObservedNode that sent the packet
-        if "from_int" in validated_data and validated_data.get("rx_time"):
-            try:
-                node = ObservedNode.objects.get(node_id=validated_data.get("from_int"))
-                node.last_heard = validated_data.get("rx_time")
-                node.save(update_fields=["last_heard"])
-            except ObservedNode.DoesNotExist:
-                # If the node doesn't exist, we don't need to update it
-                pass
+        # Process the packet using the appropriate service
+        from packets.services.factory import PacketServiceFactory
+
+        service = PacketServiceFactory.create_service(packet, observer)
+        if service:
+            service.process_packet()
 
         return observation
 
