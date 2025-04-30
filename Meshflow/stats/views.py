@@ -43,9 +43,26 @@ def parse_stats_params(request) -> Tuple[Optional[datetime], Optional[datetime],
     parsed_end = None
 
     if start_date:
-        parsed_start = datetime.strptime(start_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        try:
+            # Try parsing as ISO 8601 format first
+            parsed_start = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+        except ValueError:
+            # Fall back to YYYY-MM-DD format for backward compatibility
+            try:
+                parsed_start = datetime.strptime(start_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            except ValueError:
+                raise ValueError("Invalid start_date format. Must be ISO 8601 (YYYY-MM-DDTHH:MM:SS±HH:MM) or YYYY-MM-DD")
+
     if end_date:
-        parsed_end = datetime.strptime(end_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        try:
+            # Try parsing as ISO 8601 format first
+            parsed_end = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+        except ValueError:
+            # Fall back to YYYY-MM-DD format for backward compatibility
+            try:
+                parsed_end = datetime.strptime(end_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            except ValueError:
+                raise ValueError("Invalid end_date format. Must be ISO 8601 (YYYY-MM-DDTHH:MM:SS±HH:MM) or YYYY-MM-DD")
 
     return parsed_start, parsed_end, interval, interval_type
 
