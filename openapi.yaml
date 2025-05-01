@@ -20,6 +20,27 @@ tags:
     description: Node and API key management endpoints
 
 components:
+  parameters:
+    PaginationPage:
+      name: page
+      in: query
+      required: false
+      schema:
+        type: integer
+        default: 1
+        minimum: 1
+        description: Page number for pagination
+    PaginationPageSize:
+      name: page_size
+      in: query
+      required: false
+      schema:
+        type: integer
+        default: 100
+        minimum: 1
+        maximum: 1000
+        description: Number of items per page
+
   securitySchemes:
     BearerAuth:
       description: >
@@ -953,6 +974,9 @@ paths:
       tags: [Constellations]
       security:
         - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PaginationPage'
+        - $ref: '#/components/parameters/PaginationPageSize'
       responses:
         '200':
           description: List of constellations
@@ -1150,6 +1174,9 @@ paths:
       tags: [Nodes]
       security:
         - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PaginationPage'
+        - $ref: '#/components/parameters/PaginationPageSize'
       responses:
         '200':
           description: List of observed nodes
@@ -1340,6 +1367,9 @@ paths:
       tags: [Nodes]
       security:
         - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PaginationPage'
+        - $ref: '#/components/parameters/PaginationPageSize'
       responses:
         '200':
           description: List of managed nodes
@@ -1452,6 +1482,9 @@ paths:
       tags: [Nodes]
       security:
         - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PaginationPage'
+        - $ref: '#/components/parameters/PaginationPageSize'
       responses:
         '200':
           description: List of API keys
