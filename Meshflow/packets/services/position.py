@@ -1,6 +1,6 @@
 """Service for processing position packets."""
 
-from nodes.models import ObservedNode, Position
+from nodes.models import LocationSource, ObservedNode, Position
 from packets.models import PositionPacket
 from packets.services.base import BasePacketService
 
@@ -21,7 +21,7 @@ class PositionPacketService(BasePacketService):
             longitude=self.packet.longitude,
             altitude=self.packet.altitude,
             heading=self.packet.heading,
-            location_source=self.packet.location_source,
+            location_source=self.packet.location_source or LocationSource.UNSET,
             precision_bits=self.packet.precision_bits,
             ground_speed=self.packet.ground_speed,
             ground_track=self.packet.ground_track,

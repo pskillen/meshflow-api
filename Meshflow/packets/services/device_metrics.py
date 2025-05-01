@@ -17,11 +17,11 @@ class DeviceMetricsPacketService(BasePacketService):
         DeviceMetrics.objects.create(
             node=ObservedNode.objects.get(node_id=self.packet.from_int),
             reported_time=self.packet.reading_time or self.packet.first_reported_time,
-            battery_level=self.packet.battery_level,
-            voltage=self.packet.voltage,
-            channel_utilization=self.packet.channel_utilization,
-            air_util_tx=self.packet.air_util_tx,
-            uptime_seconds=self.packet.uptime_seconds,
+            battery_level=self.packet.battery_level or 0.0,
+            voltage=self.packet.voltage or 0.0,
+            channel_utilization=self.packet.channel_utilization or 0.0,
+            air_util_tx=self.packet.air_util_tx or 0.0,
+            uptime_seconds=self.packet.uptime_seconds or 0,
         )
 
         # Update the node's last_heard timestamp
