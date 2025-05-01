@@ -160,14 +160,15 @@ REST_FRAMEWORK = {
         "rest_framework.authentication.SessionAuthentication",
         "nodes.authentication.NodeAPIKeyAuthentication",
     ],
-    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
-    "PAGE_SIZE": 50,
+    "DEFAULT_PAGINATION_CLASS": "Meshflow.paginator.PageSizePagination",
 }
 
 # JWT Settings
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
-    "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
+    "ACCESS_TOKEN_LIFETIME": timedelta(
+        minutes=int(os.environ.get("JWT_ACCESS_TOKEN_LIFETIME_MINUTES", 1440))  # 24h default
+    ),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=int(os.environ.get("JWT_REFRESH_TOKEN_LIFETIME_DAYS", 30))),  # 30d default
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
     "UPDATE_LAST_LOGIN": True,
