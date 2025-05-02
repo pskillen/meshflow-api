@@ -55,6 +55,7 @@ INSTALLED_APPS = [
     "users",
     "constellations",
     "nodes",
+    "text_messages",
     "packets",
 ]
 
