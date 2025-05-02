@@ -26,4 +26,3 @@ class PositionPacketService(BasePacketService):
             ground_speed=self.packet.ground_speed,
             ground_track=self.packet.ground_track,
         )
-

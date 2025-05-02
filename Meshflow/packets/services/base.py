@@ -1,12 +1,14 @@
 """Base service for packet processing."""
 
 import abc
+
 from nodes.models import ManagedNode, ObservedNode
 from packets.models import PacketObservation, RawPacket
 
 
 class BasePacketService(abc.ABC):
     """Base service for processing packets."""
+
     packet: RawPacket
     observer: ManagedNode
     observation: PacketObservation

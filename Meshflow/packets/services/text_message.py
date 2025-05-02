@@ -1,8 +1,8 @@
 """Service for processing message packets."""
 
-from text_messages.models import TextMessage
 from packets.models import MessagePacket
 from packets.services.base import BasePacketService
+from text_messages.models import TextMessage
 
 
 class TextMessagePacketService(BasePacketService):
@@ -12,7 +12,7 @@ class TextMessagePacketService(BasePacketService):
         """Process the message packet and create a Message record."""
         if not isinstance(self.packet, MessagePacket):
             raise ValueError("Packet must be a MessagePacket")
-        
+
         # the channel is based on the observer's channel mapping
         channel_idx = self.observation.channel
         channel = self.observer.get_channel(channel_idx)

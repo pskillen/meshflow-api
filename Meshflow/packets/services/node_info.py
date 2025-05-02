@@ -1,9 +1,10 @@
-
-from Meshflow.packets.services.base import BasePacketService
 from Meshflow.packets.models import NodeInfoPacket
+from Meshflow.packets.services.base import BasePacketService
+
 
 class NodeInfoPacketService(BasePacketService):
     """Service for processing node info packets."""
+
     packet: NodeInfoPacket
 
     def _process_packet(self) -> None:

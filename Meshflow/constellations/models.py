@@ -42,7 +42,6 @@ class MessageChannel(models.Model):
     name = models.CharField(max_length=100)
     constellation = models.ForeignKey(Constellation, on_delete=models.CASCADE)
 
-
     class Meta:
         verbose_name = _("Message channel")
         verbose_name_plural = _("Message channels")
