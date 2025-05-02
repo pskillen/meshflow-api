@@ -5,7 +5,23 @@ from rest_framework import serializers
 from common.mesh_node_helpers import meshtastic_id_to_hex
 from constellations.models import ConstellationUserMembership
 
-from .models import DeviceMetrics, LocationSource, ManagedNode, NodeAPIKey, NodeAuth, ObservedNode, Position
+from .models import (
+    DeviceMetrics,
+    LocationSource,
+    ManagedNode,
+    NodeAPIKey,
+    NodeAuth,
+    NodeOwnerClaim,
+    ObservedNode,
+    Position,
+)
+
+
+class NodeOwnerClaimSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = NodeOwnerClaim
+        fields = ["id", "node", "user", "claim_key", "created_at", "accepted_at"]
+        read_only_fields = ["id", "node", "user", "claim_key", "created_at", "accepted_at"]
 
 
 class APIKeySerializer(serializers.ModelSerializer):

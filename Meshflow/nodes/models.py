@@ -65,6 +65,15 @@ class ObservedNode(models.Model):
     public_key = models.CharField(max_length=64, null=True, blank=True)
     last_heard = models.DateTimeField(null=True, blank=True)
 
+    claimed_by = models.ForeignKey(
+        "users.User",
+        on_delete=models.CASCADE,
+        related_name="claimed_nodes",
+        help_text=_("The user who owns this node"),
+        null=True,
+        blank=True,
+    )
+
     class Meta:
         """Model metadata."""
 
@@ -192,3 +201,16 @@ class DeviceMetrics(BaseNodeItem):
 
     def __str__(self):
         return f"Device metrics [{self.battery_level}%, {self.voltage}V, {self.uptime_seconds}s]"
+
+
+class NodeOwnerClaim(models.Model):
+    """Model representing a user's claim to a node. A row in this table does not necessarily
+    mean the user owns the node. The node must send a text message with their claim_key, and the
+    system must receive that message, before a claim is accepted.
+    """
+
+    node = models.ForeignKey(ObservedNode, on_delete=models.CASCADE)
+    user = models.ForeignKey("users.User", on_delete=models.CASCADE)
+    claim_key = models.CharField(max_length=64, null=False, blank=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    accepted_at = models.DateTimeField(null=True, blank=True)
