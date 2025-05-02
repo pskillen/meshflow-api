@@ -1,3 +1,4 @@
+import uuid
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
@@ -7,6 +8,7 @@ from nodes.models import ObservedNode
 class TextMessage(models.Model):
     """Model representing a text message sent to a node."""
 
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     sender = models.ForeignKey(ObservedNode, on_delete=models.CASCADE)
     recipient_node_id = models.BigIntegerField(null=True, blank=True)
     channel = models.ForeignKey("constellations.MessageChannel", on_delete=models.CASCADE)
