@@ -93,6 +93,10 @@ class ManagedNode(models.Model):
 
     def get_channel(self, channel_idx: int) -> MessageChannel:
         """Get the channel for the given index."""
+
+        if channel_idx < 0 or channel_idx > 7:
+            raise ValueError(f"Invalid channel index: {channel_idx}")
+
         return getattr(self, f"channel_{channel_idx}")
 
 

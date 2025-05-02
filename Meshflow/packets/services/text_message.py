@@ -15,7 +15,13 @@ class TextMessagePacketService(BasePacketService):
 
         # the channel is based on the observer's channel mapping
         channel_idx = self.observation.channel
-        channel = self.observer.get_channel(channel_idx)
+        if channel_idx is None:
+            channel = None
+        else:
+            try:
+                channel = self.observer.get_channel(channel_idx)
+            except ValueError:
+                channel = None
 
         # Create a new Message record
         TextMessage.objects.create(

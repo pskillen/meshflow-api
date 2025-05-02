@@ -12,7 +12,7 @@ class TextMessage(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     sender = models.ForeignKey(ObservedNode, on_delete=models.CASCADE)
     recipient_node_id = models.BigIntegerField(null=True, blank=True)
-    channel = models.ForeignKey("constellations.MessageChannel", on_delete=models.CASCADE)
+    channel = models.ForeignKey("constellations.MessageChannel", on_delete=models.CASCADE, null=True, blank=True)
 
     sent_at = models.DateTimeField(auto_now_add=True)
 
