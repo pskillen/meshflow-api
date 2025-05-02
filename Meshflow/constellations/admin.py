@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.utils.translation import gettext_lazy as _
 
-from .models import Constellation, ConstellationUserMembership
+from .models import Constellation, ConstellationUserMembership, MessageChannel
 
 
 @admin.register(Constellation)
@@ -72,3 +72,11 @@ class ConstellationUserMembershipAdmin(admin.ModelAdmin):
 
     get_constellation_creator.short_description = _("Constellation Creator")
     get_constellation_creator.admin_order_field = "constellation__created_by__username"
+
+
+@admin.register(MessageChannel)
+class MessageChannelAdmin(admin.ModelAdmin):
+    list_display = ("id", "name", "constellation")
+    list_filter = ("constellation",)
+    search_fields = ("name", "id")
+    ordering = ("name",)

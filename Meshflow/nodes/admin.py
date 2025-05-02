@@ -196,6 +196,14 @@ class ManagedNodeAdmin(admin.ModelAdmin):
             "name",
             "owner",
             "constellation",
+            "channel_0",
+            "channel_1",
+            "channel_2",
+            "channel_3",
+            "channel_4",
+            "channel_5",
+            "channel_6",
+            "channel_7",
         ]
         return fields
 
