@@ -35,7 +35,7 @@ urlpatterns = [
                 path("constellations/", include("constellations.urls")),
                 path("nodes/", include("nodes.urls")),
                 path("stats/", include("stats.urls")),
-                path("text-messages/", include("text_messages.urls")),
+                path("messages/", include("text_messages.urls")),
                 # JWT Token endpoints
                 path("token/", CustomTokenObtainPairView.as_view(), name="token_obtain_pair"),
                 path("token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),

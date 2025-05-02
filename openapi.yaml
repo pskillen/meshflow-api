@@ -18,6 +18,8 @@ tags:
     description: Constellation management endpoints
   - name: Nodes
     description: Node and API key management endpoints
+  - name: Text Messages
+    description: Send and retrieve text messages between nodes
 
 components:
   parameters:
@@ -852,6 +854,37 @@ components:
         packets:
           type: integer
           description: Number of packets in this interval
+
+    TextMessage:
+      type: object
+      description: A text message sent to a node
+      properties:
+        id:
+          type: string
+          readOnly: true
+          format: uuid
+        sender:
+          type: integer
+          description: The ObservedNode ID of the sender
+        recipient_node_id:
+          type: integer
+          nullable: true
+          description: The node ID of the recipient (null for broadcast)
+        channel:
+          type: integer
+          description: The MessageChannel ID (not the node's channel index)
+        sent_at:
+          type: string
+          format: date-time
+          readOnly: true
+        message_text:
+          type: string
+        is_emoji:
+          type: boolean
+        reply_to_message_id:
+          type: integer
+          nullable: true
+          description: The ID of the message being replied to
 
 
 paths:
@@ -1833,3 +1866,63 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+
+  /messages/text:
+    get:
+      summary: List text messages
+      tags: [Text Messages]
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PaginationPage'
+        - $ref: '#/components/parameters/PaginationPageSize'
+      responses:
+        '200':
+          description: List of text messages
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedResponse'
+                  - type: object
+                    properties:
+                      results:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/TextMessage'
+
+  /messages/text/{id}:
+    get:
+      summary: Get text message details
+      tags: [Text Messages]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Text message details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TextMessage'
+    delete:
+      summary: Delete text message
+      tags: [Text Messages]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Text message deleted successfully
