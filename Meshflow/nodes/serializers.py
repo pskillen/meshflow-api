@@ -20,8 +20,8 @@ from .models import (
 class NodeOwnerClaimSerializer(serializers.ModelSerializer):
     class Meta:
         model = NodeOwnerClaim
-        fields = ["id", "node", "user", "claim_key", "created_at", "accepted_at"]
-        read_only_fields = ["id", "node", "user", "claim_key", "created_at", "accepted_at"]
+        fields = ["node", "user", "claim_key", "created_at", "accepted_at"]
+        read_only_fields = ["node", "user", "claim_key", "created_at", "accepted_at"]
 
 
 class APIKeySerializer(serializers.ModelSerializer):
