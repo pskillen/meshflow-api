@@ -19,6 +19,22 @@ class LocationSource(models.IntegerChoices):
     EXTERNAL = 3, "LOC_EXTERNAL"
 
 
+class RoleSource(models.IntegerChoices):
+    """Role source types for node roles."""
+
+    CLIENT = 0, "CLIENT"
+    CLIENT_MUTE = 1, "CLIENT_MUTE"
+    CLIENT_HIDDEN = 2, "CLIENT_HIDDEN"
+    TRACKER = 3, "TRACKER"
+    LOST_AND_FOUND = 4, "LOST_AND_FOUND"
+    SENSOR = 5, "SENSOR"
+    TAK = 6, "TAK"
+    TAK_TRACKER = 7, "TAK_TRACKER"
+    REPEATER = 8, "REPEATER"
+    ROUTER = 9, "ROUTER"
+    ROUTER_LATE = 10, "ROUTER_LATE"
+
+
 class ManagedNode(models.Model):
     """Model representing a mesh network node."""
 
@@ -77,6 +93,8 @@ class ObservedNode(models.Model):
     hw_model = models.CharField(max_length=50, null=True, blank=True)
     sw_version = models.CharField(max_length=12, null=True, blank=True)
     public_key = models.CharField(max_length=64, null=True, blank=True)
+    role = models.IntegerField(choices=RoleSource.choices, null=True, blank=True)
+
     last_heard = models.DateTimeField(null=True, blank=True)
 
     claimed_by = models.ForeignKey(
