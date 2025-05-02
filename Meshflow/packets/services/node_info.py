@@ -1,5 +1,5 @@
-from Meshflow.packets.models import NodeInfoPacket
-from Meshflow.packets.services.base import BasePacketService
+from packets.models import NodeInfoPacket
+from packets.services.base import BasePacketService
 
 
 class NodeInfoPacketService(BasePacketService):
