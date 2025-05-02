@@ -11,14 +11,14 @@ class PacketServiceFactory:
     """Factory for creating packet services."""
 
     @staticmethod
-    def create_service(packet: RawPacket, observer) -> "BasePacketService":
+    def create_service(packet: RawPacket) -> "BasePacketService":
         """Create the appropriate service for the given packet type."""
         if isinstance(packet, PositionPacket):
-            return PositionPacketService(packet, observer)
+            return PositionPacketService()
         elif isinstance(packet, DeviceMetricsPacket):
-            return DeviceMetricsPacketService(packet, observer)
+            return DeviceMetricsPacketService()
         elif isinstance(packet, MessagePacket):
-            return TextMessagePacketService(packet, observer)
+            return TextMessagePacketService()
         else:
             # For packet types that don't need additional processing
             return None
