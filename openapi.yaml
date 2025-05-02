@@ -18,6 +18,8 @@ tags:
     description: Constellation management endpoints
   - name: Nodes
     description: Node and API key management endpoints
+  - name: Text Messages
+    description: Send and retrieve text messages between nodes
 
 components:
   parameters:
@@ -535,6 +537,35 @@ components:
           items:
             type: integer
 
+    NodeOwnerClaim:
+      type: object
+      description: >
+        Represents a user's claim to an observed node. A claim must be accepted (by the node sending the claim_key) to be valid.
+      properties:
+        node:
+          type: integer
+          description: The ID of the observed node being claimed
+          readOnly: true
+        user:
+          type: integer
+          description: The ID of the user making the claim
+          readOnly: true
+        claim_key:
+          type: string
+          description: The claim key that must be sent by the node to accept the claim
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          description: The date and time the claim was created
+          readOnly: true
+        accepted_at:
+          type: string
+          format: date-time
+          description: The date and time the claim was accepted (nullable)
+          nullable: true
+          readOnly: true
+
     ObservedNodeUpdate:
       type: object
       description: >
@@ -823,6 +854,37 @@ components:
         packets:
           type: integer
           description: Number of packets in this interval
+
+    TextMessage:
+      type: object
+      description: A text message sent to a node
+      properties:
+        id:
+          type: string
+          readOnly: true
+          format: uuid
+        sender:
+          type: integer
+          description: The ObservedNode ID of the sender
+        recipient_node_id:
+          type: integer
+          nullable: true
+          description: The node ID of the recipient (null for broadcast)
+        channel:
+          type: integer
+          description: The MessageChannel ID (not the node's channel index)
+        sent_at:
+          type: string
+          format: date-time
+          readOnly: true
+        message_text:
+          type: string
+        is_emoji:
+          type: boolean
+        reply_to_message_id:
+          type: integer
+          nullable: true
+          description: The ID of the message being replied to
 
 
 paths:
@@ -1731,3 +1793,136 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+
+  /nodes/observed-nodes/{node_id}/claim:
+    get:
+      summary: Get claim for observed node
+      description: Get the current user's claim for the specified observed node.
+      tags: [Nodes]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: node_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Claim found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NodeOwnerClaim'
+        '404':
+          description: No claim found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      summary: Create claim for observed node
+      description: Create a claim for the current user for the specified observed node.
+      tags: [Nodes]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: node_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '201':
+          description: Claim created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NodeOwnerClaim'
+        '400':
+          description: Claim already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      summary: Delete claim for observed node
+      description: Delete the current user's claim for the specified observed node.
+      tags: [Nodes]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: node_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Claim deleted successfully
+        '404':
+          description: No claim found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /messages/text:
+    get:
+      summary: List text messages
+      tags: [Text Messages]
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PaginationPage'
+        - $ref: '#/components/parameters/PaginationPageSize'
+      responses:
+        '200':
+          description: List of text messages
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedResponse'
+                  - type: object
+                    properties:
+                      results:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/TextMessage'
+
+  /messages/text/{id}:
+    get:
+      summary: Get text message details
+      tags: [Text Messages]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Text message details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TextMessage'
+    delete:
+      summary: Delete text message
+      tags: [Text Messages]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Text message deleted successfully

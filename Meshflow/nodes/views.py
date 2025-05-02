@@ -1,23 +1,28 @@
 from django.db.models import Q
+from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from common.mesh_node_helpers import meshtastic_hex_to_int
 from constellations.models import ConstellationUserMembership
-from nodes.models import DeviceMetrics, ManagedNode, NodeAPIKey, NodeAuth, ObservedNode, Position
+from nodes.models import DeviceMetrics, ManagedNode, NodeAPIKey, NodeAuth, NodeOwnerClaim, ObservedNode, Position
 from nodes.serializers import (
     APIKeyCreateSerializer,
     APIKeyDetailSerializer,
     APIKeySerializer,
     DeviceMetricsSerializer,
     ManagedNodeSerializer,
+    NodeOwnerClaimSerializer,
     ObservedNodeSearchSerializer,
     ObservedNodeSerializer,
     PositionSerializer,
 )
+
+from .utils import generate_claim_key
 
 
 class APIKeyViewSet(viewsets.ModelViewSet):
@@ -301,3 +306,32 @@ class ManagedNodeViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         """Create a new managed node and set the owner."""
         serializer.save(owner=self.request.user)
+
+
+class ObservedNodeClaimView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, node_id):
+        node = get_object_or_404(ObservedNode, node_id=node_id)
+        claim = NodeOwnerClaim.objects.filter(node=node, user=request.user).first()
+        if not claim:
+            return Response({"detail": "No claim found."}, status=status.HTTP_404_NOT_FOUND)
+        serializer = NodeOwnerClaimSerializer(claim)
+        return Response(serializer.data)
+
+    def post(self, request, node_id):
+        node = get_object_or_404(ObservedNode, node_id=node_id)
+        if NodeOwnerClaim.objects.filter(node=node, user=request.user).exists():
+            return Response({"detail": "Claim already exists."}, status=status.HTTP_400_BAD_REQUEST)
+        claim_key = generate_claim_key()
+        claim = NodeOwnerClaim.objects.create(node=node, user=request.user, claim_key=claim_key)
+        serializer = NodeOwnerClaimSerializer(claim)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    def delete(self, request, node_id):
+        node = get_object_or_404(ObservedNode, node_id=node_id)
+        claim = NodeOwnerClaim.objects.filter(node=node, user=request.user).first()
+        if not claim:
+            return Response({"detail": "No claim found."}, status=status.HTTP_404_NOT_FOUND)
+        claim.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)

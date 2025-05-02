@@ -129,9 +129,9 @@ class BasePacketSerializer(serializers.Serializer):
         # Process the packet using the appropriate service
         from packets.services.factory import PacketServiceFactory
 
-        service = PacketServiceFactory.create_service(packet, observer)
+        service = PacketServiceFactory.create_service(packet)
         if service:
-            service.process_packet()
+            service.process_packet(packet, observer, observation)
 
         return observation
 
