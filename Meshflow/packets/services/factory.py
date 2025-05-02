@@ -1,10 +1,11 @@
 """Factory for creating packet services."""
 
-from packets.models import DeviceMetricsPacket, MessagePacket, PositionPacket, RawPacket
+from packets.models import DeviceMetricsPacket, MessagePacket, NodeInfoPacket, PositionPacket, RawPacket
 from packets.services.base import BasePacketService
 from packets.services.device_metrics import DeviceMetricsPacketService
 from packets.services.text_message import TextMessagePacketService
 from packets.services.position import PositionPacketService
+from packets.services.node_info import NodeInfoPacketService
 
 
 class PacketServiceFactory:
@@ -19,6 +20,8 @@ class PacketServiceFactory:
             return DeviceMetricsPacketService()
         elif isinstance(packet, MessagePacket):
             return TextMessagePacketService()
+        elif isinstance(packet, NodeInfoPacket):
+            return NodeInfoPacketService()
         else:
             # For packet types that don't need additional processing
             return None
