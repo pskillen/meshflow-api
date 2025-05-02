@@ -6,6 +6,7 @@ from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
+from constellations.models import MessageChannel
 from common.mesh_node_helpers import meshtastic_id_to_hex
 
 
@@ -32,6 +33,15 @@ class ManagedNode(models.Model):
     constellation = models.ForeignKey("constellations.Constellation", on_delete=models.CASCADE, related_name="nodes")
     name = models.CharField(max_length=100, null=False, blank=False)
 
+    channel_0 = models.ForeignKey("constellations.MessageChannel", on_delete=models.CASCADE, null=True, blank=True, related_name='+')
+    channel_1 = models.ForeignKey("constellations.MessageChannel", on_delete=models.CASCADE, null=True, blank=True, related_name='+')
+    channel_2 = models.ForeignKey("constellations.MessageChannel", on_delete=models.CASCADE, null=True, blank=True, related_name='+')
+    channel_3 = models.ForeignKey("constellations.MessageChannel", on_delete=models.CASCADE, null=True, blank=True, related_name='+')
+    channel_4 = models.ForeignKey("constellations.MessageChannel", on_delete=models.CASCADE, null=True, blank=True, related_name='+')
+    channel_5 = models.ForeignKey("constellations.MessageChannel", on_delete=models.CASCADE, null=True, blank=True, related_name='+')
+    channel_6 = models.ForeignKey("constellations.MessageChannel", on_delete=models.CASCADE, null=True, blank=True, related_name='+')
+    channel_7 = models.ForeignKey("constellations.MessageChannel", on_delete=models.CASCADE, null=True, blank=True, related_name='+')
+
     class Meta:
         """Model metadata."""
 
@@ -48,6 +58,10 @@ class ManagedNode(models.Model):
     def __str__(self):
         """Return a string representation of the node, including user's short name if available."""
         return f"{self.node_id_str} {self.name} ({self.owner.username})"
+    
+    def get_channel(self, channel_idx: int) -> MessageChannel:
+        """Get the channel for the given index."""
+        return getattr(self, f"channel_{channel_idx}")
 
 
 class ObservedNode(models.Model):
