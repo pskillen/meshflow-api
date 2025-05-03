@@ -406,18 +406,12 @@ components:
         created_by:
           type: integer
           description: The ID of the user that created the constellation
-        members:
+        channels:
           type: array
-          description: The users that are members of the constellation
+          description: The channels that are part of the constellation
           items:
-            type: object
-            properties:
-              username:
-                type: string
-              role:
-                type: string
-                description: The role of the user in the constellation
-                enum: [admin, editor, viewer]
+            $ref: '#/components/schemas/MessageChannel'
+
 
     ObservedNode:
       type: object
@@ -860,31 +854,66 @@ components:
       description: A text message sent to a node
       properties:
         id:
+          description: The internal ID of the text message
           type: string
           readOnly: true
           format: uuid
+        packet_id:
+          description: The packet ID of the text message
+          type: integer
+          readOnly: true
         sender:
           type: integer
           description: The ObservedNode ID of the sender
+          readOnly: true
         recipient_node_id:
           type: integer
           nullable: true
           description: The node ID of the recipient (null for broadcast)
+          readOnly: true
         channel:
           type: integer
           description: The MessageChannel ID (not the node's channel index)
+          readOnly: true
         sent_at:
           type: string
           format: date-time
           readOnly: true
         message_text:
           type: string
+          readOnly: true
         is_emoji:
           type: boolean
+          readOnly: true
         reply_to_message_id:
-          type: integer
+          type: integer 
           nullable: true
-          description: The ID of the message being replied to
+          description: The packet_id of the message being replied to
+          readOnly: true
+
+    MessageChannel:
+      type: object
+      description: A message channel within a constellation.
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        constellation:
+          type: integer
+          description: The ID of the constellation this channel belongs to
+
+    ConstellationMember:
+      type: object
+      description: A member of a constellation.
+      properties:
+        user_id:
+          type: integer
+        username:
+          type: string
+        role:
+          type: string
+          enum: [admin, editor, viewer]
 
 
 paths:
@@ -1120,6 +1149,10 @@ paths:
                   type: string
                 description:
                   type: string
+                channels:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/MessageChannel'
       responses:
         '200':
           description: Constellation updated successfully
@@ -1144,6 +1177,27 @@ paths:
           description: Constellation deleted successfully
 
   /constellations/{id}/members:
+    get:
+      summary: List members of a constellation
+      tags: [Constellations]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: List of members for the constellation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ConstellationMember'
+
     post:
       summary: Add member to constellation
       tags: [Constellations]
@@ -1229,6 +1283,55 @@ paths:
       responses:
         '204':
           description: Member removed successfully
+
+  /constellations/{id}/channels:
+    get:
+      summary: List message channels for a constellation
+      tags: [Constellations]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: List of message channels for the constellation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MessageChannel'
+    post:
+      summary: Create a message channel for a constellation
+      tags: [Constellations]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+      responses:
+        '201':
+          description: Message channel created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageChannel'
 
   /nodes/observed-nodes:
     get:
@@ -1876,6 +1979,18 @@ paths:
       parameters:
         - $ref: '#/components/parameters/PaginationPage'
         - $ref: '#/components/parameters/PaginationPageSize'
+        - name: constellation_id
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Filter messages by constellation ID (via channel's constellation)
+        - name: channel_id
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Filter messages by message channel ID
       responses:
         '200':
           description: List of text messages

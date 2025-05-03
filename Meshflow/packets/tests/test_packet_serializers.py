@@ -53,7 +53,11 @@ class BasePacketSerializerTestCase(TestCase):
 
         # Create a test observer node
         cls.observer = ManagedNode.objects.create(
-            internal_id=uuid4(), node_id=123456, name="Test Node", constellation_id=cls.constellation.id, owner=cls.user
+            internal_id=uuid4(),
+            node_id=123456789,
+            name="Test Node",
+            constellation_id=cls.constellation.id,
+            owner=cls.user,
         )
 
         cls.from_node = ObservedNode.objects.create(
@@ -161,7 +165,7 @@ class MessagePacketSerializerTest(BasePacketSerializerTestCase):
     def test_create_message_packet(self):
         """Test creating a message packet."""
         data = {
-            "id": 123,
+            "id": 123456789,
             "from": self.from_node.node_id,
             "fromId": self.from_node.node_id_str,
             "decoded": {
@@ -177,7 +181,7 @@ class MessagePacketSerializerTest(BasePacketSerializerTestCase):
 
         # Verify model creation
         self.assertIsInstance(packet, MessagePacket)
-        self.assertEqual(packet.packet_id, 123)
+        self.assertEqual(packet.packet_id, 123456789)
         self.assertEqual(packet.message_text, "Hello, world!")
 
         # Verify observation creation
@@ -469,7 +473,7 @@ class PacketIngestSerializerTest(BasePacketSerializerTestCase):
     def test_message_packet_ingest(self):
         """Test ingesting a message packet."""
         data = {
-            "id": 123,
+            "id": 123456789,
             "from": self.from_node.node_id,
             "fromId": self.from_node.node_id_str,
             "decoded": {
