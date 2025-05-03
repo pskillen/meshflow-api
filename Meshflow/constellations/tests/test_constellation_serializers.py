@@ -1,7 +1,6 @@
 import pytest
 from rest_framework.test import APIRequestFactory
 
-from constellations.models import ConstellationUserMembership
 from constellations.serializers import ConstellationSerializer
 
 
@@ -50,31 +49,6 @@ def test_constellation_serializer_update(create_constellation):
     assert updated_constellation.name == "Updated Constellation"
     assert updated_constellation.description == "Updated Description"
     assert updated_constellation.created_by == constellation.created_by
-
-
-@pytest.mark.django_db
-def test_constellation_serializer_members(create_constellation, create_user):
-    """Test ConstellationSerializer members field."""
-    constellation = create_constellation()
-    user1 = create_user()
-    user2 = create_user()
-
-    # Add members through ConstellationUserMembership
-    ConstellationUserMembership.objects.create(user=user1, constellation=constellation, role="viewer")
-    ConstellationUserMembership.objects.create(user=user2, constellation=constellation, role="editor")
-
-    # Refresh the constellation instance to get the latest data
-    constellation.refresh_from_db()
-
-    serializer = ConstellationSerializer(constellation)
-    data = serializer.data
-
-    # Check memberships through the serializer
-    assert "members" in data
-    assert len(data["members"]) == 3  # one from create_constellation
-    member_usernames = [member["username"] for member in data["members"]]
-    assert user1.username in member_usernames
-    assert user2.username in member_usernames
 
 
 @pytest.mark.django_db

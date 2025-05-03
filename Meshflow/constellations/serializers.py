@@ -13,10 +13,6 @@ class ConstellationSerializer(serializers.ModelSerializer):
         fields = ["id", "name", "description", "created_by", "channels"]
         read_only_fields = ["created_by"]
 
-    def get_members(self, obj):
-        memberships = ConstellationUserMembership.objects.filter(constellation=obj)
-        return [{"username": membership.user.username, "role": membership.role} for membership in memberships]
-
     def get_channels(self, obj):
         channels = MessageChannel.objects.filter(constellation=obj)
         return [{"id": channel.id, "name": channel.name} for channel in channels]

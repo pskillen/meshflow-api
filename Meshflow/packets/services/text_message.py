@@ -14,7 +14,7 @@ class TextMessagePacketService(BasePacketService):
             raise ValueError("Packet must be a MessagePacket")
 
         # ensure the message hasn't already been processed
-        if TextMessage.objects.filter(packet_id=self.packet.id).exists():
+        if TextMessage.objects.filter(packet_id=self.packet.packet_id).exists():
             return
 
         # the channel is based on the observer's channel mapping
@@ -30,7 +30,7 @@ class TextMessagePacketService(BasePacketService):
         # Create a new Message record
         TextMessage.objects.create(
             sender=self.from_node,
-            packet_id=self.packet.id,
+            packet_id=self.packet.packet_id,
             recipient_node_id=self.packet.to_int,
             message_text=self.packet.message_text,
             is_emoji=self.packet.emoji,
