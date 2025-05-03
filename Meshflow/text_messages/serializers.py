@@ -23,5 +23,15 @@ class TextMessageSerializer(serializers.ModelSerializer):
             "is_emoji",
             "reply_to_message_id",
         ]
-        # all fields are read-only
-        read_only_fields = "__all__"
+        # all fields are read-only (must be a list or tuple)
+        read_only_fields = [
+            "id",
+            "packet_id",
+            "sender",
+            "recipient_node_id",
+            "channel",
+            "sent_at",
+            "message_text",
+            "is_emoji",
+            "reply_to_message_id",
+        ]
