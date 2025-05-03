@@ -222,3 +222,11 @@ CORS_ALLOW_HEADERS = [
     "x-csrftoken",
     "x-requested-with",
 ]
+
+# Enable Prometheus metrics if a password is set
+PROMETHEUS_PASSWORD = os.environ.get("PROMETHEUS_PASSWORD", None)
+if PROMETHEUS_PASSWORD:
+    INSTALLED_APPS.append("django_prometheus")
+    MIDDLEWARE.insert(0, "django_prometheus.middleware.PrometheusBeforeMiddleware")
+    MIDDLEWARE.append("Meshflow.middleware.MetricsAuthMiddleware")
+    MIDDLEWARE.append("django_prometheus.middleware.PrometheusAfterMiddleware")
