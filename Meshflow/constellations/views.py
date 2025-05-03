@@ -1,9 +1,12 @@
+from django.shortcuts import get_object_or_404
+
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
-from .models import Constellation, ConstellationUserMembership
-from .serializers import ConstellationSerializer
+from .models import Constellation, ConstellationUserMembership, MessageChannel
+from .serializers import ConstellationMemberSerializer, ConstellationSerializer, MessageChannelSerializer
 
 
 class IsConstellationAdminOrEditor(permissions.BasePermission):
@@ -102,3 +105,49 @@ class ConstellationViewSet(viewsets.ModelViewSet):
                 ConstellationUserMembership.objects.create(user_id=user_id, constellation=constellation, role=role)
 
         return Response(status=status.HTTP_200_OK)
+
+
+class MessageChannelViewSet(viewsets.ModelViewSet):
+    queryset = MessageChannel.objects.all()
+    serializer_class = MessageChannelSerializer
+
+
+class ConstellationMessageChannelListCreateView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, constellation_id):
+        constellation = get_object_or_404(Constellation, pk=constellation_id)
+        # Only members can view channels
+        if not ConstellationUserMembership.objects.filter(user=request.user, constellation=constellation).exists():
+            return Response({"detail": "Not a member of this constellation."}, status=status.HTTP_403_FORBIDDEN)
+        channels = MessageChannel.objects.filter(constellation=constellation)
+        serializer = MessageChannelSerializer(channels, many=True)
+        return Response(serializer.data)
+
+    def post(self, request, constellation_id):
+        constellation = get_object_or_404(Constellation, pk=constellation_id)
+        # Only admins or editors can create channels
+        if not ConstellationUserMembership.objects.filter(
+            user=request.user, constellation=constellation, role__in=["admin", "editor"]
+        ).exists():
+            return Response({"detail": "Only admins or editors can create channels."}, status=status.HTTP_403_FORBIDDEN)
+        data = request.data.copy()
+        data["constellation"] = constellation.id
+        serializer = MessageChannelSerializer(data=data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ConstellationMemberListView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, constellation_id):
+        constellation = get_object_or_404(Constellation, pk=constellation_id)
+        # Only members can view the list
+        if not ConstellationUserMembership.objects.filter(user=request.user, constellation=constellation).exists():
+            return Response({"detail": "Not a member of this constellation."}, status=status.HTTP_403_FORBIDDEN)
+        memberships = ConstellationUserMembership.objects.filter(constellation=constellation)
+        serializer = ConstellationMemberSerializer(memberships, many=True)
+        return Response(serializer.data)
