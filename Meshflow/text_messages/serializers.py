@@ -7,7 +7,13 @@ from .models import TextMessage
 
 
 class TextMessageSerializer(serializers.ModelSerializer):
-    sender = serializers.PrimaryKeyRelatedField(queryset=ObservedNode.objects.all())
+
+    class ObservedNodeSerializer(serializers.ModelSerializer):
+        class Meta:
+            model = ObservedNode
+            fields = ["node_id_str", "long_name", "short_name"]
+
+    sender = ObservedNodeSerializer(read_only=True)
     channel = serializers.PrimaryKeyRelatedField(queryset=MessageChannel.objects.all())
 
     class Meta:

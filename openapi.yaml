@@ -863,9 +863,20 @@ components:
           type: integer
           readOnly: true
         sender:
-          type: integer
-          description: The ObservedNode ID of the sender
-          readOnly: true
+          type: object
+          description: The sender node info
+          properties:
+            node_id_str:
+              type: string
+              description: The ID of the node in Meshastic !hex format
+            long_name:
+              type: string
+              description: The long name of the node
+              nullable: true
+            short_name:
+              type: string
+              description: The short name of the node
+              nullable: true
         recipient_node_id:
           type: integer
           nullable: true
