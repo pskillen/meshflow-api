@@ -1,0 +1,6 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+This is a Django Rest Framework API project. Don't install packages unless required, and check with me first. When modifying the API contract, unless explicitly instructed, check with me first. Remember to update the openapi.yaml file if changing the API contract.
