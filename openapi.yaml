@@ -860,31 +860,42 @@ components:
       description: A text message sent to a node
       properties:
         id:
+          description: The internal ID of the text message
           type: string
           readOnly: true
           format: uuid
+        packet_id:
+          description: The packet ID of the text message
+          type: integer
+          readOnly: true
         sender:
           type: integer
           description: The ObservedNode ID of the sender
+          readOnly: true
         recipient_node_id:
           type: integer
           nullable: true
           description: The node ID of the recipient (null for broadcast)
+          readOnly: true
         channel:
           type: integer
           description: The MessageChannel ID (not the node's channel index)
+          readOnly: true
         sent_at:
           type: string
           format: date-time
           readOnly: true
         message_text:
           type: string
+          readOnly: true
         is_emoji:
           type: boolean
+          readOnly: true
         reply_to_message_id:
-          type: integer
+          type: integer 
           nullable: true
-          description: The ID of the message being replied to
+          description: The packet_id of the message being replied to
+          readOnly: true
 
 
 paths:

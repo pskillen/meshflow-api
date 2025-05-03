@@ -14,6 +14,7 @@ class TextMessageSerializer(serializers.ModelSerializer):
         model = TextMessage
         fields = [
             "id",
+            "packet_id",
             "sender",
             "recipient_node_id",
             "channel",
@@ -22,4 +23,5 @@ class TextMessageSerializer(serializers.ModelSerializer):
             "is_emoji",
             "reply_to_message_id",
         ]
-        read_only_fields = ["id", "sent_at"]
+        # all fields are read-only
+        read_only_fields = "__all__"
