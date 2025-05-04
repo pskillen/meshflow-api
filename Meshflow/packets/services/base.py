@@ -4,6 +4,7 @@ import abc
 
 from nodes.models import ManagedNode, ObservedNode
 from packets.models import PacketObservation, RawPacket
+from users.models import User
 
 
 class BasePacketService(abc.ABC):
@@ -13,15 +14,19 @@ class BasePacketService(abc.ABC):
     observer: ManagedNode
     observation: PacketObservation
     from_node: ObservedNode
+    user: User
 
     def __init__(self):
         """Initialize the service with a packet and its observer."""
 
-    def process_packet(self, packet: RawPacket, observer: ManagedNode, observation: PacketObservation) -> None:
+    def process_packet(
+        self, packet: RawPacket, observer: ManagedNode, observation: PacketObservation, user: User
+    ) -> None:
         """Process the packet and create any necessary related records."""
         self.packet = packet
         self.observer = observer
         self.observation = observation
+        self.user = user
 
         self._get_or_create_from_node()
         self._process_packet()
