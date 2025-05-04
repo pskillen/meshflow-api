@@ -460,6 +460,18 @@ components:
           $ref: '#/components/schemas/Position'
         latest_device_metrics:
           $ref: '#/components/schemas/DeviceMetrics'
+        owner:
+          type: object
+          description: The owner of the node (if the node has been claimed by a user in the system)
+          properties:
+            id:
+              type: integer
+              description: The ID of the owner
+              readOnly: true
+            username:
+              type: string
+              description: The username of the owner
+              readOnly: true
 
     ObservedNodeSearch:
       type: object
@@ -485,6 +497,18 @@ components:
           format: date-time
           description: The timestamp when the node was last heard from
           nullable: true
+        owner:
+          type: object
+          description: The owner of the node (if the node has been claimed by a user in the system)
+          properties:
+            id:
+              type: integer
+              description: The ID of the owner
+              readOnly: true
+            username:
+              type: string
+              description: The username of the owner
+              readOnly: true
 
     NodeAPIKey:
       type: object
