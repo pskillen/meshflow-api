@@ -221,6 +221,8 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
     latest_position = serializers.SerializerMethodField()
     latest_device_metrics = serializers.SerializerMethodField()
 
+    owner = serializers.IntegerField(source="claimed_by_id", read_only=True)
+
     def to_internal_value(self, data):
         """Convert node_id_str to node_id."""
         if "node_id" in data:
@@ -242,8 +244,16 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
             "last_heard",
             "latest_position",
             "latest_device_metrics",
+            "owner",
         ]
-        read_only_fields = ["internal_id", "node_id_str", "last_heard", "latest_position", "latest_device_metrics"]
+        read_only_fields = [
+            "internal_id",
+            "node_id_str",
+            "last_heard",
+            "latest_position",
+            "latest_device_metrics",
+            "owner",
+        ]
 
     def get_latest_position(self, obj):
         """Get the latest position for this node."""
@@ -260,7 +270,7 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
         return None
 
 
-class ObservedNodeSearchSerializer(serializers.ModelSerializer):
+class ObservedNodeSearchSerializer(ObservedNodeSerializer):
     """Simplified serializer for observed nodes search results."""
 
     class Meta:
@@ -272,5 +282,5 @@ class ObservedNodeSearchSerializer(serializers.ModelSerializer):
             "long_name",
             "short_name",
             "last_heard",
+            "owner",
         ]
-        read_only_fields = ["internal_id", "node_id_str", "last_heard"]
