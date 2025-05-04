@@ -267,10 +267,14 @@ class ObservedNodeAdmin(admin.ModelAdmin):
         "node_id_str",
         "hw_model",
         "sw_version",
+        "claimed_by",
+        "role",
     )
     list_filter = (
         "hw_model",
         "sw_version",
+        "claimed_by",
+        "role",
     )
     search_fields = (
         "short_name",
@@ -281,6 +285,7 @@ class ObservedNodeAdmin(admin.ModelAdmin):
         "hw_model",
         "sw_version",
         "public_key",
+        "claimed_by__username",
     )
     readonly_fields = (
         "internal_id",
@@ -288,6 +293,7 @@ class ObservedNodeAdmin(admin.ModelAdmin):
         "node_id_str",
         "mac_addr",
         "public_key",
+        "role",
     )
 
     def get_fields(self, request, obj=None):
@@ -300,5 +306,7 @@ class ObservedNodeAdmin(admin.ModelAdmin):
             "hw_model",
             "sw_version",
             "public_key",
+            "claimed_by",
+            "role",
         ]
         return fields
