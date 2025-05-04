@@ -4,6 +4,7 @@ from rest_framework import serializers
 
 from common.mesh_node_helpers import meshtastic_id_to_hex
 from constellations.models import ConstellationUserMembership
+from users.models import User
 
 from .models import (
     DeviceMetrics,
@@ -216,12 +217,17 @@ class DeviceMetricsSerializer(serializers.ModelSerializer):
 class ObservedNodeSerializer(serializers.ModelSerializer):
     """Serializer for observed nodes."""
 
+    class OwnerSerializer(serializers.ModelSerializer):
+        class Meta:
+            model = User
+            fields = ["id", "username"]
+
     node_id_str = serializers.CharField(read_only=True)
 
     latest_position = serializers.SerializerMethodField()
     latest_device_metrics = serializers.SerializerMethodField()
 
-    owner = serializers.IntegerField(source="claimed_by_id", read_only=True)
+    owner = OwnerSerializer(source="claimed_by", read_only=True)
 
     def to_internal_value(self, data):
         """Convert node_id_str to node_id."""
