@@ -57,8 +57,6 @@ class TextMessagePacketService(BasePacketService):
     def _authorize_node_claim(self) -> None:
         """Authorize a user's claim to a node via the claim key in the message."""
 
-        logger.info(f"Processing message packet: {self.packet.message_text}")
-
         # Only accept claims via direct messages
         if self.packet.to_int == BROADCAST_ID:
             return
