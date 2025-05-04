@@ -131,7 +131,7 @@ class BasePacketSerializer(serializers.Serializer):
 
         service = PacketServiceFactory.create_service(packet)
         if service:
-            service.process_packet(packet, observer, observation)
+            service.process_packet(packet, observer, observation, self.context.get("user"))
 
         return observation
 

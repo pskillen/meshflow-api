@@ -43,7 +43,21 @@ class PacketIngestView(APIView):
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
-        serializer = PacketIngestSerializer(data=request.data, context={"observer": observer, "node_id": node_id})
+        # if data contains an 'encrypted' field we should skip the packet ingestion
+        if request.data.get("encrypted"):
+            return Response(
+                {"status": "success", "message": "Packet ingested successfully"},
+                status=status.HTTP_304_NOT_MODIFIED,
+            )
+
+        serializer = PacketIngestSerializer(
+            data=request.data,
+            context={
+                "observer": observer,
+                "node_id": node_id,
+                "user": request.user,
+            },
+        )
 
         if serializer.is_valid():
             try:
