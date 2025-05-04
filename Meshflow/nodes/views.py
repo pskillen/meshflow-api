@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -262,25 +264,23 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
         # Apply date filters if provided
         if start_date:
             try:
-                start_datetime = timezone.datetime.strptime(start_date, "%Y-%m-%d")
-                start_datetime = timezone.make_aware(start_datetime)
+                start_datetime = datetime.fromisoformat(start_date)
                 metrics = metrics.filter(reported_time__gte=start_datetime)
             except ValueError:
                 return Response(
-                    {"error": "Invalid start_date format. Use YYYY-MM-DD."},
+                    {"error": "Invalid start_date format. Use YYYY-MM-DD or full ISO 8601 format."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
         if end_date:
             try:
-                end_datetime = timezone.datetime.strptime(end_date, "%Y-%m-%d")
+                end_datetime = datetime.fromisoformat(end_date)
                 # Set time to end of day
                 end_datetime = end_datetime.replace(hour=23, minute=59, second=59)
-                end_datetime = timezone.make_aware(end_datetime)
                 metrics = metrics.filter(reported_time__lte=end_datetime)
             except ValueError:
                 return Response(
-                    {"error": "Invalid end_date format. Use YYYY-MM-DD."},
+                    {"error": "Invalid end_date format. Use YYYY-MM-DD or full ISO 8601 format."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
