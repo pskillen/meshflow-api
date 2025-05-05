@@ -132,7 +132,15 @@ class APIKeyCreateSerializer(serializers.ModelSerializer):
 
 
 class ManagedNodeSerializer(serializers.ModelSerializer):
-    """Serializer for managed nodes."""
+    """Serializer for managed nodes, enriched with observed node and latest position info."""
+
+    latitude = serializers.FloatField(read_only=True)
+    longitude = serializers.FloatField(read_only=True)
+    long_name = serializers.CharField(read_only=True)
+    short_name = serializers.CharField(read_only=True)
+    last_heard = serializers.DateTimeField(read_only=True)
+    node_id_str = serializers.CharField(read_only=True)
+    node_id_str = serializers.SerializerMethodField()
 
     class Meta:
         model = ManagedNode
@@ -142,8 +150,31 @@ class ManagedNodeSerializer(serializers.ModelSerializer):
             "owner",
             "constellation",
             "name",
+            "latitude",
+            "longitude",
+            "long_name",
+            "short_name",
+            "last_heard",
+            "node_id_str",
+            "node_id_str",
         ]
-        read_only_fields = ["internal_id", "owner"]
+        read_only_fields = [
+            "internal_id",
+            "owner",
+            "latitude",
+            "longitude",
+            "long_name",
+            "short_name",
+            "last_heard",
+            "node_id_str",
+            "node_id_str",
+        ]
+
+    def get_node_id_str(self, obj):
+        # Use annotated value if present, else fallback to property
+        if hasattr(obj, "node_id_str") and obj.node_id_str:
+            return obj.node_id_str
+        return meshtastic_id_to_hex(obj.node_id)
 
 
 class PositionSerializer(serializers.ModelSerializer):
