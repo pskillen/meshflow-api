@@ -24,7 +24,6 @@ class ConstellationAdmin(admin.ModelAdmin):
         "get_member_count",
         "get_admin_count",
         "get_node_count",
-        "get_api_key_count",
         "colored_map_color",
     )
     list_filter = ("created_by",)
@@ -46,14 +45,8 @@ class ConstellationAdmin(admin.ModelAdmin):
     def get_node_count(self, obj):
         return obj.nodes.count()
 
-    get_node_count.short_description = _("Nodes")
+    get_node_count.short_description = _("Managed nodes")
     get_node_count.admin_order_field = "nodes__count"
-
-    def get_api_key_count(self, obj):
-        return obj.api_keys.count()
-
-    get_api_key_count.short_description = _("API Keys")
-    get_api_key_count.admin_order_field = "api_keys__count"
 
     def colored_map_color(self, obj):
         color = obj.map_color or "#000000"
