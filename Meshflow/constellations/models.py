@@ -8,6 +8,7 @@ class Constellation(models.Model):
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True)
     created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name="created_constellations")
+    map_color = models.CharField(max_length=7, default="#000000")
 
     class Meta:
         verbose_name = _("Constellation")

@@ -1,11 +1,23 @@
+from django import forms
 from django.contrib import admin
+from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 
 from .models import Constellation, ConstellationUserMembership, MessageChannel
 
 
+class ConstellationAdminForm(forms.ModelForm):
+    class Meta:
+        model = Constellation
+        fields = "__all__"
+        widgets = {
+            "map_color": forms.TextInput(attrs={"type": "color"}),
+        }
+
+
 @admin.register(Constellation)
 class ConstellationAdmin(admin.ModelAdmin):
+    form = ConstellationAdminForm
     list_display = (
         "name",
         "created_by",
@@ -13,6 +25,7 @@ class ConstellationAdmin(admin.ModelAdmin):
         "get_admin_count",
         "get_node_count",
         "get_api_key_count",
+        "colored_map_color",
     )
     list_filter = ("created_by",)
     search_fields = ("name", "description", "created_by__username", "created_by__email")
@@ -41,6 +54,27 @@ class ConstellationAdmin(admin.ModelAdmin):
 
     get_api_key_count.short_description = _("API Keys")
     get_api_key_count.admin_order_field = "api_keys__count"
+
+    def colored_map_color(self, obj):
+        color = obj.map_color or "#000000"
+        # Calculate brightness to choose foreground color
+        hex_color = color.lstrip("#")
+        if len(hex_color) == 3:
+            hex_color = "".join([c * 2 for c in hex_color])
+        try:
+            r, g, b = int(hex_color[0:2], 16), int(hex_color[2:4], 16), int(hex_color[4:6], 16)
+        except Exception:
+            r, g, b = 0, 0, 0
+        brightness = (r * 299 + g * 587 + b * 114) / 1000
+        fg = "#000" if brightness > 128 else "#fff"
+        return format_html(
+            '<div style="background:{}; width: 100%; height: 24px; border-radius: 4px; border: 1px solid #ccc; text-align:center; color: {};">{}</div>',
+            color,
+            fg,
+            color,
+        )
+
+    colored_map_color.short_description = "Map Color"
 
     def save_model(self, request, obj, form, change):
         if not change:  # Only set created_by on creation
