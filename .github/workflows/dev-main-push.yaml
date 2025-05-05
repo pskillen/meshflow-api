@@ -1,0 +1,32 @@
+name: Dev Main Push
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  extract-dev-tag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get short SHA
+        id: get_sha
+        run: |
+          SHORT_SHA=$(echo $GITHUB_SHA | cut -c1-7)
+          echo "VERSION_TAG=dev-$SHORT_SHA" >> "$GITHUB_OUTPUT"
+
+    outputs:
+      VERSION_TAG: ${{ steps.get_sha.outputs.VERSION_TAG }}
+
+  build:
+    needs:
+      - extract-dev-tag
+    uses: ./.github/workflows/docker-build.yaml
+    with:
+      VERSION_TAG: ${{ needs.extract-dev-tag.outputs.VERSION_TAG }}
+      IS_PRERELEASE: false
+      IS_LATEST: true 
