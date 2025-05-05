@@ -169,8 +169,38 @@ class NodeAPIKeyForm(forms.ModelForm):
         return instance
 
 
+class NodeIdDatalistWidget(forms.TextInput):
+    template_name = "admin/nodes/node_id_datalist_widget.html"
+
+    def get_context(self, name, value, attrs):
+        context = super().get_context(name, value, attrs)
+        # Add all ObservedNodes to the context for the datalist
+        context["datalist"] = [
+            {
+                "node_id": node.node_id,
+                "display": f"{node.long_name or node.short_name or node.node_id_str} ({node.node_id})",
+            }
+            for node in ObservedNode.objects.all()
+        ]
+        context["datalist_id"] = f"{name}_datalist"
+        return context
+
+
+class ManagedNodeAdminForm(forms.ModelForm):
+    class Meta:
+        model = ManagedNode
+        fields = "__all__"
+
+    node_id = forms.CharField(
+        label="Node ID",
+        widget=NodeIdDatalistWidget,
+        help_text="Select from observed nodes or enter a new node ID.",
+    )
+
+
 @admin.register(ManagedNode)
 class ManagedNodeAdmin(admin.ModelAdmin):
+    form = ManagedNodeAdminForm
     list_display = (
         "node_id",
         "node_id_str",
@@ -310,3 +340,8 @@ class ObservedNodeAdmin(admin.ModelAdmin):
             "role",
         ]
         return fields
+
+
+# NOTE: You need to create the template file for NodeIdDatalistWidget at:
+#   Meshflow/nodes/templates/admin/nodes/node_id_datalist_widget.html
+# If the directories do not exist, create them as well.
