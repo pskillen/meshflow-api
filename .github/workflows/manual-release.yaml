@@ -11,6 +11,9 @@ jobs:
   extract-dev-tag:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
       - name: Get short SHA
         id: get_sha
         run: |
