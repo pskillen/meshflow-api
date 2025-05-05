@@ -2,29 +2,28 @@ name: Manual release
 
 on:
   workflow_dispatch:
-    inputs:
-      VERSION_TAG:
-        required: true
-        type: string
-      IS_LATEST:
-        required: true
-        type: boolean
-        default: false
-      IS_PRERELEASE:
-        required: true
-        type: boolean
-        default: false
-
 
 permissions:
   contents: read
   packages: write
 
-
 jobs:
+  extract-dev-tag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get short SHA
+        id: get_sha
+        run: |
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          echo "VERSION_LABEL=$SHORT_SHA" >> "$GITHUB_OUTPUT"
+
+    outputs:
+      VERSION_LABEL: ${{ steps.get_sha.outputs.VERSION_LABEL }}
+
   build:
+    needs:
+      - extract-dev-tag
     uses: ./.github/workflows/docker-build.yaml
     with:
-      VERSION_TAG: ${{ inputs.VERSION_TAG }}
-      IS_PRERELEASE: ${{ inputs.IS_PRERELEASE }}
-      IS_LATEST: ${{ inputs.IS_LATEST }} 
+      VERSION_LABEL: ${{ needs.extract-dev-tag.outputs.VERSION_LABEL }}
+      ENVIRONMENT: dev 
