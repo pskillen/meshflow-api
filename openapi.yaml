@@ -625,7 +625,7 @@ components:
         device_metrics:
           $ref: '#/components/schemas/DeviceMetrics'
 
-    ManagedNode:
+    ManagedNodeRead:
       type: object
       description: >
         A node that is owned and managed by a user. This model represents the administrative functions
@@ -633,19 +633,10 @@ components:
         Managed nodes submit data to the API (or a bot process does), and a managed node often has an
         associated ObservedNode.
       properties:
-        internal_id:
-          type: string
-          format: uuid
-          description: Primary key UUID
-          readOnly: true
         node_id:
           type: integer
           format: int64
           description: Node ID
-        name:
-          type: string
-          maxLength: 100
-          description: Name of the node
         long_name:
           type: string
           description: The long name of the node
@@ -1629,7 +1620,7 @@ paths:
                       results:
                         type: array
                         items:
-                          $ref: '#/components/schemas/ManagedNode'
+                          $ref: '#/components/schemas/ManagedNodeRead'
 
     post:
       summary: Create managed node
@@ -1655,7 +1646,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ManagedNode'
+                $ref: '#/components/schemas/ManagedNodeRead'
 
   /nodes/managed-nodes/{node_id}:
     get:
@@ -1675,7 +1666,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ManagedNode'
+                $ref: '#/components/schemas/ManagedNodeRead'
 
     put:
       summary: Update managed node
@@ -1705,7 +1696,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ManagedNode'
+                $ref: '#/components/schemas/ManagedNodeRead'
 
     delete:
       summary: Delete managed node

@@ -135,16 +135,26 @@ class ManagedNodeSerializer(serializers.ModelSerializer):
     """Serializer for managed nodes, enriched with observed node and latest position info."""
 
     class PositionSerializer(serializers.ModelSerializer):
-        latitude = serializers.FloatField(read_only=True)
-        longitude = serializers.FloatField(read_only=True)
+        latitude = serializers.SerializerMethodField()
+        longitude = serializers.SerializerMethodField()
 
         class Meta:
             model = Position
             fields = ["latitude", "longitude"]
 
+        def get_latitude(self, obj):
+            if hasattr(obj, "last_latitude") and obj.last_latitude:
+                return obj.last_latitude
+            return obj.default_location_latitude
+
+        def get_longitude(self, obj):
+            if hasattr(obj, "last_longitude") and obj.last_longitude:
+                return obj.last_longitude
+            return obj.default_location_longitude
+
     class UserSerializer(serializers.ModelSerializer):
-        id = serializers.IntegerField(source="owner_id", read_only=True)
-        username = serializers.CharField(source="owner_username", read_only=True)
+        id = serializers.IntegerField(read_only=True)
+        username = serializers.CharField(read_only=True)
 
         class Meta:
             model = User
@@ -155,13 +165,13 @@ class ManagedNodeSerializer(serializers.ModelSerializer):
             model = Constellation
             fields = ["id", "name", "map_color"]
 
-    long_name = serializers.CharField(read_only=True)
+    long_name = serializers.SerializerMethodField()
     short_name = serializers.CharField(read_only=True)
     last_heard = serializers.DateTimeField(read_only=True)
     node_id_str = serializers.CharField(read_only=True)
 
     position = PositionSerializer(source="*", read_only=True)
-    owner = UserSerializer(source="*", read_only=True)
+    owner = UserSerializer(read_only=True)
     constellation = ConstellationSerializer(read_only=True)
 
     class Meta:
@@ -193,6 +203,11 @@ class ManagedNodeSerializer(serializers.ModelSerializer):
         if hasattr(obj, "node_id_str") and obj.node_id_str:
             return obj.node_id_str
         return meshtastic_id_to_hex(obj.node_id)
+
+    def get_long_name(self, obj):
+        if hasattr(obj, "long_name") and obj.long_name:
+            return obj.long_name
+        return obj.name
 
 
 class PositionSerializer(serializers.ModelSerializer):

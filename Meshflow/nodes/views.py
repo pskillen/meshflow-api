@@ -312,9 +312,8 @@ class ManagedNodeViewSet(viewsets.ModelViewSet):
                 long_name=Subquery(observed_node_qs.values("long_name")[:1]),
                 short_name=Subquery(observed_node_qs.values("short_name")[:1]),
                 last_heard=Subquery(observed_node_qs.values("last_heard")[:1]),
-                latitude=Subquery(latest_position_qs.values("latitude")[:1]),
-                longitude=Subquery(latest_position_qs.values("longitude")[:1]),
-                owner_username=Subquery(observed_node_qs.values("claimed_by__username")[:1]),
+                last_latitude=Subquery(latest_position_qs.values("latitude")[:1]),
+                last_longitude=Subquery(latest_position_qs.values("longitude")[:1]),
             )
         )
 
