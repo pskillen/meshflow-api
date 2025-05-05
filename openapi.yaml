@@ -637,24 +637,70 @@ components:
           type: string
           format: uuid
           description: Primary key UUID
+          readOnly: true
         node_id:
           type: integer
           format: int64
           description: Node ID
-        owner:
-          type: integer
-          description: ID of the user who owns this node
-        constellation:
-          type: integer
-          description: ID of the constellation this node belongs to
         name:
           type: string
           maxLength: 100
           description: Name of the node
+        long_name:
+          type: string
+          description: The long name of the node
+          readOnly: true
+        short_name:
+          type: string
+          description: The short name of the node
+          readOnly: true
+        last_heard:
+          type: string
+          format: date-time
+          description: The timestamp when the node was last heard from
+          readOnly: true
         node_id_str:
           type: string
           description: Node ID in hex format
           readOnly: true
+        owner:
+          type: object
+          description: The owner of the node
+          readOnly: true
+          properties:
+            id:
+              type: integer
+              description: The ID of the owner
+              readOnly: true
+            username:
+              type: string
+              description: The username of the owner
+              readOnly: true
+        constellation:
+          type: object
+          description: The constellation this node belongs to
+          readOnly: true
+          properties:
+            id:
+              type: integer
+              description: The ID of the constellation
+            name:
+              type: string
+              description: The name of the constellation
+            map_color:
+              type: string
+              description: The color used for the constellation on maps
+        position:
+          type: object
+          description: The latest known position of the node
+          readOnly: true
+          properties:
+            latitude:
+              type: number
+              description: The latitude of the node
+            longitude:
+              type: number
+              description: The longitude of the node
 
     PaginatedResponse:
       type: object
