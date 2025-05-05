@@ -300,14 +300,13 @@ class ManagedNodeViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         """Filter nodes based on user ownership and annotate with observed node and latest position info."""
-        user = self.request.user
 
         # Subquery for ObservedNode fields
         observed_node_qs = ObservedNode.objects.filter(node_id=OuterRef("node_id"))
         # Subquery for latest Position fields
         latest_position_qs = Position.objects.filter(node__node_id=OuterRef("node_id")).order_by("-reported_time")
         return (
-            ManagedNode.objects.filter(owner=user)
+            ManagedNode.objects.all()
             .order_by("node_id")
             .annotate(
                 long_name=Subquery(observed_node_qs.values("long_name")[:1]),
