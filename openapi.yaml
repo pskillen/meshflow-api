@@ -625,7 +625,7 @@ components:
         device_metrics:
           $ref: '#/components/schemas/DeviceMetrics'
 
-    ManagedNode:
+    ManagedNodeRead:
       type: object
       description: >
         A node that is owned and managed by a user. This model represents the administrative functions
@@ -633,28 +633,65 @@ components:
         Managed nodes submit data to the API (or a bot process does), and a managed node often has an
         associated ObservedNode.
       properties:
-        internal_id:
-          type: string
-          format: uuid
-          description: Primary key UUID
         node_id:
           type: integer
           format: int64
           description: Node ID
-        owner:
-          type: integer
-          description: ID of the user who owns this node
-        constellation:
-          type: integer
-          description: ID of the constellation this node belongs to
-        name:
+        long_name:
           type: string
-          maxLength: 100
-          description: Name of the node
+          description: The long name of the node
+          readOnly: true
+        short_name:
+          type: string
+          description: The short name of the node
+          readOnly: true
+        last_heard:
+          type: string
+          format: date-time
+          description: The timestamp when the node was last heard from
+          readOnly: true
         node_id_str:
           type: string
           description: Node ID in hex format
           readOnly: true
+        owner:
+          type: object
+          description: The owner of the node
+          readOnly: true
+          properties:
+            id:
+              type: integer
+              description: The ID of the owner
+              readOnly: true
+            username:
+              type: string
+              description: The username of the owner
+              readOnly: true
+        constellation:
+          type: object
+          description: The constellation this node belongs to
+          readOnly: true
+          properties:
+            id:
+              type: integer
+              description: The ID of the constellation
+            name:
+              type: string
+              description: The name of the constellation
+            map_color:
+              type: string
+              description: The color used for the constellation on maps
+        position:
+          type: object
+          description: The latest known position of the node
+          readOnly: true
+          properties:
+            latitude:
+              type: number
+              description: The latitude of the node
+            longitude:
+              type: number
+              description: The longitude of the node
 
     PaginatedResponse:
       type: object
@@ -1583,7 +1620,7 @@ paths:
                       results:
                         type: array
                         items:
-                          $ref: '#/components/schemas/ManagedNode'
+                          $ref: '#/components/schemas/ManagedNodeRead'
 
     post:
       summary: Create managed node
@@ -1609,7 +1646,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ManagedNode'
+                $ref: '#/components/schemas/ManagedNodeRead'
 
   /nodes/managed-nodes/{node_id}:
     get:
@@ -1629,7 +1666,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ManagedNode'
+                $ref: '#/components/schemas/ManagedNodeRead'
 
     put:
       summary: Update managed node
@@ -1659,7 +1696,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ManagedNode'
+                $ref: '#/components/schemas/ManagedNodeRead'
 
     delete:
       summary: Delete managed node

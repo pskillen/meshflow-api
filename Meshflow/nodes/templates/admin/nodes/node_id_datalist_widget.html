@@ -1,0 +1,12 @@
+<input
+    type="text"
+    name="{{ widget.name }}"
+    {% include "django/forms/widgets/attrs.html" %}
+    list="{{ datalist_id }}"
+    value="{{ widget.value|default_if_none:'' }}"
+>
+<datalist id="{{ datalist_id }}">
+    {% for item in datalist %}
+        <option value="{{ item.node_id }}">{{ item.display }}</option>
+    {% endfor %}
+</datalist> 

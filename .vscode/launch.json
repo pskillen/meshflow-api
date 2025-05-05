@@ -13,8 +13,8 @@
             ],
             "django": true,
             "autoStartBrowser": false,
-            "program": "${workspaceFolder}\\Meshflow\\manage.py",
-            "cwd": "${workspaceFolder}\\Meshflow"
+            "program": "${workspaceFolder}/Meshflow/manage.py",
+            "cwd": "${workspaceFolder}/Meshflow"
         }
     ]
 }

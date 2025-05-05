@@ -49,6 +49,9 @@ class ManagedNode(models.Model):
     constellation = models.ForeignKey("constellations.Constellation", on_delete=models.CASCADE, related_name="nodes")
     name = models.CharField(max_length=100, null=False, blank=False)
 
+    default_location_latitude = models.FloatField(null=True, blank=True)
+    default_location_longitude = models.FloatField(null=True, blank=True)
+
     channel_0 = models.ForeignKey(
         "constellations.MessageChannel", on_delete=models.CASCADE, null=True, blank=True, related_name="+"
     )

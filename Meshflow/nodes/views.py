@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from django.db.models import Q
+from django.db.models import OuterRef, Q, Subquery
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
@@ -299,9 +299,23 @@ class ManagedNodeViewSet(viewsets.ModelViewSet):
     lookup_field = "node_id"
 
     def get_queryset(self):
-        """Filter nodes based on user ownership."""
-        user = self.request.user
-        return ManagedNode.objects.filter(owner=user).order_by("node_id")
+        """Filter nodes based on user ownership and annotate with observed node and latest position info."""
+
+        # Subquery for ObservedNode fields
+        observed_node_qs = ObservedNode.objects.filter(node_id=OuterRef("node_id"))
+        # Subquery for latest Position fields
+        latest_position_qs = Position.objects.filter(node__node_id=OuterRef("node_id")).order_by("-reported_time")
+        return (
+            ManagedNode.objects.all()
+            .order_by("node_id")
+            .annotate(
+                long_name=Subquery(observed_node_qs.values("long_name")[:1]),
+                short_name=Subquery(observed_node_qs.values("short_name")[:1]),
+                last_heard=Subquery(observed_node_qs.values("last_heard")[:1]),
+                last_latitude=Subquery(latest_position_qs.values("latitude")[:1]),
+                last_longitude=Subquery(latest_position_qs.values("longitude")[:1]),
+            )
+        )
 
     def perform_create(self, serializer):
         """Create a new managed node and set the owner."""
