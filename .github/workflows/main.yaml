@@ -1,4 +1,4 @@
-name: Dev Main Push
+name: Release main
 
 on:
   push:
