@@ -3,18 +3,16 @@ name: docker-build-and-push
 on:
   workflow_call:
     inputs:
-      VERSION_TAG:
+      VERSION_LABEL:
         required: true
         type: string
-      IS_LATEST:
-        required: false
-        type: boolean
-        default: false
-      IS_PRERELEASE:
-        required: false
-        type: boolean
-        default: false
-
+      ENVIRONMENT:
+        required: true
+        type: string
+        options:
+          - dev
+          - preprod
+          - prod
 
 permissions:
   contents: read
@@ -54,14 +52,14 @@ jobs:
         run: |
           PLATFORM_TAG=$(echo "${{ matrix.platform }}" | sed 's|/|-|g')
           echo "PLATFORM_TAG=$PLATFORM_TAG" >> $GITHUB_ENV
-          # Set LATEST_TAG and LATEST_MIGRATIONS_TAG based on VERSION_TAG and flags
-          if [[ "${{ inputs.VERSION_TAG }}" == dev-* ]]; then
+          # Set LATEST_TAG and LATEST_MIGRATIONS_TAG based on ENVIRONMENT
+          if [[ "${{ inputs.ENVIRONMENT }}" == "dev" ]]; then
             echo "LATEST_TAG=latest-dev" >> $GITHUB_ENV
             echo "LATEST_MIGRATIONS_TAG=latest-dev-migrations" >> $GITHUB_ENV
-          elif [[ "${{ inputs.IS_LATEST }}" == "true" && "${{ inputs.IS_PRERELEASE }}" == "true" ]]; then
+          elif [[ "${{ inputs.ENVIRONMENT }}" == "preprod" ]]; then
             echo "LATEST_TAG=latest-rc" >> $GITHUB_ENV
             echo "LATEST_MIGRATIONS_TAG=latest-rc-migrations" >> $GITHUB_ENV
-          elif [[ "${{ inputs.IS_LATEST }}" == "true" && "${{ inputs.IS_PRERELEASE }}" != "true" ]]; then
+          elif [[ "${{ inputs.ENVIRONMENT }}" == "prod" ]]; then
             echo "LATEST_TAG=latest" >> $GITHUB_ENV
             echo "LATEST_MIGRATIONS_TAG=latest-migrations" >> $GITHUB_ENV
           else
@@ -76,10 +74,9 @@ jobs:
           push: true
           platforms: ${{ matrix.platform }}
           tags: |
-            ghcr.io/${{ github.repository }}:${{ inputs.VERSION_TAG }}-${{ env.PLATFORM_TAG }}
-            ${{ env.LATEST_TAG && format('ghcr.io/{0}:{1}-{2}', github.repository, env.LATEST_TAG, env.PLATFORM_TAG) || '' }}
+            ghcr.io/${{ github.repository }}:${{ env.LATEST_TAG }}-${{ env.PLATFORM_TAG }}
           build-args: |
-            VERSION=${{ inputs.VERSION_TAG }}
+            VERSION=${{ inputs.VERSION_LABEL }}
             BASE_IMAGE=${{ matrix.base_image }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -92,10 +89,9 @@ jobs:
           platforms: ${{ matrix.platform }}
           file: Dockerfile-migrations
           tags: |
-            ghcr.io/${{ github.repository }}:${{ inputs.VERSION_TAG }}-migrations-${{ env.PLATFORM_TAG }}
-            ${{ env.LATEST_MIGRATIONS_TAG && format('ghcr.io/{0}:{1}-{2}', github.repository, env.LATEST_MIGRATIONS_TAG, env.PLATFORM_TAG) || '' }}
+            ghcr.io/${{ github.repository }}:${{ env.LATEST_MIGRATIONS_TAG }}-${{ env.PLATFORM_TAG }}
           build-args: |
-            VERSION=${{ inputs.VERSION_TAG }}
+            VERSION=${{ inputs.VERSION_LABEL }}
             BASE_IMAGE=${{ matrix.base_image }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -114,27 +110,13 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create Version Manifest
-        if: inputs.IS_LATEST
-        run: |
-          docker buildx imagetools create \
-            -t ghcr.io/${{ github.repository }}:${{ inputs.VERSION_TAG }} \
-            ghcr.io/${{ github.repository }}:${{ inputs.VERSION_TAG }}-linux-amd64 \
-            ghcr.io/${{ github.repository }}:${{ inputs.VERSION_TAG }}-linux-arm64
-
-          docker buildx imagetools create \
-            -t ghcr.io/${{ github.repository }}:${{ inputs.VERSION_TAG }}-migrations \
-            ghcr.io/${{ github.repository }}:${{ inputs.VERSION_TAG }}-migrations-linux-amd64 \
-            ghcr.io/${{ github.repository }}:${{ inputs.VERSION_TAG }}-migrations-linux-arm64
-
-      - name: Create Latest Manifest
-        if: env.LATEST_TAG != ''
         run: |
           docker buildx imagetools create \
             -t ghcr.io/${{ github.repository }}:${{ env.LATEST_TAG }} \
-            ghcr.io/${{ github.repository }}:${{ inputs.VERSION_TAG }}-linux-amd64 \
-            ghcr.io/${{ github.repository }}:${{ inputs.VERSION_TAG }}-linux-arm64
+            ghcr.io/${{ github.repository }}:${{ env.LATEST_TAG }}-linux-amd64 \
+            ghcr.io/${{ github.repository }}:${{ env.LATEST_TAG }}-linux-arm64
 
           docker buildx imagetools create \
             -t ghcr.io/${{ github.repository }}:${{ env.LATEST_MIGRATIONS_TAG }} \
-            ghcr.io/${{ github.repository }}:${{ inputs.VERSION_TAG }}-migrations-linux-amd64 \
-            ghcr.io/${{ github.repository }}:${{ inputs.VERSION_TAG }}-migrations-linux-arm64 
+            ghcr.io/${{ github.repository }}:${{ env.LATEST_MIGRATIONS_TAG }}-linux-amd64 \
+            ghcr.io/${{ github.repository }}:${{ env.LATEST_MIGRATIONS_TAG }}-linux-arm64 

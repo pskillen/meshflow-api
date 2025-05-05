@@ -17,16 +17,15 @@ jobs:
         id: get_sha
         run: |
           SHORT_SHA=$(echo $GITHUB_SHA | cut -c1-7)
-          echo "VERSION_TAG=dev-$SHORT_SHA" >> "$GITHUB_OUTPUT"
+          echo "VERSION_LABEL=dev-$SHORT_SHA" >> "$GITHUB_OUTPUT"
 
     outputs:
-      VERSION_TAG: ${{ steps.get_sha.outputs.VERSION_TAG }}
+      VERSION_LABEL: ${{ steps.get_sha.outputs.VERSION_LABEL }}
 
   build:
     needs:
       - extract-dev-tag
     uses: ./.github/workflows/docker-build.yaml
     with:
-      VERSION_TAG: ${{ needs.extract-dev-tag.outputs.VERSION_TAG }}
-      IS_PRERELEASE: false
-      IS_LATEST: true 
+      VERSION_LABEL: ${{ needs.extract-dev-tag.outputs.VERSION_LABEL }}
+      ENVIRONMENT: dev 
