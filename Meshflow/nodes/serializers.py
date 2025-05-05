@@ -3,7 +3,7 @@ import secrets
 from rest_framework import serializers
 
 from common.mesh_node_helpers import meshtastic_id_to_hex
-from constellations.models import ConstellationUserMembership
+from constellations.models import Constellation, ConstellationUserMembership
 from users.models import User
 
 from .models import (
@@ -134,40 +134,58 @@ class APIKeyCreateSerializer(serializers.ModelSerializer):
 class ManagedNodeSerializer(serializers.ModelSerializer):
     """Serializer for managed nodes, enriched with observed node and latest position info."""
 
-    latitude = serializers.FloatField(read_only=True)
-    longitude = serializers.FloatField(read_only=True)
+    class PositionSerializer(serializers.ModelSerializer):
+        latitude = serializers.FloatField(read_only=True)
+        longitude = serializers.FloatField(read_only=True)
+
+        class Meta:
+            model = Position
+            fields = ["latitude", "longitude"]
+
+    class UserSerializer(serializers.ModelSerializer):
+        id = serializers.IntegerField(source="owner_id", read_only=True)
+        username = serializers.CharField(source="owner_username", read_only=True)
+
+        class Meta:
+            model = User
+            fields = ["id", "username"]
+
+    class ConstellationSerializer(serializers.ModelSerializer):
+        class Meta:
+            model = Constellation
+            fields = ["id", "name", "map_color"]
+
     long_name = serializers.CharField(read_only=True)
     short_name = serializers.CharField(read_only=True)
     last_heard = serializers.DateTimeField(read_only=True)
     node_id_str = serializers.CharField(read_only=True)
-    node_id_str = serializers.SerializerMethodField()
+
+    position = PositionSerializer(source="*", read_only=True)
+    owner = UserSerializer(source="*", read_only=True)
+    constellation = ConstellationSerializer(read_only=True)
 
     class Meta:
         model = ManagedNode
         fields = [
-            "internal_id",
             "node_id",
-            "owner",
-            "constellation",
             "name",
-            "latitude",
-            "longitude",
             "long_name",
             "short_name",
             "last_heard",
             "node_id_str",
-            "node_id_str",
+            "owner",
+            "constellation",
+            "position",
         ]
         read_only_fields = [
             "internal_id",
-            "owner",
-            "latitude",
-            "longitude",
             "long_name",
             "short_name",
             "last_heard",
             "node_id_str",
-            "node_id_str",
+            "owner",
+            "position",
+            "constellation",
         ]
 
     def get_node_id_str(self, obj):

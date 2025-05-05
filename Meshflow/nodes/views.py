@@ -315,6 +315,7 @@ class ManagedNodeViewSet(viewsets.ModelViewSet):
                 last_heard=Subquery(observed_node_qs.values("last_heard")[:1]),
                 latitude=Subquery(latest_position_qs.values("latitude")[:1]),
                 longitude=Subquery(latest_position_qs.values("longitude")[:1]),
+                owner_username=Subquery(observed_node_qs.values("claimed_by__username")[:1]),
             )
         )
 
