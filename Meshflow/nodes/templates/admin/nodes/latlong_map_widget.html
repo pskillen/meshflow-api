@@ -1,0 +1,43 @@
+{% load static %}
+<div id="latlong-map-{{ widget.name }}" style="height: 300px; width: 100%; margin-bottom: 10px;"></div>
+<div style="display: flex; gap: 10px;">
+  <label for="{{ widget.subwidgets.0.name }}">Lat: {{ widget.subwidgets.0.tag }} </label>
+  <input type="text" name="{{ widget.subwidgets.0.name }}" value="{{ widget.subwidgets.0.value }}" />
+  <label for="{{ widget.subwidgets.1.name }}">Lng: {{ widget.subwidgets.1.tag }} </label>
+  <input type="text" name="{{ widget.subwidgets.1.name }}" value="{{ widget.subwidgets.1.value }}" />
+</div>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(function() {
+  var mapId = 'latlong-map-{{ widget.name }}';
+  var latInput = document.querySelector('[name="{{ widget.subwidgets.0.name }}"]');
+  var lngInput = document.querySelector('[name="{{ widget.subwidgets.1.name }}"]');
+  var lat = parseFloat(latInput?.value || 0);
+  var lng = parseFloat(lngInput?.value || 0);
+  var map = L.map(mapId).setView([lat, lng], (lat && lng) ? 13 : 2);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '© OpenStreetMap'
+  }).addTo(map);
+  var marker = L.marker([lat, lng], {draggable: true}).addTo(map);
+  marker.on('dragend', function(e) {
+    var pos = marker.getLatLng();
+    latInput.value = pos.lat.toFixed(6);
+    lngInput.value = pos.lng.toFixed(6);
+  });
+  // Update marker if input changes
+  latInput.addEventListener('change', function() {
+    var newLat = parseFloat(latInput?.value || 0);
+    var newLng = parseFloat(lngInput?.value || 0);
+    marker.setLatLng([newLat, newLng]);
+    map.setView([newLat, newLng]);
+  });
+  lngInput.addEventListener('change', function() {
+    var newLat = parseFloat(latInput?.value || 0);
+    var newLng = parseFloat(lngInput?.value || 0);
+    marker.setLatLng([newLat, newLng]);
+    map.setView([newLat, newLng]);
+  });
+})();
+</script> 
