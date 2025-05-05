@@ -6,3 +6,5 @@ python-dotenv~=1.1
 django-cors-headers~=4.7
 mnemonic~=0.21
 django-prometheus~=2.3
+django-allauth~=65.7.0
+dj-rest-auth~=7.0.1
