@@ -31,6 +31,13 @@ class ConstellationAdmin(admin.ModelAdmin):
     ordering = ("name",)
     readonly_fields = ("created_by",)
 
+    _COLOR_FIELD_TEMPLATE = (
+        '<div style="background:{}; width: 100%; height: 24px; border-radius: 4px; '
+        'border: 1px solid #ccc; text-align:center; color: {};">'
+        "{color}"
+        "</div>"
+    )
+
     def get_member_count(self, obj):
         return obj.constellationusermembership_set.count()
 
@@ -61,7 +68,7 @@ class ConstellationAdmin(admin.ModelAdmin):
         brightness = (r * 299 + g * 587 + b * 114) / 1000
         fg = "#000" if brightness > 128 else "#fff"
         return format_html(
-            '<div style="background:{}; width: 100%; height: 24px; border-radius: 4px; border: 1px solid #ccc; text-align:center; color: {};">{}</div>',
+            self._COLOR_FIELD_TEMPLATE,
             color,
             fg,
             color,
