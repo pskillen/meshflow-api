@@ -9,10 +9,7 @@ on:
       ENVIRONMENT:
         required: true
         type: string
-        options:
-          - dev
-          - preprod
-          - prod
+
 
 permissions:
   contents: read
