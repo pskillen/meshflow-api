@@ -19,7 +19,6 @@ class BaseLoginRedirectView(APIView):
     authentication_classes = []
 
     callback_url_base = settings.CALLBACK_URL_BASE if hasattr(settings, "CALLBACK_URL_BASE") else None
-    # callback_url = settings.CALLBACK_URL if hasattr(settings, "CALLBACK_URL") else None
     client_class = OAuth2Client
 
     provider_name: str = None
@@ -37,7 +36,6 @@ class BaseLoginRedirectView(APIView):
             app = SimpleNamespace(
                 client_id=provider_settings["client_id"],
                 secret=provider_settings["secret"],
-                callback_url=provider_settings["callback_url"],
             )
 
         adapter = self.adapter_class(request)
@@ -49,7 +47,6 @@ class BaseLoginRedirectView(APIView):
             access_token_url=adapter.access_token_url,
             access_token_method=adapter.access_token_method,
             callback_url=f"{self.callback_url_base}/api/auth/social/{self.provider_name}/callback/",
-            # callback_url=self.callback_url,
         )
 
         # Generate state and store in session
@@ -94,6 +91,11 @@ class GithubLoginRedirectView(BaseLoginRedirectView):
 
 
 class CompatibleOAuth2Client(OAuth2Client):
+    """
+    This class is required because dj-rest-auth calls OAuth2Client.__init__() with 9 arguments,
+    but allauth.socialaccount.providers.oauth2.client.OAuth2Client.__init__() only accepts 8.
+    """
+
     def __init__(
         self,
         request,

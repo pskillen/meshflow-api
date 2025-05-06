@@ -230,19 +230,23 @@ CALLBACK_URL_BASE = os.environ.get('CALLBACK_URL_BASE', 'http://localhost:8000')
 
 # Social authentication settings
 SOCIALACCOUNT_PROVIDERS = {
-    'google': {
-        # 'APP': {
-        #     'client_id': os.environ.get('GOOGLE_CLIENT_ID', ''),
-        #     'secret': os.environ.get('GOOGLE_CLIENT_SECRET', ''),
-        #     'callback_url': os.environ.get('GOOGLE_CALLBACK_URL', 'http://localhost:8000/api/accounts/google/login/callback/'),
-        #     'key': ''
-        # },
-        'SCOPE': [
-            'profile',
-            'email',
+    "google": {
+        'APP': {
+            'client_id': os.environ.get('GOOGLE_CLIENT_ID', ''),
+            'secret': os.environ.get('GOOGLE_CLIENT_SECRET', ''),
+        },
+        "SCOPE": [
+            "profile",
+            "email",
         ],
-        'AUTH_PARAMS': {
-            'access_type': 'online',
+        "AUTH_PARAMS": {
+            "access_type": "online",
+        },
+    },
+    "github": {
+        "APP": {
+            "client_id": os.environ.get("GITHUB_CLIENT_ID", ""),
+            "secret": os.environ.get("GITHUB_CLIENT_SECRET", ""),
         }
     }
 }
