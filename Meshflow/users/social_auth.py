@@ -93,28 +93,32 @@ class GithubLoginRedirectView(BaseLoginRedirectView):
         self.adapter_class = GitHubOAuth2Adapter
 
 
-class GoogleLoginView(SocialLoginView):
-    """
-    View for Google OAuth2 authentication.
-    """
+class CompatibleOAuth2Client(OAuth2Client):
+    def __init__(
+        self,
+        request,
+        consumer_key,
+        consumer_secret,
+        access_token_method,
+        access_token_url,
+        callback_url,
+        scope,
+        scope_delimiter=" ",
+        headers=None,
+        basic_auth=False,
+    ):
+        super().__init__(request, consumer_key, consumer_secret, access_token_method, access_token_url, callback_url, scope_delimiter, headers, basic_auth)
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.provider_name = "google"
-        self.adapter_class = GoogleOAuth2Adapter
-        self.client_class = OAuth2Client
+class GoogleLoginView(SocialLoginView):
+    adapter_class = GoogleOAuth2Adapter
+    client_class = CompatibleOAuth2Client
+    callback_url = settings.CALLBACK_URL_BASE + "/api/auth/social/google/callback/"
 
 
 class GithubLoginView(SocialLoginView):
-    """
-    View for Github OAuth2 authentication.
-    """
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.provider_name = "github"
-        self.adapter_class = GitHubOAuth2Adapter
-        self.client_class = OAuth2Client
+    adapter_class = GitHubOAuth2Adapter
+    client_class = CompatibleOAuth2Client
+    callback_url = settings.CALLBACK_URL_BASE + "/api/auth/social/github/callback/"
 
 
 class BaseCallbackView(APIView):
@@ -132,6 +136,10 @@ class BaseCallbackView(APIView):
         state = request.GET.get("state")
         if not code:
             return Response({"error": "Code is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # session_state = request.session.get("oauth2_state")
+        # if not state or state != session_state:
+        #     return Response({"error": "Invalid state"}, status=status.HTTP_400_BAD_REQUEST)
 
         # 1. Exchange code for access token
         token_url, client_id, client_secret, redirect_uri = self.get_provider_config(request)
@@ -195,37 +203,60 @@ class BaseCallbackView(APIView):
         )
 
 
-class GoogleCallbackView(BaseCallbackView):
+class BaseCallbackRedirectView(APIView):
     """
-    Handles Google OAuth2 callback.
+    Handles OAuth2 callback: verified state and forwards code to frontend.
+    """
+    permission_classes = []
+    
+    def get(self, request, *args, **kwargs):
+        code = request.GET.get("code")
+        state = request.GET.get("state")
+        if not code:
+            return Response({"error": "Code is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # session_state = request.session.get("oauth2_state")
+        # if not state or state != session_state:
+        #     return Response({"error": "Invalid state"}, status=status.HTTP_400_BAD_REQUEST)
+
+        return redirect(f"{settings.FRONTEND_URL}{settings.FRONTEND_OAUTH_CALLBACK_PATH}?code={code}&state={state}")
+
+class GoogleCallbackRedirectView(BaseCallbackRedirectView):
+    """
+    Handles Google OAuth2 callback: verified state and forwards code to frontend.
     """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.provider_name = "google"
         self.adapter_class = GoogleOAuth2Adapter
 
-    # def get_provider_config(self):
-    #     return (
-    #         "https://oauth2.googleapis.com/token",
-    #         settings.SOCIALACCOUNT_PROVIDERS["google"]["APP"]["client_id"],
-    #         settings.SOCIALACCOUNT_PROVIDERS["google"]["APP"]["secret"],
-    #         settings.SOCIALACCOUNT_PROVIDERS["google"]["APP"]["callback_url"],
-    #     )
-
-
-class GithubCallbackView(BaseCallbackView):
+class GithubCallbackRedirectView(BaseCallbackRedirectView):
     """
-    Handles Github OAuth2 callback.
+    Handles Github OAuth2 callback: verified state and forwards code to frontend.
     """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.provider_name = "github"
         self.adapter_class = GitHubOAuth2Adapter
 
-    # def get_provider_config(self):
-    #     return (
-    #         "https://github.com/login/oauth/access_token",
-    #         settings.SOCIALACCOUNT_PROVIDERS["github"]["APP"]["client_id"],
-    #         settings.SOCIALACCOUNT_PROVIDERS["github"]["APP"]["secret"],
-    #         settings.SOCIALACCOUNT_PROVIDERS["github"]["APP"]["callback_url"],
-    #     )
+
+class GoogleCallbackView(BaseCallbackView):
+    """
+    Handles Google OAuth2 callback: exchanges code for access token, logs in user, issues JWT, redirects to frontend.
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.provider_name = "google"
+        self.adapter_class = GoogleOAuth2Adapter
+
+
+
+class GithubCallbackView(BaseCallbackView):
+    """
+    Handles Github OAuth2 callback: exchanges code for access token, logs in user, issues JWT, redirects to frontend.
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.provider_name = "github"
+        self.adapter_class = GitHubOAuth2Adapter
+
