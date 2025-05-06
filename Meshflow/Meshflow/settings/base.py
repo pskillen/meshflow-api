@@ -213,6 +213,7 @@ ACCOUNT_SIGNUP_FIELDS = ['email*', 'username*']
 ACCOUNT_LOGIN_METHODS = {'email', 'username'}
 # ACCOUNT_AUTHENTICATION_METHOD = 'username_email'
 ACCOUNT_EMAIL_VERIFICATION = 'optional'
+SOCIALACCOUNT_ADAPTER = 'users.adapters.MergeByEmailSocialAccountAdapter'
 
 # dj-rest-auth settings
 REST_AUTH = {
