@@ -200,40 +200,40 @@ SITE_ID = int(os.environ.get("SITE_ID", "1"))
 
 AUTHENTICATION_BACKENDS = [
     # Needed to login by username in Django admin, regardless of `allauth`
-    'django.contrib.auth.backends.ModelBackend',
+    "django.contrib.auth.backends.ModelBackend",
     # `allauth` specific authentication methods, such as login by e-mail
-    'allauth.account.auth_backends.AuthenticationBackend',
+    "allauth.account.auth_backends.AuthenticationBackend",
 ]
 
 # allauth settings
 # ACCOUNT_EMAIL_REQUIRED = True
 ACCOUNT_UNIQUE_EMAIL = True
 # ACCOUNT_USERNAME_REQUIRED = True
-ACCOUNT_SIGNUP_FIELDS = ['email*', 'username*']
-ACCOUNT_LOGIN_METHODS = {'email', 'username'}
+ACCOUNT_SIGNUP_FIELDS = ["email*", "username*"]
+ACCOUNT_LOGIN_METHODS = {"email", "username"}
 # ACCOUNT_AUTHENTICATION_METHOD = 'username_email'
-ACCOUNT_EMAIL_VERIFICATION = 'optional'
-SOCIALACCOUNT_ADAPTER = 'users.adapters.MergeByEmailSocialAccountAdapter'
+ACCOUNT_EMAIL_VERIFICATION = "optional"
+SOCIALACCOUNT_ADAPTER = "users.adapters.MergeByEmailSocialAccountAdapter"
 
 # dj-rest-auth settings
 REST_AUTH = {
-    'USE_JWT': True,
-    'JWT_AUTH_COOKIE': 'meshflow-auth',
-    'JWT_AUTH_REFRESH_COOKIE': 'meshflow-refresh',
-    'JWT_AUTH_SECURE': False,  # Set to True in production
-    'JWT_AUTH_HTTPONLY': True,
-    'JWT_AUTH_SAMESITE': 'Lax',
-    'SESSION_LOGIN': False,
+    "USE_JWT": True,
+    "JWT_AUTH_COOKIE": "meshflow-auth",
+    "JWT_AUTH_REFRESH_COOKIE": "meshflow-refresh",
+    "JWT_AUTH_SECURE": False,  # Set to True in production
+    "JWT_AUTH_HTTPONLY": True,
+    "JWT_AUTH_SAMESITE": "Lax",
+    "SESSION_LOGIN": False,
 }
 
-CALLBACK_URL_BASE = os.environ.get('CALLBACK_URL_BASE', 'http://localhost:8000').rstrip('/')
+CALLBACK_URL_BASE = os.environ.get("CALLBACK_URL_BASE", "http://localhost:8000").rstrip("/")
 
 # Social authentication settings
 SOCIALACCOUNT_PROVIDERS = {
     "google": {
-        'APP': {
-            'client_id': os.environ.get('GOOGLE_CLIENT_ID', ''),
-            'secret': os.environ.get('GOOGLE_CLIENT_SECRET', ''),
+        "APP": {
+            "client_id": os.environ.get("GOOGLE_CLIENT_ID", ""),
+            "secret": os.environ.get("GOOGLE_CLIENT_SECRET", ""),
         },
         "SCOPE": [
             "profile",
@@ -248,14 +248,14 @@ SOCIALACCOUNT_PROVIDERS = {
             "client_id": os.environ.get("GITHUB_CLIENT_ID", ""),
             "secret": os.environ.get("GITHUB_CLIENT_SECRET", ""),
         }
-    }
+    },
 }
 
 # HATE trailing slashes!
 APPEND_SLASH = True
 
-FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:5173').rstrip('/')
-FRONTEND_OAUTH_CALLBACK_PATH = os.environ.get('FRONTEND_OAUTH_CALLBACK_PATH', '/auth/callback')
+FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:5173").rstrip("/")
+FRONTEND_OAUTH_CALLBACK_PATH = os.environ.get("FRONTEND_OAUTH_CALLBACK_PATH", "/auth/callback")
 
 LOGIN_URL = "/admin/login/"
 

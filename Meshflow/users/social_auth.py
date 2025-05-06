@@ -1,17 +1,19 @@
 import uuid
-from allauth.socialaccount.providers.google.views import GoogleOAuth2Adapter
+from types import SimpleNamespace
+
+from django.conf import settings
+from django.shortcuts import redirect
+
+import requests
+from allauth.socialaccount.models import SocialApp
 from allauth.socialaccount.providers.github.views import GitHubOAuth2Adapter
+from allauth.socialaccount.providers.google.views import GoogleOAuth2Adapter
 from allauth.socialaccount.providers.oauth2.client import OAuth2Client
 from dj_rest_auth.registration.views import SocialLoginView
-from django.conf import settings
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
-from allauth.socialaccount.models import SocialApp
-from types import SimpleNamespace
-import requests
-from django.shortcuts import redirect
 
 
 class BaseLoginRedirectView(APIView):
@@ -109,7 +111,18 @@ class CompatibleOAuth2Client(OAuth2Client):
         headers=None,
         basic_auth=False,
     ):
-        super().__init__(request, consumer_key, consumer_secret, access_token_method, access_token_url, callback_url, scope_delimiter, headers, basic_auth)
+        super().__init__(
+            request,
+            consumer_key,
+            consumer_secret,
+            access_token_method,
+            access_token_url,
+            callback_url,
+            scope_delimiter,
+            headers,
+            basic_auth,
+        )
+
 
 class GoogleLoginView(SocialLoginView):
     adapter_class = GoogleOAuth2Adapter
@@ -127,6 +140,7 @@ class BaseCallbackView(APIView):
     """
     Handles OAuth2 callback: exchanges code for access token, logs in user, issues JWT, redirects to frontend.
     """
+
     permission_classes = []
 
     callback_url_base = settings.CALLBACK_URL_BASE if hasattr(settings, "CALLBACK_URL_BASE") else None
@@ -140,8 +154,8 @@ class BaseCallbackView(APIView):
             return Response({"error": "Code is required"}, status=status.HTTP_400_BAD_REQUEST)
 
         # session_state = request.session.get("oauth2_state")
-        # if not state or state != session_state:
-        #     return Response({"error": "Invalid state"}, status=status.HTTP_400_BAD_REQUEST)
+        if not state:  # or state != session_state:
+            return Response({"error": "Invalid state"}, status=status.HTTP_400_BAD_REQUEST)
 
         # 1. Exchange code for access token
         token_url, client_id, client_secret, redirect_uri = self.get_provider_config(request)
@@ -185,7 +199,6 @@ class BaseCallbackView(APIView):
     def get_provider_config(self, request):
         adapter = self.adapter_class(request)
         access_token_url = adapter.access_token_url
-        access_token_method = adapter.access_token_method
         callback_url = f"{self.callback_url_base}/api/auth/social/{self.provider_name}/callback/"
 
         try:
@@ -209,8 +222,9 @@ class BaseCallbackRedirectView(APIView):
     """
     Handles OAuth2 callback: verified state and forwards code to frontend.
     """
+
     permission_classes = []
-    
+
     def get(self, request, *args, **kwargs):
         code = request.GET.get("code")
         state = request.GET.get("state")
@@ -223,19 +237,23 @@ class BaseCallbackRedirectView(APIView):
 
         return redirect(f"{settings.FRONTEND_URL}{settings.FRONTEND_OAUTH_CALLBACK_PATH}?code={code}&state={state}")
 
+
 class GoogleCallbackRedirectView(BaseCallbackRedirectView):
     """
     Handles Google OAuth2 callback: verified state and forwards code to frontend.
     """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.provider_name = "google"
         self.adapter_class = GoogleOAuth2Adapter
 
+
 class GithubCallbackRedirectView(BaseCallbackRedirectView):
     """
     Handles Github OAuth2 callback: verified state and forwards code to frontend.
     """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.provider_name = "github"
@@ -246,19 +264,19 @@ class GoogleCallbackView(BaseCallbackView):
     """
     Handles Google OAuth2 callback: exchanges code for access token, logs in user, issues JWT, redirects to frontend.
     """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.provider_name = "google"
         self.adapter_class = GoogleOAuth2Adapter
 
 
-
 class GithubCallbackView(BaseCallbackView):
     """
     Handles Github OAuth2 callback: exchanges code for access token, logs in user, issues JWT, redirects to frontend.
     """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.provider_name = "github"
         self.adapter_class = GitHubOAuth2Adapter
-

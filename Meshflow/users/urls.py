@@ -1,12 +1,12 @@
 from django.urls import include, path
 
 from users.social_auth import (
-    GoogleLoginRedirectView,
-    GoogleCallbackRedirectView,
-    GithubLoginRedirectView,
     GithubCallbackRedirectView,
-    GoogleLoginView,
+    GithubLoginRedirectView,
     GithubLoginView,
+    GoogleCallbackRedirectView,
+    GoogleLoginRedirectView,
+    GoogleLoginView,
 )
 
 urlpatterns = [

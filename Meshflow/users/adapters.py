@@ -1,5 +1,7 @@
-from allauth.socialaccount.adapter import DefaultSocialAccountAdapter
 from django.contrib.auth import get_user_model
+
+from allauth.socialaccount.adapter import DefaultSocialAccountAdapter
+
 
 class MergeByEmailSocialAccountAdapter(DefaultSocialAccountAdapter):
     def pre_social_login(self, request, sociallogin):
@@ -24,4 +26,4 @@ class MergeByEmailSocialAccountAdapter(DefaultSocialAccountAdapter):
                 # If found, connect this new social account to the existing user
                 sociallogin.connect(request, user)
             except User.DoesNotExist:
-                pass  # No user with this email, normal flow continues 
+                pass  # No user with this email, normal flow continues
