@@ -186,16 +186,90 @@ class NodeIdDatalistWidget(forms.TextInput):
         return context
 
 
-class ManagedNodeAdminForm(forms.ModelForm):
-    class Meta:
-        model = ManagedNode
-        fields = "__all__"
+class LatLongMapWidget(forms.MultiWidget):
+    template_name = "admin/nodes/latlong_map_widget.html"
 
+    def __init__(self, attrs=None):
+        widgets = [
+            forms.TextInput(attrs={"class": "lat-input", "step": "any"}),
+            forms.TextInput(attrs={"class": "lng-input", "step": "any"}),
+        ]
+        super().__init__(widgets, attrs)
+
+    def decompress(self, value):
+        if value and isinstance(value, (list, tuple)) and len(value) == 2:
+            return value
+        return [None, None]
+
+    def format_output(self, rendered_widgets):
+        return f"Lat: {rendered_widgets[0]}<br>Lng: {rendered_widgets[1]}"
+
+    def value_from_datadict(self, data, files, name):
+        lat = data.get(f"{name}_0")
+        lng = data.get(f"{name}_1")
+        return [lat, lng]
+
+
+class LatLongFormField(forms.Field):
+    widget = LatLongMapWidget
+
+    def __init__(self, *args, **kwargs):
+        kwargs.setdefault("required", False)
+        super().__init__(*args, **kwargs)
+
+    def to_python(self, value):
+        if not value or not isinstance(value, (list, tuple)) or len(value) != 2:
+            return [None, None]
+        try:
+            lat = float(value[0]) if value[0] not in (None, "", "None") else None
+            lng = float(value[1]) if value[1] not in (None, "", "None") else None
+            return [lat, lng]
+        except (TypeError, ValueError):
+            return [None, None]
+
+    def prepare_value(self, value):
+        # This ensures the widget gets a list/tuple for decompress
+        if value is None:
+            return [None, None]
+        if isinstance(value, (list, tuple)) and len(value) == 2:
+            return value
+        return [None, None]
+
+
+class ManagedNodeAdminForm(forms.ModelForm):
     node_id = forms.CharField(
         label="Node ID",
         widget=NodeIdDatalistWidget,
         help_text="Select from observed nodes or enter a new node ID.",
     )
+
+    latlong = LatLongFormField(
+        label="Default Location (lat/lng)",
+        help_text="Set the default latitude and longitude by dragging the marker on the map.",
+    )
+
+    class Meta:
+        model = ManagedNode
+        fields = "__all__"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        lat = self.instance.default_location_latitude
+        lng = self.instance.default_location_longitude
+        self.initial["latlong"] = [lat, lng]
+
+    def clean(self):
+        cleaned_data = super().clean()
+        latlong = self.cleaned_data.get("latlong")
+        if latlong:
+            cleaned_data["default_location_latitude"] = latlong[0]
+            cleaned_data["default_location_longitude"] = latlong[1]
+        return cleaned_data
+
+    def save(self, commit=True):
+        self.instance.default_location_latitude = self.cleaned_data.get("default_location_latitude")
+        self.instance.default_location_longitude = self.cleaned_data.get("default_location_longitude")
+        return super().save(commit=commit)
 
 
 @admin.register(ManagedNode)
@@ -226,6 +300,7 @@ class ManagedNodeAdmin(admin.ModelAdmin):
             "name",
             "owner",
             "constellation",
+            "latlong",
             "channel_0",
             "channel_1",
             "channel_2",

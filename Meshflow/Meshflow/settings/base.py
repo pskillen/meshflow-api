@@ -48,9 +48,20 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "django.contrib.sites",  # Required for django-allauth
     "rest_framework",
     "rest_framework.authtoken",
     "corsheaders",
+    # Authentication
+    "allauth",
+    "allauth.account",
+    "allauth.headless",
+    "allauth.socialaccount",
+    "allauth.socialaccount.providers.google",
+    "allauth.socialaccount.providers.github",
+    "dj_rest_auth",
+    "dj_rest_auth.registration",
+    # Project apps
     "Meshflow",
     "users",
     "constellations",
@@ -68,6 +79,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "allauth.account.middleware.AccountMiddleware",
 ]
 
 ROOT_URLCONF = "Meshflow.urls"
@@ -158,8 +170,8 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework_simplejwt.authentication.JWTAuthentication",
-        "rest_framework.authentication.SessionAuthentication",
-        "nodes.authentication.NodeAPIKeyAuthentication",
+        # "rest_framework.authentication.SessionAuthentication",
+        # "nodes.authentication.NodeAPIKeyAuthentication",
     ],
     "DEFAULT_PAGINATION_CLASS": "Meshflow.paginator.PageSizePagination",
 }
@@ -183,13 +195,73 @@ SIMPLE_JWT = {
     "TOKEN_TYPE_CLAIM": "token_type",
 }
 
+# django-allauth settings
+SITE_ID = int(os.environ.get("SITE_ID", "1"))
+
+AUTHENTICATION_BACKENDS = [
+    # Needed to login by username in Django admin, regardless of `allauth`
+    "django.contrib.auth.backends.ModelBackend",
+    # `allauth` specific authentication methods, such as login by e-mail
+    "allauth.account.auth_backends.AuthenticationBackend",
+]
+
+# allauth settings
+# ACCOUNT_EMAIL_REQUIRED = True
+ACCOUNT_UNIQUE_EMAIL = True
+# ACCOUNT_USERNAME_REQUIRED = True
+ACCOUNT_SIGNUP_FIELDS = ["email*", "username*"]
+ACCOUNT_LOGIN_METHODS = {"email", "username"}
+# ACCOUNT_AUTHENTICATION_METHOD = 'username_email'
+ACCOUNT_EMAIL_VERIFICATION = "optional"
+SOCIALACCOUNT_ADAPTER = "users.adapters.MergeByEmailSocialAccountAdapter"
+
+# dj-rest-auth settings
+REST_AUTH = {
+    "USE_JWT": True,
+    "JWT_AUTH_COOKIE": "meshflow-auth",
+    "JWT_AUTH_REFRESH_COOKIE": "meshflow-refresh",
+    "JWT_AUTH_SECURE": False,  # Set to True in production
+    "JWT_AUTH_HTTPONLY": True,
+    "JWT_AUTH_SAMESITE": "Lax",
+    "SESSION_LOGIN": False,
+}
+
+CALLBACK_URL_BASE = os.environ.get("CALLBACK_URL_BASE", "http://localhost:8000").rstrip("/")
+
+# Social authentication settings
+SOCIALACCOUNT_PROVIDERS = {
+    "google": {
+        "APP": {
+            "client_id": os.environ.get("GOOGLE_CLIENT_ID", ""),
+            "secret": os.environ.get("GOOGLE_CLIENT_SECRET", ""),
+        },
+        "SCOPE": [
+            "profile",
+            "email",
+        ],
+        "AUTH_PARAMS": {
+            "access_type": "online",
+        },
+    },
+    "github": {
+        "APP": {
+            "client_id": os.environ.get("GITHUB_CLIENT_ID", ""),
+            "secret": os.environ.get("GITHUB_CLIENT_SECRET", ""),
+        }
+    },
+}
+
 # HATE trailing slashes!
 APPEND_SLASH = True
+
+FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:5173").rstrip("/")
+FRONTEND_OAUTH_CALLBACK_PATH = os.environ.get("FRONTEND_OAUTH_CALLBACK_PATH", "/auth/callback")
 
 LOGIN_URL = "/admin/login/"
 
 # CORS settings
 CORS_ALLOWED_ORIGINS = [
+    FRONTEND_URL,
     "http://localhost:5173",  # Vite dev server
     "http://127.0.0.1:5173",
 ]
