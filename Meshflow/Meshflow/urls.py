@@ -22,7 +22,6 @@ from django.urls import include, path
 from rest_framework_simplejwt.views import TokenRefreshView, TokenVerifyView
 
 from users.serializers import CustomTokenObtainPairView
-from users.social_auth import GoogleLoginView, GoogleAuthToken
 
 from .views import StatusView
 
@@ -42,14 +41,8 @@ urlpatterns = [
                 path("token/", CustomTokenObtainPairView.as_view(), name="token_obtain_pair"),
                 path("token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
                 path("token/verify/", TokenVerifyView.as_view(), name="token_verify"),
-
-                # dj-rest-auth endpoints
-                path("auth/", include("dj_rest_auth.urls")),
-                path("auth/registration/", include("dj_rest_auth.registration.urls")),
-
                 # Social auth endpoints
-                path("auth/social/google/", GoogleLoginView.as_view(), name="google_login"),
-                path("auth/social/google/token/", GoogleAuthToken.as_view(), name="google_token"),
+                path("auth/", include("users.urls")),
             ]
         ),
     ),

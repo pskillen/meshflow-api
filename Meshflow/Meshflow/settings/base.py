@@ -55,8 +55,10 @@ INSTALLED_APPS = [
     # Authentication
     "allauth",
     "allauth.account",
+    "allauth.headless",
     "allauth.socialaccount",
     "allauth.socialaccount.providers.google",
+    "allauth.socialaccount.providers.github",
     "dj_rest_auth",
     "dj_rest_auth.registration",
     # Project apps
@@ -168,8 +170,8 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework_simplejwt.authentication.JWTAuthentication",
-        "rest_framework.authentication.SessionAuthentication",
-        "nodes.authentication.NodeAPIKeyAuthentication",
+        # "rest_framework.authentication.SessionAuthentication",
+        # "nodes.authentication.NodeAPIKeyAuthentication",
     ],
     "DEFAULT_PAGINATION_CLASS": "Meshflow.paginator.PageSizePagination",
 }
@@ -194,7 +196,7 @@ SIMPLE_JWT = {
 }
 
 # django-allauth settings
-SITE_ID = 1
+SITE_ID = int(os.environ.get("SITE_ID", "1"))
 
 AUTHENTICATION_BACKENDS = [
     # Needed to login by username in Django admin, regardless of `allauth`
@@ -223,14 +225,17 @@ REST_AUTH = {
     'SESSION_LOGIN': False,
 }
 
+CALLBACK_URL_BASE = os.environ.get('CALLBACK_URL_BASE', 'http://localhost:8000').rstrip('/')
+
 # Social authentication settings
 SOCIALACCOUNT_PROVIDERS = {
     'google': {
-        'APP': {
-            'client_id': os.environ.get('GOOGLE_CLIENT_ID', ''),
-            'secret': os.environ.get('GOOGLE_CLIENT_SECRET', ''),
-            'key': ''
-        },
+        # 'APP': {
+        #     'client_id': os.environ.get('GOOGLE_CLIENT_ID', ''),
+        #     'secret': os.environ.get('GOOGLE_CLIENT_SECRET', ''),
+        #     'callback_url': os.environ.get('GOOGLE_CALLBACK_URL', 'http://localhost:8000/api/accounts/google/login/callback/'),
+        #     'key': ''
+        # },
         'SCOPE': [
             'profile',
             'email',
@@ -241,16 +246,17 @@ SOCIALACCOUNT_PROVIDERS = {
     }
 }
 
-# Callback URL for social authentication
-CALLBACK_URL = os.environ.get('CALLBACK_URL', 'http://localhost:5173/api/auth/callback')
-
 # HATE trailing slashes!
 APPEND_SLASH = True
+
+FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:5173').rstrip('/')
+FRONTEND_OAUTH_CALLBACK_PATH = os.environ.get('FRONTEND_OAUTH_CALLBACK_PATH', '/auth/callback')
 
 LOGIN_URL = "/admin/login/"
 
 # CORS settings
 CORS_ALLOWED_ORIGINS = [
+    FRONTEND_URL,
     "http://localhost:5173",  # Vite dev server
     "http://127.0.0.1:5173",
 ]
