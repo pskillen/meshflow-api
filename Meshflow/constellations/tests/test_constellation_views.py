@@ -215,7 +215,9 @@ def test_constellation_members_view_admin(create_constellation, create_user):
     assert user2_membership.role == "editor"
 
     # Delete a member
-    delete_url = reverse("constellation-members-update-destroy", kwargs={"constellation_id": constellation.pk, "user_id": user1.id})
+    delete_url = reverse(
+        "constellation-members-update-destroy", kwargs={"constellation_id": constellation.pk, "user_id": user1.id}
+    )
     response = client.delete(delete_url)
 
     assert response.status_code == status.HTTP_204_NO_CONTENT
@@ -251,7 +253,9 @@ def test_constellation_members_view_editor(create_constellation, create_user):
     assert user1_membership.role == "viewer"
 
     # Delete a member
-    delete_url = reverse("constellation-members-update-destroy", kwargs={"constellation_id": constellation.pk, "user_id": user1.id})
+    delete_url = reverse(
+        "constellation-members-update-destroy", kwargs={"constellation_id": constellation.pk, "user_id": user1.id}
+    )
     response = client.delete(delete_url)
 
     assert response.status_code == status.HTTP_204_NO_CONTENT
@@ -401,7 +405,9 @@ def test_constellation_channels_put_admin(create_constellation, create_user):
     # Create a channel
     channel = MessageChannel.objects.create(name="Test Channel", constellation=constellation)
 
-    url = reverse("constellation-channels-update-destroy", kwargs={"constellation_id": constellation.id, "channel_id": channel.id})
+    url = reverse(
+        "constellation-channels-update-destroy", kwargs={"constellation_id": constellation.id, "channel_id": channel.id}
+    )
     data = {"id": channel.id, "name": "Updated Channel"}
     response = client.put(url, data)
 
@@ -424,7 +430,9 @@ def test_constellation_channels_delete_admin(create_constellation, create_user):
     # Create a channel
     channel = MessageChannel.objects.create(name="Test Channel", constellation=constellation)
 
-    url = reverse("constellation-channels-update-destroy", kwargs={"constellation_id": constellation.id, "channel_id": channel.id})
+    url = reverse(
+        "constellation-channels-update-destroy", kwargs={"constellation_id": constellation.id, "channel_id": channel.id}
+    )
     response = client.delete(url)
 
     assert response.status_code == status.HTTP_204_NO_CONTENT
