@@ -201,7 +201,7 @@ def test_constellation_members_view_admin(create_constellation, create_user):
     user2 = create_user()
 
     # Add members
-    url = reverse("constellation-members", kwargs={"pk": constellation.pk})
+    url = reverse("constellation-members-list-create", kwargs={"constellation_id": constellation.pk})
     data = {"members": [{"user": user1.id, "role": "viewer"}, {"user": user2.id, "role": "editor"}]}
     response = client.post(url, data, format="json")
 
@@ -239,7 +239,7 @@ def test_constellation_members_view_editor(create_constellation, create_user):
     user1 = create_user()
 
     # Add members
-    url = reverse("constellation-members", kwargs={"pk": constellation.pk})
+    url = reverse("constellation-members-list-create", kwargs={"constellation_id": constellation.pk})
     data = {"members": [{"user": user1.id, "role": "viewer"}]}
     response = client.post(url, data, format="json")
 
@@ -274,7 +274,7 @@ def test_constellation_members_view_viewer(create_constellation, create_user):
     user1 = create_user()
 
     # Try to add members
-    url = reverse("constellation-members", kwargs={"pk": constellation.pk})
+    url = reverse("constellation-members-list-create", kwargs={"constellation_id": constellation.pk})
     data = {"members": [{"user": user1.id, "role": "viewer"}]}
     response = client.post(url, data, format="json")
 
@@ -321,7 +321,7 @@ def test_constellation_channels_get_member(create_constellation, create_user):
     # Create a channel
     channel = MessageChannel.objects.create(name="Test Channel", constellation=constellation)
 
-    url = reverse("constellation-channels", kwargs={"constellation_id": constellation.id})
+    url = reverse("constellation-channels-list-create", kwargs={"constellation_id": constellation.id})
     response = client.get(url)
 
     assert response.status_code == status.HTTP_200_OK
@@ -339,7 +339,7 @@ def test_constellation_channels_get_non_member(create_constellation, create_user
     # Create constellation (user is not a member)
     constellation = create_constellation()
 
-    url = reverse("constellation-channels", kwargs={"constellation_id": constellation.id})
+    url = reverse("constellation-channels-list-create", kwargs={"constellation_id": constellation.id})
     response = client.get(url)
 
     assert response.status_code == status.HTTP_403_FORBIDDEN
@@ -356,7 +356,7 @@ def test_constellation_channels_post_admin(create_constellation, create_user):
     constellation = create_constellation()
     ConstellationUserMembership.objects.create(user=user, constellation=constellation, role="admin")
 
-    url = reverse("constellation-channels", kwargs={"constellation_id": constellation.id})
+    url = reverse("constellation-channels-list-create", kwargs={"constellation_id": constellation.id})
     data = {"name": "New Channel"}
     response = client.post(url, data)
 
@@ -378,7 +378,7 @@ def test_constellation_channels_post_editor(create_constellation, create_user):
     constellation = create_constellation()
     ConstellationUserMembership.objects.create(user=user, constellation=constellation, role="editor")
 
-    url = reverse("constellation-channels", kwargs={"constellation_id": constellation.id})
+    url = reverse("constellation-channels-list-create", kwargs={"constellation_id": constellation.id})
     data = {"name": "New Channel"}
     response = client.post(url, data)
 
@@ -400,7 +400,7 @@ def test_constellation_channels_put_admin(create_constellation, create_user):
     # Create a channel
     channel = MessageChannel.objects.create(name="Test Channel", constellation=constellation)
 
-    url = reverse("constellation-channels", kwargs={"constellation_id": constellation.id})
+    url = reverse("constellation-channels-list-create", kwargs={"constellation_id": constellation.id})
     data = {"id": channel.id, "name": "Updated Channel"}
     response = client.put(url, data)
 
@@ -423,7 +423,7 @@ def test_constellation_channels_delete_admin(create_constellation, create_user):
     # Create a channel
     channel = MessageChannel.objects.create(name="Test Channel", constellation=constellation)
 
-    url = reverse("constellation-channels", kwargs={"constellation_id": constellation.id})
+    url = reverse("constellation-channels-list-create", kwargs={"constellation_id": constellation.id})
     data = {"id": channel.id}
     response = client.delete(url, data)
 
