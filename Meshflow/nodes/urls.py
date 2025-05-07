@@ -13,5 +13,5 @@ router.register(r"api-keys", APIKeyViewSet, basename="api-keys")
 # The API URLs are now determined automatically by the router
 urlpatterns = [
     path("", include(router.urls)),
-    path("observed-nodes/<int:node_id>/claim", ObservedNodeClaimView.as_view(), name="observed-node-claim"),
+    path("observed-nodes/<int:node_id>/claim/", ObservedNodeClaimView.as_view(), name="observed-node-claim"),
 ]
