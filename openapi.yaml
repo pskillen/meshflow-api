@@ -2239,7 +2239,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/NodeAPIKey'
 
-  /nodes/api-keys/{id}:
+  /nodes/api-keys/{id}/:
     get:
       summary: Get API key details
       tags: [Nodes]
@@ -2304,7 +2304,7 @@ paths:
         '204':
           description: API key deleted successfully
 
-  /nodes/api-keys/{id}/add_node:
+  /nodes/api-keys/{id}/add_node/:
     post:
       summary: Add node to API key
       tags: [Nodes]
@@ -2333,7 +2333,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/NodeAPIKey'
 
-  /nodes/api-keys/{id}/remove_node:
+  /nodes/api-keys/{id}/remove_node/:
     post:
       summary: Remove node from API key
       tags: [Nodes]
@@ -2362,7 +2362,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/NodeAPIKey'
 
-  /stats/nodes/{node_id}/packets:
+  /stats/nodes/{node_id}/packets/:
     get:
       summary: Get packet stats for a specific node
       description: Returns the packet stats for a specific node with optional date filtering
@@ -2406,7 +2406,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /stats/global:
+  /stats/global/:
     get:
       summary: Get global packet statistics
       description: Returns global packet statistics across all nodes for the specified time range
@@ -2443,7 +2443,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /nodes/observed-nodes/{node_id}/claim:
+  /nodes/observed-nodes/{node_id}/claim/:
     get:
       summary: Get claim for observed node
       description: Get the current user's claim for the specified observed node.
@@ -2516,7 +2516,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /messages/text:
+  /messages/text/:
     get:
       summary: List text messages
       tags: [Text Messages]
@@ -2552,7 +2552,7 @@ paths:
                         items:
                           $ref: '#/components/schemas/TextMessage'
 
-  /messages/text/{id}:
+  /messages/text/{id}/:
     get:
       summary: Get text message details
       tags: [Text Messages]
