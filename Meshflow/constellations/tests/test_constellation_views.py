@@ -160,7 +160,7 @@ def test_constellation_delete_view_django_admin(create_constellation, create_use
     user = create_user(is_staff=True)  # Django admin
     client.force_authenticate(user=user)
 
-    constellation = create_constellation()
+    constellation = create_constellation(created_by=user)
     url = reverse("constellation-detail", kwargs={"pk": constellation.pk})
     response = client.delete(url)
 
@@ -194,8 +194,7 @@ def test_constellation_members_view_admin(create_constellation, create_user):
     client.force_authenticate(user=user)
 
     # Create constellation and make user an admin
-    constellation = create_constellation()
-    ConstellationUserMembership.objects.create(user=user, constellation=constellation, role="admin")
+    constellation = create_constellation(created_by=user)
 
     user1 = create_user()
     user2 = create_user()
@@ -216,8 +215,8 @@ def test_constellation_members_view_admin(create_constellation, create_user):
     assert user2_membership.role == "editor"
 
     # Delete a member
-    data = {"user": user1.id}
-    response = client.delete(url, data, format="json")
+    delete_url = reverse("constellation-members-update-destroy", kwargs={"constellation_id": constellation.pk, "user_id": user1.id})
+    response = client.delete(delete_url)
 
     assert response.status_code == status.HTTP_204_NO_CONTENT
     memberships = ConstellationUserMembership.objects.filter(constellation=constellation)
@@ -229,12 +228,13 @@ def test_constellation_members_view_admin(create_constellation, create_user):
 def test_constellation_members_view_editor(create_constellation, create_user):
     """Test constellation members management for editor."""
     client = APIClient()
-    user = create_user()
-    client.force_authenticate(user=user)
+    creator = create_user()
+    editor = create_user()
+    client.force_authenticate(user=editor)
 
     # Create constellation and make user an editor
-    constellation = create_constellation()
-    ConstellationUserMembership.objects.create(user=user, constellation=constellation, role="editor")
+    constellation = create_constellation(created_by=creator)
+    ConstellationUserMembership.objects.create(user=editor, constellation=constellation, role="editor")
 
     user1 = create_user()
 
@@ -245,18 +245,18 @@ def test_constellation_members_view_editor(create_constellation, create_user):
 
     assert response.status_code == status.HTTP_200_OK
     memberships = ConstellationUserMembership.objects.filter(constellation=constellation)
-    assert memberships.count() == 2  # Including the editor user
+    assert memberships.count() == 3  # Including the owner and the editor user
 
     user1_membership = memberships.get(user=user1)
     assert user1_membership.role == "viewer"
 
     # Delete a member
-    data = {"user": user1.id}
-    response = client.delete(url, data, format="json")
+    delete_url = reverse("constellation-members-update-destroy", kwargs={"constellation_id": constellation.pk, "user_id": user1.id})
+    response = client.delete(delete_url)
 
     assert response.status_code == status.HTTP_204_NO_CONTENT
     memberships = ConstellationUserMembership.objects.filter(constellation=constellation)
-    assert memberships.count() == 1  # Only editor remains
+    assert memberships.count() == 2  # Only owner and editor remain
     assert not ConstellationUserMembership.objects.filter(user=user1, constellation=constellation).exists()
 
 
@@ -269,7 +269,7 @@ def test_constellation_members_view_viewer(create_constellation, create_user):
 
     # Create constellation and make user a viewer
     constellation = create_constellation()
-    ConstellationUserMembership.objects.create(user=user, constellation=constellation, role="viewer")
+    ConstellationUserMembership.objects.filter(user=user, constellation=constellation).update(role="viewer")
 
     user1 = create_user()
 
@@ -325,8 +325,9 @@ def test_constellation_channels_get_member(create_constellation, create_user):
     response = client.get(url)
 
     assert response.status_code == status.HTTP_200_OK
-    assert len(response.data) == 1
-    assert response.data[0]["name"] == channel.name
+    assert response.data["count"] == 1
+    assert len(response.data["results"]) == 1
+    assert response.data["results"][0]["name"] == channel.name
 
 
 @pytest.mark.django_db
@@ -400,7 +401,7 @@ def test_constellation_channels_put_admin(create_constellation, create_user):
     # Create a channel
     channel = MessageChannel.objects.create(name="Test Channel", constellation=constellation)
 
-    url = reverse("constellation-channels-list-create", kwargs={"constellation_id": constellation.id})
+    url = reverse("constellation-channels-update-destroy", kwargs={"constellation_id": constellation.id, "channel_id": channel.id})
     data = {"id": channel.id, "name": "Updated Channel"}
     response = client.put(url, data)
 
@@ -423,9 +424,8 @@ def test_constellation_channels_delete_admin(create_constellation, create_user):
     # Create a channel
     channel = MessageChannel.objects.create(name="Test Channel", constellation=constellation)
 
-    url = reverse("constellation-channels-list-create", kwargs={"constellation_id": constellation.id})
-    data = {"id": channel.id}
-    response = client.delete(url, data)
+    url = reverse("constellation-channels-update-destroy", kwargs={"constellation_id": constellation.id, "channel_id": channel.id})
+    response = client.delete(url)
 
     assert response.status_code == status.HTTP_204_NO_CONTENT
     assert MessageChannel.objects.count() == 0

@@ -6,7 +6,7 @@ from rest_framework.response import Response
 from Meshflow.permissions import NoPermission
 
 from .models import Constellation, ConstellationUserMembership, MessageChannel
-from .permissions import IsConstellationAdmin, IsConstellationMember
+from .permissions import IsConstellationAdmin, IsConstellationEditorOrAdmin, IsConstellationMember
 from .serializers import ConstellationMemberSerializer, ConstellationSerializer, MessageChannelSerializer
 
 
@@ -27,23 +27,19 @@ class ConstellationViewSet(viewsets.ModelViewSet):
     queryset = Constellation.objects.all().order_by("id")
 
     def get_permissions(self):
-        """
-        Return different permission classes based on the action.
-        """
+        admin_permission = permissions.IsAdminUser()
         if self.action == "create":
-            permission_classes = [permissions.IsAuthenticated, permissions.IsAdminUser]
+            return [admin_permission]
         elif self.action == "list":
-            permission_classes = [permissions.IsAuthenticated]
+            return [permissions.AllowAny()]
         elif self.action == "retrieve":
-            permission_classes = [permissions.IsAuthenticated, IsConstellationMember]
-        elif self.action == "update" or self.action == "partial_update":
-            permission_classes = [permissions.IsAuthenticated, IsConstellationAdmin]
+            return [permissions.OR(admin_permission, IsConstellationMember())]
+        elif self.action in ["update", "partial_update"]:
+            return [permissions.OR(admin_permission, IsConstellationAdmin())]
         elif self.action == "destroy":
-            permission_classes = [permissions.IsAuthenticated, permissions.IsAdminUser]
+            return [admin_permission]
         else:
-            permission_classes = [NoPermission]
-
-        return [permission() for permission in permission_classes]
+            return [NoPermission()]
 
     def get_queryset(self):
         """
@@ -91,10 +87,11 @@ class ConstellationMembersViewSet(
         return ConstellationUserMembership.objects.filter(constellation=constellation).order_by("id")
 
     def get_permissions(self):
+        admin_permission = permissions.IsAdminUser()
         if self.action == "list":
-            return [permissions.IsAuthenticated(), IsConstellationMember()]
+            return [permissions.OR(admin_permission, IsConstellationMember())]
         else:
-            return [permissions.IsAuthenticated(), IsConstellationAdmin()]
+            return [permissions.OR(admin_permission, IsConstellationEditorOrAdmin())]
 
     def create(self, request, constellation_id=None):
         constellation = get_object_or_404(Constellation, pk=constellation_id)
@@ -119,9 +116,8 @@ class ConstellationMembersViewSet(
         )
         return Response(ConstellationMemberSerializer(membership).data)
 
-    def destroy(self, request, pk=None, constellation_id=None):
+    def destroy(self, request, user_id=None, constellation_id=None):
         constellation = get_object_or_404(Constellation, pk=constellation_id)
-        user_id = pk
         if not user_id:
             return Response({"detail": "User ID is required."}, status=status.HTTP_400_BAD_REQUEST)
         if (
@@ -163,10 +159,11 @@ class ConstellationMessageChannelsViewSet(
         return MessageChannel.objects.filter(constellation=constellation).order_by("id")
 
     def get_permissions(self):
+        admin_permission = permissions.IsAdminUser()
         if self.action == "list":
-            return [permissions.IsAuthenticated(), IsConstellationMember()]
+            return [permissions.OR(admin_permission, IsConstellationMember())]
         else:
-            return [permissions.IsAuthenticated(), IsConstellationAdmin()]
+            return [permissions.OR(admin_permission, IsConstellationAdmin())]
 
     def create(self, request, constellation_id=None):
         constellation = get_object_or_404(Constellation, pk=constellation_id)
@@ -178,10 +175,10 @@ class ConstellationMessageChannelsViewSet(
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    def update(self, request, pk=None, constellation_id=None):
+    def update(self, request, channel_id=None, constellation_id=None):
         constellation = get_object_or_404(Constellation, pk=constellation_id)
         try:
-            channel = MessageChannel.objects.get(id=pk, constellation=constellation)
+            channel = MessageChannel.objects.get(id=channel_id, constellation=constellation)
         except MessageChannel.DoesNotExist:
             return Response({"detail": "Channel not found."}, status=status.HTTP_404_NOT_FOUND)
         data = request.data.copy()
@@ -192,10 +189,10 @@ class ConstellationMessageChannelsViewSet(
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    def destroy(self, request, pk=None, constellation_id=None):
+    def destroy(self, request, channel_id=None, constellation_id=None):
         constellation = get_object_or_404(Constellation, pk=constellation_id)
         try:
-            channel = MessageChannel.objects.get(id=pk, constellation=constellation)
+            channel = MessageChannel.objects.get(id=channel_id, constellation=constellation)
         except MessageChannel.DoesNotExist:
             return Response({"detail": "Channel not found."}, status=status.HTTP_404_NOT_FOUND)
         channel.delete()
