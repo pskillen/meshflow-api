@@ -989,7 +989,7 @@ components:
 
 
 paths:
-  /status:
+  /status/:
     get:
       summary: Get API status
       tags: [Authentication]
@@ -1005,7 +1005,7 @@ paths:
                     type: string
                     enum: [ok]
 
-  /token:
+  /token/:
     post:
       summary: Obtain JWT token
       tags: [Authentication]
@@ -1033,7 +1033,7 @@ paths:
                   refresh:
                     type: string
 
-  /token/refresh:
+  /token/refresh/:
     post:
       summary: Refresh JWT token
       tags: [Authentication]
@@ -1057,7 +1057,7 @@ paths:
                   access:
                     type: string
 
-  /token/verify:
+  /token/verify/:
     post:
       summary: Verify JWT token
       tags: [Authentication]
@@ -1075,6 +1075,334 @@ paths:
           description: Token is valid
         '401':
           description: Token is invalid
+
+  # dj-rest-auth endpoints (core, no registration)
+  /auth/login/:
+    post:
+      summary: Log in and obtain user JWT
+      tags: [Authentication]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access:
+                    type: string
+                  refresh:
+                    type: string
+
+  /auth/logout/:
+    post:
+      summary: Log out user (JWT blacklisted)
+      tags: [Authentication]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Logout successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Success'
+
+  /auth/password/reset/:
+    post:
+      summary: Request password reset email
+      tags: [Authentication]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+      responses:
+        '200':
+          description: Password reset email sent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Success'
+
+  /auth/password/reset/confirm/:
+    post:
+      summary: Confirm password reset
+      tags: [Authentication]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                uid:
+                  type: string
+                token:
+                  type: string
+                new_password1:
+                  type: string
+                new_password2:
+                  type: string
+      responses:
+        '200':
+          description: Password reset successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Success'
+
+  /auth/user/:
+    get:
+      summary: Get current user details
+      tags: [Authentication]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: User details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                  username:
+                    type: string
+                  email:
+                    type: string
+                  display_name:
+                    type: string
+    put:
+      summary: Update current user details
+      tags: [Authentication]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                display_name:
+                  type: string
+      responses:
+        '200':
+          description: User updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                  username:
+                    type: string
+                  email:
+                    type: string
+                  display_name:
+                    type: string
+    patch:
+      summary: Partially update current user details
+      tags: [Authentication]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                display_name:
+                  type: string
+      responses:
+        '200':
+          description: User updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                  username:
+                    type: string
+                  email:
+                    type: string
+                  display_name:
+                    type: string
+
+  /auth/password/change/:
+    post:
+      summary: Change password for current user
+      tags: [Authentication]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                new_password1:
+                  type: string
+                new_password2:
+                  type: string
+      responses:
+        '200':
+          description: Password changed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Success'
+
+  # Social auth endpoints
+  /auth/social/google/:
+    get:
+      summary: Get Google OAuth2 login URL
+      tags: [Authentication]
+      responses:
+        '200':
+          description: Google OAuth2 login URL
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  authorization_url:
+                    type: string
+
+  /auth/social/google/callback/:
+    get:
+      summary: Google OAuth2 callback
+      tags: [Authentication]
+      parameters:
+        - name: code
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: state
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '302':
+          description: Redirect to frontend with JWT
+
+  /auth/social/google/token/:
+    post:
+      summary: Exchange Google OAuth2 code for JWT
+      tags: [Authentication]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code:
+                  type: string
+                state:
+                  type: string
+      responses:
+        '200':
+          description: JWT token returned
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access:
+                    type: string
+                  refresh:
+                    type: string
+
+  /auth/social/github/:
+    get:
+      summary: Get Github OAuth2 login URL
+      tags: [Authentication]
+      responses:
+        '200':
+          description: Github OAuth2 login URL
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  authorization_url:
+                    type: string
+
+  /auth/social/github/callback/:
+    get:
+      summary: Github OAuth2 callback
+      tags: [Authentication]
+      parameters:
+        - name: code
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: state
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '302':
+          description: Redirect to frontend with JWT
+
+  /auth/social/github/token/:
+    post:
+      summary: Exchange Github OAuth2 code for JWT
+      tags: [Authentication]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code:
+                  type: string
+                state:
+                  type: string
+      responses:
+        '200':
+          description: JWT token returned
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access:
+                    type: string
+                  refresh:
+                    type: string
 
   /packets/ingest:
     post:
