@@ -224,6 +224,7 @@ REST_AUTH = {
     "JWT_AUTH_HTTPONLY": True,
     "JWT_AUTH_SAMESITE": "Lax",
     "SESSION_LOGIN": False,
+    "USER_DETAILS_SERIALIZER": "users.serializers.UserSerializer",
 }
 
 CALLBACK_URL_BASE = os.environ.get("CALLBACK_URL_BASE", "http://localhost:8000").rstrip("/")

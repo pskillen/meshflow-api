@@ -958,7 +958,7 @@ components:
           type: boolean
           readOnly: true
         reply_to_message_id:
-          type: integer 
+          type: integer
           nullable: true
           description: The packet_id of the message being replied to
           readOnly: true
@@ -987,6 +987,42 @@ components:
           type: string
           enum: [admin, editor, viewer]
 
+    BasicAuthJWTToken:
+      description: >-
+        JWT token returned from basic auth /token endpoint
+        The token from this endpoint will contain the following claims:
+        - `user_id`: The ID of the user
+        - `username`: The username of the user
+        - `is_staff`: Whether the user is a staff member
+      type: object
+      properties:
+        access:
+          type: string
+        refresh:
+          type: string
+
+    SocialAuthJWTToken:
+      description: >-
+        JWT token returned from social auth endpoints
+        The token from this endpoint will contain the following claims:
+        - `user_id`: The ID of the user
+        Important: this token is a different format than the token from the basic auth /token endpoint.
+      type: object
+      properties:
+        access:
+          type: string
+        refresh:
+          type: string
+        user:
+          type: object
+          properties:
+            pk:
+              type: integer
+            username:
+              type: string
+            email:
+              type: string
+
 
 paths:
   /status/:
@@ -1008,6 +1044,13 @@ paths:
   /token/:
     post:
       summary: Obtain JWT token
+      description: >-
+        The token from this endpoint will contain the following claims:
+        - `user_id`: The ID of the user
+        - `username`: The username of the user
+        - `is_staff`: Whether the user is a staff member
+        - `is_superuser`: Whether the user is a superuser
+        Important: this token is a diffent format than the token from the social auth endpoints.
       tags: [Authentication]
       requestBody:
         required: true
@@ -1026,13 +1069,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  access:
-                    type: string
-                  refresh:
-                    type: string
-
+                $ref: '#/components/schemas/BasicAuthJWTToken'
   /token/refresh/:
     post:
       summary: Refresh JWT token
@@ -1282,7 +1319,9 @@ paths:
   # Social auth endpoints
   /auth/social/google/:
     get:
-      summary: Get Google OAuth2 login URL
+      summary: Get OAuth2 login URL
+      description: >-
+        This endpoint is used to get the OAuth2 login URL. The frontend should redirect the user to the URL.
       tags: [Authentication]
       responses:
         '200':
@@ -1297,7 +1336,11 @@ paths:
 
   /auth/social/google/callback/:
     get:
-      summary: Google OAuth2 callback
+      summary: Callback URL from OAuth2 provider
+      description: >-
+        This endpoint is used to handle the OAuth2 callback. The auth provider will redirect the user to this
+        endpoint with the code and state parameters. The API will then redirect the user to the frontend with the same
+        code and state parameters.
       tags: [Authentication]
       parameters:
         - name: code
@@ -1316,7 +1359,10 @@ paths:
 
   /auth/social/google/token/:
     post:
-      summary: Exchange Google OAuth2 code for JWT
+      summary: Exchange OAuth2 code for JWT
+      description: >-
+        This endpoint is used to exchange the OAuth2 code for a JWT token. The frontend should make an async POST
+        request to this endpoint with the code and state parameters. The API will then return a JWT token.
       tags: [Authentication]
       requestBody:
         required: true
@@ -1335,16 +1381,13 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  access:
-                    type: string
-                  refresh:
-                    type: string
+                $ref: '#/components/schemas/SocialAuthJWTToken'
 
   /auth/social/github/:
     get:
-      summary: Get Github OAuth2 login URL
+      summary: Get OAuth2 login URL
+      description: >-
+        This endpoint is used to get the OAuth2 login URL. The frontend should redirect the user to the URL.
       tags: [Authentication]
       responses:
         '200':
@@ -1359,7 +1402,11 @@ paths:
 
   /auth/social/github/callback/:
     get:
-      summary: Github OAuth2 callback
+      summary: Callback URL from OAuth2 provider
+      description: >-
+        This endpoint is used to handle the OAuth2 callback. The auth provider will redirect the user to this
+        endpoint with the code and state parameters. The API will then redirect the user to the frontend with the same
+        code and state parameters.
       tags: [Authentication]
       parameters:
         - name: code
@@ -1378,7 +1425,10 @@ paths:
 
   /auth/social/github/token/:
     post:
-      summary: Exchange Github OAuth2 code for JWT
+      summary: Exchange OAuth2 code for JWT
+      description: >-
+        This endpoint is used to exchange the OAuth2 code for a JWT token. The frontend should make an async POST
+        request to this endpoint with the code and state parameters. The API will then return a JWT token.
       tags: [Authentication]
       requestBody:
         required: true
@@ -1397,12 +1447,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  access:
-                    type: string
-                  refresh:
-                    type: string
+                $ref: '#/components/schemas/SocialAuthJWTToken'
 
   /packets/ingest:
     post:
