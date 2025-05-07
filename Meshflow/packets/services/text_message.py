@@ -68,22 +68,21 @@ class TextMessagePacketService(BasePacketService):
 
         # remove whitespace from the claim key
         claim_key = " ".join(self.packet.message_text.strip().split()).lower()
-        logger.info(f"Checking node claim for {self.from_node.node_id_str} by {self.user.username}: {claim_key}")
+        logger.info(f"Checking node claim for {self.from_node.node_id_str}: {claim_key}")
 
         # check if this key matches a claim
         claim = NodeOwnerClaim.objects.filter(
             node=self.from_node,
             claim_key=claim_key,
-            user=self.user,
             accepted_at__isnull=True,
         ).first()
         if claim is None:
             return
 
-        logger.info(f"Authorizing node claim for {self.from_node.node_id_str} by {self.user.username}")
+        logger.info(f"Authorizing node claim for {self.from_node.node_id_str} by {claim.user.username}")
 
         # update the node's owner
-        self.from_node.claimed_by = self.user
+        self.from_node.claimed_by = claim.user
         self.from_node.save(update_fields=["claimed_by"])
 
         # delete the claim

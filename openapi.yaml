@@ -1507,6 +1507,7 @@ paths:
   /constellations:
     get:
       summary: List constellations
+      description: Returns a list of any constellation for which the user is a member (regardless of role)
       tags: [Constellations]
       security:
         - BearerAuth: []
@@ -1530,6 +1531,7 @@ paths:
 
     post:
       summary: Create a new constellation
+      description: Only Django admins can create new constellations
       tags: [Constellations]
       security:
         - BearerAuth: []
@@ -1551,10 +1553,13 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Constellation'
+        '403':
+          description: Forbidden - User is not a Django admin
 
   /constellations/{id}:
     get:
       summary: Get constellation details
+      description: User must be a member of the constellation (any role)
       tags: [Constellations]
       security:
         - BearerAuth: []
@@ -1571,9 +1576,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Constellation'
+        '403':
+          description: Forbidden - User is not a member of the constellation
 
     put:
       summary: Update constellation
+      description: User must be an admin of the constellation
       tags: [Constellations]
       security:
         - BearerAuth: []
@@ -1605,9 +1613,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Constellation'
+        '403':
+          description: Forbidden - User is not an admin of the constellation
 
     delete:
       summary: Delete constellation
+      description: Only Django admins can delete constellations
       tags: [Constellations]
       security:
         - BearerAuth: []
@@ -1620,10 +1631,13 @@ paths:
       responses:
         '204':
           description: Constellation deleted successfully
+        '403':
+          description: Forbidden - User is not a Django admin
 
   /constellations/{id}/members:
     get:
       summary: List members of a constellation
+      description: User must be a member of the constellation (any role)
       tags: [Constellations]
       security:
         - BearerAuth: []
@@ -1642,9 +1656,12 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/ConstellationMember'
+        '403':
+          description: Forbidden - User is not a member of the constellation
 
     post:
       summary: Add member to constellation
+      description: User must be an admin or editor of the constellation
       tags: [Constellations]
       security:
         - BearerAuth: []
@@ -1661,11 +1678,16 @@ paths:
             schema:
               type: object
               properties:
-                user_id:
-                  type: integer
-                role:
-                  type: string
-                  enum: [admin, editor, viewer]
+                members:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      user:
+                        type: integer
+                      role:
+                        type: string
+                        enum: [admin, editor, viewer]
       responses:
         '200':
           description: Member added successfully
@@ -1673,10 +1695,13 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Constellation'
+        '403':
+          description: Forbidden - User is not an admin or editor of the constellation
 
   /constellations/{id}/members/{user_id}:
     put:
       summary: Update member role
+      description: User must be an admin or editor of the constellation
       tags: [Constellations]
       security:
         - BearerAuth: []
@@ -1708,9 +1733,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Constellation'
+        '403':
+          description: Forbidden - User is not an admin or editor of the constellation
 
     delete:
       summary: Remove member from constellation
+      description: User must be an admin or editor of the constellation
       tags: [Constellations]
       security:
         - BearerAuth: []
@@ -1728,10 +1756,13 @@ paths:
       responses:
         '204':
           description: Member removed successfully
+        '403':
+          description: Forbidden - User is not an admin or editor of the constellation
 
   /constellations/{id}/channels:
     get:
       summary: List message channels for a constellation
+      description: User must be a member of the constellation (any role)
       tags: [Constellations]
       security:
         - BearerAuth: []
@@ -1750,8 +1781,12 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/MessageChannel'
+        '403':
+          description: Forbidden - User is not a member of the constellation
+
     post:
       summary: Create a message channel for a constellation
+      description: User must be an admin of the constellation
       tags: [Constellations]
       security:
         - BearerAuth: []
@@ -1777,6 +1812,72 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MessageChannel'
+        '403':
+          description: Forbidden - User is not an admin of the constellation
+
+    put:
+      summary: Update a message channel for a constellation
+      description: User must be an admin of the constellation
+      tags: [Constellations]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: integer
+                name:
+                  type: string
+      responses:
+        '200':
+          description: Message channel updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageChannel'
+        '403':
+          description: Forbidden - User is not an admin of the constellation
+        '404':
+          description: Not found - Channel not found
+
+    delete:
+      summary: Delete a message channel from a constellation
+      description: User must be an admin of the constellation
+      tags: [Constellations]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: integer
+      responses:
+        '204':
+          description: Message channel deleted successfully
+        '403':
+          description: Forbidden - User is not an admin of the constellation
+        '404':
+          description: Not found - Channel not found
 
   /nodes/observed-nodes:
     get:
@@ -2138,7 +2239,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/NodeAPIKey'
 
-  /nodes/api-keys/{id}:
+  /nodes/api-keys/{id}/:
     get:
       summary: Get API key details
       tags: [Nodes]
@@ -2203,7 +2304,7 @@ paths:
         '204':
           description: API key deleted successfully
 
-  /nodes/api-keys/{id}/add_node:
+  /nodes/api-keys/{id}/add_node/:
     post:
       summary: Add node to API key
       tags: [Nodes]
@@ -2232,7 +2333,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/NodeAPIKey'
 
-  /nodes/api-keys/{id}/remove_node:
+  /nodes/api-keys/{id}/remove_node/:
     post:
       summary: Remove node from API key
       tags: [Nodes]
@@ -2261,7 +2362,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/NodeAPIKey'
 
-  /stats/nodes/{node_id}/packets:
+  /stats/nodes/{node_id}/packets/:
     get:
       summary: Get packet stats for a specific node
       description: Returns the packet stats for a specific node with optional date filtering
@@ -2305,7 +2406,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /stats/global:
+  /stats/global/:
     get:
       summary: Get global packet statistics
       description: Returns global packet statistics across all nodes for the specified time range
@@ -2342,7 +2443,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /nodes/observed-nodes/{node_id}/claim:
+  /nodes/observed-nodes/{node_id}/claim/:
     get:
       summary: Get claim for observed node
       description: Get the current user's claim for the specified observed node.
@@ -2415,7 +2516,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /messages/text:
+  /messages/text/:
     get:
       summary: List text messages
       tags: [Text Messages]
@@ -2451,7 +2552,7 @@ paths:
                         items:
                           $ref: '#/components/schemas/TextMessage'
 
-  /messages/text/{id}:
+  /messages/text/{id}/:
     get:
       summary: Get text message details
       tags: [Text Messages]
