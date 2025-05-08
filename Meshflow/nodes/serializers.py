@@ -159,20 +159,31 @@ class ManagedNodeSerializer(serializers.ModelSerializer):
         class Meta:
             model = User
             fields = ["id", "username"]
+            read_only_fields = ["username"]
 
     class ConstellationSerializer(serializers.ModelSerializer):
         class Meta:
             model = Constellation
             fields = ["id", "name", "map_color"]
+            read_only_fields = ["name", "map_color"]
+
+    # For write (POST/PUT), accept just the ID
+    owner_id = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.all(), source="owner", write_only=True, required=True
+    )
+    constellation_id = serializers.PrimaryKeyRelatedField(
+        queryset=Constellation.objects.all(), source="constellation", write_only=True, required=True
+    )
+    # For read, show nested
+    owner = UserSerializer(read_only=True)
+    constellation = ConstellationSerializer(read_only=True)
 
     long_name = serializers.SerializerMethodField()
     short_name = serializers.CharField(read_only=True)
     last_heard = serializers.DateTimeField(read_only=True)
     node_id_str = serializers.CharField(read_only=True)
 
-    position = PositionSerializer(source="*", read_only=True)
-    owner = UserSerializer(read_only=True)
-    constellation = ConstellationSerializer(read_only=True)
+    position = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = ManagedNode
@@ -183,9 +194,11 @@ class ManagedNodeSerializer(serializers.ModelSerializer):
             "short_name",
             "last_heard",
             "node_id_str",
-            "owner",
-            "constellation",
-            "position",
+            "owner_id",  # for input
+            "owner",  # for output
+            "constellation_id",  # for input
+            "constellation",  # for output
+            "position",  # position is not a direct FK, so remove from input
         ]
         read_only_fields = [
             "internal_id",
@@ -194,7 +207,6 @@ class ManagedNodeSerializer(serializers.ModelSerializer):
             "last_heard",
             "node_id_str",
             "owner",
-            "position",
             "constellation",
         ]
 
@@ -209,27 +221,101 @@ class ManagedNodeSerializer(serializers.ModelSerializer):
             return obj.long_name
         return obj.name
 
+    def set_long_name(self, obj, value):
+        if value:
+            obj.name = value
+            obj.save()
+
+    def get_position(self, obj):
+        # Keep your current read logic
+        return self.PositionSerializer(obj).data
+
+    def to_internal_value(self, data):
+        # Let DRF do its normal validation first
+        validated_data = super().to_internal_value(data)
+        # Now handle position if present in input
+        position = data.get("position")
+        if position:
+            lat = position.get("latitude")
+            lon = position.get("longitude")
+            if lat is not None:
+                validated_data["default_location_latitude"] = lat
+            if lon is not None:
+                validated_data["default_location_longitude"] = lon
+        return validated_data
+
+
+class NestedChannelSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MessageChannel
+        fields = ["id", "name"]
+        read_only_fields = ["name"]
+
 
 class OwnedManagedNodeSerializer(ManagedNodeSerializer):
     """Serializer for managed nodes owned by the current user."""
 
-    class ChannelSerializer(serializers.ModelSerializer):
-        class Meta:
-            model = MessageChannel
-            fields = ["id", "name"]
+    # For write
+    channel_0 = serializers.PrimaryKeyRelatedField(queryset=MessageChannel.objects.all(), required=False)
+    channel_1 = serializers.PrimaryKeyRelatedField(queryset=MessageChannel.objects.all(), required=False)
+    channel_2 = serializers.PrimaryKeyRelatedField(queryset=MessageChannel.objects.all(), required=False)
+    channel_3 = serializers.PrimaryKeyRelatedField(queryset=MessageChannel.objects.all(), required=False)
+    channel_4 = serializers.PrimaryKeyRelatedField(queryset=MessageChannel.objects.all(), required=False)
+    channel_5 = serializers.PrimaryKeyRelatedField(queryset=MessageChannel.objects.all(), required=False)
+    channel_6 = serializers.PrimaryKeyRelatedField(queryset=MessageChannel.objects.all(), required=False)
+    channel_7 = serializers.PrimaryKeyRelatedField(queryset=MessageChannel.objects.all(), required=False)
 
-    channel_0 = ChannelSerializer()
-    channel_1 = ChannelSerializer()
-    channel_2 = ChannelSerializer()
-    channel_3 = ChannelSerializer()
-    channel_4 = ChannelSerializer()
-    channel_5 = ChannelSerializer()
-    channel_6 = ChannelSerializer()
-    channel_7 = ChannelSerializer()
+    # For read, override to_representation
+    # (or use a SerializerMethodField if you want to return the nested object)
 
-    class Meta(ManagedNodeSerializer.Meta):
+    def to_representation(self, instance):
+        rep = super().to_representation(instance)
+        # Replace channel_0 with nested representation
+        if instance.channel_0_id:
+            rep["channel_0"] = NestedChannelSerializer(instance.channel_0).data
+        else:
+            rep["channel_0"] = None
+
+        if instance.channel_1_id:
+            rep["channel_1"] = NestedChannelSerializer(instance.channel_1).data
+        else:
+            rep["channel_1"] = None
+
+        if instance.channel_2_id:
+            rep["channel_2"] = NestedChannelSerializer(instance.channel_2).data
+        else:
+            rep["channel_2"] = None
+
+        if instance.channel_3_id:
+            rep["channel_3"] = NestedChannelSerializer(instance.channel_3).data
+        else:
+            rep["channel_3"] = None
+
+        if instance.channel_4_id:
+            rep["channel_4"] = NestedChannelSerializer(instance.channel_4).data
+        else:
+            rep["channel_4"] = None
+
+        if instance.channel_5_id:
+            rep["channel_5"] = NestedChannelSerializer(instance.channel_5).data
+        else:
+            rep["channel_5"] = None
+
+        if instance.channel_6_id:
+            rep["channel_6"] = NestedChannelSerializer(instance.channel_6).data
+        else:
+            rep["channel_6"] = None
+
+        if instance.channel_7_id:
+            rep["channel_7"] = NestedChannelSerializer(instance.channel_7).data
+        else:
+            rep["channel_7"] = None
+
+        return rep
+
+    class Meta:
+        model = ManagedNode
         fields = ManagedNodeSerializer.Meta.fields + [
-            "owner",
             "channel_0",
             "channel_1",
             "channel_2",
