@@ -82,10 +82,12 @@ class APIKeyCreateSerializer(serializers.ModelSerializer):
     """Serializer for creating API keys."""
 
     nodes = serializers.ListField(child=serializers.IntegerField(), required=False, write_only=True)
+    owner = serializers.PrimaryKeyRelatedField(read_only=True)
+    key = serializers.CharField(read_only=True)
 
     class Meta:
         model = NodeAPIKey
-        fields = ["name", "constellation", "nodes"]
+        fields = ["id", "name", "constellation", "nodes", "owner", "created_at", "last_used", "is_active", "key"]
 
     def validate_constellation(self, value):
         """Validate that the user has permission to create API keys for this constellation."""
@@ -256,14 +258,30 @@ class OwnedManagedNodeSerializer(ManagedNodeSerializer):
     """Serializer for managed nodes owned by the current user."""
 
     # For write
-    channel_0 = serializers.PrimaryKeyRelatedField(queryset=MessageChannel.objects.all(), required=False)
-    channel_1 = serializers.PrimaryKeyRelatedField(queryset=MessageChannel.objects.all(), required=False)
-    channel_2 = serializers.PrimaryKeyRelatedField(queryset=MessageChannel.objects.all(), required=False)
-    channel_3 = serializers.PrimaryKeyRelatedField(queryset=MessageChannel.objects.all(), required=False)
-    channel_4 = serializers.PrimaryKeyRelatedField(queryset=MessageChannel.objects.all(), required=False)
-    channel_5 = serializers.PrimaryKeyRelatedField(queryset=MessageChannel.objects.all(), required=False)
-    channel_6 = serializers.PrimaryKeyRelatedField(queryset=MessageChannel.objects.all(), required=False)
-    channel_7 = serializers.PrimaryKeyRelatedField(queryset=MessageChannel.objects.all(), required=False)
+    channel_0 = serializers.PrimaryKeyRelatedField(
+        queryset=MessageChannel.objects.all(), required=False, allow_null=True
+    )
+    channel_1 = serializers.PrimaryKeyRelatedField(
+        queryset=MessageChannel.objects.all(), required=False, allow_null=True
+    )
+    channel_2 = serializers.PrimaryKeyRelatedField(
+        queryset=MessageChannel.objects.all(), required=False, allow_null=True
+    )
+    channel_3 = serializers.PrimaryKeyRelatedField(
+        queryset=MessageChannel.objects.all(), required=False, allow_null=True
+    )
+    channel_4 = serializers.PrimaryKeyRelatedField(
+        queryset=MessageChannel.objects.all(), required=False, allow_null=True
+    )
+    channel_5 = serializers.PrimaryKeyRelatedField(
+        queryset=MessageChannel.objects.all(), required=False, allow_null=True
+    )
+    channel_6 = serializers.PrimaryKeyRelatedField(
+        queryset=MessageChannel.objects.all(), required=False, allow_null=True
+    )
+    channel_7 = serializers.PrimaryKeyRelatedField(
+        queryset=MessageChannel.objects.all(), required=False, allow_null=True
+    )
 
     # For read, override to_representation
     # (or use a SerializerMethodField if you want to return the nested object)
