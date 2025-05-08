@@ -2089,7 +2089,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /nodes/observed-nodes/{node_id}/device-metrics/:
+  /nodes/observed-nodes/{node_id}/device_metrics/:
     get:
       summary: Get device metrics for a specific node
       description: Returns a list of device metrics for a specific node with optional date filtering
