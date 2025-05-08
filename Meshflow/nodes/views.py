@@ -21,6 +21,7 @@ from nodes.serializers import (
     NodeOwnerClaimSerializer,
     ObservedNodeSearchSerializer,
     ObservedNodeSerializer,
+    OwnedManagedNodeSerializer,
     PositionSerializer,
 )
 
@@ -149,6 +150,15 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         """Create a new node."""
         serializer.save()
+
+    @action(detail=False, methods=["get"])
+    def mine(self, request):
+        """
+        Get all observed nodes claimed by the current user.
+        """
+        nodes = ObservedNode.objects.filter(claimed_by=request.user).order_by("node_id")
+        serializer = self.get_serializer(nodes, many=True)
+        return Response(serializer.data)
 
     @action(detail=False, methods=["get"], url_path="search")
     def search(self, request):
@@ -290,7 +300,7 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
 
 class ManagedNodeViewSet(viewsets.ModelViewSet):
     """
-    ViewSet for managing owned nodes.
+    ViewSet for managing managed nodes.
     """
 
     queryset = ManagedNode.objects.all().order_by("node_id")
@@ -317,9 +327,42 @@ class ManagedNodeViewSet(viewsets.ModelViewSet):
             )
         )
 
+    def get_serializer_class(self):
+        """Return different serializers based on the action."""
+        if self.action == "mine":
+            return OwnedManagedNodeSerializer
+        if self.action == "create":
+            return OwnedManagedNodeSerializer
+        return ManagedNodeSerializer
+
     def perform_create(self, serializer):
         """Create a new managed node and set the owner."""
         serializer.save(owner=self.request.user)
+
+    @action(detail=False, methods=["get"])
+    def mine(self, request):
+        """
+        Get all managed nodes owned by the current user.
+        """
+        # Subquery for ObservedNode fields
+        observed_node_qs = ObservedNode.objects.filter(node_id=OuterRef("node_id"))
+        # Subquery for latest Position fields
+        latest_position_qs = Position.objects.filter(node__node_id=OuterRef("node_id")).order_by("-reported_time")
+
+        nodes = (
+            ManagedNode.objects.filter(owner=request.user)
+            .order_by("node_id")
+            .annotate(
+                long_name=Subquery(observed_node_qs.values("long_name")[:1]),
+                short_name=Subquery(observed_node_qs.values("short_name")[:1]),
+                last_heard=Subquery(observed_node_qs.values("last_heard")[:1]),
+                last_latitude=Subquery(latest_position_qs.values("latitude")[:1]),
+                last_longitude=Subquery(latest_position_qs.values("longitude")[:1]),
+            )
+        )
+
+        serializer = self.get_serializer(nodes, many=True)
+        return Response(serializer.data)
 
 
 class ObservedNodeClaimView(APIView):

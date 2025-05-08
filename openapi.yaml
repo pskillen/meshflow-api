@@ -693,6 +693,29 @@ components:
               type: number
               description: The longitude of the node
 
+    OwnedManagedNode:
+      allOf:
+        - $ref: '#/components/schemas/ManagedNodeRead'
+        - type: object
+          description: A managed node that is owned by the current user
+          properties:
+            channel_0:
+              $ref: '#/components/schemas/MessageChannel'
+            channel_1:
+              $ref: '#/components/schemas/MessageChannel'
+            channel_2:
+              $ref: '#/components/schemas/MessageChannel'
+            channel_3:
+              $ref: '#/components/schemas/MessageChannel'
+            channel_4:
+              $ref: '#/components/schemas/MessageChannel'
+            channel_5:
+              $ref: '#/components/schemas/MessageChannel'
+            channel_6:
+              $ref: '#/components/schemas/MessageChannel'
+            channel_7:
+              $ref: '#/components/schemas/MessageChannel'
+
     PaginatedResponse:
       type: object
       description: Standard Django REST Framework paginated response
@@ -1449,7 +1472,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/SocialAuthJWTToken'
 
-  /packets/ingest:
+  /packets/ingest/:
     post:
       summary: Ingest a packet
       description: >
@@ -1478,7 +1501,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /packets/nodes:
+  /packets/nodes/:
     post:
       summary: Upsert node information
       description: >
@@ -1504,7 +1527,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ObservedNode'
 
-  /constellations:
+  /constellations/:
     get:
       summary: List constellations
       description: Returns a list of any constellation for which the user is a member (regardless of role)
@@ -1556,7 +1579,7 @@ paths:
         '403':
           description: Forbidden - User is not a Django admin
 
-  /constellations/{id}:
+  /constellations/{id}/:
     get:
       summary: Get constellation details
       description: User must be a member of the constellation (any role)
@@ -1634,7 +1657,7 @@ paths:
         '403':
           description: Forbidden - User is not a Django admin
 
-  /constellations/{id}/members:
+  /constellations/{id}/members/:
     get:
       summary: List members of a constellation
       description: User must be a member of the constellation (any role)
@@ -1698,7 +1721,7 @@ paths:
         '403':
           description: Forbidden - User is not an admin or editor of the constellation
 
-  /constellations/{id}/members/{user_id}:
+  /constellations/{id}/members/{user_id}/:
     put:
       summary: Update member role
       description: User must be an admin or editor of the constellation
@@ -1759,7 +1782,7 @@ paths:
         '403':
           description: Forbidden - User is not an admin or editor of the constellation
 
-  /constellations/{id}/channels:
+  /constellations/{id}/channels/:
     get:
       summary: List message channels for a constellation
       description: User must be a member of the constellation (any role)
@@ -1879,7 +1902,7 @@ paths:
         '404':
           description: Not found - Channel not found
 
-  /nodes/observed-nodes:
+  /nodes/observed-nodes/:
     get:
       summary: List observed nodes
       tags: [Nodes]
@@ -1922,7 +1945,31 @@ paths:
               schema:
                 $ref: '#/components/schemas/ObservedNode'
 
-  /nodes/observed-nodes/search:
+  /nodes/observed-nodes/mine/:
+    get:
+      summary: List observed nodes owned by the current user
+      tags: [Nodes]
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PaginationPage'
+        - $ref: '#/components/parameters/PaginationPageSize'
+      responses:
+        '200':
+          description: List of observed nodes owned by the current user
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedResponse'
+                  - type: object
+                    properties:
+                      results:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ObservedNode'
+
+  /nodes/observed-nodes/search/:
     get:
       summary: Search observed nodes
       description: Search for observed nodes by node_id_str, short_name, long_name, or node_id
@@ -1952,7 +1999,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /nodes/observed-nodes/{node_id}:
+  /nodes/observed-nodes/{node_id}/:
     get:
       summary: Get observed node details
       tags: [Nodes]
@@ -2012,7 +2059,7 @@ paths:
         '204':
           description: Node deleted successfully
 
-  /nodes/observed-nodes/{node_id}/positions:
+  /nodes/observed-nodes/{node_id}/positions/:
     get:
       summary: Get positions for a specific node
       description: Returns a list of positions for a specific node with optional date filtering
@@ -2042,7 +2089,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /nodes/observed-nodes/{node_id}/device-metrics:
+  /nodes/observed-nodes/{node_id}/device-metrics/:
     get:
       summary: Get device metrics for a specific node
       description: Returns a list of device metrics for a specific node with optional date filtering
@@ -2072,7 +2119,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /nodes/managed-nodes:
+  /nodes/managed-nodes/:
     get:
       summary: List managed nodes
       tags: [Nodes]
@@ -2106,23 +2153,41 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                node_id:
-                  type: integer
-                name:
-                  type: string
-                constellation:
-                  type: integer
+              $ref: '#/components/schemas/OwnedManagedNode'
       responses:
         '201':
           description: Node created successfully
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ManagedNodeRead'
+                $ref: '#/components/schemas/OwnedManagedNode'
 
-  /nodes/managed-nodes/{node_id}:
+  /nodes/managed-nodes/mine/:
+    get:
+      summary: List managed nodes owned by the current user
+      tags: [Nodes]
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PaginationPage'
+        - $ref: '#/components/parameters/PaginationPageSize'
+      responses:
+        '200':
+          description: List of managed nodes owned by the current user
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedResponse'
+                  - type: object
+                    properties:
+                      results:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/OwnedManagedNode'
+
+
+  /nodes/managed-nodes/{node_id}/:
     get:
       summary: Get managed node details
       tags: [Nodes]
@@ -2157,20 +2222,14 @@ paths:
         required: true
         content:
           application/json:
-              schema:
-                type: object
-                properties:
-                  name:
-                    type: string
-                  constellation:
-                    type: integer
+            $ref: '#/components/schemas/OwnedManagedNode'
       responses:
         '200':
           description: Node updated successfully
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ManagedNodeRead'
+                $ref: '#/components/schemas/OwnedManagedNode'
 
     delete:
       summary: Delete managed node
@@ -2187,9 +2246,9 @@ paths:
         '204':
           description: Node deleted successfully
 
-  /nodes/api-keys:
+  /nodes/api-keys/:
     get:
-      summary: List API keys
+      summary: List API keys available to the current user
       tags: [Nodes]
       security:
         - BearerAuth: []
@@ -2198,7 +2257,7 @@ paths:
         - $ref: '#/components/parameters/PaginationPageSize'
       responses:
         '200':
-          description: List of API keys
+          description: List of API keys available to the current user
           content:
             application/json:
               schema:
