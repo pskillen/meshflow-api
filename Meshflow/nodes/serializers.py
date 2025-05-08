@@ -258,14 +258,30 @@ class OwnedManagedNodeSerializer(ManagedNodeSerializer):
     """Serializer for managed nodes owned by the current user."""
 
     # For write
-    channel_0 = serializers.PrimaryKeyRelatedField(queryset=MessageChannel.objects.all(), required=False, allow_null=True)
-    channel_1 = serializers.PrimaryKeyRelatedField(queryset=MessageChannel.objects.all(), required=False, allow_null=True)
-    channel_2 = serializers.PrimaryKeyRelatedField(queryset=MessageChannel.objects.all(), required=False, allow_null=True)
-    channel_3 = serializers.PrimaryKeyRelatedField(queryset=MessageChannel.objects.all(), required=False, allow_null=True)
-    channel_4 = serializers.PrimaryKeyRelatedField(queryset=MessageChannel.objects.all(), required=False, allow_null=True)
-    channel_5 = serializers.PrimaryKeyRelatedField(queryset=MessageChannel.objects.all(), required=False, allow_null=True)
-    channel_6 = serializers.PrimaryKeyRelatedField(queryset=MessageChannel.objects.all(), required=False, allow_null=True)
-    channel_7 = serializers.PrimaryKeyRelatedField(queryset=MessageChannel.objects.all(), required=False, allow_null=True)
+    channel_0 = serializers.PrimaryKeyRelatedField(
+        queryset=MessageChannel.objects.all(), required=False, allow_null=True
+    )
+    channel_1 = serializers.PrimaryKeyRelatedField(
+        queryset=MessageChannel.objects.all(), required=False, allow_null=True
+    )
+    channel_2 = serializers.PrimaryKeyRelatedField(
+        queryset=MessageChannel.objects.all(), required=False, allow_null=True
+    )
+    channel_3 = serializers.PrimaryKeyRelatedField(
+        queryset=MessageChannel.objects.all(), required=False, allow_null=True
+    )
+    channel_4 = serializers.PrimaryKeyRelatedField(
+        queryset=MessageChannel.objects.all(), required=False, allow_null=True
+    )
+    channel_5 = serializers.PrimaryKeyRelatedField(
+        queryset=MessageChannel.objects.all(), required=False, allow_null=True
+    )
+    channel_6 = serializers.PrimaryKeyRelatedField(
+        queryset=MessageChannel.objects.all(), required=False, allow_null=True
+    )
+    channel_7 = serializers.PrimaryKeyRelatedField(
+        queryset=MessageChannel.objects.all(), required=False, allow_null=True
+    )
 
     # For read, override to_representation
     # (or use a SerializerMethodField if you want to return the nested object)
