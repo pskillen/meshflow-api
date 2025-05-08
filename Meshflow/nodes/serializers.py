@@ -3,7 +3,7 @@ import secrets
 from rest_framework import serializers
 
 from common.mesh_node_helpers import meshtastic_id_to_hex
-from constellations.models import Constellation, ConstellationUserMembership
+from constellations.models import Constellation, ConstellationUserMembership, MessageChannel
 from users.models import User
 
 from .models import (
@@ -208,6 +208,37 @@ class ManagedNodeSerializer(serializers.ModelSerializer):
         if hasattr(obj, "long_name") and obj.long_name:
             return obj.long_name
         return obj.name
+
+
+class OwnedManagedNodeSerializer(ManagedNodeSerializer):
+    """Serializer for managed nodes owned by the current user."""
+
+    class ChannelSerializer(serializers.ModelSerializer):
+        class Meta:
+            model = MessageChannel
+            fields = ["id", "name"]
+
+    channel_0 = ChannelSerializer()
+    channel_1 = ChannelSerializer()
+    channel_2 = ChannelSerializer()
+    channel_3 = ChannelSerializer()
+    channel_4 = ChannelSerializer()
+    channel_5 = ChannelSerializer()
+    channel_6 = ChannelSerializer()
+    channel_7 = ChannelSerializer()
+
+    class Meta(ManagedNodeSerializer.Meta):
+        fields = ManagedNodeSerializer.Meta.fields + [
+            "owner",
+            "channel_0",
+            "channel_1",
+            "channel_2",
+            "channel_3",
+            "channel_4",
+            "channel_5",
+            "channel_6",
+            "channel_7",
+        ]
 
 
 class PositionSerializer(serializers.ModelSerializer):
