@@ -157,6 +157,10 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
         Get all observed nodes claimed by the current user.
         """
         nodes = ObservedNode.objects.filter(claimed_by=request.user).order_by("node_id")
+        page = self.paginate_queryset(nodes)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
         serializer = self.get_serializer(nodes, many=True)
         return Response(serializer.data)
 
@@ -361,6 +365,10 @@ class ManagedNodeViewSet(viewsets.ModelViewSet):
             )
         )
 
+        page = self.paginate_queryset(nodes)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
         serializer = self.get_serializer(nodes, many=True)
         return Response(serializer.data)
 
