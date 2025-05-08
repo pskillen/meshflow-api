@@ -82,10 +82,12 @@ class APIKeyCreateSerializer(serializers.ModelSerializer):
     """Serializer for creating API keys."""
 
     nodes = serializers.ListField(child=serializers.IntegerField(), required=False, write_only=True)
+    owner = serializers.PrimaryKeyRelatedField(read_only=True)
+    key = serializers.CharField(read_only=True)
 
     class Meta:
         model = NodeAPIKey
-        fields = ["name", "constellation", "nodes"]
+        fields = ["id", "name", "constellation", "nodes", "owner", "created_at", "last_used", "is_active", "key"]
 
     def validate_constellation(self, value):
         """Validate that the user has permission to create API keys for this constellation."""
