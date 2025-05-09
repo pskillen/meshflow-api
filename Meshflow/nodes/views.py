@@ -406,12 +406,13 @@ class UserNodeClaimsView(APIView):
     """
     API endpoint to retrieve all NodeOwnerClaim models for the current user.
     """
+
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
         """
         Get all node claims for the current user.
         """
-        claims = NodeOwnerClaim.objects.filter(user=request.user).select_related('node')
+        claims = NodeOwnerClaim.objects.filter(user=request.user).select_related("node")
         serializer = NodeOwnerClaimSerializer(claims, many=True)
         return Response(serializer.data)

@@ -2,7 +2,13 @@ from django.urls import include, path
 
 from rest_framework.routers import DefaultRouter
 
-from nodes.views import APIKeyViewSet, ManagedNodeViewSet, ObservedNodeClaimView, ObservedNodeViewSet, UserNodeClaimsView
+from nodes.views import (
+    APIKeyViewSet,
+    ManagedNodeViewSet,
+    ObservedNodeClaimView,
+    ObservedNodeViewSet,
+    UserNodeClaimsView,
+)
 
 # Create a router and register our viewsets with it
 router = DefaultRouter()
