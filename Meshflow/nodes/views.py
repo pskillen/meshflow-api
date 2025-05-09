@@ -400,3 +400,19 @@ class ObservedNodeClaimView(APIView):
             return Response({"detail": "No claim found."}, status=status.HTTP_404_NOT_FOUND)
         claim.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class UserNodeClaimsView(APIView):
+    """
+    API endpoint to retrieve all NodeOwnerClaim models for the current user.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        """
+        Get all node claims for the current user.
+        """
+        claims = NodeOwnerClaim.objects.filter(user=request.user).select_related("node")
+        serializer = NodeOwnerClaimSerializer(claims, many=True)
+        return Response(serializer.data)

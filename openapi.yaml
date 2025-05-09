@@ -561,9 +561,33 @@ components:
         Represents a user's claim to an observed node. A claim must be accepted (by the node sending the claim_key) to be valid.
       properties:
         node:
-          type: integer
-          description: The ID of the observed node being claimed
+          type: object
+          description: The observed node being claimed
           readOnly: true
+          properties:
+            node_id:
+              type: integer
+              format: int64
+              description: The numeric ID of the node
+              readOnly: true
+            node_id_str:
+              type: string
+              description: The node ID in hex format
+              readOnly: true
+            long_name:
+              type: string
+              description: The long name of the node
+              readOnly: true
+            short_name:
+              type: string
+              description: The short name of the node
+              readOnly: true
+            last_heard:
+              type: string
+              format: date-time
+              description: The timestamp when the node was last heard from
+              readOnly: true
+              nullable: true
         user:
           type: integer
           description: The ID of the user making the claim
@@ -2501,6 +2525,23 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+
+  /nodes/claims/mine/:
+    get:
+      summary: Get all claims for current user
+      description: Get all node claims for the current user, both pending and approved.
+      tags: [Nodes]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of claims
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/NodeOwnerClaim'
 
   /nodes/observed-nodes/{node_id}/claim/:
     get:

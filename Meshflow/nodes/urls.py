@@ -2,7 +2,13 @@ from django.urls import include, path
 
 from rest_framework.routers import DefaultRouter
 
-from nodes.views import APIKeyViewSet, ManagedNodeViewSet, ObservedNodeClaimView, ObservedNodeViewSet
+from nodes.views import (
+    APIKeyViewSet,
+    ManagedNodeViewSet,
+    ObservedNodeClaimView,
+    ObservedNodeViewSet,
+    UserNodeClaimsView,
+)
 
 # Create a router and register our viewsets with it
 router = DefaultRouter()
@@ -14,4 +20,5 @@ router.register(r"api-keys", APIKeyViewSet, basename="api-keys")
 urlpatterns = [
     path("", include(router.urls)),
     path("observed-nodes/<int:node_id>/claim/", ObservedNodeClaimView.as_view(), name="observed-node-claim"),
+    path("claims/mine/", UserNodeClaimsView.as_view(), name="user-node-claims"),
 ]

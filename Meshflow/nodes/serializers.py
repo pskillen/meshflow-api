@@ -19,6 +19,18 @@ from .models import (
 
 
 class NodeOwnerClaimSerializer(serializers.ModelSerializer):
+    """Serializer for node owner claims with full node information."""
+
+    class NodeSerializer(serializers.ModelSerializer):
+        """Nested serializer for the node field."""
+
+        class Meta:
+            model = ObservedNode
+            fields = ["node_id", "node_id_str", "long_name", "short_name", "last_heard"]
+            read_only_fields = ["node_id", "node_id_str", "long_name", "short_name", "last_heard"]
+
+    node = NodeSerializer(read_only=True)
+
     class Meta:
         model = NodeOwnerClaim
         fields = ["node", "user", "claim_key", "created_at", "accepted_at"]
