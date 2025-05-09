@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     "django.contrib.sites",  # Required for django-allauth
     "rest_framework",
     "rest_framework.authtoken",
+    "rest_framework_simplejwt",
     "corsheaders",
     # Authentication
     "allauth",
@@ -183,7 +184,7 @@ SIMPLE_JWT = {
     ),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=int(os.environ.get("JWT_REFRESH_TOKEN_LIFETIME_DAYS", 30))),  # 30d default
     "ROTATE_REFRESH_TOKENS": True,
-    "BLACKLIST_AFTER_ROTATION": True,
+    "BLACKLIST_AFTER_ROTATION": False,
     "UPDATE_LAST_LOGIN": True,
     "ALGORITHM": "HS256",
     "SIGNING_KEY": SECRET_KEY,

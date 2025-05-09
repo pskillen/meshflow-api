@@ -148,24 +148,6 @@ class APIKeyCreateSerializer(serializers.ModelSerializer):
 class ManagedNodeSerializer(serializers.ModelSerializer):
     """Serializer for managed nodes, enriched with observed node and latest position info."""
 
-    class PositionSerializer(serializers.ModelSerializer):
-        latitude = serializers.SerializerMethodField()
-        longitude = serializers.SerializerMethodField()
-
-        class Meta:
-            model = Position
-            fields = ["latitude", "longitude"]
-
-        def get_latitude(self, obj):
-            if hasattr(obj, "last_latitude") and obj.last_latitude:
-                return obj.last_latitude
-            return obj.default_location_latitude
-
-        def get_longitude(self, obj):
-            if hasattr(obj, "last_longitude") and obj.last_longitude:
-                return obj.last_longitude
-            return obj.default_location_longitude
-
     class UserSerializer(serializers.ModelSerializer):
         id = serializers.IntegerField(read_only=True)
         username = serializers.CharField(read_only=True)
@@ -181,14 +163,12 @@ class ManagedNodeSerializer(serializers.ModelSerializer):
             fields = ["id", "name", "map_color"]
             read_only_fields = ["name", "map_color"]
 
-    # For write (POST/PUT), accept just the ID
     owner_id = serializers.PrimaryKeyRelatedField(
         queryset=User.objects.all(), source="owner", write_only=True, required=True
     )
     constellation_id = serializers.PrimaryKeyRelatedField(
         queryset=Constellation.objects.all(), source="constellation", write_only=True, required=True
     )
-    # For read, show nested
     owner = UserSerializer(read_only=True)
     constellation = ConstellationSerializer(read_only=True)
 
@@ -198,6 +178,7 @@ class ManagedNodeSerializer(serializers.ModelSerializer):
     node_id_str = serializers.CharField(read_only=True)
 
     position = serializers.SerializerMethodField(read_only=True)
+    device_metrics = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = ManagedNode
@@ -208,11 +189,12 @@ class ManagedNodeSerializer(serializers.ModelSerializer):
             "short_name",
             "last_heard",
             "node_id_str",
-            "owner_id",  # for input
-            "owner",  # for output
-            "constellation_id",  # for input
-            "constellation",  # for output
-            "position",  # position is not a direct FK, so remove from input
+            "owner_id",
+            "owner",
+            "constellation_id",
+            "constellation",
+            "position",
+            "device_metrics",
         ]
         read_only_fields = [
             "internal_id",
@@ -225,7 +207,6 @@ class ManagedNodeSerializer(serializers.ModelSerializer):
         ]
 
     def get_node_id_str(self, obj):
-        # Use annotated value if present, else fallback to property
         if hasattr(obj, "node_id_str") and obj.node_id_str:
             return obj.node_id_str
         return meshtastic_id_to_hex(obj.node_id)
@@ -241,13 +222,65 @@ class ManagedNodeSerializer(serializers.ModelSerializer):
             obj.save()
 
     def get_position(self, obj):
-        # Keep your current read logic
-        return self.PositionSerializer(obj).data
+        # If annotated fields are present, build a dict for the serializer
+        annotation_keys = [
+            "last_latitude",
+            "last_longitude",
+            "last_altitude",
+            "last_position_time",
+            "last_heading",
+            "last_location_source",
+            "last_precision_bits",
+            "last_ground_speed",
+            "last_ground_track",
+            "last_sats_in_view",
+            "last_pdop",
+        ]
+        if any(hasattr(obj, k) for k in annotation_keys):
+            data = {k: getattr(obj, k, None) for k in annotation_keys}
+            data["node"] = getattr(obj, "internal_id", None)
+            # Check if all real data fields are None
+            real_fields = [
+                "last_latitude",
+                "last_longitude",
+                "last_altitude",
+                "last_position_time",
+                "last_heading",
+                "last_location_source",
+                "last_precision_bits",
+                "last_ground_speed",
+                "last_ground_track",
+                "last_sats_in_view",
+                "last_pdop",
+            ]
+            if all(data[k] is None for k in real_fields):
+                return None
+            return PositionSerializer(data).data
+        # Fallback to latest Position instance
+        latest = Position.objects.filter(node__node_id=obj.node_id).order_by("-reported_time").first()
+        return PositionSerializer(latest).data if latest else None
+
+    def get_device_metrics(self, obj):
+        annotation_keys = [
+            "last_battery_level",
+            "last_voltage",
+            "last_metrics_time",
+            "last_channel_utilization",
+            "last_air_util_tx",
+            "last_uptime_seconds",
+        ]
+        if any(hasattr(obj, k) for k in annotation_keys):
+            data = {k: getattr(obj, k, None) for k in annotation_keys}
+            data["node"] = getattr(obj, "internal_id", None)
+            # Use the timestamp field as the indicator
+            if data.get("last_metrics_time") is None:
+                return None
+            return DeviceMetricsSerializer(data).data
+        latest = DeviceMetrics.objects.filter(node__node_id=obj.node_id).order_by("-reported_time").first()
+        return DeviceMetricsSerializer(latest).data if latest else None
 
     def to_internal_value(self, data):
-        # Let DRF do its normal validation first
         validated_data = super().to_internal_value(data)
-        # Now handle position if present in input
         position = data.get("position")
         if position:
             lat = position.get("latitude")
@@ -358,9 +391,37 @@ class OwnedManagedNodeSerializer(ManagedNodeSerializer):
 
 
 class PositionSerializer(serializers.ModelSerializer):
-    """Serializer for position reports."""
+    """Serializer for position reports, supporting both model instances and dicts (from annotations)."""
 
     location_source = serializers.CharField(source="get_location_source_display", read_only=True)
+
+    # Mapping from possible annotated keys to canonical field names
+    ANNOTATION_MAP = {
+        # For ObservedNode
+        "latest_latitude": "latitude",
+        "latest_longitude": "longitude",
+        "latest_altitude": "altitude",
+        "latest_position_time": "reported_time",
+        "latest_heading": "heading",
+        "latest_location_source": "location_source",
+        "latest_precision_bits": "precision_bits",
+        "latest_ground_speed": "ground_speed",
+        "latest_ground_track": "ground_track",
+        "latest_sats_in_view": "sats_in_view",
+        "latest_pdop": "pdop",
+        # For ManagedNode
+        "last_latitude": "latitude",
+        "last_longitude": "longitude",
+        "last_altitude": "altitude",
+        "last_position_time": "reported_time",
+        "last_heading": "heading",
+        "last_location_source": "location_source",
+        "last_precision_bits": "precision_bits",
+        "last_ground_speed": "ground_speed",
+        "last_ground_track": "ground_track",
+        "last_sats_in_view": "sats_in_view",
+        "last_pdop": "pdop",
+    }
 
     class Meta:
         model = Position
@@ -381,34 +442,70 @@ class PositionSerializer(serializers.ModelSerializer):
             "pdop",
         ]
 
-    def to_internal_value(self, data):
-        """Convert location source from string to integer and handle node field."""
-        # First, handle the standard DRF conversion
-        validated_data = super().to_internal_value(data)
+    def to_representation(self, instance):
+        # Support both model instance and dict/annotated object
+        if isinstance(instance, dict):
+            # Map annotated keys to canonical field names
+            data = {}
+            for field in self.Meta.fields:
+                # Try direct field
+                if field in instance:
+                    data[field] = instance.get(field)
+                else:
+                    # Try annotation map
+                    for ann_key, canon_key in self.ANNOTATION_MAP.items():
+                        if canon_key == field and ann_key in instance:
+                            data[field] = instance[ann_key]
+                            break
+                    else:
+                        data[field] = None
+            # location_source: try to get display value if possible
+            if "location_source" in data and data["location_source"] is not None:
+                try:
+                    data["location_source"] = LocationSource(data["location_source"]).label
+                except Exception:
+                    pass
+            return data
+        return super().to_representation(instance)
 
+    def to_internal_value(self, data):
+        validated_data = super().to_internal_value(data)
         # Convert location_source from string to integer using LocationSource
         if "location_source" in validated_data and validated_data["location_source"]:
             try:
-                # Find the matching location source in LocationSource
                 for source_choice in LocationSource:
                     if source_choice.label == validated_data["location_source"]:
                         validated_data["location_source"] = source_choice.value
                         break
                 else:
-                    # If no match found, set to UNSET
                     validated_data["location_source"] = LocationSource.UNSET
             except (ValueError, TypeError):
                 validated_data["location_source"] = LocationSource.UNSET
-
         # Handle node field
         if "node" in data and isinstance(data["node"], ObservedNode):
             validated_data["node"] = data["node"]
-
         return validated_data
 
 
 class DeviceMetricsSerializer(serializers.ModelSerializer):
-    """Serializer for device metrics."""
+    """Serializer for device metrics, supporting both model instances and dicts (from annotations)."""
+
+    ANNOTATION_MAP = {
+        # For ObservedNode
+        "latest_battery_level": "battery_level",
+        "latest_voltage": "voltage",
+        "latest_metrics_time": "reported_time",
+        "latest_channel_utilization": "channel_utilization",
+        "latest_air_util_tx": "air_util_tx",
+        "latest_uptime_seconds": "uptime_seconds",
+        # For ManagedNode
+        "last_battery_level": "battery_level",
+        "last_voltage": "voltage",
+        "last_metrics_time": "reported_time",
+        "last_channel_utilization": "channel_utilization",
+        "last_air_util_tx": "air_util_tx",
+        "last_uptime_seconds": "uptime_seconds",
+    }
 
     class Meta:
         model = DeviceMetrics
@@ -424,6 +521,23 @@ class DeviceMetricsSerializer(serializers.ModelSerializer):
             "uptime_seconds",
         ]
 
+    def to_representation(self, instance):
+        # Support both model instance and dict/annotated object
+        if isinstance(instance, dict):
+            data = {}
+            for field in self.Meta.fields:
+                if field in instance:
+                    data[field] = instance.get(field)
+                else:
+                    for ann_key, canon_key in self.ANNOTATION_MAP.items():
+                        if canon_key == field and ann_key in instance:
+                            data[field] = instance[ann_key]
+                            break
+                    else:
+                        data[field] = None
+            return data
+        return super().to_representation(instance)
+
 
 class ObservedNodeSerializer(serializers.ModelSerializer):
     """Serializer for observed nodes."""
@@ -434,14 +548,11 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
             fields = ["id", "username"]
 
     node_id_str = serializers.CharField(read_only=True)
-
     latest_position = serializers.SerializerMethodField()
     latest_device_metrics = serializers.SerializerMethodField()
-
     owner = OwnerSerializer(source="claimed_by", read_only=True)
 
     def to_internal_value(self, data):
-        """Convert node_id_str to node_id."""
         if "node_id" in data:
             data["node_id_str"] = meshtastic_id_to_hex(data["node_id"])
         return super().to_internal_value(data)
@@ -475,18 +586,59 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
         ]
 
     def get_latest_position(self, obj):
-        """Get the latest position for this node."""
-        latest_position = Position.objects.filter(node=obj).order_by("-reported_time").first()
-        if latest_position:
-            return PositionSerializer(latest_position).data
-        return None
+        annotation_keys = [
+            "latest_latitude",
+            "latest_longitude",
+            "latest_altitude",
+            "latest_position_time",
+            "latest_heading",
+            "latest_location_source",
+            "latest_precision_bits",
+            "latest_ground_speed",
+            "latest_ground_track",
+            "latest_sats_in_view",
+            "latest_pdop",
+        ]
+        if any(hasattr(obj, k) for k in annotation_keys):
+            data = {k: getattr(obj, k, None) for k in annotation_keys}
+            data["node"] = getattr(obj, "internal_id", None)
+            real_fields = [
+                "latest_latitude",
+                "latest_longitude",
+                "latest_altitude",
+                "latest_position_time",
+                "latest_heading",
+                "latest_location_source",
+                "latest_precision_bits",
+                "latest_ground_speed",
+                "latest_ground_track",
+                "latest_sats_in_view",
+                "latest_pdop",
+            ]
+            if all(data[k] is None for k in real_fields):
+                return None
+            return PositionSerializer(data).data
+        latest = Position.objects.filter(node=obj).order_by("-reported_time").first()
+        return PositionSerializer(latest).data if latest else None
 
     def get_latest_device_metrics(self, obj):
-        """Get the latest device metrics for this node."""
-        latest_metrics = DeviceMetrics.objects.filter(node=obj).order_by("-reported_time").first()
-        if latest_metrics:
-            return DeviceMetricsSerializer(latest_metrics).data
-        return None
+        annotation_keys = [
+            "latest_battery_level",
+            "latest_voltage",
+            "latest_metrics_time",
+            "latest_channel_utilization",
+            "latest_air_util_tx",
+            "latest_uptime_seconds",
+        ]
+        if any(hasattr(obj, k) for k in annotation_keys):
+            data = {k: getattr(obj, k, None) for k in annotation_keys}
+            data["node"] = getattr(obj, "internal_id", None)
+            # Use the timestamp field as the indicator
+            if data.get("latest_metrics_time") is None:
+                return None
+            return DeviceMetricsSerializer(data).data
+        latest = DeviceMetrics.objects.filter(node=obj).order_by("-reported_time").first()
+        return DeviceMetricsSerializer(latest).data if latest else None
 
 
 class ObservedNodeSearchSerializer(ObservedNodeSerializer):
