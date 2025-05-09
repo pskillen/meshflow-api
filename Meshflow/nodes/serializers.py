@@ -239,6 +239,22 @@ class ManagedNodeSerializer(serializers.ModelSerializer):
         if any(hasattr(obj, k) for k in annotation_keys):
             data = {k: getattr(obj, k, None) for k in annotation_keys}
             data["node"] = getattr(obj, "internal_id", None)
+            # Check if all real data fields are None
+            real_fields = [
+                "last_latitude",
+                "last_longitude",
+                "last_altitude",
+                "last_position_time",
+                "last_heading",
+                "last_location_source",
+                "last_precision_bits",
+                "last_ground_speed",
+                "last_ground_track",
+                "last_sats_in_view",
+                "last_pdop",
+            ]
+            if all(data[k] is None for k in real_fields):
+                return None
             return PositionSerializer(data).data
         # Fallback to latest Position instance
         latest = Position.objects.filter(node__node_id=obj.node_id).order_by("-reported_time").first()
@@ -256,6 +272,9 @@ class ManagedNodeSerializer(serializers.ModelSerializer):
         if any(hasattr(obj, k) for k in annotation_keys):
             data = {k: getattr(obj, k, None) for k in annotation_keys}
             data["node"] = getattr(obj, "internal_id", None)
+            # Use the timestamp field as the indicator
+            if data.get("last_metrics_time") is None:
+                return None
             return DeviceMetricsSerializer(data).data
         latest = DeviceMetrics.objects.filter(node__node_id=obj.node_id).order_by("-reported_time").first()
         return DeviceMetricsSerializer(latest).data if latest else None
@@ -583,6 +602,21 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
         if any(hasattr(obj, k) for k in annotation_keys):
             data = {k: getattr(obj, k, None) for k in annotation_keys}
             data["node"] = getattr(obj, "internal_id", None)
+            real_fields = [
+                "latest_latitude",
+                "latest_longitude",
+                "latest_altitude",
+                "latest_position_time",
+                "latest_heading",
+                "latest_location_source",
+                "latest_precision_bits",
+                "latest_ground_speed",
+                "latest_ground_track",
+                "latest_sats_in_view",
+                "latest_pdop",
+            ]
+            if all(data[k] is None for k in real_fields):
+                return None
             return PositionSerializer(data).data
         latest = Position.objects.filter(node=obj).order_by("-reported_time").first()
         return PositionSerializer(latest).data if latest else None
@@ -599,6 +633,9 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
         if any(hasattr(obj, k) for k in annotation_keys):
             data = {k: getattr(obj, k, None) for k in annotation_keys}
             data["node"] = getattr(obj, "internal_id", None)
+            # Use the timestamp field as the indicator
+            if data.get("latest_metrics_time") is None:
+                return None
             return DeviceMetricsSerializer(data).data
         latest = DeviceMetrics.objects.filter(node=obj).order_by("-reported_time").first()
         return DeviceMetricsSerializer(latest).data if latest else None
