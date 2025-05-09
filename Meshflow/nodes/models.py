@@ -39,7 +39,7 @@ class ManagedNode(models.Model):
     """Model representing a mesh network node."""
 
     internal_id = models.UUIDField(primary_key=True, null=False, default=uuid.uuid4, editable=False)
-    node_id = models.BigIntegerField(null=False)
+    node_id = models.BigIntegerField(null=False, db_index=True)
     owner = models.ForeignKey(
         "users.User",
         on_delete=models.CASCADE,
@@ -234,6 +234,9 @@ class Position(BaseNodeItem):
     class Meta:
         verbose_name = _("Position")
         verbose_name_plural = _("Positions")
+        indexes = [
+            models.Index(fields=["node", "-logged_time"], name="idx_node_latest_position"),
+        ]
 
     def __str__(self):
         return f"Position [{self.latitude}, {self.longitude}]"
@@ -253,6 +256,9 @@ class DeviceMetrics(BaseNodeItem):
 
         verbose_name = _("Device metrics")
         verbose_name_plural = _("Device metrics")
+        indexes = [
+            models.Index(fields=["node", "-logged_time"], name="idx_node_latest_device_metrics"),
+        ]
 
     def __str__(self):
         return f"Device metrics [{self.battery_level}%, {self.voltage}V, {self.uptime_seconds}s]"
