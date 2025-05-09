@@ -151,10 +151,12 @@ class ManagedNodeSerializer(serializers.ModelSerializer):
     class PositionSerializer(serializers.ModelSerializer):
         latitude = serializers.SerializerMethodField()
         longitude = serializers.SerializerMethodField()
+        altitude = serializers.SerializerMethodField()
+        reported_time = serializers.SerializerMethodField()
 
         class Meta:
             model = Position
-            fields = ["latitude", "longitude"]
+            fields = ["latitude", "longitude", "altitude", "reported_time"]
 
         def get_latitude(self, obj):
             if hasattr(obj, "last_latitude") and obj.last_latitude:
@@ -165,6 +167,40 @@ class ManagedNodeSerializer(serializers.ModelSerializer):
             if hasattr(obj, "last_longitude") and obj.last_longitude:
                 return obj.last_longitude
             return obj.default_location_longitude
+
+        def get_altitude(self, obj):
+            if hasattr(obj, "last_altitude") and obj.last_altitude:
+                return obj.last_altitude
+            return None
+
+        def get_reported_time(self, obj):
+            if hasattr(obj, "last_position_time") and obj.last_position_time:
+                return obj.last_position_time
+            return None
+
+    class DeviceMetricsSerializer(serializers.ModelSerializer):
+        battery_level = serializers.SerializerMethodField()
+        voltage = serializers.SerializerMethodField()
+        reported_time = serializers.SerializerMethodField()
+
+        class Meta:
+            model = DeviceMetrics
+            fields = ["battery_level", "voltage", "reported_time"]
+
+        def get_battery_level(self, obj):
+            if hasattr(obj, "last_battery_level") and obj.last_battery_level:
+                return obj.last_battery_level
+            return None
+
+        def get_voltage(self, obj):
+            if hasattr(obj, "last_voltage") and obj.last_voltage:
+                return obj.last_voltage
+            return None
+
+        def get_reported_time(self, obj):
+            if hasattr(obj, "last_metrics_time") and obj.last_metrics_time:
+                return obj.last_metrics_time
+            return None
 
     class UserSerializer(serializers.ModelSerializer):
         id = serializers.IntegerField(read_only=True)
@@ -198,6 +234,7 @@ class ManagedNodeSerializer(serializers.ModelSerializer):
     node_id_str = serializers.CharField(read_only=True)
 
     position = serializers.SerializerMethodField(read_only=True)
+    device_metrics = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = ManagedNode
@@ -213,6 +250,7 @@ class ManagedNodeSerializer(serializers.ModelSerializer):
             "constellation_id",  # for input
             "constellation",  # for output
             "position",  # position is not a direct FK, so remove from input
+            "device_metrics",  # device metrics is not a direct FK, so remove from input
         ]
         read_only_fields = [
             "internal_id",
@@ -243,6 +281,10 @@ class ManagedNodeSerializer(serializers.ModelSerializer):
     def get_position(self, obj):
         # Keep your current read logic
         return self.PositionSerializer(obj).data
+
+    def get_device_metrics(self, obj):
+        # Similar to get_position, return device metrics data
+        return self.DeviceMetricsSerializer(obj).data
 
     def to_internal_value(self, data):
         # Let DRF do its normal validation first
@@ -476,6 +518,18 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
 
     def get_latest_position(self, obj):
         """Get the latest position for this node."""
+        # Check if we have prefetched position data
+        if hasattr(obj, "latest_latitude") and obj.latest_latitude is not None:
+            # Create a position-like dict from the prefetched attributes
+            position_data = {
+                "latitude": obj.latest_latitude,
+                "longitude": obj.latest_longitude,
+                "altitude": getattr(obj, "latest_altitude", None),
+                "reported_time": getattr(obj, "latest_position_time", None),
+            }
+            return position_data
+
+        # Fallback to the original implementation
         latest_position = Position.objects.filter(node=obj).order_by("-reported_time").first()
         if latest_position:
             return PositionSerializer(latest_position).data
@@ -483,6 +537,17 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
 
     def get_latest_device_metrics(self, obj):
         """Get the latest device metrics for this node."""
+        # Check if we have prefetched metrics data
+        if hasattr(obj, "latest_battery_level") and obj.latest_battery_level is not None:
+            # Create a metrics-like dict from the prefetched attributes
+            metrics_data = {
+                "battery_level": obj.latest_battery_level,
+                "voltage": getattr(obj, "latest_voltage", None),
+                "reported_time": getattr(obj, "latest_metrics_time", None),
+            }
+            return metrics_data
+
+        # Fallback to the original implementation
         latest_metrics = DeviceMetrics.objects.filter(node=obj).order_by("-reported_time").first()
         if latest_metrics:
             return DeviceMetricsSerializer(latest_metrics).data

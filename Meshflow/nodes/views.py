@@ -144,8 +144,26 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
     lookup_field = "node_id"
 
     def get_queryset(self):
-        """Filter nodes based on user permissions."""
-        return ObservedNode.objects.all().order_by("node_id")
+        """Filter nodes based on user permissions and prefetch latest position and metrics."""
+        # Subquery for latest Position fields
+        latest_position_qs = Position.objects.filter(node=OuterRef("pk")).order_by("-reported_time")
+
+        # Subquery for latest DeviceMetrics fields
+        latest_metrics_qs = DeviceMetrics.objects.filter(node=OuterRef("pk")).order_by("-reported_time")
+
+        return (
+            ObservedNode.objects.all()
+            .order_by("node_id")
+            .annotate(
+                latest_latitude=Subquery(latest_position_qs.values("latitude")[:1]),
+                latest_longitude=Subquery(latest_position_qs.values("longitude")[:1]),
+                latest_altitude=Subquery(latest_position_qs.values("altitude")[:1]),
+                latest_position_time=Subquery(latest_position_qs.values("reported_time")[:1]),
+                latest_battery_level=Subquery(latest_metrics_qs.values("battery_level")[:1]),
+                latest_voltage=Subquery(latest_metrics_qs.values("voltage")[:1]),
+                latest_metrics_time=Subquery(latest_metrics_qs.values("reported_time")[:1]),
+            )
+        )
 
     def perform_create(self, serializer):
         """Create a new node."""
@@ -156,7 +174,26 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
         """
         Get all observed nodes claimed by the current user.
         """
-        nodes = ObservedNode.objects.filter(claimed_by=request.user).order_by("node_id")
+        # Subquery for latest Position fields
+        latest_position_qs = Position.objects.filter(node=OuterRef("pk")).order_by("-reported_time")
+
+        # Subquery for latest DeviceMetrics fields
+        latest_metrics_qs = DeviceMetrics.objects.filter(node=OuterRef("pk")).order_by("-reported_time")
+
+        nodes = (
+            ObservedNode.objects.filter(claimed_by=request.user)
+            .order_by("node_id")
+            .annotate(
+                latest_latitude=Subquery(latest_position_qs.values("latitude")[:1]),
+                latest_longitude=Subquery(latest_position_qs.values("longitude")[:1]),
+                latest_altitude=Subquery(latest_position_qs.values("altitude")[:1]),
+                latest_position_time=Subquery(latest_position_qs.values("reported_time")[:1]),
+                latest_battery_level=Subquery(latest_metrics_qs.values("battery_level")[:1]),
+                latest_voltage=Subquery(latest_metrics_qs.values("voltage")[:1]),
+                latest_metrics_time=Subquery(latest_metrics_qs.values("reported_time")[:1]),
+            )
+        )
+
         page = self.paginate_queryset(nodes)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
@@ -313,12 +350,15 @@ class ManagedNodeViewSet(viewsets.ModelViewSet):
     lookup_field = "node_id"
 
     def get_queryset(self):
-        """Filter nodes based on user ownership and annotate with observed node and latest position info."""
+        """Filter nodes based on user ownership and annotate with observed node, latest position, and metrics info."""
 
         # Subquery for ObservedNode fields
         observed_node_qs = ObservedNode.objects.filter(node_id=OuterRef("node_id"))
         # Subquery for latest Position fields
         latest_position_qs = Position.objects.filter(node__node_id=OuterRef("node_id")).order_by("-reported_time")
+        # Subquery for latest DeviceMetrics fields
+        latest_metrics_qs = DeviceMetrics.objects.filter(node__node_id=OuterRef("node_id")).order_by("-reported_time")
+
         return (
             ManagedNode.objects.all()
             .order_by("node_id")
@@ -328,6 +368,11 @@ class ManagedNodeViewSet(viewsets.ModelViewSet):
                 last_heard=Subquery(observed_node_qs.values("last_heard")[:1]),
                 last_latitude=Subquery(latest_position_qs.values("latitude")[:1]),
                 last_longitude=Subquery(latest_position_qs.values("longitude")[:1]),
+                last_altitude=Subquery(latest_position_qs.values("altitude")[:1]),
+                last_position_time=Subquery(latest_position_qs.values("reported_time")[:1]),
+                last_battery_level=Subquery(latest_metrics_qs.values("battery_level")[:1]),
+                last_voltage=Subquery(latest_metrics_qs.values("voltage")[:1]),
+                last_metrics_time=Subquery(latest_metrics_qs.values("reported_time")[:1]),
             )
         )
 
@@ -352,6 +397,8 @@ class ManagedNodeViewSet(viewsets.ModelViewSet):
         observed_node_qs = ObservedNode.objects.filter(node_id=OuterRef("node_id"))
         # Subquery for latest Position fields
         latest_position_qs = Position.objects.filter(node__node_id=OuterRef("node_id")).order_by("-reported_time")
+        # Subquery for latest DeviceMetrics fields
+        latest_metrics_qs = DeviceMetrics.objects.filter(node__node_id=OuterRef("node_id")).order_by("-reported_time")
 
         nodes = (
             ManagedNode.objects.filter(owner=request.user)
@@ -362,6 +409,11 @@ class ManagedNodeViewSet(viewsets.ModelViewSet):
                 last_heard=Subquery(observed_node_qs.values("last_heard")[:1]),
                 last_latitude=Subquery(latest_position_qs.values("latitude")[:1]),
                 last_longitude=Subquery(latest_position_qs.values("longitude")[:1]),
+                last_altitude=Subquery(latest_position_qs.values("altitude")[:1]),
+                last_position_time=Subquery(latest_position_qs.values("reported_time")[:1]),
+                last_battery_level=Subquery(latest_metrics_qs.values("battery_level")[:1]),
+                last_voltage=Subquery(latest_metrics_qs.values("voltage")[:1]),
+                last_metrics_time=Subquery(latest_metrics_qs.values("reported_time")[:1]),
             )
         )
 
