@@ -9,8 +9,8 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from nodes.models import ObservedNode
-from packets.models import RawPacket
+from nodes.models import ManagedNode, ObservedNode
+from packets.models import PacketObservation, RawPacket
 
 from .serializers import GlobalStatsSerializer, NodeStatsSerializer
 
@@ -165,6 +165,86 @@ def node_packet_stats(request, node_id: int):
             device_metrics=Count("id", filter=Q(devicemetricspacket__isnull=False)),
             local_stats=Count("id", filter=Q(localstatspacket__isnull=False)),
             environment_metrics=Count("id", filter=Q(environmentmetricspacket__isnull=False)),
+        )
+        .order_by("interval_start")
+    )
+
+    # Format response
+    intervals = []
+    for stat in stats:
+        interval_data = {
+            "start_date": stat["interval_start"],
+            "end_date": stat["interval_start"] + get_interval_delta(interval_type, interval),
+            "packet_types": [
+                {"packet_type": "text_message", "count": stat["text_messages"]},
+                {"packet_type": "position", "count": stat["position_updates"]},
+                {"packet_type": "node_info", "count": stat["node_info"]},
+                {"packet_type": "device_metrics", "count": stat["device_metrics"]},
+                {"packet_type": "local_stats", "count": stat["local_stats"]},
+                {"packet_type": "environment_metrics", "count": stat["environment_metrics"]},
+            ],
+        }
+        intervals.append(interval_data)
+
+    response_data = {"start_date": start_date, "end_date": end_date, "intervals": intervals}
+
+    # Validate and serialize response
+    serializer = NodeStatsSerializer(data=response_data)
+    if not serializer.is_valid():
+        return Response(
+            {"status": "error", "message": "Invalid response data"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+    return Response(serializer.validated_data)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def node_received_stats(request, node_id: int):
+    """
+    Get statistics for packets received/heard by a specific node over time intervals.
+
+    Args:
+        request: The HTTP request
+        node_id: The ID of the node to get stats for
+
+    Returns:
+        Response containing packet statistics grouped by time intervals
+    """
+    try:
+        # Check if this is a managed node
+        managed_node = ManagedNode.objects.get(node_id=node_id)
+    except ManagedNode.DoesNotExist:
+        # If not a managed node, return empty result
+        return Response({"start_date": None, "end_date": None, "intervals": []}, status=status.HTTP_200_OK)
+
+    try:
+        start_date, end_date, interval, interval_type = parse_stats_params(request)
+    except ValueError as e:
+        return Response({"status": "error", "message": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Build base query for packet observations by this node
+    observations = PacketObservation.objects.filter(observer=managed_node)
+
+    # Apply date filters if provided
+    if start_date:
+        observations = observations.filter(rx_time__gte=start_date)
+    if end_date:
+        observations = observations.filter(rx_time__lt=end_date)
+
+    # Get interval stats
+    stats = (
+        observations.annotate(
+            interval_start=Trunc("rx_time", interval_type, **get_interval_trunc_kwargs(interval_type, interval))
+        )
+        .values("interval_start")
+        .annotate(
+            text_messages=Count("id", filter=Q(packet__messagepacket__isnull=False)),
+            position_updates=Count("id", filter=Q(packet__positionpacket__isnull=False)),
+            node_info=Count("id", filter=Q(packet__nodeinfopacket__isnull=False)),
+            device_metrics=Count("id", filter=Q(packet__devicemetricspacket__isnull=False)),
+            local_stats=Count("id", filter=Q(packet__localstatspacket__isnull=False)),
+            environment_metrics=Count("id", filter=Q(packet__environmentmetricspacket__isnull=False)),
         )
         .order_by("interval_start")
     )

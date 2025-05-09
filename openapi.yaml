@@ -2489,6 +2489,50 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
+  /stats/nodes/{node_id}/received/:
+    get:
+      summary: Get received packet stats for a specific node
+      description: Returns statistics for packets received/heard by a specific node over time intervals
+      tags: [Nodes]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: node_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - $ref: '#/components/schemas/DateRangeQuery'
+        - name: interval
+          in: query
+          required: false
+          schema:
+            type: integer
+            description: The interval of the stats
+            default: 1
+        - name: interval_type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [hour, day, week, month]
+            default: hour
+      responses:
+        '200':
+          description: List of received packet stats for the node
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PacketStats'
+        '400':
+          description: Invalid request parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
   /stats/global/:
     get:
       summary: Get global packet statistics
