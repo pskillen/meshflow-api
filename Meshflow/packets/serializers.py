@@ -7,7 +7,8 @@ from django.utils import timezone as django_timezone
 from rest_framework import serializers
 
 from common.mesh_node_helpers import meshtastic_hex_to_int, meshtastic_id_to_hex
-from nodes.models import DeviceMetrics, ObservedNode, Position
+from nodes.models import DeviceMetrics, ManagedNode, ObservedNode, Position
+from nodes.serializers import ManagedNodeSerializer
 
 from .models import (
     DeviceMetricsPacket,
@@ -743,3 +744,39 @@ class NodeSerializer(serializers.ModelSerializer):
         self._create_related_objects(instance, position_data, device_metrics_data)
 
         return instance
+
+
+class PacketObservationSerializer(serializers.ModelSerializer):
+    """Serializer for packet observations."""
+
+    class ObserverSerializer(serializers.ModelSerializer):
+        """Serializer for the observer node."""
+
+        class Meta:
+            model = ManagedNode
+            fields = ["node_id", "node_id_str", "long_name", "short_name"]
+
+    observer = ObserverSerializer(read_only=True)
+    direct_from_sender = serializers.SerializerMethodField()
+    hop_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PacketObservation
+        fields = [
+            "observer",
+            "rx_time",
+            "rx_rssi",
+            "rx_snr",
+            "direct_from_sender",
+            "hop_count",
+        ]
+
+    def get_direct_from_sender(self, obj):
+        """Return True if the packet was heard directly from the sender."""
+        return obj.hop_start == obj.hop_limit
+
+    def get_hop_count(self, obj):
+        """Return the hop count (hop_start minus hop_limit)."""
+        if obj.hop_start is None or obj.hop_limit is None:
+            return None
+        return obj.hop_start - obj.hop_limit
