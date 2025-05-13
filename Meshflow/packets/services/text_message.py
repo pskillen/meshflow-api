@@ -34,7 +34,7 @@ class TextMessagePacketService(BasePacketService):
 
     def _create_message(self) -> None:
         # the channel is based on the observer's channel mapping
-        channel_idx = self.observation.channel
+        channel_idx = self.observation.channel_idx
         if channel_idx is None:
             channel = None
         else:
