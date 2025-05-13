@@ -11,7 +11,6 @@ class TextMessage(models.Model):
     """Model representing a text message sent to a node."""
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    packet_id = models.BigIntegerField(null=False, blank=False)
     original_packet = models.ForeignKey(MessagePacket, null=True, on_delete=models.CASCADE)
 
     sender = models.ForeignKey(ObservedNode, on_delete=models.CASCADE)

@@ -40,7 +40,6 @@ def test_process_packet_already_processed(
 
     # Create a message with the same packet_id to simulate already processed
     TextMessage.objects.create(
-        packet_id=packet.packet_id,
         sender=ObservedNode.objects.get_or_create(node_id=packet.from_int)[0],
         original_packet=packet,
         recipient_node_id=packet.to_int,

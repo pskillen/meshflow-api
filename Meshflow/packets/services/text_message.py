@@ -26,7 +26,7 @@ class TextMessagePacketService(BasePacketService):
             raise ValueError("Packet must be a MessagePacket")
 
         # ensure the message hasn't already been processed
-        if TextMessage.objects.filter(packet_id=self.packet.packet_id).exists():
+        if TextMessage.objects.filter(original_packet=self.packet).exists():
             return
 
         self._create_message()
@@ -37,8 +37,6 @@ class TextMessagePacketService(BasePacketService):
         # Create a new Message record
         TextMessage.objects.create(
             sender=self.from_node,
-            # TODO: We're dropping the packet_id from the Message model
-            packet_id=self.packet.packet_id,
             original_packet=self.packet,
             recipient_node_id=self.packet.to_int,
             message_text=self.packet.message_text,
