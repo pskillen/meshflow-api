@@ -1,5 +1,3 @@
-from unittest.mock import patch
-
 import pytest
 
 from common.mesh_node_helpers import BROADCAST_ID
@@ -84,41 +82,21 @@ def test_create_message_with_channel(
 ):
     """Test creating a message with a channel."""
     service = TextMessagePacketService()
-    packet = create_message_packet()
-    observer = create_managed_node()
-    observation = create_packet_observation(packet=packet, observer=observer, channel=1)
-    user = create_user()
 
     # Create a real MessageChannel instance
     constellation = create_constellation()
     message_channel = MessageChannel.objects.create(name="test_channel", constellation=constellation)
 
+    packet = create_message_packet()
+    observer = create_managed_node()
+    observation = create_packet_observation(packet=packet, observer=observer, channel=message_channel)
+    user = create_user()
+
     # Mock the get_channel method to return a MessageChannel instance
-    with patch.object(observer, "get_channel", return_value=message_channel):
-        service.process_packet(packet, observer, observation, user)
+    service.process_packet(packet, observer, observation, user)
 
     message = TextMessage.objects.latest("id")
     assert message.channel == message_channel
-    assert message.original_packet == packet
-
-
-@pytest.mark.django_db
-def test_create_message_with_invalid_channel(
-    create_message_packet, create_managed_node, create_packet_observation, create_user
-):
-    """Test creating a message with an invalid channel."""
-    service = TextMessagePacketService()
-    packet = create_message_packet()
-    observer = create_managed_node()
-    observation = create_packet_observation(packet=packet, observer=observer, channel=1)
-    user = create_user()
-
-    # Mock the get_channel method to raise ValueError
-    with patch.object(observer, "get_channel", side_effect=ValueError):
-        service.process_packet(packet, observer, observation, user)
-
-    message = TextMessage.objects.latest("id")
-    assert message.channel is None
     assert message.original_packet == packet
 
 

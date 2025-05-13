@@ -167,8 +167,6 @@ class PacketObservation(models.Model):
     packet = models.ForeignKey(RawPacket, on_delete=models.CASCADE, related_name="observations")
     observer = models.ForeignKey(ManagedNode, on_delete=models.CASCADE)
 
-    channel_idx = models.SmallIntegerField(null=True)
-    # TODO: add a FK to constellation.MessageChannel. Add a migration to infer value from self.channel
     channel = models.ForeignKey(MessageChannel, on_delete=models.CASCADE, null=True)
     hop_limit = models.SmallIntegerField(null=True)
     hop_start = models.SmallIntegerField(null=True)

@@ -33,15 +33,6 @@ class TextMessagePacketService(BasePacketService):
         self._authorize_node_claim()
 
     def _create_message(self) -> None:
-        # the channel is based on the observer's channel mapping
-        channel_idx = self.observation.channel_idx
-        if channel_idx is None:
-            channel = None
-        else:
-            try:
-                channel = self.observer.get_channel(channel_idx)
-            except ValueError:
-                channel = None
 
         # Create a new Message record
         TextMessage.objects.create(
@@ -53,7 +44,8 @@ class TextMessagePacketService(BasePacketService):
             message_text=self.packet.message_text,
             is_emoji=self.packet.emoji,
             reply_to_message_id=self.packet.reply_packet_id,
-            channel=channel,
+            # the channel is based on the observer's channel mapping
+            channel=self.observation.channel,
         )
 
     def _authorize_node_claim(self) -> None:
