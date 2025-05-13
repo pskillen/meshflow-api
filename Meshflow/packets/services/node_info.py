@@ -9,6 +9,8 @@ class NodeInfoPacketService(BasePacketService):
 
     def _process_packet(self) -> None:
         """Process the node info packet and update the ObservedNode if required."""
+        if not isinstance(self.packet, NodeInfoPacket):
+            raise ValueError("Packet must be a NodeInfoPacket")
         sender = self.from_node
 
         # check if the node info packet is for the current node
