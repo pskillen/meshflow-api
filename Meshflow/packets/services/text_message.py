@@ -46,7 +46,9 @@ class TextMessagePacketService(BasePacketService):
         # Create a new Message record
         TextMessage.objects.create(
             sender=self.from_node,
+            # TODO: We're dropping the packet_id from the Message model
             packet_id=self.packet.packet_id,
+            original_packet=self.packet,
             recipient_node_id=self.packet.to_int,
             message_text=self.packet.message_text,
             is_emoji=self.packet.emoji,

@@ -99,6 +99,7 @@ def test_create_message_with_channel(
 
     message = TextMessage.objects.latest("id")
     assert message.channel == message_channel
+    assert message.original_packet == packet
 
 
 @pytest.mark.django_db
@@ -118,6 +119,7 @@ def test_create_message_with_invalid_channel(
 
     message = TextMessage.objects.latest("id")
     assert message.channel is None
+    assert message.original_packet == packet
 
 
 @pytest.mark.django_db
