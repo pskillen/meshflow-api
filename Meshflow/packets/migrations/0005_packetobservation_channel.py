@@ -8,19 +8,34 @@ def migrate_channel_idx_to_channel(apps, schema_editor):
     ManagedNode = apps.get_model('nodes', 'ManagedNode')
     MessageChannel = apps.get_model('constellations', 'MessageChannel')
 
-    for obs in PacketObservation.objects.all():
+    try:
+        from tqdm import tqdm
+    except ImportError:
+        # Fallback: dummy tqdm
+        def tqdm(x, *args, **kwargs):
+            return x
+
+    # Step 1: Bulk fetch all observers
+    observers = {o.pk: o for o in ManagedNode.objects.all()}
+
+    # Step 2: Bulk fetch all channels for all observers
+    # We'll assume channel_0 ... channel_7 fields exist
+    observer_channels = {}
+    for observer in ManagedNode.objects.all():
+        observer_channels[observer.pk] = {i: getattr(observer, f'channel_{i}', None) for i in range(8)}
+
+    observations = PacketObservation.objects.all()
+    obs_count = observations.count()
+    print(f"\nMigrating {obs_count} packet observations")
+
+    for obs in tqdm(observations.iterator(), total=obs_count, desc="Migrating PacketObservations"):
         if obs.channel_idx is not None:
-            try:
-                observer = obs.observer
-                constellation = observer.constellation
-                # Get the channel field name for this index
-                channel_field = f'channel_{obs.channel_idx}'
-                channel = getattr(observer, channel_field, None)
+            observer = observers.get(obs.observer_id)
+            if observer:
+                channel = observer_channels[observer.pk].get(obs.channel_idx)
                 if channel is not None:
                     obs.channel = channel
                     obs.save(update_fields=['channel'])
-            except Exception:
-                pass  # If anything goes wrong, leave channel as None
 
 def migrate_channel_to_channel_idx(apps, schema_editor):
     PacketObservation = apps.get_model('packets', 'PacketObservation')
