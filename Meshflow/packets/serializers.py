@@ -8,7 +8,6 @@ from rest_framework import serializers
 
 from common.mesh_node_helpers import meshtastic_hex_to_int, meshtastic_id_to_hex
 from nodes.models import DeviceMetrics, ManagedNode, ObservedNode, Position
-from nodes.serializers import ManagedNodeSerializer
 
 from .models import (
     DeviceMetricsPacket,
@@ -114,11 +113,28 @@ class BasePacketSerializer(serializers.Serializer):
             # If the same observer reports the same packet again, ignore it
             return existing_observation
 
+        # --- Channel FK resolution logic ---
+        channel_value = validated_data.get("channel")
+        channel_instance = None
+        if channel_value is not None:
+            from constellations.models import MessageChannel
+
+            if isinstance(channel_value, MessageChannel):
+                channel_instance = channel_value
+            else:
+                # Assume int/PK
+                try:
+                    channel_instance = MessageChannel.objects.get(pk=channel_value)
+                except MessageChannel.DoesNotExist:
+                    raise serializers.ValidationError(
+                        {"channel": f"MessageChannel with id {channel_value} does not exist"}
+                    )
+
         # Create new observation
         observation = PacketObservation.objects.create(
             packet=packet,
             observer=observer,
-            channel=validated_data.get("channel"),
+            channel=channel_instance,
             hop_limit=validated_data.get("hop_limit"),
             hop_start=validated_data.get("hop_start"),
             rx_time=validated_data.get("rx_time"),
