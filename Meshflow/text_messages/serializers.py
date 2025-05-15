@@ -2,7 +2,7 @@ from rest_framework import serializers
 
 from constellations.models import MessageChannel
 from nodes.models import ObservedNode
-from packets.serializers import PacketObservationSerializer
+from packets.serializers import PrefetchedPacketObservationSerializer
 
 from .models import TextMessage
 
@@ -50,5 +50,5 @@ class TextMessageSerializer(serializers.ModelSerializer):
         # Use prefetched observations if available
         if hasattr(obj.original_packet, "prefetched_observations"):
             observations = obj.original_packet.prefetched_observations
-            return PacketObservationSerializer(observations, many=True).data
+            return PrefetchedPacketObservationSerializer(observations, many=True).data
         return []

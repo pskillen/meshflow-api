@@ -762,15 +762,44 @@ class NodeSerializer(serializers.ModelSerializer):
         return instance
 
 
-class PacketObservationSerializer(serializers.ModelSerializer):
+class PrefetchedPacketObservationSerializer(serializers.ModelSerializer):
     """Serializer for packet observations."""
 
     class ObserverSerializer(serializers.ModelSerializer):
         """Serializer for the observer node."""
 
+        long_name = serializers.SerializerMethodField()
+        short_name = serializers.SerializerMethodField()
+
         class Meta:
             model = ManagedNode
             fields = ["node_id", "node_id_str", "long_name", "short_name"]
+
+        def get_long_name(self, obj):
+            """
+            Return the long_name from the corresponding ObservedNode if it exists,
+            otherwise return the ManagedNode's name.
+            """
+            # Try to find a corresponding ObservedNode
+            try:
+                observed_node = ObservedNode.objects.get(node_id=obj.node_id)
+                return observed_node.long_name
+            except ObservedNode.DoesNotExist:
+                # Fall back to ManagedNode's name
+                return obj.name
+
+        def get_short_name(self, obj):
+            """
+            Return the short_name from the corresponding ObservedNode if it exists,
+            otherwise return the ManagedNode's node_id_str.
+            """
+            # Try to find a corresponding ObservedNode
+            try:
+                observed_node = ObservedNode.objects.get(node_id=obj.node_id)
+                return observed_node.short_name
+            except ObservedNode.DoesNotExist:
+                # Fall back to ManagedNode's node_id_str
+                return obj.node_id_str
 
     observer = ObserverSerializer(read_only=True)
     direct_from_sender = serializers.SerializerMethodField()
