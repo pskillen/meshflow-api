@@ -775,32 +775,47 @@ class PrefetchedPacketObservationSerializer(serializers.ModelSerializer):
             model = ManagedNode
             fields = ["node_id", "node_id_str", "long_name", "short_name"]
 
+        def __init__(self, *args, **kwargs):
+            # Always pass parent context to this serializer
+            parent = kwargs.pop("parent", None)
+            if parent is not None:
+                kwargs["context"] = parent.context
+            super().__init__(*args, **kwargs)
+
         def get_long_name(self, obj):
             """
             Return the long_name from the corresponding ObservedNode if it exists,
             otherwise return the ManagedNode's name.
             """
-            # Try to find a corresponding ObservedNode
-            try:
-                observed_node = ObservedNode.objects.get(node_id=obj.node_id)
+            # Try to get ObservedNode from prefetch cache
+            observed_node = self._get_observed_node(obj)
+            if observed_node:
                 return observed_node.long_name
-            except ObservedNode.DoesNotExist:
-                # Fall back to ManagedNode's name
-                return obj.name
+            return obj.name
 
         def get_short_name(self, obj):
             """
             Return the short_name from the corresponding ObservedNode if it exists,
             otherwise return the ManagedNode's node_id_str.
             """
-            # Try to find a corresponding ObservedNode
-            try:
-                observed_node = ObservedNode.objects.get(node_id=obj.node_id)
+            observed_node = self._get_observed_node(obj)
+            if observed_node:
                 return observed_node.short_name
-            except ObservedNode.DoesNotExist:
-                # Fall back to ManagedNode's node_id_str
-                return obj.node_id_str
+            return obj.node_id_str
 
+        def _get_observed_node(self, obj):
+            # Use pre-fetched observed nodes if available
+            # The parent serializer context should have a mapping: node_id -> ObservedNode
+            observer_nodes_map = self.context.get("observer_nodes_map")
+            if observer_nodes_map:
+                return observer_nodes_map.get(obj.node_id)
+            # Fallback: try to use prefetch cache (if using prefetch_related)
+            if hasattr(obj, "prefetched_observed_nodes") and obj.prefetched_observed_nodes:
+                return obj.prefetched_observed_nodes[0]
+            # Fallback: DB hit (should be rare)
+            return ObservedNode.objects.filter(node_id=obj.node_id).first()
+
+    # observer = serializers.SerializerMethodField()
     observer = ObserverSerializer(read_only=True)
     direct_from_sender = serializers.SerializerMethodField()
     hop_count = serializers.SerializerMethodField()
@@ -825,3 +840,7 @@ class PrefetchedPacketObservationSerializer(serializers.ModelSerializer):
         if obj.hop_start is None or obj.hop_limit is None:
             return None
         return obj.hop_start - obj.hop_limit
+
+    def get_observer(self, obj):
+        # Pass self as parent so context is inherited
+        return self.ObserverSerializer(obj.observer, parent=self).data
