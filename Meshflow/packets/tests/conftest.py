@@ -2,6 +2,7 @@ from django.utils import timezone
 
 import pytest
 
+from constellations.models import MessageChannel
 from constellations.tests.conftest import constellation_data, create_constellation  # noqa: F401
 from nodes.tests.conftest import create_managed_node, managed_node_data  # noqa: F401
 from packets.models import (
@@ -190,6 +191,9 @@ def create_device_metrics_packet(device_metrics_packet_data):
     def make_packet(**kwargs):
         data = device_metrics_packet_data.copy()
         data.update(kwargs)
+        # Ensure reading_time is always set
+        if data.get("reading_time") is None:
+            data["reading_time"] = timezone.now()
         return DeviceMetricsPacket.objects.create(**data)
 
     return make_packet
@@ -220,11 +224,18 @@ def create_packet_observation(create_raw_packet, create_managed_node):  # noqa: 
     def make_observation(**kwargs):
         packet = kwargs.pop("packet", create_raw_packet())
         observer = kwargs.pop("observer", create_managed_node())
+        channel = kwargs.pop("channel", None)
+
+        if channel is None:
+            channel = MessageChannel.objects.create(
+                name=f"Channel {observer.internal_id}",
+                constellation=observer.constellation,
+            )
 
         return PacketObservation.objects.create(
             packet=packet,
             observer=observer,
-            channel=1,
+            channel=channel,
             hop_limit=3,
             hop_start=3,
             rx_time=timezone.now(),

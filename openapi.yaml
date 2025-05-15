@@ -957,6 +957,50 @@ components:
           type: integer
           description: Number of packets in this interval
 
+    PacketObservation:
+      type: object
+      description: Information about a node that observed a packet
+      properties:
+        observer:
+          type: object
+          description: The node that observed the packet
+          properties:
+            node_id:
+              type: integer
+              description: The ID of the node
+            node_id_str:
+              type: string
+              description: The ID of the node in Meshastic !hex format
+            long_name:
+              type: string
+              description: The long name of the node
+              nullable: true
+            short_name:
+              type: string
+              description: The short name of the node
+              nullable: true
+        rx_time:
+          type: string
+          format: date-time
+          description: The time the packet was received
+        rx_rssi:
+          type: number
+          format: float
+          description: The RSSI of the received packet
+          nullable: true
+        rx_snr:
+          type: number
+          format: float
+          description: The SNR of the received packet
+          nullable: true
+        direct_from_sender:
+          type: boolean
+          description: Whether the packet was heard directly from the sender
+        hop_count:
+          type: integer
+          description: The number of hops the packet took to reach the observer
+          nullable: true
+
     TextMessage:
       type: object
       description: A text message sent to a node
@@ -1008,6 +1052,12 @@ components:
           type: integer
           nullable: true
           description: The packet_id of the message being replied to
+          readOnly: true
+        heard:
+          type: array
+          description: List of nodes that heard this message
+          items:
+            $ref: '#/components/schemas/PacketObservation'
           readOnly: true
 
     MessageChannel:

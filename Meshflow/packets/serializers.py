@@ -7,7 +7,7 @@ from django.utils import timezone as django_timezone
 from rest_framework import serializers
 
 from common.mesh_node_helpers import meshtastic_hex_to_int, meshtastic_id_to_hex
-from nodes.models import DeviceMetrics, ObservedNode, Position
+from nodes.models import DeviceMetrics, ManagedNode, ObservedNode, Position
 
 from .models import (
     DeviceMetricsPacket,
@@ -113,11 +113,28 @@ class BasePacketSerializer(serializers.Serializer):
             # If the same observer reports the same packet again, ignore it
             return existing_observation
 
+        # --- Channel FK resolution logic ---
+        channel_value = validated_data.get("channel")
+        channel_instance = None
+        if channel_value is not None:
+            from constellations.models import MessageChannel
+
+            if isinstance(channel_value, MessageChannel):
+                channel_instance = channel_value
+            else:
+                # Assume int/PK
+                try:
+                    channel_instance = MessageChannel.objects.get(pk=channel_value)
+                except MessageChannel.DoesNotExist:
+                    raise serializers.ValidationError(
+                        {"channel": f"MessageChannel with id {channel_value} does not exist"}
+                    )
+
         # Create new observation
         observation = PacketObservation.objects.create(
             packet=packet,
             observer=observer,
-            channel=validated_data.get("channel"),
+            channel=channel_instance,
             hop_limit=validated_data.get("hop_limit"),
             hop_start=validated_data.get("hop_start"),
             rx_time=validated_data.get("rx_time"),
@@ -743,3 +760,87 @@ class NodeSerializer(serializers.ModelSerializer):
         self._create_related_objects(instance, position_data, device_metrics_data)
 
         return instance
+
+
+class PrefetchedPacketObservationSerializer(serializers.ModelSerializer):
+    """Serializer for packet observations."""
+
+    class ObserverSerializer(serializers.ModelSerializer):
+        """Serializer for the observer node."""
+
+        long_name = serializers.SerializerMethodField()
+        short_name = serializers.SerializerMethodField()
+
+        class Meta:
+            model = ManagedNode
+            fields = ["node_id", "node_id_str", "long_name", "short_name"]
+
+        def __init__(self, *args, **kwargs):
+            # Always pass parent context to this serializer
+            parent = kwargs.pop("parent", None)
+            if parent is not None:
+                kwargs["context"] = parent.context
+            super().__init__(*args, **kwargs)
+
+        def get_long_name(self, obj):
+            """
+            Return the long_name from the corresponding ObservedNode if it exists,
+            otherwise return the ManagedNode's name.
+            """
+            # Try to get ObservedNode from prefetch cache
+            observed_node = self._get_observed_node(obj)
+            if observed_node:
+                return observed_node.long_name
+            return obj.name
+
+        def get_short_name(self, obj):
+            """
+            Return the short_name from the corresponding ObservedNode if it exists,
+            otherwise return the ManagedNode's node_id_str.
+            """
+            observed_node = self._get_observed_node(obj)
+            if observed_node:
+                return observed_node.short_name
+            return obj.node_id_str
+
+        def _get_observed_node(self, obj):
+            # Use pre-fetched observed nodes if available
+            # The parent serializer context should have a mapping: node_id -> ObservedNode
+            observer_nodes_map = self.context.get("observer_nodes_map")
+            if observer_nodes_map:
+                return observer_nodes_map.get(obj.node_id)
+            # Fallback: try to use prefetch cache (if using prefetch_related)
+            if hasattr(obj, "prefetched_observed_nodes") and obj.prefetched_observed_nodes:
+                return obj.prefetched_observed_nodes[0]
+            # Fallback: DB hit (should be rare)
+            return ObservedNode.objects.filter(node_id=obj.node_id).first()
+
+    # observer = serializers.SerializerMethodField()
+    observer = ObserverSerializer(read_only=True)
+    direct_from_sender = serializers.SerializerMethodField()
+    hop_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PacketObservation
+        fields = [
+            "observer",
+            "rx_time",
+            "rx_rssi",
+            "rx_snr",
+            "direct_from_sender",
+            "hop_count",
+        ]
+
+    def get_direct_from_sender(self, obj):
+        """Return True if the packet was heard directly from the sender."""
+        return obj.hop_start == obj.hop_limit
+
+    def get_hop_count(self, obj):
+        """Return the hop count (hop_start minus hop_limit)."""
+        if obj.hop_start is None or obj.hop_limit is None:
+            return None
+        return obj.hop_start - obj.hop_limit
+
+    def get_observer(self, obj):
+        # Pass self as parent so context is inherited
+        return self.ObserverSerializer(obj.observer, parent=self).data

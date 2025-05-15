@@ -7,7 +7,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 
 from common.mesh_node_helpers import meshtastic_id_to_hex
-from constellations.models import Constellation
+from constellations.models import Constellation, MessageChannel
 from nodes.models import ManagedNode, ObservedNode
 from packets.models import (
     DeviceMetricsPacket,
@@ -188,6 +188,43 @@ class MessagePacketSerializerTest(BasePacketSerializerTestCase):
         self.assertEqual(packet.observations.count(), 1)
         observation = packet.observations.first()
         self.assertEqual(observation.observer, self.observer)
+
+    def test_create_message_packet_with_channel(self):
+        """Test creating a message packet with a channel (int) sets the correct FK on PacketObservation."""
+
+        # Create a MessageChannel for the observer's constellation
+        message_channel = MessageChannel.objects.create(
+            name="Test Channel",
+            constellation=self.observer.constellation,
+        )
+
+        data = {
+            "id": 987654321,
+            "from": self.from_node.node_id,
+            "fromId": self.from_node.node_id_str,
+            "decoded": {
+                "portnum": "TEXT_MESSAGE_APP",
+                "text": "Channel test!",
+            },
+            "rxTime": 1672531200,
+            "channel": message_channel.id,  # Pass the channel as int
+        }
+
+        serializer = MessagePacketSerializer(data=data, context=self.context)
+        assert_serializer_valid(serializer)
+        packet = serializer.save()
+
+        # Verify model creation
+        self.assertIsInstance(packet, MessagePacket)
+        self.assertEqual(packet.packet_id, 987654321)
+        self.assertEqual(packet.message_text, "Channel test!")
+
+        # Verify observation creation and correct channel FK
+        self.assertEqual(packet.observations.count(), 1)
+        observation = packet.observations.first()
+        self.assertEqual(observation.observer, self.observer)
+        self.assertIsNotNone(observation.channel)
+        self.assertEqual(observation.channel, message_channel)
 
 
 class PositionPacketSerializerTest(BasePacketSerializerTestCase):

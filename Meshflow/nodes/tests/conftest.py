@@ -1,6 +1,7 @@
 import pytest
 
 from common.mesh_node_helpers import meshtastic_id_to_hex
+from constellations.models import MessageChannel
 from constellations.tests.conftest import create_constellation  # noqa: F401
 from nodes.models import ManagedNode, NodeAPIKey, NodeAuth, ObservedNode
 from users.tests.conftest import create_user  # noqa: F401
@@ -43,6 +44,19 @@ def create_managed_node(managed_node_data, create_user, create_constellation):  
             data["owner"] = create_user()
         if "constellation" not in data:
             data["constellation"] = create_constellation(created_by=data["owner"])
+
+        # only add 2 channels, we don't need all 8
+        if "channel_0" not in data:
+            data["channel_0"] = MessageChannel.objects.create(
+                name="Channel 0",
+                constellation=data["constellation"],
+            )
+        if "channel_1" not in data:
+            data["channel_1"] = MessageChannel.objects.create(
+                name="Channel 1",
+                constellation=data["constellation"],
+            )
+
         return ManagedNode.objects.create(**data)
 
     return make_managed_node

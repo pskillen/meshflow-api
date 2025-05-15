@@ -26,32 +26,24 @@ class TextMessagePacketService(BasePacketService):
             raise ValueError("Packet must be a MessagePacket")
 
         # ensure the message hasn't already been processed
-        if TextMessage.objects.filter(packet_id=self.packet.packet_id).exists():
+        if TextMessage.objects.filter(original_packet=self.packet).exists():
             return
 
         self._create_message()
         self._authorize_node_claim()
 
     def _create_message(self) -> None:
-        # the channel is based on the observer's channel mapping
-        channel_idx = self.observation.channel
-        if channel_idx is None:
-            channel = None
-        else:
-            try:
-                channel = self.observer.get_channel(channel_idx)
-            except ValueError:
-                channel = None
 
         # Create a new Message record
         TextMessage.objects.create(
             sender=self.from_node,
-            packet_id=self.packet.packet_id,
+            original_packet=self.packet,
             recipient_node_id=self.packet.to_int,
             message_text=self.packet.message_text,
             is_emoji=self.packet.emoji,
             reply_to_message_id=self.packet.reply_packet_id,
-            channel=channel,
+            # the channel is based on the observer's channel mapping
+            channel=self.observation.channel,
         )
 
     def _authorize_node_claim(self) -> None:

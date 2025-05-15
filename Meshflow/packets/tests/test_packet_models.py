@@ -98,7 +98,7 @@ def test_environment_metrics_packet_creation(create_environment_metrics_packet):
 def test_packet_observation_creation(create_packet_observation):
     """Test packet observation creation."""
     observation = create_packet_observation()
-    assert observation.channel == 1
+    assert observation.channel is not None
     assert observation.hop_limit == 3
     assert observation.hop_start == 3
     assert observation.rx_rssi == -60.0
