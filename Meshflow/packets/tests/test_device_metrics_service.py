@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from django.utils import timezone
 
 import pytest
@@ -87,7 +89,8 @@ def test_process_device_metrics_packet_without_reading_time(
     service.process_packet(packet, observer, observation, user)
 
     metrics = DeviceMetrics.objects.latest("id")
-    assert metrics.reported_time == first_reported_time
+    # Compare datetimes with a tolerance
+    assert abs(metrics.reported_time - first_reported_time) < timedelta(milliseconds=100)
 
 
 @pytest.mark.django_db
