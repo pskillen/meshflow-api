@@ -1,0 +1,15 @@
+FROM node:20-alpine
+
+WORKDIR /usr/src/app
+
+# Install Redocly CLI
+RUN npm install -g @redocly/cli@latest
+
+# Copy the OpenAPI specification
+COPY openapi.yaml /usr/src/app/openapi.yaml
+
+# Expose the port
+EXPOSE 8080
+
+# Start Redocly in preview mode
+CMD ["redocly", "preview-docs", "--port", "8080", "--host", "0.0.0.0", "openapi.yaml"]

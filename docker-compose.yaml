@@ -63,6 +63,17 @@ services:
     networks:
       - meshflow_net
 
+  docs:
+    build:
+      context: .
+      dockerfile: Dockerfile-redocly
+    container_name: meshflow-docs
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    networks:
+      - meshflow_net
+
 volumes:
   pg_data:
 
