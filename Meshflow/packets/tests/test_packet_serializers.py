@@ -190,13 +190,16 @@ class MessagePacketSerializerTest(BasePacketSerializerTestCase):
         self.assertEqual(observation.observer, self.observer)
 
     def test_create_message_packet_with_channel(self):
-        """Test creating a message packet with a channel (int) sets the correct FK on PacketObservation."""
+        """Test creating a message packet with a channel index sets the correct FK on PacketObservation."""
 
         # Create a MessageChannel for the observer's constellation
         message_channel = MessageChannel.objects.create(
             name="Test Channel",
             constellation=self.observer.constellation,
         )
+        # Assign to observer's channel_0
+        self.observer.channel_0 = message_channel
+        self.observer.save()
 
         data = {
             "id": 987654321,
@@ -207,7 +210,7 @@ class MessagePacketSerializerTest(BasePacketSerializerTestCase):
                 "text": "Channel test!",
             },
             "rxTime": 1672531200,
-            "channel": message_channel.id,  # Pass the channel as int
+            "channel": 0,  # Pass the channel index
         }
 
         serializer = MessagePacketSerializer(data=data, context=self.context)
