@@ -7,6 +7,7 @@ ARG VERSION=development
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
 ENV APP_VERSION=${VERSION}
+ENV DJANGO_SETTINGS_MODULE=Meshflow.settings.monolith
 
 # Set the working directory
 WORKDIR /app
@@ -33,5 +34,10 @@ RUN python manage.py collectstatic --noinput
 # Expose the port the app runs on
 EXPOSE 8000
 
-# Run the Django development server
-CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"] 
+# Create a non-root user to run the application
+RUN adduser --disabled-password --gecos "" appuser
+RUN chown -R appuser:appuser /app
+USER appuser
+
+# Run Gunicorn with 4 workers
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "4", "Meshflow.wsgi:application"]
