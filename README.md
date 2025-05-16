@@ -71,9 +71,9 @@ All endpoints will be namespaced under `/api/v1/`.
 
 ---
 
-## 🛠️ Setup Instructions (TBD)
+## 🛠️ Setup Instructions
 
-This project is under initial development. Once bootstrapped, the following will apply:
+### Development Setup
 
 ```bash
 # Clone and enter repo
@@ -89,7 +89,52 @@ python manage.py migrate
 python manage.py runserver
 ```
 
-Docker setup will be included via `docker-compose.yml`.
+### Production Deployment
+
+The application is designed to be deployed as Docker containers. For production deployment, follow these steps:
+
+1. Create a `.env` file with the following variables:
+   ```
+   SECRET_KEY=your_secure_secret_key
+   ```
+
+2. Deploy using Docker Compose:
+   ```bash
+   docker-compose up -d
+   ```
+
+This will start three services:
+- **PostgreSQL database** (port 5432)
+- **Django API** (port 8000)
+- **API Documentation** using Redocly (port 8080)
+
+#### Production Configuration
+
+The production deployment uses:
+- Gunicorn as the WSGI server
+- Whitenoise for static file serving
+- Enhanced security settings
+- Redocly for OpenAPI documentation
+
+#### Accessing the API Documentation
+
+There are two options for accessing the API documentation:
+
+1. **Standalone Redocly Server**: Available at `http://your-server:8080`
+2. **Integrated Documentation**: The Django application also serves documentation at:
+   - Redoc UI: `http://your-server:8000/docs/`
+   - Swagger UI: `http://your-server:8000/swagger/`
+   - Raw OpenAPI JSON: `http://your-server:8000/openapi.json`
+
+The integrated documentation is automatically generated from the API endpoints and is always up-to-date with the codebase.
+
+#### Cloudflare Tunnel Configuration
+
+When using Cloudflare Tunnels, ensure you configure the tunnel to route traffic to both services:
+- Route API requests to `http://localhost:8000`
+- Route documentation requests to `http://localhost:8080`
+
+No additional CDN or cache configuration is needed for static files as they are efficiently served by Whitenoise.
 
 ---
 
@@ -106,4 +151,3 @@ Meshflow is designed to be:
 ## 📌 Status
 
 > 🧪 Currently pre-alpha. The core architecture and structure are being scaffolded.
-

@@ -29,12 +29,14 @@ services:
     container_name: meshflow-migrations
     restart: no
     environment:
-      DEBUG: true
+      DEBUG: false
+      DJANGO_SETTINGS_MODULE: Meshflow.settings.monolith
       POSTGRES_DB: meshflow
       POSTGRES_USER: meshflow
       POSTGRES_PASSWORD: meshflow
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
+      SECRET_KEY: ${SECRET_KEY}
     depends_on:
       postgres:
         condition: service_healthy
@@ -48,13 +50,17 @@ services:
     container_name: meshflow-manager
     restart: unless-stopped
     environment:
-      DEBUG: true
+      DEBUG: false
+      DJANGO_SETTINGS_MODULE: Meshflow.settings.monolith
       POSTGRES_DB: meshflow
       POSTGRES_USER: meshflow
       POSTGRES_PASSWORD: meshflow
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
-      ALLOWED_HOSTS: meshflow-manager
+      ALLOWED_HOSTS: meshflow-manager,localhost,127.0.0.1
+      SECRET_KEY: ${SECRET_KEY}
+      # Disable SSL redirect for Docker setup (handled by reverse proxy)
+      SECURE_SSL_REDIRECT: "false"
     ports:
       - "8000:8000"
     depends_on:
