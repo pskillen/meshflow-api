@@ -1,0 +1,28 @@
+{
+    "from": 4276604911,
+    "to": 4294967295,
+    "channel": 1,
+    "decoded": {
+        "portnum": "TELEMETRY_APP",
+        "payload": "DSqnJ2gaFw194bVBFVIjHEIdxxSARCXs5lJDOJkB",
+        "bitfield": 0,
+        "telemetry": {
+            "time": 1747429162,
+            "environmentMetrics": {
+                "temperature": 22.735102,
+                "relativeHumidity": 39.034492,
+                "barometricPressure": 1024.6493,
+                "gasResistance": 210.90204,
+                "iaq": 153
+            }
+        }
+    },
+    "id": 4016498604,
+    "rxTime": 1747429169,
+    "rxSnr": 0.5,
+    "hopLimit": 3,
+    "rxRssi": -110,
+    "hopStart": 7,
+    "fromId": "!fee7cfef",
+    "toId": "^all"
+}
