@@ -2781,3 +2781,38 @@ paths:
       responses:
         '204':
           description: Text message deleted successfully
+
+  /ws/messages/:
+    get:
+      summary: WebSocket connection for real-time text messages
+      description: |
+        This endpoint provides a WebSocket connection for receiving real-time text messages.
+
+        ## Connection
+        Connect to this endpoint using the WebSocket protocol:
+        ```
+        ws://{host}/ws/messages/?token={jwt_token}
+        ```
+
+        The JWT token must be provided as a query parameter for authentication.
+
+        ## Message Format
+        Messages are sent as JSON objects with the same schema as the TextMessage model.
+
+        ## Example
+        ```javascript
+        // Connect to the WebSocket
+        const socket = new WebSocket(`ws://example.com/ws/messages/?token=${jwtToken}`);
+
+        // Listen for messages
+        socket.onmessage = (event) => {
+          const message = JSON.parse(event.data);
+          console.log('New message:', message);
+        };
+        ```
+      tags: [Text Messages]
+      security:
+        - BearerAuth: []
+      responses:
+        '101':
+          description: WebSocket connection established
