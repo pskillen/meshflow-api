@@ -5,11 +5,15 @@ import re
 
 from django.utils import timezone
 
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
+
 from common.mesh_node_helpers import BROADCAST_ID
 from nodes.models import NodeOwnerClaim
 from packets.models import MessagePacket
 from packets.services.base import BasePacketService
 from text_messages.models import TextMessage
+from text_messages.serializers import TextMessageSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -33,9 +37,10 @@ class TextMessagePacketService(BasePacketService):
         self._authorize_node_claim()
 
     def _create_message(self) -> None:
+        """Create a new TextMessage record and send a WebSocket event."""
 
         # Create a new Message record
-        TextMessage.objects.create(
+        message = TextMessage.objects.create(
             sender=self.from_node,
             original_packet=self.packet,
             recipient_node_id=self.packet.to_int,
@@ -45,6 +50,38 @@ class TextMessagePacketService(BasePacketService):
             # the channel is based on the observer's channel mapping
             channel=self.observation.channel,
         )
+
+        # Send a WebSocket event with the new message
+        self._send_message_event(message)
+
+    def _send_message_event(self, message: TextMessage) -> None:
+        """
+        Send a WebSocket event with the new message.
+
+        Args:
+            message: The TextMessage object to send
+        """
+        try:
+            # Serialize the message
+            serializer = TextMessageSerializer(message)
+            message_data = serializer.data
+
+            # Get the channel layer
+            channel_layer = get_channel_layer()
+
+            # Send the message to the text_messages group
+            async_to_sync(channel_layer.group_send)(
+                "text_messages",
+                {
+                    "type": "text_message",
+                    "message": message_data,
+                },
+            )
+
+            logger.info(f"Sent WebSocket event for message {message.id}")
+        except Exception as e:
+            # Log the error but don't raise it to avoid breaking the message processing
+            logger.error(f"Error sending WebSocket event: {e}")
 
     def _authorize_node_claim(self) -> None:
         """Authorize a user's claim to a node via the claim key in the message."""
