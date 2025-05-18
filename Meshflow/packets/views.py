@@ -82,13 +82,21 @@ class PacketIngestView(APIView):
                 if isinstance(packet, MessagePacket):
                     message_packet_received.send(sender=self, packet=packet, observer=observer, observation=observation)
                 elif isinstance(packet, PositionPacket):
-                    position_packet_received.send(sender=self, packet=packet, observer=observer, observation=observation)
+                    position_packet_received.send(
+                        sender=self, packet=packet, observer=observer, observation=observation
+                    )
                 elif isinstance(packet, DeviceMetricsPacket):
-                    device_metrics_packet_received.send(sender=self, packet=packet, observer=observer, observation=observation)
+                    device_metrics_packet_received.send(
+                        sender=self, packet=packet, observer=observer, observation=observation
+                    )
                 elif isinstance(packet, LocalStatsPacket):
-                    local_stats_packet_received.send(sender=self, packet=packet, observer=observer, observation=observation)
+                    local_stats_packet_received.send(
+                        sender=self, packet=packet, observer=observer, observation=observation
+                    )
                 elif isinstance(packet, NodeInfoPacket):
-                    node_info_packet_received.send(sender=self, packet=packet, observer=observer, observation=observation)
+                    node_info_packet_received.send(
+                        sender=self, packet=packet, observer=observer, observation=observation
+                    )
 
                 return Response(
                     {"status": "success", "message": "Packet ingested successfully"},

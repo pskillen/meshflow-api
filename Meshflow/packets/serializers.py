@@ -9,7 +9,6 @@ from rest_framework import serializers
 from common.mesh_node_helpers import meshtastic_hex_to_int, meshtastic_id_to_hex
 from constellations.models import MessageChannel
 from nodes.models import DeviceMetrics, ManagedNode, ObservedNode, Position
-from packets.services.factory import PacketServiceFactory
 
 from .models import (
     DeviceMetricsPacket,
@@ -151,11 +150,6 @@ class BasePacketSerializer(serializers.Serializer):
             rx_snr=validated_data.get("rx_snr"),
             relay_node=validated_data.get("relay_node"),
         )
-
-        # # Process the packet using the appropriate service
-        # service = PacketServiceFactory.create_service(packet)
-        # if service:
-        #     service.process_packet(packet, observer, observation, self.context.get("user"))
 
         return self.observation
 

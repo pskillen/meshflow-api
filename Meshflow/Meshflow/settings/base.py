@@ -107,9 +107,9 @@ TEMPLATES = [
 WSGI_APPLICATION = "Meshflow.wsgi.application"
 ASGI_APPLICATION = "Meshflow.asgi.application"
 
-_redis_password = os.environ.get('REDIS_PASSWORD', '')
-_redis_host = os.environ.get('REDIS_HOST', 'localhost')
-_redis_port = os.environ.get('REDIS_PORT', '6379')
+_redis_password = os.environ.get("REDIS_PASSWORD", "")
+_redis_host = os.environ.get("REDIS_HOST", "localhost")
+_redis_port = os.environ.get("REDIS_PORT", "6379")
 _redis_url = f"redis://:{_redis_password}@{_redis_host}:{_redis_port}/0"
 
 # Channel layers for Django Channels
