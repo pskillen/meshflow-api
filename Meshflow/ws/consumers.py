@@ -78,6 +78,7 @@ class TextMessageConsumer(AsyncWebsocketConsumer):
         Called when a message is received from the channel layer.
         """
         # Send the message to the WebSocket
+        print(f"Forwarding to WS message: {event['message']}")
         await self.send(text_data=json.dumps(event["message"]))
 
     @database_sync_to_async

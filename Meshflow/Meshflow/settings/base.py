@@ -72,6 +72,7 @@ INSTALLED_APPS = [
     "nodes",
     "packets",
     "text_messages",
+    "ws",
 ]
 
 MIDDLEWARE = [
