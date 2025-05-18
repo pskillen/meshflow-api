@@ -6,8 +6,17 @@ from common.mesh_node_helpers import meshtastic_hex_to_int
 from nodes.authentication import NodeAPIKeyAuthentication
 from nodes.models import ObservedNode
 from nodes.permissions import NodeAuthorizationPermission
+from packets.models import DeviceMetricsPacket, LocalStatsPacket, MessagePacket, NodeInfoPacket, PositionPacket
 
 from .serializers import NodeSerializer, PacketIngestSerializer
+from .signals import (
+    device_metrics_packet_received,
+    local_stats_packet_received,
+    message_packet_received,
+    node_info_packet_received,
+    packet_received,
+    position_packet_received,
+)
 
 
 class PacketIngestView(APIView):
@@ -62,6 +71,24 @@ class PacketIngestView(APIView):
         if serializer.is_valid():
             try:
                 serializer.save()
+
+                packet = serializer.instance
+
+                # Send the packet received signal
+                packet_received.send(sender=self, packet=packet, observer=observer)
+
+                # Send the specific packet type signals
+                if isinstance(packet, MessagePacket):
+                    message_packet_received.send(sender=self, packet=packet, observer=observer)
+                elif isinstance(packet, PositionPacket):
+                    position_packet_received.send(sender=self, packet=packet, observer=observer)
+                elif isinstance(packet, DeviceMetricsPacket):
+                    device_metrics_packet_received.send(sender=self, packet=packet, observer=observer)
+                elif isinstance(packet, LocalStatsPacket):
+                    local_stats_packet_received.send(sender=self, packet=packet, observer=observer)
+                elif isinstance(packet, NodeInfoPacket):
+                    node_info_packet_received.send(sender=self, packet=packet, observer=observer)
+
                 return Response(
                     {"status": "success", "message": "Packet ingested successfully"},
                     status=status.HTTP_201_CREATED,

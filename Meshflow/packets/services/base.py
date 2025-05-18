@@ -4,6 +4,7 @@ import abc
 
 from nodes.models import ManagedNode, ObservedNode
 from packets.models import PacketObservation, RawPacket
+from packets.signals import new_node_observed
 from users.models import User
 
 
@@ -44,6 +45,7 @@ class BasePacketService(abc.ABC):
                 self.from_node = ObservedNode.objects.get(node_id=self.packet.from_int)
             except ObservedNode.DoesNotExist:
                 self.from_node = ObservedNode.objects.create(node_id=self.packet.from_int)
+                new_node_observed.send(sender=self, node=self.from_node, observer=self.observer)
         else:
             raise ValueError("Packet has no from_int")
 
