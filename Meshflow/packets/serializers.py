@@ -76,6 +76,9 @@ class BasePacketSerializer(serializers.Serializer):
     priority = serializers.CharField(required=False, allow_null=True)
     raw = serializers.CharField(required=False)
 
+    # non-serialized fields
+    observation: PacketObservation
+
     def to_internal_value(self, data):
         """Convert camelCase to snake_case for nested fields."""
         # First, handle the standard DRF conversion
@@ -103,6 +106,8 @@ class BasePacketSerializer(serializers.Serializer):
 
     def _create_observation(self, packet, validated_data):
         """Create a PacketObservation for the packet."""
+        self.observation = None
+
         # Get the observer from the request context
         observer = self.context.get("observer")
         if not observer:
@@ -113,10 +118,11 @@ class BasePacketSerializer(serializers.Serializer):
 
         if existing_observation:
             # If the same observer reports the same packet again, ignore it
+            self.observation = existing_observation
             return existing_observation
 
         # --- Channel FK resolution logic ---
-        channel_value = validated_data.get("channel")
+        channel_value = validated_data.get("channel", 0)  # The bot often omits nullish fields
         channel_instance = None
         if channel_value is not None:
 
@@ -134,7 +140,7 @@ class BasePacketSerializer(serializers.Serializer):
                     )
 
         # Create new observation
-        observation = PacketObservation.objects.create(
+        self.observation = PacketObservation.objects.create(
             packet=packet,
             observer=observer,
             channel=channel_instance,
@@ -146,12 +152,12 @@ class BasePacketSerializer(serializers.Serializer):
             relay_node=validated_data.get("relay_node"),
         )
 
-        # Process the packet using the appropriate service
-        service = PacketServiceFactory.create_service(packet)
-        if service:
-            service.process_packet(packet, observer, observation, self.context.get("user"))
+        # # Process the packet using the appropriate service
+        # service = PacketServiceFactory.create_service(packet)
+        # if service:
+        #     service.process_packet(packet, observer, observation, self.context.get("user"))
 
-        return observation
+        return self.observation
 
 
 class MessagePacketSerializer(BasePacketSerializer):
@@ -534,6 +540,10 @@ class LocalStatsPacketSerializer(BasePacketSerializer):
 class PacketIngestSerializer(serializers.Serializer):
     """Serializer for ingesting packets of any type."""
 
+    # non-serialized fields
+    observation: PacketObservation
+    child_serializer: BasePacketSerializer
+
     def to_internal_value(self, data):
         """Convert the incoming packet data to the appropriate packet type."""
         # Determine the packet type based on the portnum
@@ -566,17 +576,17 @@ class PacketIngestSerializer(serializers.Serializer):
         portnum = validated_data.get("port_num")
 
         if portnum == "TEXT_MESSAGE_APP":
-            packet = MessagePacketSerializer(context=self.context).create(validated_data)
+            self.child_serializer = MessagePacketSerializer(context=self.context)
         elif portnum == "NODEINFO_APP":
-            packet = NodeInfoPacketSerializer(context=self.context).create(validated_data)
+            self.child_serializer = NodeInfoPacketSerializer(context=self.context)
         elif portnum == "POSITION_APP":
-            packet = PositionPacketSerializer(context=self.context).create(validated_data)
+            self.child_serializer = PositionPacketSerializer(context=self.context)
         elif portnum == "TELEMETRY_APP":
             # Check if it's device metrics or local stats
             if "battery_level" in validated_data:
-                packet = DeviceMetricsPacketSerializer(context=self.context).create(validated_data)
+                self.child_serializer = DeviceMetricsPacketSerializer(context=self.context)
             elif "num_packets_tx" in validated_data:
-                packet = LocalStatsPacketSerializer(context=self.context).create(validated_data)
+                self.child_serializer = LocalStatsPacketSerializer(context=self.context)
             else:
                 raise serializers.ValidationError(
                     {"decoded.telemetry": "Must contain either deviceMetrics or localStats"}
@@ -584,6 +594,8 @@ class PacketIngestSerializer(serializers.Serializer):
         else:
             raise serializers.ValidationError({"decoded.portnum": f"Unknown packet type: {portnum}"})
 
+        packet = self.child_serializer.create(validated_data)
+        self.observation = self.child_serializer.observation
         return packet
 
 

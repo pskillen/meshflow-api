@@ -6,38 +6,16 @@ from django.dispatch import Signal
 #   sender: The sender of the signal
 #   packet: The packet that was received
 #   observer: The observer that received the packet
+#   observation: The observation that was created for the packet
+#   user: The user that received the packet
 packet_received = Signal()
 
 # Specific packet type signals
-# These are used to signal that a specific packet type has been received
-# Args:
-#   sender: The sender of the signal
-#   packet: The packet that was received
-#   observer: The observer that received the packet
+# these all have the same signature as the packet_received signal
 message_packet_received = Signal()
-# These are used to signal that a node info packet has been received
-# Args:
-#   sender: The sender of the signal
-#   packet: The packet that was received
-#   observer: The observer that received the packet
 node_info_packet_received = Signal()
-# These are used to signal that a position packet has been received
-# Args:
-#   sender: The sender of the signal
-#   packet: The packet that was received
-#   observer: The observer that received the packet
 position_packet_received = Signal()
-# These are used to signal that a device metrics packet has been received
-# Args:
-#   sender: The sender of the signal
-#   packet: The packet that was received
-#   observer: The observer that received the packet
 device_metrics_packet_received = Signal()
-# These are used to signal that a local stats packet has been received
-# Args:
-#   sender: The sender of the signal
-#   packet: The packet that was received
-#   observer: The observer that received the packet
 local_stats_packet_received = Signal()
 
 

@@ -73,21 +73,22 @@ class PacketIngestView(APIView):
                 serializer.save()
 
                 packet = serializer.instance
+                observation = serializer.observation
 
                 # Send the packet received signal
-                packet_received.send(sender=self, packet=packet, observer=observer)
+                packet_received.send(sender=self, packet=packet, observer=observer, observation=observation)
 
                 # Send the specific packet type signals
                 if isinstance(packet, MessagePacket):
-                    message_packet_received.send(sender=self, packet=packet, observer=observer)
+                    message_packet_received.send(sender=self, packet=packet, observer=observer, observation=observation)
                 elif isinstance(packet, PositionPacket):
-                    position_packet_received.send(sender=self, packet=packet, observer=observer)
+                    position_packet_received.send(sender=self, packet=packet, observer=observer, observation=observation)
                 elif isinstance(packet, DeviceMetricsPacket):
-                    device_metrics_packet_received.send(sender=self, packet=packet, observer=observer)
+                    device_metrics_packet_received.send(sender=self, packet=packet, observer=observer, observation=observation)
                 elif isinstance(packet, LocalStatsPacket):
-                    local_stats_packet_received.send(sender=self, packet=packet, observer=observer)
+                    local_stats_packet_received.send(sender=self, packet=packet, observer=observer, observation=observation)
                 elif isinstance(packet, NodeInfoPacket):
-                    node_info_packet_received.send(sender=self, packet=packet, observer=observer)
+                    node_info_packet_received.send(sender=self, packet=packet, observer=observer, observation=observation)
 
                 return Response(
                     {"status": "success", "message": "Packet ingested successfully"},
