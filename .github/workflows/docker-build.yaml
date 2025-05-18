@@ -34,6 +34,7 @@ jobs:
     outputs:
       LATEST_TAG: ${{ steps.set_tags.outputs.LATEST_TAG }}
       LATEST_MIGRATIONS_TAG: ${{ steps.set_tags.outputs.LATEST_MIGRATIONS_TAG }}
+      LATEST_DOCS_TAG: ${{ steps.set_tags.outputs.LATEST_DOCS_TAG }}
 
     steps:
       - name: Checkout Repository
