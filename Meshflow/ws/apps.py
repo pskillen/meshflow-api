@@ -1,10 +1,10 @@
 from django.apps import AppConfig
 
 
-class PacketsConfig(AppConfig):
+class WsConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
-    name = "packets"
+    name = "ws"
 
     def ready(self):
         """Import signal handlers when Django is ready."""
-        import packets.receivers  # noqa
+        import ws.receivers  # noqa

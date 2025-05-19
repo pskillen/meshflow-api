@@ -9,6 +9,7 @@ from common.mesh_node_helpers import BROADCAST_ID
 from nodes.models import NodeOwnerClaim
 from packets.models import MessagePacket
 from packets.services.base import BasePacketService
+from packets.signals import node_claim_authorized, text_message_received
 from text_messages.models import TextMessage
 
 logger = logging.getLogger(__name__)
@@ -33,9 +34,10 @@ class TextMessagePacketService(BasePacketService):
         self._authorize_node_claim()
 
     def _create_message(self) -> None:
+        """Create a new TextMessage record."""
 
         # Create a new Message record
-        TextMessage.objects.create(
+        message = TextMessage.objects.create(
             sender=self.from_node,
             original_packet=self.packet,
             recipient_node_id=self.packet.to_int,
@@ -45,6 +47,10 @@ class TextMessagePacketService(BasePacketService):
             # the channel is based on the observer's channel mapping
             channel=self.observation.channel,
         )
+
+        if self.packet.to_int == BROADCAST_ID:
+            # send the text message packet received signal
+            text_message_received.send(sender=self, message=message, observer=self.observer)
 
     def _authorize_node_claim(self) -> None:
         """Authorize a user's claim to a node via the claim key in the message."""
@@ -80,3 +86,6 @@ class TextMessagePacketService(BasePacketService):
         # delete the claim
         claim.accepted_at = timezone.now()
         claim.save(update_fields=["accepted_at"])
+
+        # send the node claim authorized signal
+        node_claim_authorized.send(sender=self, node=self.from_node, claim=claim, observer=self.observer)

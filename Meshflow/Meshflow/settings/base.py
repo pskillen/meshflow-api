@@ -54,6 +54,8 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt",
     "rest_framework_simplejwt.token_blacklist",
     "corsheaders",
+    # Channels
+    "channels",
     # Authentication
     "allauth",
     "allauth.account",
@@ -68,8 +70,9 @@ INSTALLED_APPS = [
     "users",
     "constellations",
     "nodes",
-    "text_messages",
     "packets",
+    "text_messages",
+    "ws",
 ]
 
 MIDDLEWARE = [
@@ -103,6 +106,22 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = "Meshflow.wsgi.application"
+ASGI_APPLICATION = "Meshflow.asgi.application"
+
+_redis_password = os.environ.get("REDIS_PASSWORD", "")
+_redis_host = os.environ.get("REDIS_HOST", "localhost")
+_redis_port = os.environ.get("REDIS_PORT", "6379")
+_redis_url = f"redis://:{_redis_password}@{_redis_host}:{_redis_port}/0"
+
+# Channel layers for Django Channels
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [_redis_url],
+        },
+    },
+}
 
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
