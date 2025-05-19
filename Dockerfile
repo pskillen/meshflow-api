@@ -39,5 +39,5 @@ RUN adduser --disabled-password --gecos "" appuser
 RUN chown -R appuser:appuser /app
 USER appuser
 
-# Run Gunicorn with 4 workers
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "4", "Meshflow.wsgi:application"]
+# Run Daphne ASGI server
+CMD ["daphne", "-b", "0.0.0.0", "-p", "8000", "Meshflow.asgi:application"]
