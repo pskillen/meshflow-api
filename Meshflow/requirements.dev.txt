@@ -12,5 +12,9 @@ black~=24.2
 flake8~=7.0
 isort~=5.13
 
+# live reload
+watchfiles~=1.0.5
+uvicorn~=0.34.2
+
 # Include production requirements
 -r requirements.txt
