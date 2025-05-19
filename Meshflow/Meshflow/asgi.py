@@ -9,6 +9,7 @@ https://docs.djangoproject.com/en/4.2/howto/deployment/asgi/
 
 import os
 
+from django.conf import settings
 from django.core.asgi import get_asgi_application
 
 from channels.auth import AuthMiddlewareStack
@@ -34,3 +35,9 @@ application = ProtocolTypeRouter(
         ),
     }
 )
+
+# Serve static files in development
+if settings.SERVE_STATIC_FILES:
+    from django.contrib.staticfiles.handlers import ASGIStaticFilesHandler
+
+    application = ASGIStaticFilesHandler(application)

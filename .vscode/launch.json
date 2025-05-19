@@ -5,6 +5,18 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Meshflow API (daphne)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "daphne",
+            "args": [
+                "Meshflow.asgi:application",
+                "--bind", "0.0.0.0",
+                "--port", "8000"
+            ],
+            "cwd": "${workspaceFolder}/Meshflow"
+        },
+        {
             "name": "Meshflow API (runserver)",
             "type": "debugpy",
             "request": "launch",
@@ -16,6 +28,20 @@
             "django": true,
             "autoStartBrowser": false,
             "program": "${workspaceFolder}/Meshflow/manage.py",
+            "cwd": "${workspaceFolder}/Meshflow",
+            "python": "${workspaceFolder}/Meshflow/venv-mf-api/bin/python"
+        },
+        {
+            "name": "Meshflow API (uvicorn, autoreload)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "uvicorn",
+            "args": [
+                "Meshflow.asgi:application",
+                "--host", "0.0.0.0",
+                "--port", "8000",
+                "--reload"
+            ],
             "cwd": "${workspaceFolder}/Meshflow"
         }
     ]
