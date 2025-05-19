@@ -30,6 +30,8 @@ SECRET_KEY = os.environ.get("SECRET_KEY", _non_prod_secret_key)
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get("DEBUG", "false") in ["True", "true", "1"]
 
+SERVE_STATIC_FILES = os.environ.get("SERVE_STATIC_FILES", "false") in ["True", "true", "1"]
+
 ALLOWED_HOSTS = [
     "127.0.0.1",
     "localhost",
