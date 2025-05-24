@@ -203,6 +203,7 @@ class MessagePacketSerializer(BasePacketSerializer):
             message_text=validated_data.get("message_text"),
             reply_packet_id=validated_data.get("reply_packet_id"),
             emoji=validated_data.get("emoji", False),
+            first_observed_time=validated_data.get("rx_time"),
         )
 
         # Create the observation
@@ -279,6 +280,7 @@ class PositionPacketSerializer(BasePacketSerializer):
             position_time=validated_data.get("position_time"),
             ground_speed=validated_data.get("ground_speed"),
             ground_track=validated_data.get("ground_track"),
+            first_observed_time=validated_data.get("rx_time"),
         )
 
         # Create the observation
@@ -359,6 +361,7 @@ class NodeInfoPacketSerializer(BasePacketSerializer):
             public_key=validated_data.get("public_key"),
             mac_address=validated_data.get("mac_address"),
             role=validated_data.get("role"),
+            first_observed_time=validated_data.get("rx_time"),
         )
 
         # Create the observation
@@ -437,6 +440,7 @@ class DeviceMetricsPacketSerializer(BasePacketSerializer):
             channel_utilization=validated_data.get("channel_utilization"),
             air_util_tx=validated_data.get("air_util_tx"),
             uptime_seconds=validated_data.get("uptime_seconds"),
+            first_observed_time=validated_data.get("rx_time"),
         )
 
         # Create the observation
@@ -523,6 +527,7 @@ class LocalStatsPacketSerializer(BasePacketSerializer):
             num_total_nodes=validated_data.get("num_total_nodes"),
             num_rx_dupe=validated_data.get("num_rx_dupe"),
             reading_time=validated_data.get("reading_time"),
+            first_observed_time=validated_data.get("rx_time"),
         )
 
         # Create the observation

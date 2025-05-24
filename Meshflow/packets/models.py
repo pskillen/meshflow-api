@@ -45,7 +45,7 @@ class RawPacket(models.Model):
     to_int = models.BigIntegerField(null=True)
     to_str = models.CharField(max_length=9, null=True)
     port_num = models.CharField(max_length=50, null=True)
-    first_reported_time = models.DateTimeField(null=False, default=timezone.now)
+    first_observed_time = models.DateTimeField(null=False)
 
     class Meta:
         indexes = [
