@@ -831,6 +831,7 @@ class PrefetchedPacketObservationSerializer(serializers.ModelSerializer):
     observer = ObserverSerializer(read_only=True)
     direct_from_sender = serializers.SerializerMethodField()
     hop_count = serializers.SerializerMethodField()
+    first_observed_time = serializers.ReadOnlyField(source="packet.first_observed_time")
 
     class Meta:
         model = PacketObservation
@@ -841,6 +842,7 @@ class PrefetchedPacketObservationSerializer(serializers.ModelSerializer):
             "rx_snr",
             "direct_from_sender",
             "hop_count",
+            "first_observed_time",
         ]
 
     def get_direct_from_sender(self, obj):

@@ -75,10 +75,10 @@ def test_process_position_packet_without_position_time(
 ):
     """Test processing a position packet without a position time."""
     service = PositionPacketService()
-    first_reported_time = timezone.now()
+    first_observed_time = timezone.now()
     packet = create_position_packet(position_time=None)
-    # Set first_reported_time directly since it's not in the fixture
-    packet.first_reported_time = first_reported_time
+    # Set first_observed_time directly since it's not in the fixture
+    packet.first_observed_time = first_observed_time
     packet.save()
 
     observer = create_managed_node()
@@ -88,7 +88,7 @@ def test_process_position_packet_without_position_time(
     service.process_packet(packet, observer, observation, user)
 
     position = Position.objects.latest("id")
-    assert position.reported_time == first_reported_time
+    assert position.reported_time == first_observed_time
 
 
 @pytest.mark.django_db

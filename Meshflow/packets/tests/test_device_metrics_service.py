@@ -76,10 +76,10 @@ def test_process_device_metrics_packet_without_reading_time(
 ):
     """Test processing a device metrics packet without a reading time."""
     service = DeviceMetricsPacketService()
-    first_reported_time = timezone.now()
+    first_observed_time = timezone.now()
     packet = create_device_metrics_packet(reading_time=None)
-    # Set first_reported_time directly since it's not in the fixture
-    packet.first_reported_time = first_reported_time
+    # Set first_observed_time directly since it's not in the fixture
+    packet.first_observed_time = first_observed_time
     packet.save()
 
     observer = create_managed_node()
@@ -90,7 +90,7 @@ def test_process_device_metrics_packet_without_reading_time(
 
     metrics = DeviceMetrics.objects.latest("id")
     # Compare datetimes with a tolerance
-    assert abs(metrics.reported_time - first_reported_time) < timedelta(milliseconds=100)
+    assert abs(metrics.reported_time - first_observed_time) < timedelta(milliseconds=100)
 
 
 @pytest.mark.django_db
@@ -122,9 +122,9 @@ def test_update_node_last_heard(
 ):
     """Test that the node's last_heard timestamp is updated."""
     service = DeviceMetricsPacketService()
-    first_reported_time = timezone.now()
+    first_observed_time = timezone.now()
     packet = create_device_metrics_packet()
-    packet.first_reported_time = first_reported_time
+    packet.first_observed_time = first_observed_time
     packet.save()
 
     observer = create_managed_node()
@@ -141,4 +141,4 @@ def test_update_node_last_heard(
 
     # Verify the node's last_heard was updated
     from_node.refresh_from_db()
-    assert from_node.last_heard == first_reported_time
+    assert from_node.last_heard == first_observed_time

@@ -29,6 +29,7 @@ def raw_packet_data():
         "to_int": 123456789,
         "to_str": "!75bcd15",
         "port_num": "TEXT_MESSAGE_APP",
+        "first_observed_time": timezone.now(),
     }
 
 
@@ -44,6 +45,7 @@ def message_packet_data():
         "message_text": "Test message",
         "reply_packet_id": None,
         "emoji": False,
+        "first_observed_time": timezone.now(),
     }
 
 
@@ -65,6 +67,7 @@ def position_packet_data():
         "position_time": None,
         "ground_speed": 0.0,
         "ground_track": 0.0,
+        "first_observed_time": timezone.now(),
     }
 
 
@@ -85,6 +88,7 @@ def node_info_packet_data():
         "public_key": None,
         "mac_address": "00:11:22:33:44:55",
         "role": RoleSource.ROUTER,
+        "first_observed_time": timezone.now(),
     }
 
 
@@ -103,6 +107,7 @@ def device_metrics_packet_data():
         "channel_utilization": 0.1,
         "air_util_tx": 0.2,
         "uptime_seconds": 3600,
+        "first_observed_time": timezone.now(),
     }
 
 
@@ -125,6 +130,7 @@ def local_stats_packet_data():
         "num_online_nodes": 10,
         "num_total_nodes": 20,
         "num_rx_dupe": 100,
+        "first_observed_time": timezone.now(),
     }
 
 
@@ -143,6 +149,7 @@ def environment_metrics_packet_data():
         "barometric_pressure": 1013.25,
         "gas_resistance": 1000.0,
         "iaq": 50.0,
+        "first_observed_time": timezone.now(),
     }
 
 

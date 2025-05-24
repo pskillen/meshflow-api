@@ -1000,6 +1000,11 @@ components:
           type: integer
           description: The number of hops the packet took to reach the observer
           nullable: true
+        first_observed_time:
+          type: string
+          format: date-time
+          readOnly: true
+          description: When the packet associated with this observation was first_observed by the system.
 
     TextMessage:
       type: object
