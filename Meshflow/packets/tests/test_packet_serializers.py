@@ -8,7 +8,7 @@ from django.test import TestCase
 
 from common.mesh_node_helpers import meshtastic_id_to_hex
 from constellations.models import Constellation, MessageChannel
-from nodes.models import ManagedNode, ObservedNode
+from nodes.models import ManagedNode, NodeLatestStatus, ObservedNode
 from packets.models import (
     DeviceMetricsPacket,
     LocalStatsPacket,
@@ -24,6 +24,7 @@ from packets.serializers import (
     LocalStatsPacketSerializer,
     MessagePacketSerializer,
     NodeInfoPacketSerializer,
+    NodeSerializer,
     PacketIngestSerializer,
     PositionPacketSerializer,
 )
@@ -61,7 +62,10 @@ class BasePacketSerializerTestCase(TestCase):
         )
 
         cls.from_node = ObservedNode.objects.create(
-            node_id=456789, node_id_str=meshtastic_id_to_hex(456789), long_name="From Node"
+            node_id=456789,
+            node_id_str=meshtastic_id_to_hex(456789),
+            long_name="From Node",
+            short_name="FRM",
         )
 
     def setUp(self):
@@ -571,3 +575,67 @@ class PacketIngestSerializerTest(BasePacketSerializerTestCase):
         serializer = PacketIngestSerializer(data=data, context=self.context)
         self.assertFalse(serializer.is_valid())
         self.assertIn("Unknown packet type", str(serializer.errors))
+
+
+class NodeSerializerTest(BasePacketSerializerTestCase):
+    """Tests for NodeSerializer."""
+
+    def test_node_upsert_with_position_updates_nodelateststatus(self):
+        """Test that creating a node with position updates NodeLatestStatus."""
+        from django.utils import timezone
+
+        data = {
+            "id": self.from_node.node_id,
+            "id_str": self.from_node.node_id_str,
+            "long_name": "Updated Node",
+            "short_name": "UPD",
+            "position": {
+                "reported_time": timezone.now().isoformat(),
+                "latitude": 40.7128,
+                "longitude": -74.0060,
+                "altitude": 10.0,
+                "heading": 0.0,
+                "location_source": "UNSET",
+            },
+        }
+
+        serializer = NodeSerializer(instance=self.from_node, data=data, partial=True)
+        assert_serializer_valid(serializer)
+        serializer.save()
+
+        latest_status = NodeLatestStatus.objects.get(node=self.from_node)
+        self.assertEqual(latest_status.latitude, 40.7128)
+        self.assertEqual(latest_status.longitude, -74.0060)
+        self.assertEqual(latest_status.altitude, 10.0)
+        self.assertIsNotNone(latest_status.position_reported_time)
+
+    def test_node_upsert_with_device_metrics_updates_nodelateststatus(self):
+        """Test that creating a node with device_metrics updates NodeLatestStatus."""
+        from django.utils import timezone
+
+        data = {
+            "id": self.from_node.node_id,
+            "id_str": self.from_node.node_id_str,
+            "long_name": "Updated Node",
+            "short_name": "UPD",
+            "device_metrics": {
+                "reported_time": timezone.now().isoformat(),
+                "battery_level": 85.0,
+                "voltage": 3.9,
+                "channel_utilization": 0.2,
+                "air_util_tx": 0.3,
+                "uptime_seconds": 10000,
+            },
+        }
+
+        serializer = NodeSerializer(instance=self.from_node, data=data, partial=True)
+        assert_serializer_valid(serializer)
+        serializer.save()
+
+        latest_status = NodeLatestStatus.objects.get(node=self.from_node)
+        self.assertEqual(latest_status.battery_level, 85.0)
+        self.assertEqual(latest_status.voltage, 3.9)
+        self.assertEqual(latest_status.channel_utilization, 0.2)
+        self.assertEqual(latest_status.air_util_tx, 0.3)
+        self.assertEqual(latest_status.uptime_seconds, 10000)
+        self.assertIsNotNone(latest_status.metrics_reported_time)

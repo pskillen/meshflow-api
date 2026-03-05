@@ -8,7 +8,7 @@ from rest_framework import serializers
 
 from common.mesh_node_helpers import meshtastic_hex_to_int, meshtastic_id_to_hex
 from constellations.models import MessageChannel
-from nodes.models import DeviceMetrics, ManagedNode, ObservedNode, Position
+from nodes.models import DeviceMetrics, ManagedNode, NodeLatestStatus, ObservedNode, Position
 
 from .models import (
     DeviceMetricsPacket,
@@ -717,25 +717,50 @@ class NodeSerializer(serializers.ModelSerializer):
         """Create position and device metrics records for a node."""
         # Create position if provided
         if position_data:
+            reported_time = position_data.get("reported_time")
             Position.objects.create(
                 node=node,
-                reported_time=position_data.get("reported_time"),
+                reported_time=reported_time,
                 latitude=position_data.get("latitude"),
                 longitude=position_data.get("longitude"),
                 altitude=position_data.get("altitude"),
                 location_source=position_data.get("location_source"),
             )
+            # Update NodeLatestStatus with latest position
+            NodeLatestStatus.objects.update_or_create(
+                node=node,
+                defaults={
+                    "latitude": position_data.get("latitude"),
+                    "longitude": position_data.get("longitude"),
+                    "altitude": position_data.get("altitude"),
+                    "location_source": position_data.get("location_source"),
+                    "position_reported_time": reported_time,
+                },
+            )
 
         # Create device metrics if provided
         if device_metrics_data:
+            reported_time = device_metrics_data.get("reported_time")
             DeviceMetrics.objects.create(
                 node=node,
-                reported_time=device_metrics_data.get("reported_time"),
+                reported_time=reported_time,
                 battery_level=device_metrics_data.get("battery_level"),
                 voltage=device_metrics_data.get("voltage"),
                 channel_utilization=device_metrics_data.get("channel_utilization"),
                 air_util_tx=device_metrics_data.get("air_util_tx"),
                 uptime_seconds=device_metrics_data.get("uptime_seconds"),
+            )
+            # Update NodeLatestStatus with latest device metrics
+            NodeLatestStatus.objects.update_or_create(
+                node=node,
+                defaults={
+                    "battery_level": device_metrics_data.get("battery_level"),
+                    "voltage": device_metrics_data.get("voltage"),
+                    "channel_utilization": device_metrics_data.get("channel_utilization"),
+                    "air_util_tx": device_metrics_data.get("air_util_tx"),
+                    "uptime_seconds": device_metrics_data.get("uptime_seconds"),
+                    "metrics_reported_time": reported_time,
+                },
             )
 
     def create(self, validated_data):
