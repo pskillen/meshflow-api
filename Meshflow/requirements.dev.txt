@@ -8,13 +8,13 @@ factory-boy~=3.3
 coverage~=7.4
 
 # Development tools
-black~=24.2
-flake8~=7.0
-isort~=5.13
+black~=26.1
+flake8~=7.3
+isort~=8.0
 
 # live reload
 watchfiles~=1.1
-uvicorn~=0.34.2
+uvicorn~=0.41
 
 # Include production requirements
 -r requirements.txt
