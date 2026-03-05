@@ -24,12 +24,12 @@ jobs:
       matrix:
         platform:
           - linux/amd64
-          - linux/arm64
+          # - linux/arm64  # NB: Disable ARM64 for now because nobody's using it
         include:
           - platform: linux/amd64
-            base_image: "python:3.12"
+            base_image: "python:3.14"
           - platform: linux/arm64
-            base_image: "arm64v8/python:3.12"
+            base_image: "arm64v8/python:3.14"
 
     outputs:
       LATEST_TAG: ${{ steps.set_tags.outputs.LATEST_TAG }}
