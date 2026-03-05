@@ -16,17 +16,10 @@ jobs:
     steps:
       - name: Extract Release Tag
         id: get_tag
-        run: |
-          echo "VERSION_LABEL=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
-          if ${{ github.event.release.prerelease }}; then
-            echo "ENVIRONMENT=preprod" >> "$GITHUB_OUTPUT"
-          else
-            echo "ENVIRONMENT=prod" >> "$GITHUB_OUTPUT"
-          fi
+        run: echo "VERSION_LABEL=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
 
     outputs:
       VERSION_LABEL: ${{ steps.get_tag.outputs.VERSION_LABEL }}
-      ENVIRONMENT: ${{ steps.get_tag.outputs.ENVIRONMENT }}
 
   build:
     needs:
