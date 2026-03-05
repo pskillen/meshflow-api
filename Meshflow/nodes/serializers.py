@@ -479,7 +479,7 @@ class PositionSerializer(serializers.ModelSerializer):
                         break
                 else:
                     validated_data["location_source"] = LocationSource.UNSET
-            except (ValueError, TypeError):
+            except ValueError, TypeError:
                 validated_data["location_source"] = LocationSource.UNSET
         # Handle node field
         if "node" in data and isinstance(data["node"], ObservedNode):

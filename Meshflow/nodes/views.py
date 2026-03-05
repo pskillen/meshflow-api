@@ -244,7 +244,7 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
         try:
             node_id_query = int(query)
             conditions |= Q(node_id=node_id_query)
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             pass
 
         # Add conditions for text fields

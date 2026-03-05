@@ -23,8 +23,7 @@ class CopyToClipboardWidget(forms.Widget):
         if value is None:
             value = ""
         final_attrs = self.build_attrs(attrs, {"name": name})
-        return mark_safe(
-            f"""  # noqa: E501
+        return mark_safe(f"""  # noqa: E501
             <div class="copy-to-clipboard-container">
                 <input type="text" value="{value}" {forms.widgets.flatatt(final_attrs)} readonly />
                 <button type="button" class="copy-button" onclick="copyToClipboard(this)">
@@ -76,8 +75,7 @@ class CopyToClipboardWidget(forms.Widget):
                     color: #000;
                 }}
             </style>
-        """
-        )
+        """)
 
 
 class NodeAPIKeyForm(forms.ModelForm):
@@ -224,7 +222,7 @@ class LatLongFormField(forms.Field):
             lat = float(value[0]) if value[0] not in (None, "", "None") else None
             lng = float(value[1]) if value[1] not in (None, "", "None") else None
             return [lat, lng]
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return [None, None]
 
     def prepare_value(self, value):
