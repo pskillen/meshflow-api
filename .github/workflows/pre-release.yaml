@@ -1,8 +1,8 @@
-name: Release
+name: Pre-release
 
 on:
   release:
-    types: [ released ]
+    types: [ prereleased ]
 
 
 permissions:
@@ -27,4 +27,4 @@ jobs:
     uses: ./.github/workflows/docker-build.yaml
     with:
       VERSION_LABEL: ${{ needs.extract-tag.outputs.VERSION_LABEL }}
-      ENVIRONMENT: prod
+      ENVIRONMENT: preprod

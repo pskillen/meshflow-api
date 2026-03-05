@@ -298,6 +298,14 @@ for origin in os.environ.get("CORS_ALLOWED_ORIGINS", "").split(","):
 
 CORS_ALLOW_CREDENTIALS = True
 
+# CSRF - Django 4.0+ requires the full URL with scheme for origin checking.
+# Separate from CORS: CSRF_TRUSTED_ORIGINS validates the Origin/Referer header on unsafe requests.
+CSRF_TRUSTED_ORIGINS = []
+for origin in os.environ.get("CSRF_TRUSTED_ORIGINS", "").split(","):
+    origin = origin.strip().rstrip("/")
+    if origin:
+        CSRF_TRUSTED_ORIGINS.append(origin)
+
 # Add any additional CORS settings as needed
 CORS_ALLOW_METHODS = [
     "DELETE",

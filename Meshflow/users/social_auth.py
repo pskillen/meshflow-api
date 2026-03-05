@@ -94,8 +94,9 @@ class GithubLoginRedirectView(BaseLoginRedirectView):
 
 class CompatibleOAuth2Client(OAuth2Client):
     """
-    This class is required because dj-rest-auth calls OAuth2Client.__init__() with 9 arguments,
-    but allauth.socialaccount.providers.oauth2.client.OAuth2Client.__init__() only accepts 8.
+    Compatibility shim for dj-rest-auth and django-allauth OAuth2Client.
+    Accepts both legacy (9-arg, with scope) and current (8-arg, no scope) call signatures.
+    Scope is not used in __init__ (parent receives it in get_redirect_url).
     """
 
     def __init__(
@@ -106,7 +107,7 @@ class CompatibleOAuth2Client(OAuth2Client):
         access_token_method,
         access_token_url,
         callback_url,
-        scope,
+        scope=None,  # Optional: dj-rest-auth 7.0.2+ no longer passes scope
         scope_delimiter=" ",
         headers=None,
         basic_auth=False,
