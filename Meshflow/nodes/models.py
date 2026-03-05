@@ -22,17 +22,21 @@ class LocationSource(models.IntegerChoices):
 class RoleSource(models.IntegerChoices):
     """Role source types for node roles."""
 
+    # Updated per https://github.com/meshtastic/protobufs/blob/master/meshtastic/config.proto
+    # on 5 March 2026
     CLIENT = 0, "CLIENT"
     CLIENT_MUTE = 1, "CLIENT_MUTE"
-    CLIENT_HIDDEN = 2, "CLIENT_HIDDEN"
-    TRACKER = 3, "TRACKER"
-    LOST_AND_FOUND = 4, "LOST_AND_FOUND"
-    SENSOR = 5, "SENSOR"
-    TAK = 6, "TAK"
-    TAK_TRACKER = 7, "TAK_TRACKER"
-    REPEATER = 8, "REPEATER"
-    ROUTER = 9, "ROUTER"
-    ROUTER_LATE = 10, "ROUTER_LATE"
+    ROUTER = 2, "ROUTER"
+    ROUTER_CLIENT = 3, "ROUTER_CLIENT" # deprecated
+    REPEATER = 4, "REPEATER" # deprecated
+    TRACKER = 5, "TRACKER"
+    SENSOR = 6, "SENSOR"
+    TAK = 7, "TAK"
+    CLIENT_HIDDEN = 8, "CLIENT_HIDDEN"
+    LOST_AND_FOUND = 9, "LOST_AND_FOUND"
+    TAK_TRACKER = 10, "TAK_TRACKER"
+    ROUTER_LATE = 11, "ROUTER_LATE"
+    CLIENT_BASE = 12, "CLIENT_BASE"
 
 
 class ManagedNode(models.Model):
