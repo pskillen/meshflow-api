@@ -487,6 +487,32 @@ class PositionSerializer(serializers.ModelSerializer):
         return validated_data
 
 
+class DeviceMetricsBulkSerializer(serializers.ModelSerializer):
+    """
+    Lightweight serializer for bulk device metrics response.
+    Includes node_id, node_id_str, short_name for frontend grouping by node.
+    """
+
+    node_id = serializers.IntegerField(source="node.node_id", read_only=True)
+    node_id_str = serializers.CharField(source="node.node_id_str", read_only=True)
+    short_name = serializers.CharField(source="node.short_name", read_only=True, allow_null=True)
+
+    class Meta:
+        model = DeviceMetrics
+        fields = [
+            "node_id",
+            "node_id_str",
+            "short_name",
+            "reported_time",
+            "logged_time",
+            "battery_level",
+            "voltage",
+            "channel_utilization",
+            "air_util_tx",
+            "uptime_seconds",
+        ]
+
+
 class DeviceMetricsSerializer(serializers.ModelSerializer):
     """Serializer for device metrics, supporting both model instances and dicts (from annotations)."""
 
