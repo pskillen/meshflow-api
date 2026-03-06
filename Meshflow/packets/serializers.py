@@ -316,17 +316,25 @@ class NodeInfoPacketSerializer(BasePacketSerializer):
             user_data = validated_data.pop("user")
             validated_data.update(user_data)
 
-        # Convert role from string to integer using RoleSource
-        if "role" in validated_data and validated_data["role"]:
+        # Convert role from string or integer to RoleSource value (matches Meshtastic config.proto)
+        if "role" in validated_data and validated_data["role"] is not None:
             try:
-                # Find the matching role in RoleSource
-                for role_choice in RoleSource:
-                    if role_choice.label == validated_data["role"]:
-                        validated_data["role"] = role_choice.value
-                        break
+                role_val = validated_data["role"]
+                if isinstance(role_val, int):
+                    # Meshtastic may send protobuf enum value directly; use if valid
+                    if role_val in [c.value for c in RoleSource]:
+                        validated_data["role"] = role_val
+                    else:
+                        validated_data["role"] = None
                 else:
-                    # If no match found, set to None
-                    validated_data["role"] = None
+                    # String: match by label (e.g. "CLIENT", "ROUTER")
+                    role_str = str(role_val).strip()
+                    for role_choice in RoleSource:
+                        if role_choice.label == role_str:
+                            validated_data["role"] = role_choice.value
+                            break
+                    else:
+                        validated_data["role"] = None
             except ValueError, TypeError:
                 validated_data["role"] = None
 

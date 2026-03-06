@@ -7,7 +7,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from constellations.models import MessageChannel
-from nodes.models import ManagedNode
+from nodes.models import ManagedNode, RoleSource
 
 
 class LocationSource(models.IntegerChoices):
@@ -17,22 +17,6 @@ class LocationSource(models.IntegerChoices):
     MANUAL = 1, "LOC_MANUAL"
     INTERNAL = 2, "LOC_INTERNAL"
     EXTERNAL = 3, "LOC_EXTERNAL"
-
-
-class RoleSource(models.IntegerChoices):
-    """Role source types for node roles."""
-
-    CLIENT = 0, "CLIENT"
-    CLIENT_MUTE = 1, "CLIENT_MUTE"
-    CLIENT_HIDDEN = 2, "CLIENT_HIDDEN"
-    TRACKER = 3, "TRACKER"
-    LOST_AND_FOUND = 4, "LOST_AND_FOUND"
-    SENSOR = 5, "SENSOR"
-    TAK = 6, "TAK"
-    TAK_TRACKER = 7, "TAK_TRACKER"
-    REPEATER = 8, "REPEATER"
-    ROUTER = 9, "ROUTER"
-    ROUTER_LATE = 10, "ROUTER_LATE"
 
 
 class RawPacket(models.Model):
