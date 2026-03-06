@@ -5,7 +5,7 @@ from django.db import transaction
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 
-from .models import ManagedNode, NodeAPIKey, NodeAuth, ObservedNode
+from .models import ManagedNode, NodeAPIKey, NodeAuth, NodeLatestStatus, ObservedNode
 
 
 class CopyToClipboardWidget(forms.Widget):
@@ -361,8 +361,37 @@ class NodeAPIKeyAdmin(admin.ModelAdmin):
         return self.readonly_fields
 
 
+class NodeLatestStatusInline(admin.StackedInline):
+    model = NodeLatestStatus
+    can_delete = False
+    max_num = 1
+    readonly_fields = (
+        "latitude",
+        "longitude",
+        "altitude",
+        "heading",
+        "location_source",
+        "precision_bits",
+        "ground_speed",
+        "ground_track",
+        "sats_in_view",
+        "pdop",
+        "position_reported_time",
+        "battery_level",
+        "voltage",
+        "channel_utilization",
+        "air_util_tx",
+        "uptime_seconds",
+        "metrics_reported_time",
+    )
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+
 @admin.register(ObservedNode)
 class ObservedNodeAdmin(admin.ModelAdmin):
+    inlines = [NodeLatestStatusInline]
     list_display = (
         "short_name",
         "long_name",

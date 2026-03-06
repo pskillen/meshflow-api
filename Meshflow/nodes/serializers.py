@@ -586,6 +586,27 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
         ]
 
     def get_latest_position(self, obj):
+        # Prefer NodeLatestStatus when available (from select_related)
+        if hasattr(obj, "latest_status") and obj.latest_status is not None:
+            status = obj.latest_status
+            if status.position_reported_time is None and status.latitude is None and status.longitude is None:
+                return None
+            data = {
+                "latest_latitude": status.latitude,
+                "latest_longitude": status.longitude,
+                "latest_altitude": status.altitude,
+                "latest_position_time": status.position_reported_time,
+                "latest_heading": status.heading,
+                "latest_location_source": status.location_source,
+                "latest_precision_bits": status.precision_bits,
+                "latest_ground_speed": status.ground_speed,
+                "latest_ground_track": status.ground_track,
+                "latest_sats_in_view": status.sats_in_view,
+                "latest_pdop": status.pdop,
+                "node": obj.internal_id,
+            }
+            return PositionSerializer(data).data
+        # Fallback to annotation or subquery
         annotation_keys = [
             "latest_latitude",
             "latest_longitude",
@@ -622,6 +643,22 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
         return PositionSerializer(latest).data if latest else None
 
     def get_latest_device_metrics(self, obj):
+        # Prefer NodeLatestStatus when available (from select_related)
+        if hasattr(obj, "latest_status") and obj.latest_status is not None:
+            status = obj.latest_status
+            if status.metrics_reported_time is None:
+                return None
+            data = {
+                "latest_battery_level": status.battery_level,
+                "latest_voltage": status.voltage,
+                "latest_metrics_time": status.metrics_reported_time,
+                "latest_channel_utilization": status.channel_utilization,
+                "latest_air_util_tx": status.air_util_tx,
+                "latest_uptime_seconds": status.uptime_seconds,
+                "node": obj.internal_id,
+            }
+            return DeviceMetricsSerializer(data).data
+        # Fallback to annotation or subquery
         annotation_keys = [
             "latest_battery_level",
             "latest_voltage",
@@ -633,7 +670,6 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
         if any(hasattr(obj, k) for k in annotation_keys):
             data = {k: getattr(obj, k, None) for k in annotation_keys}
             data["node"] = getattr(obj, "internal_id", None)
-            # Use the timestamp field as the indicator
             if data.get("latest_metrics_time") is None:
                 return None
             return DeviceMetricsSerializer(data).data

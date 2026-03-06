@@ -22,17 +22,21 @@ class LocationSource(models.IntegerChoices):
 class RoleSource(models.IntegerChoices):
     """Role source types for node roles."""
 
+    # Updated per https://github.com/meshtastic/protobufs/blob/master/meshtastic/config.proto
+    # on 5 March 2026
     CLIENT = 0, "CLIENT"
     CLIENT_MUTE = 1, "CLIENT_MUTE"
-    CLIENT_HIDDEN = 2, "CLIENT_HIDDEN"
-    TRACKER = 3, "TRACKER"
-    LOST_AND_FOUND = 4, "LOST_AND_FOUND"
-    SENSOR = 5, "SENSOR"
-    TAK = 6, "TAK"
-    TAK_TRACKER = 7, "TAK_TRACKER"
-    REPEATER = 8, "REPEATER"
-    ROUTER = 9, "ROUTER"
-    ROUTER_LATE = 10, "ROUTER_LATE"
+    ROUTER = 2, "ROUTER"
+    ROUTER_CLIENT = 3, "ROUTER_CLIENT"  # deprecated
+    REPEATER = 4, "REPEATER"  # deprecated
+    TRACKER = 5, "TRACKER"
+    SENSOR = 6, "SENSOR"
+    TAK = 7, "TAK"
+    CLIENT_HIDDEN = 8, "CLIENT_HIDDEN"
+    LOST_AND_FOUND = 9, "LOST_AND_FOUND"
+    TAK_TRACKER = 10, "TAK_TRACKER"
+    ROUTER_LATE = 11, "ROUTER_LATE"
+    CLIENT_BASE = 12, "CLIENT_BASE"
 
 
 class ManagedNode(models.Model):
@@ -138,6 +142,40 @@ class ObservedNode(models.Model):
     def __str__(self):
         """Return a string representation of the node, including user's short name if available."""
         return f"{self.short_name} ({self.node_id_str})"
+
+
+class NodeLatestStatus(models.Model):
+    """Denormalized cache of latest position and device metrics for a node."""
+
+    node = models.OneToOneField(ObservedNode, on_delete=models.CASCADE, related_name="latest_status")
+
+    # Position fields (from Position model)
+    latitude = models.FloatField(null=True, blank=True)
+    longitude = models.FloatField(null=True, blank=True)
+    altitude = models.FloatField(null=True, blank=True)
+    heading = models.FloatField(null=True, blank=True)
+    location_source = models.IntegerField(choices=LocationSource.choices, null=True, blank=True)
+    precision_bits = models.SmallIntegerField(null=True, blank=True)
+    ground_speed = models.FloatField(null=True, blank=True)
+    ground_track = models.FloatField(null=True, blank=True)
+    sats_in_view = models.SmallIntegerField(null=True, blank=True)
+    pdop = models.FloatField(null=True, blank=True)
+    position_reported_time = models.DateTimeField(null=True, blank=True)
+
+    # Device metrics fields (from DeviceMetrics model)
+    battery_level = models.FloatField(null=True, blank=True)
+    voltage = models.FloatField(null=True, blank=True)
+    channel_utilization = models.FloatField(null=True, blank=True)
+    air_util_tx = models.FloatField(null=True, blank=True)
+    uptime_seconds = models.BigIntegerField(null=True, blank=True)
+    metrics_reported_time = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = _("Node latest status")
+        verbose_name_plural = _("Node latest statuses")
+
+    def __str__(self):
+        return f"Latest status for {self.node}"
 
 
 class NodeAPIKey(models.Model):

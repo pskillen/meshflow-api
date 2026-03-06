@@ -4,7 +4,7 @@ from django.utils import timezone
 
 import pytest
 
-from nodes.models import DeviceMetrics, ObservedNode
+from nodes.models import DeviceMetrics, NodeLatestStatus, ObservedNode
 from packets.services.device_metrics import DeviceMetricsPacketService
 
 
@@ -142,3 +142,34 @@ def test_update_node_last_heard(
     # Verify the node's last_heard was updated
     from_node.refresh_from_db()
     assert from_node.last_heard == first_reported_time
+
+
+@pytest.mark.django_db
+def test_process_device_metrics_packet_updates_nodelateststatus(
+    create_device_metrics_packet, create_managed_node, create_packet_observation, create_user
+):
+    """Test that processing a device metrics packet updates NodeLatestStatus."""
+    service = DeviceMetricsPacketService()
+    packet = create_device_metrics_packet(
+        battery_level=88.0,
+        voltage=4.1,
+        channel_utilization=0.15,
+        air_util_tx=0.25,
+        uptime_seconds=7200,
+    )
+    observer = create_managed_node()
+    observation = create_packet_observation(packet=packet, observer=observer)
+    user = create_user()
+
+    service.process_packet(packet, observer, observation, user)
+
+    metrics = DeviceMetrics.objects.latest("id")
+    observed_node = metrics.node
+
+    latest_status = NodeLatestStatus.objects.get(node=observed_node)
+    assert latest_status.battery_level == 88.0
+    assert latest_status.voltage == 4.1
+    assert latest_status.channel_utilization == 0.15
+    assert latest_status.air_util_tx == 0.25
+    assert latest_status.uptime_seconds == 7200
+    assert latest_status.metrics_reported_time is not None

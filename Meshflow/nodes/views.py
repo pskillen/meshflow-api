@@ -11,7 +11,16 @@ from rest_framework.views import APIView
 
 from common.mesh_node_helpers import meshtastic_hex_to_int
 from constellations.models import ConstellationUserMembership
-from nodes.models import DeviceMetrics, ManagedNode, NodeAPIKey, NodeAuth, NodeOwnerClaim, ObservedNode, Position
+from nodes.models import (
+    DeviceMetrics,
+    ManagedNode,
+    NodeAPIKey,
+    NodeAuth,
+    NodeLatestStatus,
+    NodeOwnerClaim,
+    ObservedNode,
+    Position,
+)
 from nodes.serializers import (
     APIKeyCreateSerializer,
     APIKeyDetailSerializer,
@@ -144,35 +153,8 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
     lookup_field = "node_id"
 
     def get_queryset(self):
-        """Filter nodes based on user permissions and prefetch latest position and metrics."""
-        # Subquery for latest Position fields (all fields)
-        latest_position_qs = Position.objects.filter(node=OuterRef("pk")).order_by("-reported_time")
-        # Subquery for latest DeviceMetrics fields (all fields)
-        latest_metrics_qs = DeviceMetrics.objects.filter(node=OuterRef("pk")).order_by("-reported_time")
-
-        return (
-            ObservedNode.objects.all()
-            .order_by("node_id")
-            .annotate(
-                latest_latitude=Subquery(latest_position_qs.values("latitude")[:1]),
-                latest_longitude=Subquery(latest_position_qs.values("longitude")[:1]),
-                latest_altitude=Subquery(latest_position_qs.values("altitude")[:1]),
-                latest_position_time=Subquery(latest_position_qs.values("reported_time")[:1]),
-                latest_heading=Subquery(latest_position_qs.values("heading")[:1]),
-                latest_location_source=Subquery(latest_position_qs.values("location_source")[:1]),
-                latest_precision_bits=Subquery(latest_position_qs.values("precision_bits")[:1]),
-                latest_ground_speed=Subquery(latest_position_qs.values("ground_speed")[:1]),
-                latest_ground_track=Subquery(latest_position_qs.values("ground_track")[:1]),
-                latest_sats_in_view=Subquery(latest_position_qs.values("sats_in_view")[:1]),
-                latest_pdop=Subquery(latest_position_qs.values("pdop")[:1]),
-                latest_battery_level=Subquery(latest_metrics_qs.values("battery_level")[:1]),
-                latest_voltage=Subquery(latest_metrics_qs.values("voltage")[:1]),
-                latest_metrics_time=Subquery(latest_metrics_qs.values("reported_time")[:1]),
-                latest_channel_utilization=Subquery(latest_metrics_qs.values("channel_utilization")[:1]),
-                latest_air_util_tx=Subquery(latest_metrics_qs.values("air_util_tx")[:1]),
-                latest_uptime_seconds=Subquery(latest_metrics_qs.values("uptime_seconds")[:1]),
-            )
-        )
+        """Filter nodes based on user permissions and prefetch latest status."""
+        return ObservedNode.objects.all().order_by("node_id").select_related("latest_status")
 
     def perform_create(self, serializer):
         """Create a new node."""
@@ -183,25 +165,7 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
         """
         Get all observed nodes claimed by the current user.
         """
-        # Subquery for latest Position fields
-        latest_position_qs = Position.objects.filter(node=OuterRef("pk")).order_by("-reported_time")
-
-        # Subquery for latest DeviceMetrics fields
-        latest_metrics_qs = DeviceMetrics.objects.filter(node=OuterRef("pk")).order_by("-reported_time")
-
-        nodes = (
-            ObservedNode.objects.filter(claimed_by=request.user)
-            .order_by("node_id")
-            .annotate(
-                latest_latitude=Subquery(latest_position_qs.values("latitude")[:1]),
-                latest_longitude=Subquery(latest_position_qs.values("longitude")[:1]),
-                latest_altitude=Subquery(latest_position_qs.values("altitude")[:1]),
-                latest_position_time=Subquery(latest_position_qs.values("reported_time")[:1]),
-                latest_battery_level=Subquery(latest_metrics_qs.values("battery_level")[:1]),
-                latest_voltage=Subquery(latest_metrics_qs.values("voltage")[:1]),
-                latest_metrics_time=Subquery(latest_metrics_qs.values("reported_time")[:1]),
-            )
-        )
+        nodes = ObservedNode.objects.filter(claimed_by=request.user).order_by("node_id").select_related("latest_status")
 
         page = self.paginate_queryset(nodes)
         if page is not None:
@@ -359,13 +323,9 @@ class ManagedNodeViewSet(viewsets.ModelViewSet):
     lookup_field = "node_id"
 
     def get_queryset(self):
-        """Filter nodes based on user ownership and annotate with observed node, latest position, and metrics info."""
-        # Subquery for ObservedNode fields
+        """Filter nodes based on user ownership and annotate with observed node and NodeLatestStatus."""
         observed_node_qs = ObservedNode.objects.filter(node_id=OuterRef("node_id"))
-        # Subquery for latest Position fields (all fields)
-        latest_position_qs = Position.objects.filter(node__node_id=OuterRef("node_id")).order_by("-reported_time")
-        # Subquery for latest DeviceMetrics fields (all fields)
-        latest_metrics_qs = DeviceMetrics.objects.filter(node__node_id=OuterRef("node_id")).order_by("-reported_time")
+        latest_status_qs = NodeLatestStatus.objects.filter(node__node_id=OuterRef("node_id"))
 
         return (
             ManagedNode.objects.all()
@@ -374,23 +334,23 @@ class ManagedNodeViewSet(viewsets.ModelViewSet):
                 long_name=Subquery(observed_node_qs.values("long_name")[:1]),
                 short_name=Subquery(observed_node_qs.values("short_name")[:1]),
                 last_heard=Subquery(observed_node_qs.values("last_heard")[:1]),
-                last_latitude=Subquery(latest_position_qs.values("latitude")[:1]),
-                last_longitude=Subquery(latest_position_qs.values("longitude")[:1]),
-                last_altitude=Subquery(latest_position_qs.values("altitude")[:1]),
-                last_position_time=Subquery(latest_position_qs.values("reported_time")[:1]),
-                last_heading=Subquery(latest_position_qs.values("heading")[:1]),
-                last_location_source=Subquery(latest_position_qs.values("location_source")[:1]),
-                last_precision_bits=Subquery(latest_position_qs.values("precision_bits")[:1]),
-                last_ground_speed=Subquery(latest_position_qs.values("ground_speed")[:1]),
-                last_ground_track=Subquery(latest_position_qs.values("ground_track")[:1]),
-                last_sats_in_view=Subquery(latest_position_qs.values("sats_in_view")[:1]),
-                last_pdop=Subquery(latest_position_qs.values("pdop")[:1]),
-                last_battery_level=Subquery(latest_metrics_qs.values("battery_level")[:1]),
-                last_voltage=Subquery(latest_metrics_qs.values("voltage")[:1]),
-                last_metrics_time=Subquery(latest_metrics_qs.values("reported_time")[:1]),
-                last_channel_utilization=Subquery(latest_metrics_qs.values("channel_utilization")[:1]),
-                last_air_util_tx=Subquery(latest_metrics_qs.values("air_util_tx")[:1]),
-                last_uptime_seconds=Subquery(latest_metrics_qs.values("uptime_seconds")[:1]),
+                last_latitude=Subquery(latest_status_qs.values("latitude")[:1]),
+                last_longitude=Subquery(latest_status_qs.values("longitude")[:1]),
+                last_altitude=Subquery(latest_status_qs.values("altitude")[:1]),
+                last_position_time=Subquery(latest_status_qs.values("position_reported_time")[:1]),
+                last_heading=Subquery(latest_status_qs.values("heading")[:1]),
+                last_location_source=Subquery(latest_status_qs.values("location_source")[:1]),
+                last_precision_bits=Subquery(latest_status_qs.values("precision_bits")[:1]),
+                last_ground_speed=Subquery(latest_status_qs.values("ground_speed")[:1]),
+                last_ground_track=Subquery(latest_status_qs.values("ground_track")[:1]),
+                last_sats_in_view=Subquery(latest_status_qs.values("sats_in_view")[:1]),
+                last_pdop=Subquery(latest_status_qs.values("pdop")[:1]),
+                last_battery_level=Subquery(latest_status_qs.values("battery_level")[:1]),
+                last_voltage=Subquery(latest_status_qs.values("voltage")[:1]),
+                last_metrics_time=Subquery(latest_status_qs.values("metrics_reported_time")[:1]),
+                last_channel_utilization=Subquery(latest_status_qs.values("channel_utilization")[:1]),
+                last_air_util_tx=Subquery(latest_status_qs.values("air_util_tx")[:1]),
+                last_uptime_seconds=Subquery(latest_status_qs.values("uptime_seconds")[:1]),
             )
         )
 
@@ -411,12 +371,8 @@ class ManagedNodeViewSet(viewsets.ModelViewSet):
         """
         Get all managed nodes owned by the current user.
         """
-        # Subquery for ObservedNode fields
         observed_node_qs = ObservedNode.objects.filter(node_id=OuterRef("node_id"))
-        # Subquery for latest Position fields
-        latest_position_qs = Position.objects.filter(node__node_id=OuterRef("node_id")).order_by("-reported_time")
-        # Subquery for latest DeviceMetrics fields
-        latest_metrics_qs = DeviceMetrics.objects.filter(node__node_id=OuterRef("node_id")).order_by("-reported_time")
+        latest_status_qs = NodeLatestStatus.objects.filter(node__node_id=OuterRef("node_id"))
 
         nodes = (
             ManagedNode.objects.filter(owner=request.user)
@@ -425,13 +381,13 @@ class ManagedNodeViewSet(viewsets.ModelViewSet):
                 long_name=Subquery(observed_node_qs.values("long_name")[:1]),
                 short_name=Subquery(observed_node_qs.values("short_name")[:1]),
                 last_heard=Subquery(observed_node_qs.values("last_heard")[:1]),
-                last_latitude=Subquery(latest_position_qs.values("latitude")[:1]),
-                last_longitude=Subquery(latest_position_qs.values("longitude")[:1]),
-                last_altitude=Subquery(latest_position_qs.values("altitude")[:1]),
-                last_position_time=Subquery(latest_position_qs.values("reported_time")[:1]),
-                last_battery_level=Subquery(latest_metrics_qs.values("battery_level")[:1]),
-                last_voltage=Subquery(latest_metrics_qs.values("voltage")[:1]),
-                last_metrics_time=Subquery(latest_metrics_qs.values("reported_time")[:1]),
+                last_latitude=Subquery(latest_status_qs.values("latitude")[:1]),
+                last_longitude=Subquery(latest_status_qs.values("longitude")[:1]),
+                last_altitude=Subquery(latest_status_qs.values("altitude")[:1]),
+                last_position_time=Subquery(latest_status_qs.values("position_reported_time")[:1]),
+                last_battery_level=Subquery(latest_status_qs.values("battery_level")[:1]),
+                last_voltage=Subquery(latest_status_qs.values("voltage")[:1]),
+                last_metrics_time=Subquery(latest_status_qs.values("metrics_reported_time")[:1]),
             )
         )
 

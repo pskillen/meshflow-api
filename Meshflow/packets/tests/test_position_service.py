@@ -2,7 +2,7 @@ from django.utils import timezone
 
 import pytest
 
-from nodes.models import LocationSource, Position
+from nodes.models import LocationSource, NodeLatestStatus, Position
 from packets.services.position import PositionPacketService
 
 
@@ -106,3 +106,37 @@ def test_process_position_packet_without_location_source(
 
     position = Position.objects.latest("id")
     assert position.location_source == LocationSource.UNSET
+
+
+@pytest.mark.django_db
+def test_process_position_packet_updates_nodelateststatus(
+    create_position_packet, create_managed_node, create_packet_observation, create_user
+):
+    """Test that processing a position packet updates NodeLatestStatus."""
+    service = PositionPacketService()
+    packet = create_position_packet(
+        latitude=12.34,
+        longitude=56.78,
+        altitude=100.0,
+        heading=45.0,
+        ground_speed=5.0,
+        ground_track=90.0,
+    )
+    observer = create_managed_node()
+    observation = create_packet_observation(packet=packet, observer=observer)
+    user = create_user()
+
+    service.process_packet(packet, observer, observation, user)
+
+    from_node = packet.from_int
+    observed_node = Position.objects.latest("id").node
+    assert observed_node.node_id == from_node
+
+    latest_status = NodeLatestStatus.objects.get(node=observed_node)
+    assert latest_status.latitude == 12.34
+    assert latest_status.longitude == 56.78
+    assert latest_status.altitude == 100.0
+    assert latest_status.heading == 45.0
+    assert latest_status.ground_speed == 5.0
+    assert latest_status.ground_track == 90.0
+    assert latest_status.position_reported_time is not None
