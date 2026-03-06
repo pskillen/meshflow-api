@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from django.db.models import OuterRef, Q, Subquery
 from django.shortcuts import get_object_or_404
@@ -191,6 +191,27 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
             return self.get_paginated_response(serializer.data)
         serializer = self.get_serializer(nodes, many=True)
         return Response(serializer.data)
+
+    @action(detail=False, methods=["get"], url_path="recent_counts")
+    def recent_counts(self, request):
+        """
+        Get node counts by time window (nodes seen since each threshold).
+
+        Returns counts for: 2h, 24h, 7d, 30d, 90d, and all time.
+        """
+        now = timezone.now()
+        windows = [
+            ("2", now - timedelta(hours=2)),
+            ("24", now - timedelta(hours=24)),
+            ("168", now - timedelta(days=7)),
+            ("720", now - timedelta(days=30)),
+            ("2160", now - timedelta(days=90)),
+        ]
+        result = {}
+        for key, threshold in windows:
+            result[key] = ObservedNode.objects.filter(last_heard__gte=threshold).count()
+        result["all"] = ObservedNode.objects.count()
+        return Response(result)
 
     @action(detail=False, methods=["get"], url_path="search")
     def search(self, request):
