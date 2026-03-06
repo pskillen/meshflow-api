@@ -4,6 +4,7 @@ from rest_framework.routers import DefaultRouter
 
 from nodes.views import (
     APIKeyViewSet,
+    DeviceMetricsBulkView,
     ManagedNodeViewSet,
     ObservedNodeClaimView,
     ObservedNodeViewSet,
@@ -19,6 +20,11 @@ router.register(r"api-keys", APIKeyViewSet, basename="api-keys")
 # The API URLs are now determined automatically by the router
 urlpatterns = [
     path("", include(router.urls)),
+    path(
+        "device-metrics-bulk/",
+        DeviceMetricsBulkView.as_view(),
+        name="device-metrics-bulk",
+    ),
     path("observed-nodes/<int:node_id>/claim/", ObservedNodeClaimView.as_view(), name="observed-node-claim"),
     path("claims/mine/", UserNodeClaimsView.as_view(), name="user-node-claims"),
 ]

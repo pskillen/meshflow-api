@@ -20,11 +20,13 @@ from nodes.models import (
     NodeOwnerClaim,
     ObservedNode,
     Position,
+    RoleSource,
 )
 from nodes.serializers import (
     APIKeyCreateSerializer,
     APIKeyDetailSerializer,
     APIKeySerializer,
+    DeviceMetricsBulkSerializer,
     DeviceMetricsSerializer,
     ManagedNodeSerializer,
     NodeOwnerClaimSerializer,
@@ -33,8 +35,12 @@ from nodes.serializers import (
     OwnedManagedNodeSerializer,
     PositionSerializer,
 )
+from nodes.services.device_metrics import get_device_metrics_bulk
 
 from .utils import generate_claim_key
+
+# Infrastructure roles: ROUTER, ROUTER_CLIENT, REPEATER, ROUTER_LATE (optionally CLIENT_BASE)
+INFRASTRUCTURE_ROLES = [RoleSource.ROUTER, RoleSource.ROUTER_CLIENT, RoleSource.REPEATER, RoleSource.ROUTER_LATE]
 
 
 class APIKeyViewSet(viewsets.ModelViewSet):
@@ -343,6 +349,108 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
 
         serializer = DeviceMetricsSerializer(metrics, many=True)
         return Response(serializer.data)
+
+    @action(detail=False, methods=["get"], url_path="infrastructure")
+    def infrastructure(self, request):
+        """
+        Get observed nodes whose role is infrastructure (router, repeater, etc.).
+
+        Query params: last_heard_after, page, page_size, include_client_base (default false)
+        """
+        include_client_base = request.query_params.get("include_client_base", "false").lower() == "true"
+        roles = INFRASTRUCTURE_ROLES + ([RoleSource.CLIENT_BASE] if include_client_base else [])
+
+        qs = (
+            ObservedNode.objects.filter(role__in=roles)
+            .order_by("-last_heard", "node_id")
+            .select_related("latest_status")
+        )
+
+        last_heard_after = request.query_params.get("last_heard_after")
+        if last_heard_after:
+            try:
+                dt = timezone.datetime.fromisoformat(last_heard_after.replace("Z", "+00:00"))
+                if timezone.is_naive(dt):
+                    dt = timezone.make_aware(dt)
+                qs = qs.filter(last_heard__gte=dt)
+            except ValueError, TypeError:
+                pass
+
+        page = self.paginate_queryset(qs)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        serializer = self.get_serializer(qs, many=True)
+        return Response(serializer.data)
+
+
+class DeviceMetricsBulkView(APIView):
+    """
+    Bulk device metrics for multiple nodes in one request.
+    Reusable by Infrastructure, Monitor, My Nodes pages.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def _parse_node_ids(self, request):
+        """Extract node_ids from GET (comma-separated) or POST body."""
+        if request.method == "GET":
+            node_ids_param = request.query_params.get("node_ids", "")
+            if not node_ids_param:
+                return None
+            try:
+                return [int(x.strip()) for x in node_ids_param.split(",") if x.strip()]
+            except ValueError:
+                return None
+        # POST
+        node_ids = request.data.get("node_ids", [])
+        if not isinstance(node_ids, list):
+            return None
+        try:
+            return [int(x) for x in node_ids]
+        except ValueError, TypeError:
+            return None
+
+    def _parse_date(self, value):
+        """Parse ISO 8601 or YYYY-MM-DD date."""
+        if not value:
+            return None
+        try:
+            dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+            if timezone.is_naive(dt):
+                dt = timezone.make_aware(dt)
+            return dt
+        except ValueError:
+            try:
+                return timezone.datetime.strptime(str(value), "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            except ValueError:
+                return None
+
+    def get(self, request):
+        node_ids = self._parse_node_ids(request)
+        if not node_ids:
+            return Response(
+                {"error": "node_ids query parameter required (comma-separated integers)"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        start_date = self._parse_date(request.query_params.get("start_date"))
+        end_date = self._parse_date(request.query_params.get("end_date"))
+        metrics = get_device_metrics_bulk(node_ids, start_date, end_date)
+        serializer = DeviceMetricsBulkSerializer(metrics, many=True)
+        return Response({"results": serializer.data})
+
+    def post(self, request):
+        node_ids = self._parse_node_ids(request)
+        if not node_ids:
+            return Response(
+                {"error": "node_ids required in body (array of integers)"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        start_date = self._parse_date(request.data.get("start_date"))
+        end_date = self._parse_date(request.data.get("end_date"))
+        metrics = get_device_metrics_bulk(node_ids, start_date, end_date)
+        serializer = DeviceMetricsBulkSerializer(metrics, many=True)
+        return Response({"results": serializer.data})
 
 
 class ManagedNodeViewSet(viewsets.ModelViewSet):
