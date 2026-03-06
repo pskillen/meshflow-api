@@ -154,23 +154,17 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         """Filter nodes based on user permissions and prefetch latest status."""
-        qs = (
-            ObservedNode.objects.all()
-            .order_by("-last_heard", "node_id")
-            .select_related("latest_status")
-        )
+        qs = ObservedNode.objects.all().order_by("-last_heard", "node_id").select_related("latest_status")
         # Apply last_heard_after filter only for list action
         if self.action == "list":
             last_heard_after = self.request.query_params.get("last_heard_after")
             if last_heard_after:
                 try:
-                    dt = timezone.datetime.fromisoformat(
-                        last_heard_after.replace("Z", "+00:00")
-                    )
+                    dt = timezone.datetime.fromisoformat(last_heard_after.replace("Z", "+00:00"))
                     if timezone.is_naive(dt):
                         dt = timezone.make_aware(dt)
                     qs = qs.filter(last_heard__gte=dt)
-                except (ValueError, TypeError):
+                except ValueError, TypeError:
                     pass
         return qs
 
