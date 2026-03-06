@@ -122,7 +122,7 @@ class ObservedNode(models.Model):
     public_key = models.CharField(max_length=64, null=True, blank=True)
     role = models.IntegerField(choices=RoleSource.choices, null=True, blank=True)
 
-    last_heard = models.DateTimeField(null=True, blank=True)
+    last_heard = models.DateTimeField(null=True, blank=True, db_index=True)
 
     claimed_by = models.ForeignKey(
         "users.User",
