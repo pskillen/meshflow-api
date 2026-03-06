@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from django.db.models import OuterRef, Q, Subquery
 from django.shortcuts import get_object_or_404
@@ -154,7 +154,19 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         """Filter nodes based on user permissions and prefetch latest status."""
-        return ObservedNode.objects.all().order_by("node_id").select_related("latest_status")
+        qs = ObservedNode.objects.all().order_by("-last_heard", "node_id").select_related("latest_status")
+        # Apply last_heard_after filter only for list action
+        if self.action == "list":
+            last_heard_after = self.request.query_params.get("last_heard_after")
+            if last_heard_after:
+                try:
+                    dt = timezone.datetime.fromisoformat(last_heard_after.replace("Z", "+00:00"))
+                    if timezone.is_naive(dt):
+                        dt = timezone.make_aware(dt)
+                    qs = qs.filter(last_heard__gte=dt)
+                except ValueError, TypeError:
+                    pass
+        return qs
 
     def perform_create(self, serializer):
         """Create a new node."""
@@ -173,6 +185,27 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
             return self.get_paginated_response(serializer.data)
         serializer = self.get_serializer(nodes, many=True)
         return Response(serializer.data)
+
+    @action(detail=False, methods=["get"], url_path="recent_counts")
+    def recent_counts(self, request):
+        """
+        Get node counts by time window (nodes seen since each threshold).
+
+        Returns counts for: 2h, 24h, 7d, 30d, 90d, and all time.
+        """
+        now = timezone.now()
+        windows = [
+            ("2", now - timedelta(hours=2)),
+            ("24", now - timedelta(hours=24)),
+            ("168", now - timedelta(days=7)),
+            ("720", now - timedelta(days=30)),
+            ("2160", now - timedelta(days=90)),
+        ]
+        result = {}
+        for key, threshold in windows:
+            result[key] = ObservedNode.objects.filter(last_heard__gte=threshold).count()
+        result["all"] = ObservedNode.objects.count()
+        return Response(result)
 
     @action(detail=False, methods=["get"], url_path="search")
     def search(self, request):
