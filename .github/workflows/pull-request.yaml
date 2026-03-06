@@ -30,8 +30,17 @@ jobs:
         working-directory: Meshflow/
 
       - name: Run tests with coverage
-        run: pytest --cov=. --cov-report=xml
-        working-directory: Meshflow/
+        run: |
+          mkdir -p reports
+          python -m pytest Meshflow/ -v --junit-xml=reports/junit.xml
+
+      - name: Test Report
+        uses: dorny/test-reporter@v2
+        with:
+          name: pytest
+          path: reports/junit.xml
+          reporter: python-xunit
+        if: always()
 
   build:
     needs: verify
