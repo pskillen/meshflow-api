@@ -52,11 +52,21 @@ python manage.py runserver
 
 ## Testing
 
+When making changes, **add or update unit and integration tests** as needed. New behaviour should be covered by tests; changes to existing behaviour should update the corresponding tests.
+
+- **Unit tests**: `Meshflow/` – Django TestCase/pytest, run with `python -m pytest Meshflow/ -v`
+- **Integration tests**: `tests/integration/` – HTTP client tests against live API, run with `pytest tests/integration/ -v` (requires API running and `seed_integration_tests`)
+
 ```bash
 cd Meshflow
 python -m pytest -v
 # With coverage:
 python -m pytest -v --cov
+
+# Integration tests (API must be running):
+cd ..
+pip install -r tests/requirements-integration.txt
+MESHFLOW_API_URL=http://localhost:8000 MESHFLOW_NODE_API_KEY=integration-test-key-a1b2c3d4e5f6 pytest tests/integration/ -v
 ```
 
 ## Code Style
@@ -68,6 +78,7 @@ python -m pytest -v --cov
 
 ## Conventions
 
+- Add or update unit and integration tests when changing behaviour.
 - Use `timezone.now()` for timestamps; keep `last_heard` timezone-aware.
 - Node IDs: `node_id` (BigInteger), `node_id_str` (hex, e.g. `!12345678`). Use `common.mesh_node_helpers` for conversion.
 - Pagination: `PageSizePagination` (default 100, max 1000). Use `page_size` query param.
