@@ -11,7 +11,7 @@ All packet types share these common fields:
 | from       | integer   | Sender's node ID         | Numeric identifier                  |
 | to         | integer   | Recipient's node ID      | 4294967295 for broadcast            |
 | channel    | integer   | Channel number           | 0-based                             |
-| id         | integer   | Unique packet identifier | -                                   |
+| id         | integer   | Packet identifier        | Unique per sender, not globally     |
 | rxTime     | integer   | Reception timestamp      | Unix timestamp                      |
 | rxSnr      | float     | Signal-to-noise ratio    | -                                   |
 | hopLimit   | integer   | Maximum number of hops   | -                                   |

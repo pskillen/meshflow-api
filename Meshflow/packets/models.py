@@ -35,6 +35,7 @@ class RawPacket(models.Model):
         indexes = [
             models.Index(fields=["packet_id"]),
             models.Index(fields=["from_int"]),
+            models.Index(fields=["from_int", "packet_id"]),
             models.Index(fields=["to_int"]),
         ]
         verbose_name = _("Raw packet")

@@ -66,7 +66,15 @@ This document describes all environment variables used by the Meshflow Django pr
 
 ---
 
-## 7. Monitoring / Prometheus
+## 7. Packet Ingestion
+
+| Variable                      | Default | Description                                                       | Allowable Values         |
+|-------------------------------|---------|-------------------------------------------------------------------|-------------------------|
+| `PACKET_DEDUP_WINDOW_MINUTES` | `10`    | Time window (minutes) within which same sender+packet_id is treated as duplicate. | Integer (string)        |
+
+---
+
+## 8. Monitoring / Prometheus
 
 | Variable                | Default | Description                                      | Allowable Values         |
 |-------------------------|---------|--------------------------------------------------|-------------------------|
@@ -108,7 +116,11 @@ This document describes all environment variables used by the Meshflow Django pr
 
 - **CORS_ALLOWED_ORIGINS**: Additional allowed origins for CORS, comma-separated.
 
-## 7. Monitoring / Prometheus
+## 7. Packet Ingestion
+
+- **PACKET_DEDUP_WINDOW_MINUTES**: Time window (minutes) within which the same sender+packet_id is treated as a duplicate. See `docs/packets/DEDUPLICATION.md`.
+
+## 8. Monitoring / Prometheus
 
 - **PROMETHEUS_PASSWORD**: If set, enables Prometheus metrics and adds authentication.
 
@@ -143,6 +155,8 @@ FRONTEND_URL=https://yourdomain.com
 FRONTEND_OAUTH_CALLBACK_PATH=/auth/callback
 
 CORS_ALLOWED_ORIGINS=https://yourdomain.com,https://admin.yourdomain.com
+
+PACKET_DEDUP_WINDOW_MINUTES=10
 
 PROMETHEUS_PASSWORD=your-prometheus-password
 ``` 
