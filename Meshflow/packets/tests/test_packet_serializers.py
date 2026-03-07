@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.test import TestCase, override_settings
 
 from common.mesh_node_helpers import meshtastic_id_to_hex
 from constellations.models import Constellation, MessageChannel
@@ -639,3 +639,160 @@ class NodeSerializerTest(BasePacketSerializerTestCase):
         self.assertEqual(latest_status.air_util_tx, 0.3)
         self.assertEqual(latest_status.uptime_seconds, 10000)
         self.assertIsNotNone(latest_status.metrics_reported_time)
+
+
+@override_settings(PACKET_DEDUP_WINDOW_MINUTES=10)
+class PacketDeduplicationTest(BasePacketSerializerTestCase):
+    """Tests for packet deduplication behavior."""
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        # Second observer for multi-observer tests
+        cls.observer2 = ManagedNode.objects.create(
+            internal_id=uuid4(),
+            node_id=999888777,
+            name="Test Node 2",
+            constellation_id=cls.constellation.id,
+            owner=cls.user,
+        )
+        # Second sender (different node) for cross-sender test
+        cls.from_node_b = ObservedNode.objects.create(
+            node_id=111222333,
+            node_id_str=meshtastic_id_to_hex(111222333),
+            long_name="From Node B",
+            short_name="FRB",
+        )
+
+    def test_different_senders_same_packet_id_creates_new_packet(self):
+        """Different senders with same packet_id must create separate packets."""
+        from django.utils import timezone as django_tz
+
+        base_time = int(django_tz.now().timestamp())
+        data_a = {
+            "id": 123,
+            "from": self.from_node.node_id,
+            "fromId": self.from_node.node_id_str,
+            "decoded": {"portnum": "TEXT_MESSAGE_APP", "text": "From A"},
+            "rxTime": base_time,
+        }
+        data_b = {
+            "id": 123,
+            "from": self.from_node_b.node_id,
+            "fromId": self.from_node_b.node_id_str,
+            "decoded": {"portnum": "TEXT_MESSAGE_APP", "text": "From B"},
+            "rxTime": base_time,
+        }
+
+        serializer_a = MessagePacketSerializer(data=data_a, context=self.context)
+        assert_serializer_valid(serializer_a)
+        packet_a = serializer_a.save()
+
+        serializer_b = MessagePacketSerializer(data=data_b, context=self.context)
+        assert_serializer_valid(serializer_b)
+        packet_b = serializer_b.save()
+
+        self.assertNotEqual(packet_a.id, packet_b.id)
+        self.assertEqual(packet_a.packet_id, 123)
+        self.assertEqual(packet_b.packet_id, 123)
+        self.assertEqual(packet_a.from_int, self.from_node.node_id)
+        self.assertEqual(packet_b.from_int, self.from_node_b.node_id)
+        self.assertEqual(packet_a.message_text, "From A")
+        self.assertEqual(packet_b.message_text, "From B")
+
+    def test_same_sender_same_packet_id_within_window_reuses_packet(self):
+        """Same sender+packet_id within 10 min from another observer reuses packet."""
+        from django.utils import timezone as django_tz
+
+        base_time = int(django_tz.now().timestamp())
+        data = {
+            "id": 456,
+            "from": self.from_node.node_id,
+            "fromId": self.from_node.node_id_str,
+            "decoded": {"portnum": "TEXT_MESSAGE_APP", "text": "Hello"},
+            "rxTime": base_time,
+        }
+        data_observer2 = {
+            "id": 456,
+            "from": self.from_node.node_id,
+            "fromId": self.from_node.node_id_str,
+            "decoded": {"portnum": "TEXT_MESSAGE_APP", "text": "Hello"},
+            "rxTime": base_time + 300,  # 5 min later
+        }
+
+        ctx1 = {"observer": self.observer}
+        ctx2 = {"observer": self.observer2}
+
+        serializer1 = MessagePacketSerializer(data=data, context=ctx1)
+        assert_serializer_valid(serializer1)
+        packet1 = serializer1.save()
+
+        serializer2 = MessagePacketSerializer(data=data_observer2, context=ctx2)
+        assert_serializer_valid(serializer2)
+        packet2 = serializer2.save()
+
+        self.assertEqual(packet1.id, packet2.id)
+        self.assertEqual(packet1.observations.count(), 2)
+        observer_ids = {o.observer_id for o in packet1.observations.all()}
+        self.assertEqual(observer_ids, {self.observer.pk, self.observer2.pk})
+
+    def test_same_sender_same_packet_id_after_window_creates_new_packet(self):
+        """Same sender+packet_id 10+ min later creates new packet."""
+        from django.utils import timezone as django_tz
+
+        base_time = int(django_tz.now().timestamp())
+        data_first = {
+            "id": 789,
+            "from": self.from_node.node_id,
+            "fromId": self.from_node.node_id_str,
+            "decoded": {"portnum": "TEXT_MESSAGE_APP", "text": "First"},
+            "rxTime": base_time,
+        }
+
+        serializer1 = MessagePacketSerializer(data=data_first, context=self.context)
+        assert_serializer_valid(serializer1)
+        packet1 = serializer1.save()
+
+        # Second packet rx_time 11 min after first packet's first_reported_time
+        first_reported_ts = int(packet1.first_reported_time.timestamp())
+        data_second = {
+            "id": 789,
+            "from": self.from_node.node_id,
+            "fromId": self.from_node.node_id_str,
+            "decoded": {"portnum": "TEXT_MESSAGE_APP", "text": "Second"},
+            "rxTime": first_reported_ts + 660,  # 11 min later
+        }
+
+        serializer2 = MessagePacketSerializer(data=data_second, context=self.context)
+        assert_serializer_valid(serializer2)
+        packet2 = serializer2.save()
+
+        self.assertNotEqual(packet1.id, packet2.id)
+        self.assertEqual(packet1.packet_id, 789)
+        self.assertEqual(packet2.packet_id, 789)
+        self.assertEqual(packet1.message_text, "First")
+        self.assertEqual(packet2.message_text, "Second")
+
+    def test_same_observer_same_packet_twice_no_duplicate_observation(self):
+        """Same observer reporting same packet twice does not create duplicate observation."""
+        from django.utils import timezone as django_tz
+
+        base_time = int(django_tz.now().timestamp())
+        data = {
+            "id": 321,
+            "from": self.from_node.node_id,
+            "fromId": self.from_node.node_id_str,
+            "decoded": {"portnum": "TEXT_MESSAGE_APP", "text": "Once"},
+            "rxTime": base_time,
+        }
+
+        serializer1 = MessagePacketSerializer(data=data, context=self.context)
+        assert_serializer_valid(serializer1)
+        packet1 = serializer1.save()
+
+        serializer2 = MessagePacketSerializer(data=data, context=self.context)
+        assert_serializer_valid(serializer2)
+        packet2 = serializer2.save()
+
+        self.assertEqual(packet1.id, packet2.id)
+        self.assertEqual(packet1.observations.count(), 1)

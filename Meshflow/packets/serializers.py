@@ -1,7 +1,8 @@
 """Serializers for the packets app."""
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
+from django.conf import settings
 from django.utils import timezone as django_timezone
 
 from rest_framework import serializers
@@ -51,6 +52,18 @@ def convert_location_source(source):
                 return source_choice.value
         # If no match found, set to UNSET
         return LocationSource.UNSET
+
+
+def find_existing_packet(model_class, from_int, packet_id, rx_time):
+    """Find an existing packet that matches (sender, packet_id) within the dedup window."""
+    window_minutes = getattr(settings, "PACKET_DEDUP_WINDOW_MINUTES", 10)
+    window = timedelta(minutes=window_minutes)
+    return model_class.objects.filter(
+        from_int=from_int,
+        packet_id=packet_id,
+        first_reported_time__gte=rx_time - window,
+        first_reported_time__lte=rx_time + window,
+    ).first()
 
 
 class BasePacketSerializer(serializers.Serializer):
@@ -190,8 +203,10 @@ class MessagePacketSerializer(BasePacketSerializer):
     def create(self, validated_data):
         """Create a new MessagePacket instance."""
         # Check if packet already exists
+        from_int = validated_data.get("from_int")
         packet_id = validated_data.get("packet_id")
-        existing_packet = MessagePacket.objects.filter(packet_id=packet_id).first()
+        rx_time = validated_data.get("rx_time")
+        existing_packet = find_existing_packet(MessagePacket, from_int, packet_id, rx_time)
 
         if existing_packet:
             # If packet exists, just create the observation
@@ -260,8 +275,10 @@ class PositionPacketSerializer(BasePacketSerializer):
     def create(self, validated_data):
         """Create a new PositionPacket instance."""
         # Check if packet already exists
+        from_int = validated_data.get("from_int")
         packet_id = validated_data.get("packet_id")
-        existing_packet = PositionPacket.objects.filter(packet_id=packet_id).first()
+        rx_time = validated_data.get("rx_time")
+        existing_packet = find_existing_packet(PositionPacket, from_int, packet_id, rx_time)
 
         if existing_packet:
             # If packet exists, just create the observation
@@ -349,8 +366,10 @@ class NodeInfoPacketSerializer(BasePacketSerializer):
     def create(self, validated_data):
         """Create a new NodeInfoPacket instance."""
         # Check if packet already exists
+        from_int = validated_data.get("from_int")
         packet_id = validated_data.get("packet_id")
-        existing_packet = NodeInfoPacket.objects.filter(packet_id=packet_id).first()
+        rx_time = validated_data.get("rx_time")
+        existing_packet = find_existing_packet(NodeInfoPacket, from_int, packet_id, rx_time)
 
         if existing_packet:
             # If packet exists, just create the observation
@@ -429,8 +448,10 @@ class DeviceMetricsPacketSerializer(BasePacketSerializer):
     def create(self, validated_data):
         """Create a new DeviceMetricsPacket instance."""
         # Check if packet already exists
+        from_int = validated_data.get("from_int")
         packet_id = validated_data.get("packet_id")
-        existing_packet = DeviceMetricsPacket.objects.filter(packet_id=packet_id).first()
+        rx_time = validated_data.get("rx_time")
+        existing_packet = find_existing_packet(DeviceMetricsPacket, from_int, packet_id, rx_time)
 
         if existing_packet:
             # If packet exists, just create the observation
@@ -519,8 +540,10 @@ class LocalStatsPacketSerializer(BasePacketSerializer):
     def create(self, validated_data):
         """Create a new LocalStatsPacket instance."""
         # Check if packet already exists
+        from_int = validated_data.get("from_int")
         packet_id = validated_data.get("packet_id")
-        existing_packet = LocalStatsPacket.objects.filter(packet_id=packet_id).first()
+        rx_time = validated_data.get("rx_time")
+        existing_packet = find_existing_packet(LocalStatsPacket, from_int, packet_id, rx_time)
 
         if existing_packet:
             # If packet exists, just create the observation
@@ -612,8 +635,10 @@ class EnvironmentMetricsPacketSerializer(BasePacketSerializer):
         return validated_data
 
     def create(self, validated_data):
+        from_int = validated_data.get("from_int")
         packet_id = validated_data.get("packet_id")
-        existing_packet = EnvironmentMetricsPacket.objects.filter(packet_id=packet_id).first()
+        rx_time = validated_data.get("rx_time")
+        existing_packet = find_existing_packet(EnvironmentMetricsPacket, from_int, packet_id, rx_time)
         if existing_packet:
             self._create_observation(existing_packet, validated_data)
             return existing_packet
@@ -713,8 +738,10 @@ class AirQualityMetricsPacketSerializer(BasePacketSerializer):
         return validated_data
 
     def create(self, validated_data):
+        from_int = validated_data.get("from_int")
         packet_id = validated_data.get("packet_id")
-        existing_packet = AirQualityMetricsPacket.objects.filter(packet_id=packet_id).first()
+        rx_time = validated_data.get("rx_time")
+        existing_packet = find_existing_packet(AirQualityMetricsPacket, from_int, packet_id, rx_time)
         if existing_packet:
             self._create_observation(existing_packet, validated_data)
             return existing_packet
@@ -802,8 +829,10 @@ class PowerMetricsPacketSerializer(BasePacketSerializer):
         return validated_data
 
     def create(self, validated_data):
+        from_int = validated_data.get("from_int")
         packet_id = validated_data.get("packet_id")
-        existing_packet = PowerMetricsPacket.objects.filter(packet_id=packet_id).first()
+        rx_time = validated_data.get("rx_time")
+        existing_packet = find_existing_packet(PowerMetricsPacket, from_int, packet_id, rx_time)
         if existing_packet:
             self._create_observation(existing_packet, validated_data)
             return existing_packet
@@ -869,8 +898,10 @@ class HealthMetricsPacketSerializer(BasePacketSerializer):
         return validated_data
 
     def create(self, validated_data):
+        from_int = validated_data.get("from_int")
         packet_id = validated_data.get("packet_id")
-        existing_packet = HealthMetricsPacket.objects.filter(packet_id=packet_id).first()
+        rx_time = validated_data.get("rx_time")
+        existing_packet = find_existing_packet(HealthMetricsPacket, from_int, packet_id, rx_time)
         if existing_packet:
             self._create_observation(existing_packet, validated_data)
             return existing_packet
@@ -929,8 +960,10 @@ class HostMetricsPacketSerializer(BasePacketSerializer):
         return validated_data
 
     def create(self, validated_data):
+        from_int = validated_data.get("from_int")
         packet_id = validated_data.get("packet_id")
-        existing_packet = HostMetricsPacket.objects.filter(packet_id=packet_id).first()
+        rx_time = validated_data.get("rx_time")
+        existing_packet = find_existing_packet(HostMetricsPacket, from_int, packet_id, rx_time)
         if existing_packet:
             self._create_observation(existing_packet, validated_data)
             return existing_packet
@@ -1003,8 +1036,10 @@ class TrafficManagementStatsPacketSerializer(BasePacketSerializer):
         return validated_data
 
     def create(self, validated_data):
+        from_int = validated_data.get("from_int")
         packet_id = validated_data.get("packet_id")
-        existing_packet = TrafficManagementStatsPacket.objects.filter(packet_id=packet_id).first()
+        rx_time = validated_data.get("rx_time")
+        existing_packet = find_existing_packet(TrafficManagementStatsPacket, from_int, packet_id, rx_time)
         if existing_packet:
             self._create_observation(existing_packet, validated_data)
             return existing_packet
