@@ -11,14 +11,20 @@ from constellations.models import MessageChannel
 from nodes.models import DeviceMetrics, ManagedNode, NodeLatestStatus, ObservedNode, Position
 
 from .models import (
+    AirQualityMetricsPacket,
     DeviceMetricsPacket,
+    EnvironmentMetricsPacket,
+    HealthMetricsPacket,
+    HostMetricsPacket,
     LocalStatsPacket,
     LocationSource,
     MessagePacket,
     NodeInfoPacket,
     PacketObservation,
     PositionPacket,
+    PowerMetricsPacket,
     RoleSource,
+    TrafficManagementStatsPacket,
 )
 
 
@@ -472,6 +478,14 @@ class LocalStatsPacketSerializer(BasePacketSerializer):
                 numOnlineNodes = serializers.IntegerField(source="num_online_nodes", required=False, allow_null=True)
                 numTotalNodes = serializers.IntegerField(source="num_total_nodes", required=False, allow_null=True)
                 numRxDupe = serializers.IntegerField(source="num_rx_dupe", required=False, allow_null=True)
+                numTxRelay = serializers.IntegerField(source="num_tx_relay", required=False, allow_null=True)
+                numTxRelayCanceled = serializers.IntegerField(
+                    source="num_tx_relay_canceled", required=False, allow_null=True
+                )
+                heapTotalBytes = serializers.IntegerField(source="heap_total_bytes", required=False, allow_null=True)
+                heapFreeBytes = serializers.IntegerField(source="heap_free_bytes", required=False, allow_null=True)
+                numTxDropped = serializers.IntegerField(source="num_tx_dropped", required=False, allow_null=True)
+                noiseFloor = serializers.IntegerField(source="noise_floor", required=False, allow_null=True)
 
             localStats = LocalStatsSerializer()
             time = serializers.IntegerField(source="reading_time")
@@ -530,12 +544,488 @@ class LocalStatsPacketSerializer(BasePacketSerializer):
             num_online_nodes=validated_data.get("num_online_nodes"),
             num_total_nodes=validated_data.get("num_total_nodes"),
             num_rx_dupe=validated_data.get("num_rx_dupe"),
+            num_tx_relay=validated_data.get("num_tx_relay"),
+            num_tx_relay_canceled=validated_data.get("num_tx_relay_canceled"),
+            heap_total_bytes=validated_data.get("heap_total_bytes"),
+            heap_free_bytes=validated_data.get("heap_free_bytes"),
+            num_tx_dropped=validated_data.get("num_tx_dropped"),
+            noise_floor=validated_data.get("noise_floor"),
             reading_time=validated_data.get("reading_time"),
         )
 
         # Create the observation
         self._create_observation(packet, validated_data)
 
+        return packet
+
+
+class EnvironmentMetricsPacketSerializer(BasePacketSerializer):
+    """Serializer for environment metrics telemetry packets."""
+
+    class DecodedSerializer(serializers.Serializer):
+        class TelemetrySerializer(serializers.Serializer):
+            class EnvironmentMetricsSerializer(serializers.Serializer):
+                temperature = serializers.FloatField(required=False, allow_null=True)
+                relativeHumidity = serializers.FloatField(source="relative_humidity", required=False, allow_null=True)
+                barometricPressure = serializers.FloatField(
+                    source="barometric_pressure", required=False, allow_null=True
+                )
+                gasResistance = serializers.FloatField(source="gas_resistance", required=False, allow_null=True)
+                voltage = serializers.FloatField(required=False, allow_null=True)
+                current = serializers.FloatField(required=False, allow_null=True)
+                iaq = serializers.IntegerField(required=False, allow_null=True)
+                distance = serializers.FloatField(required=False, allow_null=True)
+                lux = serializers.FloatField(required=False, allow_null=True)
+                whiteLux = serializers.FloatField(source="white_lux", required=False, allow_null=True)
+                irLux = serializers.FloatField(source="ir_lux", required=False, allow_null=True)
+                uvLux = serializers.FloatField(source="uv_lux", required=False, allow_null=True)
+                windDirection = serializers.IntegerField(source="wind_direction", required=False, allow_null=True)
+                windSpeed = serializers.FloatField(source="wind_speed", required=False, allow_null=True)
+                weight = serializers.FloatField(required=False, allow_null=True)
+                windGust = serializers.FloatField(source="wind_gust", required=False, allow_null=True)
+                windLull = serializers.FloatField(source="wind_lull", required=False, allow_null=True)
+                radiation = serializers.FloatField(required=False, allow_null=True)
+                rainfall1h = serializers.FloatField(source="rainfall_1h", required=False, allow_null=True)
+                rainfall24h = serializers.FloatField(source="rainfall_24h", required=False, allow_null=True)
+                soilMoisture = serializers.IntegerField(source="soil_moisture", required=False, allow_null=True)
+                soilTemperature = serializers.FloatField(source="soil_temperature", required=False, allow_null=True)
+
+            environmentMetrics = EnvironmentMetricsSerializer()
+            time = serializers.IntegerField(source="reading_time")
+
+        telemetry = TelemetrySerializer()
+
+    decoded = DecodedSerializer(source="*")
+
+    def to_internal_value(self, data):
+        validated_data = super().to_internal_value(data)
+        if "telemetry" in validated_data:
+            telemetry_data = validated_data.pop("telemetry")
+            if "environmentMetrics" in telemetry_data:
+                env_data = telemetry_data.pop("environmentMetrics")
+                validated_data.update(env_data)
+            if "time" in telemetry_data:
+                validated_data["reading_time"] = telemetry_data["time"]
+            validated_data.update(telemetry_data)
+        if "reading_time" in validated_data and validated_data["reading_time"] is not None:
+            validated_data["reading_time"] = convert_timestamp(validated_data["reading_time"])
+        return validated_data
+
+    def create(self, validated_data):
+        packet_id = validated_data.get("packet_id")
+        existing_packet = EnvironmentMetricsPacket.objects.filter(packet_id=packet_id).first()
+        if existing_packet:
+            self._create_observation(existing_packet, validated_data)
+            return existing_packet
+
+        packet = EnvironmentMetricsPacket.objects.create(
+            packet_id=validated_data.get("packet_id"),
+            from_int=validated_data.get("from_int"),
+            from_str=validated_data.get("from_str"),
+            to_int=validated_data.get("to_int"),
+            to_str=validated_data.get("to_str"),
+            port_num=validated_data.get("port_num"),
+            reading_time=validated_data.get("reading_time"),
+            temperature=validated_data.get("temperature"),
+            relative_humidity=validated_data.get("relative_humidity"),
+            barometric_pressure=validated_data.get("barometric_pressure"),
+            gas_resistance=validated_data.get("gas_resistance"),
+            iaq=validated_data.get("iaq"),
+            voltage=validated_data.get("voltage"),
+            current=validated_data.get("current"),
+            distance=validated_data.get("distance"),
+            lux=validated_data.get("lux"),
+            white_lux=validated_data.get("white_lux"),
+            ir_lux=validated_data.get("ir_lux"),
+            uv_lux=validated_data.get("uv_lux"),
+            wind_direction=validated_data.get("wind_direction"),
+            wind_speed=validated_data.get("wind_speed"),
+            weight=validated_data.get("weight"),
+            wind_gust=validated_data.get("wind_gust"),
+            wind_lull=validated_data.get("wind_lull"),
+            radiation=validated_data.get("radiation"),
+            rainfall_1h=validated_data.get("rainfall_1h"),
+            rainfall_24h=validated_data.get("rainfall_24h"),
+            soil_moisture=validated_data.get("soil_moisture"),
+            soil_temperature=validated_data.get("soil_temperature"),
+        )
+        self._create_observation(packet, validated_data)
+        return packet
+
+
+class AirQualityMetricsPacketSerializer(BasePacketSerializer):
+    """Serializer for air quality metrics telemetry packets."""
+
+    class DecodedSerializer(serializers.Serializer):
+        class TelemetrySerializer(serializers.Serializer):
+            class AirQualityMetricsSerializer(serializers.Serializer):
+                pm10Standard = serializers.IntegerField(source="pm10_standard", required=False, allow_null=True)
+                pm25Standard = serializers.IntegerField(source="pm25_standard", required=False, allow_null=True)
+                pm100Standard = serializers.IntegerField(source="pm100_standard", required=False, allow_null=True)
+                pm10Environmental = serializers.IntegerField(
+                    source="pm10_environmental", required=False, allow_null=True
+                )
+                pm25Environmental = serializers.IntegerField(
+                    source="pm25_environmental", required=False, allow_null=True
+                )
+                pm100Environmental = serializers.IntegerField(
+                    source="pm100_environmental", required=False, allow_null=True
+                )
+                particles03um = serializers.IntegerField(source="particles_03um", required=False, allow_null=True)
+                particles05um = serializers.IntegerField(source="particles_05um", required=False, allow_null=True)
+                particles10um = serializers.IntegerField(source="particles_10um", required=False, allow_null=True)
+                particles25um = serializers.IntegerField(source="particles_25um", required=False, allow_null=True)
+                particles50um = serializers.IntegerField(source="particles_50um", required=False, allow_null=True)
+                particles100um = serializers.IntegerField(source="particles_100um", required=False, allow_null=True)
+                co2 = serializers.IntegerField(required=False, allow_null=True)
+                co2Temperature = serializers.FloatField(source="co2_temperature", required=False, allow_null=True)
+                co2Humidity = serializers.FloatField(source="co2_humidity", required=False, allow_null=True)
+                formFormaldehyde = serializers.FloatField(source="form_formaldehyde", required=False, allow_null=True)
+                formHumidity = serializers.FloatField(source="form_humidity", required=False, allow_null=True)
+                formTemperature = serializers.FloatField(source="form_temperature", required=False, allow_null=True)
+                pm40Standard = serializers.IntegerField(source="pm40_standard", required=False, allow_null=True)
+                particles40um = serializers.IntegerField(source="particles_40um", required=False, allow_null=True)
+                pmTemperature = serializers.FloatField(source="pm_temperature", required=False, allow_null=True)
+                pmHumidity = serializers.FloatField(source="pm_humidity", required=False, allow_null=True)
+                pmVocIdx = serializers.FloatField(source="pm_voc_idx", required=False, allow_null=True)
+                pmNoxIdx = serializers.FloatField(source="pm_nox_idx", required=False, allow_null=True)
+                particlesTps = serializers.FloatField(source="particles_tps", required=False, allow_null=True)
+
+            airQualityMetrics = AirQualityMetricsSerializer()
+            time = serializers.IntegerField(source="reading_time")
+
+        telemetry = TelemetrySerializer()
+
+    decoded = DecodedSerializer(source="*")
+
+    def to_internal_value(self, data):
+        validated_data = super().to_internal_value(data)
+        if "telemetry" in validated_data:
+            telemetry_data = validated_data.pop("telemetry")
+            if "airQualityMetrics" in telemetry_data:
+                aq_data = telemetry_data.pop("airQualityMetrics")
+                validated_data.update(aq_data)
+            if "time" in telemetry_data:
+                validated_data["reading_time"] = telemetry_data["time"]
+            validated_data.update(telemetry_data)
+        if "reading_time" in validated_data and validated_data["reading_time"] is not None:
+            validated_data["reading_time"] = convert_timestamp(validated_data["reading_time"])
+        return validated_data
+
+    def create(self, validated_data):
+        packet_id = validated_data.get("packet_id")
+        existing_packet = AirQualityMetricsPacket.objects.filter(packet_id=packet_id).first()
+        if existing_packet:
+            self._create_observation(existing_packet, validated_data)
+            return existing_packet
+
+        packet = AirQualityMetricsPacket.objects.create(
+            packet_id=validated_data.get("packet_id"),
+            from_int=validated_data.get("from_int"),
+            from_str=validated_data.get("from_str"),
+            to_int=validated_data.get("to_int"),
+            to_str=validated_data.get("to_str"),
+            port_num=validated_data.get("port_num"),
+            reading_time=validated_data.get("reading_time"),
+            pm10_standard=validated_data.get("pm10_standard"),
+            pm25_standard=validated_data.get("pm25_standard"),
+            pm100_standard=validated_data.get("pm100_standard"),
+            pm10_environmental=validated_data.get("pm10_environmental"),
+            pm25_environmental=validated_data.get("pm25_environmental"),
+            pm100_environmental=validated_data.get("pm100_environmental"),
+            particles_03um=validated_data.get("particles_03um"),
+            particles_05um=validated_data.get("particles_05um"),
+            particles_10um=validated_data.get("particles_10um"),
+            particles_25um=validated_data.get("particles_25um"),
+            particles_50um=validated_data.get("particles_50um"),
+            particles_100um=validated_data.get("particles_100um"),
+            co2=validated_data.get("co2"),
+            co2_temperature=validated_data.get("co2_temperature"),
+            co2_humidity=validated_data.get("co2_humidity"),
+            form_formaldehyde=validated_data.get("form_formaldehyde"),
+            form_humidity=validated_data.get("form_humidity"),
+            form_temperature=validated_data.get("form_temperature"),
+            pm40_standard=validated_data.get("pm40_standard"),
+            particles_40um=validated_data.get("particles_40um"),
+            pm_temperature=validated_data.get("pm_temperature"),
+            pm_humidity=validated_data.get("pm_humidity"),
+            pm_voc_idx=validated_data.get("pm_voc_idx"),
+            pm_nox_idx=validated_data.get("pm_nox_idx"),
+            particles_tps=validated_data.get("particles_tps"),
+        )
+        self._create_observation(packet, validated_data)
+        return packet
+
+
+class PowerMetricsPacketSerializer(BasePacketSerializer):
+    """Serializer for power metrics telemetry packets."""
+
+    class DecodedSerializer(serializers.Serializer):
+        class TelemetrySerializer(serializers.Serializer):
+            class PowerMetricsSerializer(serializers.Serializer):
+                ch1Voltage = serializers.FloatField(source="ch1_voltage", required=False, allow_null=True)
+                ch1Current = serializers.FloatField(source="ch1_current", required=False, allow_null=True)
+                ch2Voltage = serializers.FloatField(source="ch2_voltage", required=False, allow_null=True)
+                ch2Current = serializers.FloatField(source="ch2_current", required=False, allow_null=True)
+                ch3Voltage = serializers.FloatField(source="ch3_voltage", required=False, allow_null=True)
+                ch3Current = serializers.FloatField(source="ch3_current", required=False, allow_null=True)
+                ch4Voltage = serializers.FloatField(source="ch4_voltage", required=False, allow_null=True)
+                ch4Current = serializers.FloatField(source="ch4_current", required=False, allow_null=True)
+                ch5Voltage = serializers.FloatField(source="ch5_voltage", required=False, allow_null=True)
+                ch5Current = serializers.FloatField(source="ch5_current", required=False, allow_null=True)
+                ch6Voltage = serializers.FloatField(source="ch6_voltage", required=False, allow_null=True)
+                ch6Current = serializers.FloatField(source="ch6_current", required=False, allow_null=True)
+                ch7Voltage = serializers.FloatField(source="ch7_voltage", required=False, allow_null=True)
+                ch7Current = serializers.FloatField(source="ch7_current", required=False, allow_null=True)
+                ch8Voltage = serializers.FloatField(source="ch8_voltage", required=False, allow_null=True)
+                ch8Current = serializers.FloatField(source="ch8_current", required=False, allow_null=True)
+
+            powerMetrics = PowerMetricsSerializer()
+            time = serializers.IntegerField(source="reading_time")
+
+        telemetry = TelemetrySerializer()
+
+    decoded = DecodedSerializer(source="*")
+
+    def to_internal_value(self, data):
+        validated_data = super().to_internal_value(data)
+        if "telemetry" in validated_data:
+            telemetry_data = validated_data.pop("telemetry")
+            if "powerMetrics" in telemetry_data:
+                pm_data = telemetry_data.pop("powerMetrics")
+                validated_data.update(pm_data)
+            if "time" in telemetry_data:
+                validated_data["reading_time"] = telemetry_data["time"]
+            validated_data.update(telemetry_data)
+        if "reading_time" in validated_data and validated_data["reading_time"] is not None:
+            validated_data["reading_time"] = convert_timestamp(validated_data["reading_time"])
+        return validated_data
+
+    def create(self, validated_data):
+        packet_id = validated_data.get("packet_id")
+        existing_packet = PowerMetricsPacket.objects.filter(packet_id=packet_id).first()
+        if existing_packet:
+            self._create_observation(existing_packet, validated_data)
+            return existing_packet
+
+        packet = PowerMetricsPacket.objects.create(
+            packet_id=validated_data.get("packet_id"),
+            from_int=validated_data.get("from_int"),
+            from_str=validated_data.get("from_str"),
+            to_int=validated_data.get("to_int"),
+            to_str=validated_data.get("to_str"),
+            port_num=validated_data.get("port_num"),
+            reading_time=validated_data.get("reading_time"),
+            ch1_voltage=validated_data.get("ch1_voltage"),
+            ch1_current=validated_data.get("ch1_current"),
+            ch2_voltage=validated_data.get("ch2_voltage"),
+            ch2_current=validated_data.get("ch2_current"),
+            ch3_voltage=validated_data.get("ch3_voltage"),
+            ch3_current=validated_data.get("ch3_current"),
+            ch4_voltage=validated_data.get("ch4_voltage"),
+            ch4_current=validated_data.get("ch4_current"),
+            ch5_voltage=validated_data.get("ch5_voltage"),
+            ch5_current=validated_data.get("ch5_current"),
+            ch6_voltage=validated_data.get("ch6_voltage"),
+            ch6_current=validated_data.get("ch6_current"),
+            ch7_voltage=validated_data.get("ch7_voltage"),
+            ch7_current=validated_data.get("ch7_current"),
+            ch8_voltage=validated_data.get("ch8_voltage"),
+            ch8_current=validated_data.get("ch8_current"),
+        )
+        self._create_observation(packet, validated_data)
+        return packet
+
+
+class HealthMetricsPacketSerializer(BasePacketSerializer):
+    """Serializer for health metrics telemetry packets."""
+
+    class DecodedSerializer(serializers.Serializer):
+        class TelemetrySerializer(serializers.Serializer):
+            class HealthMetricsSerializer(serializers.Serializer):
+                heartBpm = serializers.IntegerField(source="heart_bpm", required=False, allow_null=True)
+                spO2 = serializers.IntegerField(source="spo2", required=False, allow_null=True)
+                temperature = serializers.FloatField(required=False, allow_null=True)
+
+            healthMetrics = HealthMetricsSerializer()
+            time = serializers.IntegerField(source="reading_time")
+
+        telemetry = TelemetrySerializer()
+
+    decoded = DecodedSerializer(source="*")
+
+    def to_internal_value(self, data):
+        validated_data = super().to_internal_value(data)
+        if "telemetry" in validated_data:
+            telemetry_data = validated_data.pop("telemetry")
+            if "healthMetrics" in telemetry_data:
+                hm_data = telemetry_data.pop("healthMetrics")
+                validated_data.update(hm_data)
+            if "time" in telemetry_data:
+                validated_data["reading_time"] = telemetry_data["time"]
+            validated_data.update(telemetry_data)
+        if "reading_time" in validated_data and validated_data["reading_time"] is not None:
+            validated_data["reading_time"] = convert_timestamp(validated_data["reading_time"])
+        return validated_data
+
+    def create(self, validated_data):
+        packet_id = validated_data.get("packet_id")
+        existing_packet = HealthMetricsPacket.objects.filter(packet_id=packet_id).first()
+        if existing_packet:
+            self._create_observation(existing_packet, validated_data)
+            return existing_packet
+
+        packet = HealthMetricsPacket.objects.create(
+            packet_id=validated_data.get("packet_id"),
+            from_int=validated_data.get("from_int"),
+            from_str=validated_data.get("from_str"),
+            to_int=validated_data.get("to_int"),
+            to_str=validated_data.get("to_str"),
+            port_num=validated_data.get("port_num"),
+            reading_time=validated_data.get("reading_time"),
+            heart_bpm=validated_data.get("heart_bpm"),
+            spo2=validated_data.get("spo2"),
+            temperature=validated_data.get("temperature"),
+        )
+        self._create_observation(packet, validated_data)
+        return packet
+
+
+class HostMetricsPacketSerializer(BasePacketSerializer):
+    """Serializer for host metrics telemetry packets."""
+
+    class DecodedSerializer(serializers.Serializer):
+        class TelemetrySerializer(serializers.Serializer):
+            class HostMetricsSerializer(serializers.Serializer):
+                uptimeSeconds = serializers.IntegerField(source="uptime_seconds", required=False, allow_null=True)
+                freememBytes = serializers.IntegerField(source="freemem_bytes", required=False, allow_null=True)
+                diskfree1Bytes = serializers.IntegerField(source="diskfree1_bytes", required=False, allow_null=True)
+                diskfree2Bytes = serializers.IntegerField(source="diskfree2_bytes", required=False, allow_null=True)
+                diskfree3Bytes = serializers.IntegerField(source="diskfree3_bytes", required=False, allow_null=True)
+                load1 = serializers.IntegerField(required=False, allow_null=True)
+                load5 = serializers.IntegerField(required=False, allow_null=True)
+                load15 = serializers.IntegerField(required=False, allow_null=True)
+                userString = serializers.CharField(source="user_string", required=False, allow_null=True)
+
+            hostMetrics = HostMetricsSerializer()
+            time = serializers.IntegerField(source="reading_time")
+
+        telemetry = TelemetrySerializer()
+
+    decoded = DecodedSerializer(source="*")
+
+    def to_internal_value(self, data):
+        validated_data = super().to_internal_value(data)
+        if "telemetry" in validated_data:
+            telemetry_data = validated_data.pop("telemetry")
+            if "hostMetrics" in telemetry_data:
+                host_data = telemetry_data.pop("hostMetrics")
+                validated_data.update(host_data)
+            if "time" in telemetry_data:
+                validated_data["reading_time"] = telemetry_data["time"]
+            validated_data.update(telemetry_data)
+        if "reading_time" in validated_data and validated_data["reading_time"] is not None:
+            validated_data["reading_time"] = convert_timestamp(validated_data["reading_time"])
+        return validated_data
+
+    def create(self, validated_data):
+        packet_id = validated_data.get("packet_id")
+        existing_packet = HostMetricsPacket.objects.filter(packet_id=packet_id).first()
+        if existing_packet:
+            self._create_observation(existing_packet, validated_data)
+            return existing_packet
+
+        packet = HostMetricsPacket.objects.create(
+            packet_id=validated_data.get("packet_id"),
+            from_int=validated_data.get("from_int"),
+            from_str=validated_data.get("from_str"),
+            to_int=validated_data.get("to_int"),
+            to_str=validated_data.get("to_str"),
+            port_num=validated_data.get("port_num"),
+            reading_time=validated_data.get("reading_time"),
+            uptime_seconds=validated_data.get("uptime_seconds"),
+            freemem_bytes=validated_data.get("freemem_bytes"),
+            diskfree1_bytes=validated_data.get("diskfree1_bytes"),
+            diskfree2_bytes=validated_data.get("diskfree2_bytes"),
+            diskfree3_bytes=validated_data.get("diskfree3_bytes"),
+            load1=validated_data.get("load1"),
+            load5=validated_data.get("load5"),
+            load15=validated_data.get("load15"),
+            user_string=validated_data.get("user_string"),
+        )
+        self._create_observation(packet, validated_data)
+        return packet
+
+
+class TrafficManagementStatsPacketSerializer(BasePacketSerializer):
+    """Serializer for traffic management stats telemetry packets."""
+
+    class DecodedSerializer(serializers.Serializer):
+        class TelemetrySerializer(serializers.Serializer):
+            class TrafficManagementStatsSerializer(serializers.Serializer):
+                packetsInspected = serializers.IntegerField(source="packets_inspected", required=False, allow_null=True)
+                positionDedupDrops = serializers.IntegerField(
+                    source="position_dedup_drops", required=False, allow_null=True
+                )
+                nodeinfoCacheHits = serializers.IntegerField(
+                    source="nodeinfo_cache_hits", required=False, allow_null=True
+                )
+                rateLimitDrops = serializers.IntegerField(source="rate_limit_drops", required=False, allow_null=True)
+                unknownPacketDrops = serializers.IntegerField(
+                    source="unknown_packet_drops", required=False, allow_null=True
+                )
+                hopExhaustedPackets = serializers.IntegerField(
+                    source="hop_exhausted_packets", required=False, allow_null=True
+                )
+                routerHopsPreserved = serializers.IntegerField(
+                    source="router_hops_preserved", required=False, allow_null=True
+                )
+
+            trafficManagementStats = TrafficManagementStatsSerializer()
+            time = serializers.IntegerField(source="reading_time")
+
+        telemetry = TelemetrySerializer()
+
+    decoded = DecodedSerializer(source="*")
+
+    def to_internal_value(self, data):
+        validated_data = super().to_internal_value(data)
+        if "telemetry" in validated_data:
+            telemetry_data = validated_data.pop("telemetry")
+            if "trafficManagementStats" in telemetry_data:
+                tm_data = telemetry_data.pop("trafficManagementStats")
+                validated_data.update(tm_data)
+            if "time" in telemetry_data:
+                validated_data["reading_time"] = telemetry_data["time"]
+            validated_data.update(telemetry_data)
+        if "reading_time" in validated_data and validated_data["reading_time"] is not None:
+            validated_data["reading_time"] = convert_timestamp(validated_data["reading_time"])
+        return validated_data
+
+    def create(self, validated_data):
+        packet_id = validated_data.get("packet_id")
+        existing_packet = TrafficManagementStatsPacket.objects.filter(packet_id=packet_id).first()
+        if existing_packet:
+            self._create_observation(existing_packet, validated_data)
+            return existing_packet
+
+        packet = TrafficManagementStatsPacket.objects.create(
+            packet_id=validated_data.get("packet_id"),
+            from_int=validated_data.get("from_int"),
+            from_str=validated_data.get("from_str"),
+            to_int=validated_data.get("to_int"),
+            to_str=validated_data.get("to_str"),
+            port_num=validated_data.get("port_num"),
+            reading_time=validated_data.get("reading_time"),
+            packets_inspected=validated_data.get("packets_inspected"),
+            position_dedup_drops=validated_data.get("position_dedup_drops"),
+            nodeinfo_cache_hits=validated_data.get("nodeinfo_cache_hits"),
+            rate_limit_drops=validated_data.get("rate_limit_drops"),
+            unknown_packet_drops=validated_data.get("unknown_packet_drops"),
+            hop_exhausted_packets=validated_data.get("hop_exhausted_packets"),
+            router_hops_preserved=validated_data.get("router_hops_preserved"),
+        )
+        self._create_observation(packet, validated_data)
         return packet
 
 
@@ -558,14 +1048,38 @@ class PacketIngestSerializer(serializers.Serializer):
         elif portnum == "POSITION_APP":
             validated_data = PositionPacketSerializer().to_internal_value(data)
         elif portnum == "TELEMETRY_APP":
-            # Check if it's device metrics or local stats
-            if "deviceMetrics" in data.get("decoded", {}).get("telemetry", {}):
+            telemetry = data.get("decoded", {}).get("telemetry", {})
+            if "deviceMetrics" in telemetry:
                 validated_data = DeviceMetricsPacketSerializer().to_internal_value(data)
-            elif "localStats" in data.get("decoded", {}).get("telemetry", {}):
+                validated_data["_telemetry_variant"] = "deviceMetrics"
+            elif "localStats" in telemetry:
                 validated_data = LocalStatsPacketSerializer().to_internal_value(data)
+                validated_data["_telemetry_variant"] = "localStats"
+            elif "environmentMetrics" in telemetry:
+                validated_data = EnvironmentMetricsPacketSerializer().to_internal_value(data)
+                validated_data["_telemetry_variant"] = "environmentMetrics"
+            elif "airQualityMetrics" in telemetry:
+                validated_data = AirQualityMetricsPacketSerializer().to_internal_value(data)
+                validated_data["_telemetry_variant"] = "airQualityMetrics"
+            elif "powerMetrics" in telemetry:
+                validated_data = PowerMetricsPacketSerializer().to_internal_value(data)
+                validated_data["_telemetry_variant"] = "powerMetrics"
+            elif "healthMetrics" in telemetry:
+                validated_data = HealthMetricsPacketSerializer().to_internal_value(data)
+                validated_data["_telemetry_variant"] = "healthMetrics"
+            elif "hostMetrics" in telemetry:
+                validated_data = HostMetricsPacketSerializer().to_internal_value(data)
+                validated_data["_telemetry_variant"] = "hostMetrics"
+            elif "trafficManagementStats" in telemetry:
+                validated_data = TrafficManagementStatsPacketSerializer().to_internal_value(data)
+                validated_data["_telemetry_variant"] = "trafficManagementStats"
             else:
                 raise serializers.ValidationError(
-                    {"decoded.telemetry": "Must contain either deviceMetrics or localStats"}
+                    {
+                        "decoded.telemetry": "Must contain one of: deviceMetrics, localStats, "
+                        "environmentMetrics, airQualityMetrics, powerMetrics, healthMetrics, "
+                        "hostMetrics, trafficManagementStats"
+                    }
                 )
         else:
             raise serializers.ValidationError({"decoded.portnum": f"Unknown packet type: {portnum}"})
@@ -584,14 +1098,30 @@ class PacketIngestSerializer(serializers.Serializer):
         elif portnum == "POSITION_APP":
             self.child_serializer = PositionPacketSerializer(context=self.context)
         elif portnum == "TELEMETRY_APP":
-            # Check if it's device metrics or local stats
-            if "battery_level" in validated_data:
+            variant = validated_data.pop("_telemetry_variant", None)
+            variant_to_serializer = {
+                "deviceMetrics": DeviceMetricsPacketSerializer,
+                "localStats": LocalStatsPacketSerializer,
+                "environmentMetrics": EnvironmentMetricsPacketSerializer,
+                "airQualityMetrics": AirQualityMetricsPacketSerializer,
+                "powerMetrics": PowerMetricsPacketSerializer,
+                "healthMetrics": HealthMetricsPacketSerializer,
+                "hostMetrics": HostMetricsPacketSerializer,
+                "trafficManagementStats": TrafficManagementStatsPacketSerializer,
+            }
+            if variant and variant in variant_to_serializer:
+                self.child_serializer = variant_to_serializer[variant](context=self.context)
+            elif "battery_level" in validated_data:
                 self.child_serializer = DeviceMetricsPacketSerializer(context=self.context)
             elif "num_packets_tx" in validated_data:
                 self.child_serializer = LocalStatsPacketSerializer(context=self.context)
             else:
                 raise serializers.ValidationError(
-                    {"decoded.telemetry": "Must contain either deviceMetrics or localStats"}
+                    {
+                        "decoded.telemetry": "Must contain one of: deviceMetrics, localStats, "
+                        "environmentMetrics, airQualityMetrics, powerMetrics, healthMetrics, "
+                        "hostMetrics, trafficManagementStats"
+                    }
                 )
         else:
             raise serializers.ValidationError({"decoded.portnum": f"Unknown packet type: {portnum}"})

@@ -383,6 +383,120 @@ components:
                       type: string
                       nullable: true
 
+    EnvironmentTelemetryPacket:
+      allOf:
+        - $ref: '#/components/schemas/BaseIncomingPacket'
+        - type: object
+          description: TELEMETRY_APP packet with environmentMetrics
+          properties:
+            decoded:
+              type: object
+              properties:
+                portnum:
+                  type: string
+                  enum: [TELEMETRY_APP]
+                telemetry:
+                  type: object
+                  properties:
+                    environmentMetrics:
+                      type: object
+                      description: See meshtastic/telemetry.proto EnvironmentMetrics
+
+    AirQualityTelemetryPacket:
+      allOf:
+        - $ref: '#/components/schemas/BaseIncomingPacket'
+        - type: object
+          description: TELEMETRY_APP packet with airQualityMetrics
+          properties:
+            decoded:
+              type: object
+              properties:
+                portnum:
+                  type: string
+                  enum: [TELEMETRY_APP]
+                telemetry:
+                  type: object
+                  properties:
+                    airQualityMetrics:
+                      type: object
+                      description: See meshtastic/telemetry.proto AirQualityMetrics
+
+    PowerTelemetryPacket:
+      allOf:
+        - $ref: '#/components/schemas/BaseIncomingPacket'
+        - type: object
+          description: TELEMETRY_APP packet with powerMetrics
+          properties:
+            decoded:
+              type: object
+              properties:
+                portnum:
+                  type: string
+                  enum: [TELEMETRY_APP]
+                telemetry:
+                  type: object
+                  properties:
+                    powerMetrics:
+                      type: object
+                      description: See meshtastic/telemetry.proto PowerMetrics
+
+    HealthTelemetryPacket:
+      allOf:
+        - $ref: '#/components/schemas/BaseIncomingPacket'
+        - type: object
+          description: TELEMETRY_APP packet with healthMetrics
+          properties:
+            decoded:
+              type: object
+              properties:
+                portnum:
+                  type: string
+                  enum: [TELEMETRY_APP]
+                telemetry:
+                  type: object
+                  properties:
+                    healthMetrics:
+                      type: object
+                      description: See meshtastic/telemetry.proto HealthMetrics
+
+    HostTelemetryPacket:
+      allOf:
+        - $ref: '#/components/schemas/BaseIncomingPacket'
+        - type: object
+          description: TELEMETRY_APP packet with hostMetrics
+          properties:
+            decoded:
+              type: object
+              properties:
+                portnum:
+                  type: string
+                  enum: [TELEMETRY_APP]
+                telemetry:
+                  type: object
+                  properties:
+                    hostMetrics:
+                      type: object
+                      description: See meshtastic/telemetry.proto HostMetrics
+
+    TrafficManagementStatsTelemetryPacket:
+      allOf:
+        - $ref: '#/components/schemas/BaseIncomingPacket'
+        - type: object
+          description: TELEMETRY_APP packet with trafficManagementStats
+          properties:
+            decoded:
+              type: object
+              properties:
+                portnum:
+                  type: string
+                  enum: [TELEMETRY_APP]
+                telemetry:
+                  type: object
+                  properties:
+                    trafficManagementStats:
+                      type: object
+                      description: See meshtastic/telemetry.proto TrafficManagementStats
+
     IncomingPacket:
       oneOf:
         - $ref: '#/components/schemas/TextMessagePacket'
@@ -390,6 +504,12 @@ components:
         - $ref: '#/components/schemas/PositionPacket'
         - $ref: '#/components/schemas/DeviceTelemetryPacket'
         - $ref: '#/components/schemas/LocalStatsTelemetryPacket'
+        - $ref: '#/components/schemas/EnvironmentTelemetryPacket'
+        - $ref: '#/components/schemas/AirQualityTelemetryPacket'
+        - $ref: '#/components/schemas/PowerTelemetryPacket'
+        - $ref: '#/components/schemas/HealthTelemetryPacket'
+        - $ref: '#/components/schemas/HostTelemetryPacket'
+        - $ref: '#/components/schemas/TrafficManagementStatsTelemetryPacket'
 
     Constellation:
       type: object
@@ -460,6 +580,14 @@ components:
           $ref: '#/components/schemas/Position'
         latest_device_metrics:
           $ref: '#/components/schemas/DeviceMetrics'
+        latest_environment_metrics:
+          $ref: '#/components/schemas/LatestEnvironmentMetrics'
+        latest_air_quality_metrics:
+          $ref: '#/components/schemas/LatestAirQualityMetrics'
+        latest_health_metrics:
+          $ref: '#/components/schemas/LatestHealthMetrics'
+        latest_host_metrics:
+          $ref: '#/components/schemas/LatestHostMetrics'
         owner:
           type: object
           description: The owner of the node (if the node has been claimed by a user in the system)
@@ -716,6 +844,14 @@ components:
             longitude:
               type: number
               description: The longitude of the node
+        latest_environment_metrics:
+          $ref: '#/components/schemas/LatestEnvironmentMetrics'
+        latest_air_quality_metrics:
+          $ref: '#/components/schemas/LatestAirQualityMetrics'
+        latest_health_metrics:
+          $ref: '#/components/schemas/LatestHealthMetrics'
+        latest_host_metrics:
+          $ref: '#/components/schemas/LatestHostMetrics'
 
     OwnedManagedNode:
       allOf:
@@ -849,6 +985,77 @@ components:
         uptime_seconds:
           type: integer
           description: The device uptime in seconds
+
+    LatestEnvironmentMetrics:
+      type: object
+      description: Latest environment metrics from NodeLatestStatus
+      nullable: true
+      properties:
+        temperature:
+          type: number
+          nullable: true
+        relative_humidity:
+          type: number
+          nullable: true
+        barometric_pressure:
+          type: number
+          nullable: true
+        reported_time:
+          type: string
+          format: date-time
+          nullable: true
+
+    LatestAirQualityMetrics:
+      type: object
+      description: Latest air quality metrics from NodeLatestStatus
+      nullable: true
+      properties:
+        pm25_standard:
+          type: integer
+          nullable: true
+        co2:
+          type: integer
+          nullable: true
+        reported_time:
+          type: string
+          format: date-time
+          nullable: true
+
+    LatestHealthMetrics:
+      type: object
+      description: Latest health metrics from NodeLatestStatus
+      nullable: true
+      properties:
+        heart_bpm:
+          type: integer
+          nullable: true
+        spo2:
+          type: integer
+          nullable: true
+        temperature:
+          type: number
+          nullable: true
+        reported_time:
+          type: string
+          format: date-time
+          nullable: true
+
+    LatestHostMetrics:
+      type: object
+      description: Latest host metrics from NodeLatestStatus
+      nullable: true
+      properties:
+        uptime_seconds:
+          type: integer
+          nullable: true
+        freemem_bytes:
+          type: integer
+          format: int64
+          nullable: true
+        reported_time:
+          type: string
+          format: date-time
+          nullable: true
 
     DateRangeQuery:
       type: object

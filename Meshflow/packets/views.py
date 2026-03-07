@@ -6,16 +6,34 @@ from common.mesh_node_helpers import meshtastic_hex_to_int
 from nodes.authentication import NodeAPIKeyAuthentication
 from nodes.models import ObservedNode
 from nodes.permissions import NodeAuthorizationPermission
-from packets.models import DeviceMetricsPacket, LocalStatsPacket, MessagePacket, NodeInfoPacket, PositionPacket
+from packets.models import (
+    AirQualityMetricsPacket,
+    DeviceMetricsPacket,
+    EnvironmentMetricsPacket,
+    HealthMetricsPacket,
+    HostMetricsPacket,
+    LocalStatsPacket,
+    MessagePacket,
+    NodeInfoPacket,
+    PositionPacket,
+    PowerMetricsPacket,
+    TrafficManagementStatsPacket,
+)
 
 from .serializers import NodeSerializer, PacketIngestSerializer
 from .signals import (
+    air_quality_metrics_packet_received,
     device_metrics_packet_received,
+    environment_metrics_packet_received,
+    health_metrics_packet_received,
+    host_metrics_packet_received,
     local_stats_packet_received,
     message_packet_received,
     node_info_packet_received,
     packet_received,
     position_packet_received,
+    power_metrics_packet_received,
+    traffic_management_stats_packet_received,
 )
 
 
@@ -95,6 +113,30 @@ class PacketIngestView(APIView):
                     )
                 elif isinstance(packet, NodeInfoPacket):
                     node_info_packet_received.send(
+                        sender=self, packet=packet, observer=observer, observation=observation
+                    )
+                elif isinstance(packet, EnvironmentMetricsPacket):
+                    environment_metrics_packet_received.send(
+                        sender=self, packet=packet, observer=observer, observation=observation
+                    )
+                elif isinstance(packet, AirQualityMetricsPacket):
+                    air_quality_metrics_packet_received.send(
+                        sender=self, packet=packet, observer=observer, observation=observation
+                    )
+                elif isinstance(packet, HealthMetricsPacket):
+                    health_metrics_packet_received.send(
+                        sender=self, packet=packet, observer=observer, observation=observation
+                    )
+                elif isinstance(packet, HostMetricsPacket):
+                    host_metrics_packet_received.send(
+                        sender=self, packet=packet, observer=observer, observation=observation
+                    )
+                elif isinstance(packet, PowerMetricsPacket):
+                    power_metrics_packet_received.send(
+                        sender=self, packet=packet, observer=observer, observation=observation
+                    )
+                elif isinstance(packet, TrafficManagementStatsPacket):
+                    traffic_management_stats_packet_received.send(
                         sender=self, packet=packet, observer=observer, observation=observation
                     )
 

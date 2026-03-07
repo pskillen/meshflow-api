@@ -179,6 +179,10 @@ class ManagedNodeSerializer(serializers.ModelSerializer):
 
     position = serializers.SerializerMethodField(read_only=True)
     device_metrics = serializers.SerializerMethodField(read_only=True)
+    latest_environment_metrics = serializers.SerializerMethodField(read_only=True)
+    latest_air_quality_metrics = serializers.SerializerMethodField(read_only=True)
+    latest_health_metrics = serializers.SerializerMethodField(read_only=True)
+    latest_host_metrics = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = ManagedNode
@@ -195,6 +199,10 @@ class ManagedNodeSerializer(serializers.ModelSerializer):
             "constellation",
             "position",
             "device_metrics",
+            "latest_environment_metrics",
+            "latest_air_quality_metrics",
+            "latest_health_metrics",
+            "latest_host_metrics",
         ]
         read_only_fields = [
             "internal_id",
@@ -278,6 +286,53 @@ class ManagedNodeSerializer(serializers.ModelSerializer):
             return DeviceMetricsSerializer(data).data
         latest = DeviceMetrics.objects.filter(node__node_id=obj.node_id).order_by("-reported_time").first()
         return DeviceMetricsSerializer(latest).data if latest else None
+
+    def _get_managed_node_latest_status(self, obj):
+        """Get NodeLatestStatus for ManagedNode via ObservedNode lookup."""
+        observed = ObservedNode.objects.filter(node_id=obj.node_id).select_related("latest_status").first()
+        return observed.latest_status if observed else None
+
+    def get_latest_environment_metrics(self, obj):
+        status = self._get_managed_node_latest_status(obj)
+        if status is None or status.environment_reported_time is None:
+            return None
+        return {
+            "temperature": status.environment_temperature,
+            "relative_humidity": status.environment_relative_humidity,
+            "barometric_pressure": status.environment_barometric_pressure,
+            "reported_time": status.environment_reported_time,
+        }
+
+    def get_latest_air_quality_metrics(self, obj):
+        status = self._get_managed_node_latest_status(obj)
+        if status is None or status.air_quality_reported_time is None:
+            return None
+        return {
+            "pm25_standard": status.air_quality_pm25_standard,
+            "co2": status.air_quality_co2,
+            "reported_time": status.air_quality_reported_time,
+        }
+
+    def get_latest_health_metrics(self, obj):
+        status = self._get_managed_node_latest_status(obj)
+        if status is None or status.health_reported_time is None:
+            return None
+        return {
+            "heart_bpm": status.health_heart_bpm,
+            "spo2": status.health_spo2,
+            "temperature": status.health_temperature,
+            "reported_time": status.health_reported_time,
+        }
+
+    def get_latest_host_metrics(self, obj):
+        status = self._get_managed_node_latest_status(obj)
+        if status is None or status.host_reported_time is None:
+            return None
+        return {
+            "uptime_seconds": status.host_uptime_seconds,
+            "freemem_bytes": status.host_freemem_bytes,
+            "reported_time": status.host_reported_time,
+        }
 
     def to_internal_value(self, data):
         validated_data = super().to_internal_value(data)
@@ -576,6 +631,10 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
     node_id_str = serializers.CharField(read_only=True)
     latest_position = serializers.SerializerMethodField()
     latest_device_metrics = serializers.SerializerMethodField()
+    latest_environment_metrics = serializers.SerializerMethodField()
+    latest_air_quality_metrics = serializers.SerializerMethodField()
+    latest_health_metrics = serializers.SerializerMethodField()
+    latest_host_metrics = serializers.SerializerMethodField()
     owner = OwnerSerializer(source="claimed_by", read_only=True)
 
     def to_internal_value(self, data):
@@ -599,6 +658,10 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
             "last_heard",
             "latest_position",
             "latest_device_metrics",
+            "latest_environment_metrics",
+            "latest_air_quality_metrics",
+            "latest_health_metrics",
+            "latest_host_metrics",
             "owner",
         ]
         read_only_fields = [
@@ -608,13 +671,23 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
             "role",
             "latest_position",
             "latest_device_metrics",
+            "latest_environment_metrics",
+            "latest_air_quality_metrics",
+            "latest_health_metrics",
+            "latest_host_metrics",
             "owner",
         ]
 
+    def _get_latest_status(self, obj):
+        """Get NodeLatestStatus for ObservedNode (obj has latest_status)."""
+        if hasattr(obj, "latest_status") and obj.latest_status is not None:
+            return obj.latest_status
+        return None
+
     def get_latest_position(self, obj):
         # Prefer NodeLatestStatus when available (from select_related)
-        if hasattr(obj, "latest_status") and obj.latest_status is not None:
-            status = obj.latest_status
+        status = self._get_latest_status(obj)
+        if status is not None:
             if status.position_reported_time is None and status.latitude is None and status.longitude is None:
                 return None
             data = {
@@ -670,8 +743,8 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
 
     def get_latest_device_metrics(self, obj):
         # Prefer NodeLatestStatus when available (from select_related)
-        if hasattr(obj, "latest_status") and obj.latest_status is not None:
-            status = obj.latest_status
+        status = self._get_latest_status(obj)
+        if status is not None:
             if status.metrics_reported_time is None:
                 return None
             data = {
@@ -701,6 +774,48 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
             return DeviceMetricsSerializer(data).data
         latest = DeviceMetrics.objects.filter(node=obj).order_by("-reported_time").first()
         return DeviceMetricsSerializer(latest).data if latest else None
+
+    def get_latest_environment_metrics(self, obj):
+        status = self._get_latest_status(obj)
+        if status is None or status.environment_reported_time is None:
+            return None
+        return {
+            "temperature": status.environment_temperature,
+            "relative_humidity": status.environment_relative_humidity,
+            "barometric_pressure": status.environment_barometric_pressure,
+            "reported_time": status.environment_reported_time,
+        }
+
+    def get_latest_air_quality_metrics(self, obj):
+        status = self._get_latest_status(obj)
+        if status is None or status.air_quality_reported_time is None:
+            return None
+        return {
+            "pm25_standard": status.air_quality_pm25_standard,
+            "co2": status.air_quality_co2,
+            "reported_time": status.air_quality_reported_time,
+        }
+
+    def get_latest_health_metrics(self, obj):
+        status = self._get_latest_status(obj)
+        if status is None or status.health_reported_time is None:
+            return None
+        return {
+            "heart_bpm": status.health_heart_bpm,
+            "spo2": status.health_spo2,
+            "temperature": status.health_temperature,
+            "reported_time": status.health_reported_time,
+        }
+
+    def get_latest_host_metrics(self, obj):
+        status = self._get_latest_status(obj)
+        if status is None or status.host_reported_time is None:
+            return None
+        return {
+            "uptime_seconds": status.host_uptime_seconds,
+            "freemem_bytes": status.host_freemem_bytes,
+            "reported_time": status.host_reported_time,
+        }
 
 
 class ObservedNodeSearchSerializer(ObservedNodeSerializer):
