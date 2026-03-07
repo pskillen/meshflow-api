@@ -13,7 +13,7 @@ def test_device_metrics_packet_creates_device_metrics(api_client):
     from_int = payload["from"]
 
     resp = api_client.post_ingest(payload)
-    assert resp.status_code == 200
+    assert resp.status_code == 201
 
     node_resp = api_client.get_observed_node(from_int)
     assert node_resp.status_code == 200

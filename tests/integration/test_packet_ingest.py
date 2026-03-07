@@ -27,12 +27,12 @@ INGEST_FIXTURES = [
 
 @pytest.mark.parametrize("fixture_file,portnum", INGEST_FIXTURES)
 def test_ingest_packet_returns_success(api_client, fixture_file, portnum):
-    """Each packet type should ingest successfully and return 200."""
+    """Each packet type should ingest successfully and return 201."""
     payload = load_fixture(fixture_file)
     resp = api_client.post_ingest(payload)
     assert (
-        resp.status_code == 200
-    ), f"Expected 200 for {portnum}, got {resp.status_code}: {resp.text}"
+        resp.status_code == 201
+    ), f"Expected 201 for {portnum}, got {resp.status_code}: {resp.text}"
 
 
 def test_ingest_encrypted_packet_returns_304(api_client):
