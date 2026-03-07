@@ -57,17 +57,7 @@ When making changes, **add or update unit and integration tests** as needed. New
 - **Unit tests**: `Meshflow/` – Django TestCase/pytest, run with `python -m pytest Meshflow/ -v`
 - **Integration tests**: `tests/integration/` – HTTP client tests against live API, run with `pytest tests/integration/ -v` (requires API running and `seed_integration_tests`)
 
-```bash
-cd Meshflow
-python -m pytest -v
-# With coverage:
-python -m pytest -v --cov
-
-# Integration tests (API must be running):
-cd ..
-pip install -r tests/requirements-integration.txt
-MESHFLOW_API_URL=http://localhost:8000 MESHFLOW_NODE_API_KEY=integration-test-key-a1b2c3d4e5f6 pytest tests/integration/ -v
-```
+See **tests/TESTING.md** for detailed instructions (unit tests, integration tests via Docker Compose or local Django).
 
 ## Code Style
 
