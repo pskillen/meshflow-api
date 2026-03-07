@@ -1,0 +1,25 @@
+{
+    "from": 4276604915,
+    "to": 4294967295,
+    "channel": 1,
+    "decoded": {
+        "portnum": "TELEMETRY_APP",
+        "bitfield": 0,
+        "telemetry": {
+            "time": 1747429200,
+            "hostMetrics": {
+                "uptimeSeconds": 86400,
+                "freememBytes": 512000000,
+                "load1": 100,
+                "load5": 80,
+                "load15": 60
+            }
+        }
+    },
+    "id": 4016498608,
+    "rxTime": 1747429205,
+    "rxSnr": 2.5,
+    "hopLimit": 3,
+    "fromId": "!fee7cff3",
+    "toId": "^all"
+}
