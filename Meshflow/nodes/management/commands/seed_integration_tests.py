@@ -19,7 +19,6 @@ from constellations.models import Constellation, ConstellationUserMembership, Me
 from nodes.models import ManagedNode, NodeAPIKey, NodeAuth
 from users.models import User
 
-
 # Fixed values for reproducibility in CI and local runs
 INTEGRATION_TEST_USERNAME = "integration-test@example.com"
 INTEGRATION_TEST_PASSWORD = "integration-test-password"
