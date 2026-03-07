@@ -104,6 +104,34 @@ jobs:
           docker compose -f docker-compose.ci-pr.yaml logs api
           exit 1
 
+      - name: Set up Python for integration tests
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Seed integration test data
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_EVENT_PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          docker compose -f docker-compose.ci-pr.yaml run --rm api python manage.py seed_integration_tests
+
+      - name: Run integration tests
+        env:
+          MESHFLOW_API_URL: http://localhost:8000
+          MESHFLOW_NODE_API_KEY: integration-test-key-a1b2c3d4e5f6
+        run: |
+          pip install -r tests/requirements-integration.txt
+          pytest tests/integration/ -v --junit-xml=reports/integration-tests.xml
+
+      - name: Integration Test Report
+        uses: dorny/test-reporter@v2
+        with:
+          name: integration-tests
+          path: reports/integration-tests.xml
+          reporter: python-xunit
+        if: always()
+
       - name: Cleanup
         if: always()
         run: |
