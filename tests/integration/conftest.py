@@ -69,7 +69,10 @@ def jwt_token(api_base_url, wait_for_api):
     creds = get_jwt_credentials()
     r = requests.post(url, json=creds, timeout=10)
     if r.status_code != 200:
-        pytest.fail(f"Failed to obtain JWT: {r.status_code} {r.text}")
+        pytest.fail(
+            f"Failed to obtain JWT: {r.status_code} {r.text}. "
+            "Run 'python manage.py seed_integration_tests' (or 'docker compose run --rm api python manage.py seed_integration_tests') first."
+        )
     data = r.json()
     return data["access"]
 
