@@ -86,3 +86,8 @@ python manage.py migrate
 
 Always update openapi.yaml when modifying API contract. openapi.yaml is the contract shared between API and clients;
 where the code deviates from openapi.yaml, the OpenAPI spec is often correct. Check for what to do if this happens.
+
+## Source control
+
+When asked to create a pull request description, follow the template at
+.github/pull_request_template.md, and output a markdown file named `tmp/PR.md`
