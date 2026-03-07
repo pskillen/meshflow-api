@@ -42,6 +42,10 @@ until curl -s -f http://localhost:8000/api/status/ > /dev/null; do sleep 2; done
 # Seed integration test data
 docker compose -f docker-compose.test.yaml run --rm api python manage.py seed_integration_tests
 
+# Activate venv as required
+python3.14 -m venv venv-tests
+source venv-tests/bin/activate
+
 # Run integration tests
 pip install -r tests/requirements-integration.txt
 MESHFLOW_API_URL=http://localhost:8000 \
