@@ -125,6 +125,12 @@ class LocalStatsPacket(BaseTelemetryPacket):
     num_online_nodes = models.IntegerField(null=True)
     num_total_nodes = models.IntegerField(null=True)
     num_rx_dupe = models.BigIntegerField(null=True)
+    num_tx_relay = models.BigIntegerField(null=True)
+    num_tx_relay_canceled = models.BigIntegerField(null=True)
+    heap_total_bytes = models.BigIntegerField(null=True)
+    heap_free_bytes = models.BigIntegerField(null=True)
+    num_tx_dropped = models.BigIntegerField(null=True)
+    noise_floor = models.IntegerField(null=True)
 
     class Meta:
         verbose_name = _("Local stats packet")
@@ -138,11 +144,133 @@ class EnvironmentMetricsPacket(BaseTelemetryPacket):
     relative_humidity = models.FloatField(null=True)
     barometric_pressure = models.FloatField(null=True)
     gas_resistance = models.FloatField(null=True)
-    iaq = models.FloatField(null=True)
+    iaq = models.IntegerField(null=True)
+    voltage = models.FloatField(null=True)
+    current = models.FloatField(null=True)
+    distance = models.FloatField(null=True)
+    lux = models.FloatField(null=True)
+    white_lux = models.FloatField(null=True)
+    ir_lux = models.FloatField(null=True)
+    uv_lux = models.FloatField(null=True)
+    wind_direction = models.IntegerField(null=True)
+    wind_speed = models.FloatField(null=True)
+    weight = models.FloatField(null=True)
+    wind_gust = models.FloatField(null=True)
+    wind_lull = models.FloatField(null=True)
+    radiation = models.FloatField(null=True)
+    rainfall_1h = models.FloatField(null=True)
+    rainfall_24h = models.FloatField(null=True)
+    soil_moisture = models.IntegerField(null=True)
+    soil_temperature = models.FloatField(null=True)
 
     class Meta:
         verbose_name = _("Environment metrics packet")
         verbose_name_plural = _("Environment metrics packets")
+
+
+class AirQualityMetricsPacket(BaseTelemetryPacket):
+    """Model for storing air quality sensor data."""
+
+    pm10_standard = models.IntegerField(null=True)
+    pm25_standard = models.IntegerField(null=True)
+    pm100_standard = models.IntegerField(null=True)
+    pm10_environmental = models.IntegerField(null=True)
+    pm25_environmental = models.IntegerField(null=True)
+    pm100_environmental = models.IntegerField(null=True)
+    particles_03um = models.IntegerField(null=True)
+    particles_05um = models.IntegerField(null=True)
+    particles_10um = models.IntegerField(null=True)
+    particles_25um = models.IntegerField(null=True)
+    particles_50um = models.IntegerField(null=True)
+    particles_100um = models.IntegerField(null=True)
+    co2 = models.IntegerField(null=True)
+    co2_temperature = models.FloatField(null=True)
+    co2_humidity = models.FloatField(null=True)
+    form_formaldehyde = models.FloatField(null=True)
+    form_humidity = models.FloatField(null=True)
+    form_temperature = models.FloatField(null=True)
+    pm40_standard = models.IntegerField(null=True)
+    particles_40um = models.IntegerField(null=True)
+    pm_temperature = models.FloatField(null=True)
+    pm_humidity = models.FloatField(null=True)
+    pm_voc_idx = models.FloatField(null=True)
+    pm_nox_idx = models.FloatField(null=True)
+    particles_tps = models.FloatField(null=True)
+
+    class Meta:
+        verbose_name = _("Air quality metrics packet")
+        verbose_name_plural = _("Air quality metrics packets")
+
+
+class PowerMetricsPacket(BaseTelemetryPacket):
+    """Model for storing power metrics (voltage/current per channel)."""
+
+    ch1_voltage = models.FloatField(null=True)
+    ch1_current = models.FloatField(null=True)
+    ch2_voltage = models.FloatField(null=True)
+    ch2_current = models.FloatField(null=True)
+    ch3_voltage = models.FloatField(null=True)
+    ch3_current = models.FloatField(null=True)
+    ch4_voltage = models.FloatField(null=True)
+    ch4_current = models.FloatField(null=True)
+    ch5_voltage = models.FloatField(null=True)
+    ch5_current = models.FloatField(null=True)
+    ch6_voltage = models.FloatField(null=True)
+    ch6_current = models.FloatField(null=True)
+    ch7_voltage = models.FloatField(null=True)
+    ch7_current = models.FloatField(null=True)
+    ch8_voltage = models.FloatField(null=True)
+    ch8_current = models.FloatField(null=True)
+
+    class Meta:
+        verbose_name = _("Power metrics packet")
+        verbose_name_plural = _("Power metrics packets")
+
+
+class HealthMetricsPacket(BaseTelemetryPacket):
+    """Model for storing health telemetry metrics."""
+
+    heart_bpm = models.IntegerField(null=True)
+    spo2 = models.IntegerField(null=True)
+    temperature = models.FloatField(null=True)
+
+    class Meta:
+        verbose_name = _("Health metrics packet")
+        verbose_name_plural = _("Health metrics packets")
+
+
+class HostMetricsPacket(BaseTelemetryPacket):
+    """Model for storing Linux host metrics."""
+
+    uptime_seconds = models.IntegerField(null=True)
+    freemem_bytes = models.BigIntegerField(null=True)
+    diskfree1_bytes = models.BigIntegerField(null=True)
+    diskfree2_bytes = models.BigIntegerField(null=True)
+    diskfree3_bytes = models.BigIntegerField(null=True)
+    load1 = models.IntegerField(null=True)
+    load5 = models.IntegerField(null=True)
+    load15 = models.IntegerField(null=True)
+    user_string = models.TextField(null=True)
+
+    class Meta:
+        verbose_name = _("Host metrics packet")
+        verbose_name_plural = _("Host metrics packets")
+
+
+class TrafficManagementStatsPacket(BaseTelemetryPacket):
+    """Model for storing traffic management statistics."""
+
+    packets_inspected = models.IntegerField(null=True)
+    position_dedup_drops = models.IntegerField(null=True)
+    nodeinfo_cache_hits = models.IntegerField(null=True)
+    rate_limit_drops = models.IntegerField(null=True)
+    unknown_packet_drops = models.IntegerField(null=True)
+    hop_exhausted_packets = models.IntegerField(null=True)
+    router_hops_preserved = models.IntegerField(null=True)
+
+    class Meta:
+        verbose_name = _("Traffic management stats packet")
+        verbose_name_plural = _("Traffic management stats packets")
 
 
 class PacketObservation(models.Model):

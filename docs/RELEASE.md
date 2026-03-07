@@ -83,14 +83,14 @@ Replace `OWNER/REPO` with your GitHub org/repo (e.g. `myorg/meshflow-api`):
 
 ```bash
 # Latest production
-docker pull ghcr.io/OWNER/REPO:latest
+docker pull ghcr.io/pskillen/meshflow-api:latest
 
 # Specific version
-docker pull ghcr.io/OWNER/REPO:1.2.3
+docker pull ghcr.io/pskillen/meshflow-api:1.2.3
 
 # Latest dev build
-docker pull ghcr.io/OWNER/REPO:latest-dev
+docker pull ghcr.io/pskillen/meshflow-api:latest-dev
 
 # Latest release candidate
-docker pull ghcr.io/OWNER/REPO:latest-rc
+docker pull ghcr.io/pskillen/meshflow-api:latest-rc
 ```

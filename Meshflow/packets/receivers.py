@@ -4,16 +4,39 @@ from django.dispatch import receiver
 
 from nodes.models import ObservedNode
 
-from .models import DeviceMetricsPacket, MessagePacket, NodeInfoPacket, PacketObservation, PositionPacket
+from .models import (
+    AirQualityMetricsPacket,
+    DeviceMetricsPacket,
+    EnvironmentMetricsPacket,
+    HealthMetricsPacket,
+    HostMetricsPacket,
+    MessagePacket,
+    NodeInfoPacket,
+    PacketObservation,
+    PositionPacket,
+    PowerMetricsPacket,
+    TrafficManagementStatsPacket,
+)
+from .services.air_quality import AirQualityMetricsPacketService
 from .services.device_metrics import DeviceMetricsPacketService
+from .services.environment_metrics import EnvironmentMetricsPacketService
+from .services.health_metrics import HealthMetricsPacketService
+from .services.host_metrics import HostMetricsPacketService
 from .services.node_info import NodeInfoPacketService
 from .services.position import PositionPacketService
+from .services.power_metrics import PowerMetricsPacketService
 from .services.text_message import TextMessagePacketService
 from .signals import (
+    air_quality_metrics_packet_received,
     device_metrics_packet_received,
+    environment_metrics_packet_received,
+    health_metrics_packet_received,
+    host_metrics_packet_received,
     message_packet_received,
     node_info_packet_received,
     position_packet_received,
+    power_metrics_packet_received,
+    traffic_management_stats_packet_received,
 )
 
 logger = logging.getLogger(__name__)
@@ -61,3 +84,61 @@ def node_info_packet_received(
 
     service = NodeInfoPacketService()
     service.process_packet(packet, observer, observation, user=None)
+
+
+@receiver(environment_metrics_packet_received)
+def on_environment_metrics_packet_received(
+    sender, packet: EnvironmentMetricsPacket, observer: ObservedNode, observation: PacketObservation, **kwargs
+):
+    """Handle an environment metrics packet received signal."""
+    logger.info(f"Environment metrics packet received: {packet.id}")
+    service = EnvironmentMetricsPacketService()
+    service.process_packet(packet, observer, observation, user=None)
+
+
+@receiver(air_quality_metrics_packet_received)
+def on_air_quality_metrics_packet_received(
+    sender, packet: AirQualityMetricsPacket, observer: ObservedNode, observation: PacketObservation, **kwargs
+):
+    """Handle an air quality metrics packet received signal."""
+    logger.info(f"Air quality metrics packet received: {packet.id}")
+    service = AirQualityMetricsPacketService()
+    service.process_packet(packet, observer, observation, user=None)
+
+
+@receiver(health_metrics_packet_received)
+def on_health_metrics_packet_received(
+    sender, packet: HealthMetricsPacket, observer: ObservedNode, observation: PacketObservation, **kwargs
+):
+    """Handle a health metrics packet received signal."""
+    logger.info(f"Health metrics packet received: {packet.id}")
+    service = HealthMetricsPacketService()
+    service.process_packet(packet, observer, observation, user=None)
+
+
+@receiver(host_metrics_packet_received)
+def on_host_metrics_packet_received(
+    sender, packet: HostMetricsPacket, observer: ObservedNode, observation: PacketObservation, **kwargs
+):
+    """Handle a host metrics packet received signal."""
+    logger.info(f"Host metrics packet received: {packet.id}")
+    service = HostMetricsPacketService()
+    service.process_packet(packet, observer, observation, user=None)
+
+
+@receiver(power_metrics_packet_received)
+def on_power_metrics_packet_received(
+    sender, packet: PowerMetricsPacket, observer: ObservedNode, observation: PacketObservation, **kwargs
+):
+    """Handle a power metrics packet received signal."""
+    logger.info(f"Power metrics packet received: {packet.id}")
+    service = PowerMetricsPacketService()
+    service.process_packet(packet, observer, observation, user=None)
+
+
+@receiver(traffic_management_stats_packet_received)
+def on_traffic_management_stats_packet_received(
+    sender, packet: TrafficManagementStatsPacket, observer: ObservedNode, observation: PacketObservation, **kwargs
+):
+    """Handle a traffic management stats packet received signal. Packet is stored by serializer; no service."""
+    logger.info(f"Traffic management stats packet received: {packet.id}")

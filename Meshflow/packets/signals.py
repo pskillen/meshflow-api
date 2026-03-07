@@ -17,6 +17,12 @@ node_info_packet_received = Signal()
 position_packet_received = Signal()
 device_metrics_packet_received = Signal()
 local_stats_packet_received = Signal()
+environment_metrics_packet_received = Signal()
+air_quality_metrics_packet_received = Signal()
+health_metrics_packet_received = Signal()
+host_metrics_packet_received = Signal()
+power_metrics_packet_received = Signal()
+traffic_management_stats_packet_received = Signal()
 
 
 # Converted packet signals

@@ -170,6 +170,28 @@ class NodeLatestStatus(models.Model):
     uptime_seconds = models.BigIntegerField(null=True, blank=True)
     metrics_reported_time = models.DateTimeField(null=True, blank=True)
 
+    # Environment metrics fields
+    environment_temperature = models.FloatField(null=True, blank=True)
+    environment_relative_humidity = models.FloatField(null=True, blank=True)
+    environment_barometric_pressure = models.FloatField(null=True, blank=True)
+    environment_reported_time = models.DateTimeField(null=True, blank=True)
+
+    # Air quality metrics fields
+    air_quality_pm25_standard = models.IntegerField(null=True, blank=True)
+    air_quality_co2 = models.IntegerField(null=True, blank=True)
+    air_quality_reported_time = models.DateTimeField(null=True, blank=True)
+
+    # Health metrics fields
+    health_heart_bpm = models.IntegerField(null=True, blank=True)
+    health_spo2 = models.IntegerField(null=True, blank=True)
+    health_temperature = models.FloatField(null=True, blank=True)
+    health_reported_time = models.DateTimeField(null=True, blank=True)
+
+    # Host metrics fields
+    host_uptime_seconds = models.IntegerField(null=True, blank=True)
+    host_freemem_bytes = models.BigIntegerField(null=True, blank=True)
+    host_reported_time = models.DateTimeField(null=True, blank=True)
+
     class Meta:
         verbose_name = _("Node latest status")
         verbose_name_plural = _("Node latest statuses")
@@ -300,6 +322,141 @@ class DeviceMetrics(BaseNodeItem):
 
     def __str__(self):
         return f"Device metrics [{self.battery_level}%, {self.voltage}V, {self.uptime_seconds}s]"
+
+
+class EnvironmentMetrics(BaseNodeItem):
+    """Model representing environment metrics reported by a mesh node."""
+
+    temperature = models.FloatField(null=True, blank=True)
+    relative_humidity = models.FloatField(null=True, blank=True)
+    barometric_pressure = models.FloatField(null=True, blank=True)
+    gas_resistance = models.FloatField(null=True, blank=True)
+    iaq = models.IntegerField(null=True, blank=True)
+    voltage = models.FloatField(null=True, blank=True)
+    current = models.FloatField(null=True, blank=True)
+    distance = models.FloatField(null=True, blank=True)
+    lux = models.FloatField(null=True, blank=True)
+    white_lux = models.FloatField(null=True, blank=True)
+    ir_lux = models.FloatField(null=True, blank=True)
+    uv_lux = models.FloatField(null=True, blank=True)
+    wind_direction = models.IntegerField(null=True, blank=True)
+    wind_speed = models.FloatField(null=True, blank=True)
+    weight = models.FloatField(null=True, blank=True)
+    wind_gust = models.FloatField(null=True, blank=True)
+    wind_lull = models.FloatField(null=True, blank=True)
+    radiation = models.FloatField(null=True, blank=True)
+    rainfall_1h = models.FloatField(null=True, blank=True)
+    rainfall_24h = models.FloatField(null=True, blank=True)
+    soil_moisture = models.IntegerField(null=True, blank=True)
+    soil_temperature = models.FloatField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = _("Environment metrics")
+        verbose_name_plural = _("Environment metrics")
+        indexes = [
+            models.Index(fields=["node", "-logged_time"], name="idx_node_latest_env_metrics"),
+        ]
+
+
+class AirQualityMetrics(BaseNodeItem):
+    """Model representing air quality metrics reported by a mesh node."""
+
+    pm10_standard = models.IntegerField(null=True, blank=True)
+    pm25_standard = models.IntegerField(null=True, blank=True)
+    pm100_standard = models.IntegerField(null=True, blank=True)
+    pm10_environmental = models.IntegerField(null=True, blank=True)
+    pm25_environmental = models.IntegerField(null=True, blank=True)
+    pm100_environmental = models.IntegerField(null=True, blank=True)
+    particles_03um = models.IntegerField(null=True, blank=True)
+    particles_05um = models.IntegerField(null=True, blank=True)
+    particles_10um = models.IntegerField(null=True, blank=True)
+    particles_25um = models.IntegerField(null=True, blank=True)
+    particles_50um = models.IntegerField(null=True, blank=True)
+    particles_100um = models.IntegerField(null=True, blank=True)
+    co2 = models.IntegerField(null=True, blank=True)
+    co2_temperature = models.FloatField(null=True, blank=True)
+    co2_humidity = models.FloatField(null=True, blank=True)
+    form_formaldehyde = models.FloatField(null=True, blank=True)
+    form_humidity = models.FloatField(null=True, blank=True)
+    form_temperature = models.FloatField(null=True, blank=True)
+    pm40_standard = models.IntegerField(null=True, blank=True)
+    particles_40um = models.IntegerField(null=True, blank=True)
+    pm_temperature = models.FloatField(null=True, blank=True)
+    pm_humidity = models.FloatField(null=True, blank=True)
+    pm_voc_idx = models.FloatField(null=True, blank=True)
+    pm_nox_idx = models.FloatField(null=True, blank=True)
+    particles_tps = models.FloatField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = _("Air quality metrics")
+        verbose_name_plural = _("Air quality metrics")
+        indexes = [
+            models.Index(fields=["node", "-logged_time"], name="idx_node_latest_aq_metrics"),
+        ]
+
+
+class HealthMetrics(BaseNodeItem):
+    """Model representing health metrics reported by a mesh node."""
+
+    heart_bpm = models.IntegerField(null=True, blank=True)
+    spo2 = models.IntegerField(null=True, blank=True)
+    temperature = models.FloatField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = _("Health metrics")
+        verbose_name_plural = _("Health metrics")
+        indexes = [
+            models.Index(fields=["node", "-logged_time"], name="idx_node_latest_health_metrics"),
+        ]
+
+
+class HostMetrics(BaseNodeItem):
+    """Model representing host metrics reported by a mesh node (e.g. Linux)."""
+
+    uptime_seconds = models.IntegerField(null=True, blank=True)
+    freemem_bytes = models.BigIntegerField(null=True, blank=True)
+    diskfree1_bytes = models.BigIntegerField(null=True, blank=True)
+    diskfree2_bytes = models.BigIntegerField(null=True, blank=True)
+    diskfree3_bytes = models.BigIntegerField(null=True, blank=True)
+    load1 = models.IntegerField(null=True, blank=True)
+    load5 = models.IntegerField(null=True, blank=True)
+    load15 = models.IntegerField(null=True, blank=True)
+    user_string = models.TextField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = _("Host metrics")
+        verbose_name_plural = _("Host metrics")
+        indexes = [
+            models.Index(fields=["node", "-logged_time"], name="idx_node_latest_host_metrics"),
+        ]
+
+
+class PowerMetrics(BaseNodeItem):
+    """Model representing power metrics (voltage/current per channel) reported by a mesh node."""
+
+    ch1_voltage = models.FloatField(null=True, blank=True)
+    ch1_current = models.FloatField(null=True, blank=True)
+    ch2_voltage = models.FloatField(null=True, blank=True)
+    ch2_current = models.FloatField(null=True, blank=True)
+    ch3_voltage = models.FloatField(null=True, blank=True)
+    ch3_current = models.FloatField(null=True, blank=True)
+    ch4_voltage = models.FloatField(null=True, blank=True)
+    ch4_current = models.FloatField(null=True, blank=True)
+    ch5_voltage = models.FloatField(null=True, blank=True)
+    ch5_current = models.FloatField(null=True, blank=True)
+    ch6_voltage = models.FloatField(null=True, blank=True)
+    ch6_current = models.FloatField(null=True, blank=True)
+    ch7_voltage = models.FloatField(null=True, blank=True)
+    ch7_current = models.FloatField(null=True, blank=True)
+    ch8_voltage = models.FloatField(null=True, blank=True)
+    ch8_current = models.FloatField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = _("Power metrics")
+        verbose_name_plural = _("Power metrics")
+        indexes = [
+            models.Index(fields=["node", "-logged_time"], name="idx_node_latest_power_metrics"),
+        ]
 
 
 class NodeOwnerClaim(models.Model):
