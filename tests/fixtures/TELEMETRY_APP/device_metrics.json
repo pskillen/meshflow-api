@@ -1,0 +1,25 @@
+{
+    "from": 1127973616,
+    "to": 4294967295,
+    "decoded": {
+        "portnum": "TELEMETRY_APP",
+        "bitfield": 0,
+        "telemetry": {
+            "time": 1745330880,
+            "deviceMetrics": {
+                "batteryLevel": 95,
+                "voltage": 4.132,
+                "channelUtilization": 4.0133333,
+                "airUtilTx": 0.05,
+                "uptimeSeconds": 265163
+            }
+        }
+    },
+    "id": 4123563612,
+    "rxTime": 1745330880,
+    "hopLimit": 4,
+    "hopStart": 4,
+    "relayNode": 240,
+    "fromId": "!433b82f0",
+    "toId": "^all"
+}

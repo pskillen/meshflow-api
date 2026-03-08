@@ -1,0 +1,24 @@
+{
+    "from": 4276604912,
+    "to": 4294967295,
+    "channel": 1,
+    "decoded": {
+        "portnum": "TELEMETRY_APP",
+        "bitfield": 0,
+        "telemetry": {
+            "time": 1747429170,
+            "airQualityMetrics": {
+                "pm10Standard": 12,
+                "pm25Standard": 8,
+                "pm100Standard": 15,
+                "co2": 450
+            }
+        }
+    },
+    "id": 4016498605,
+    "rxTime": 1747429175,
+    "rxSnr": 1.0,
+    "hopLimit": 3,
+    "fromId": "!fee7cff0",
+    "toId": "^all"
+}

@@ -1,0 +1,27 @@
+{
+    "from": 4276604916,
+    "to": 4294967295,
+    "channel": 1,
+    "decoded": {
+        "portnum": "TELEMETRY_APP",
+        "bitfield": 0,
+        "telemetry": {
+            "time": 1747429210,
+            "trafficManagementStats": {
+                "packetsInspected": 1000,
+                "positionDedupDrops": 50,
+                "nodeinfoCacheHits": 200,
+                "rateLimitDrops": 5,
+                "unknownPacketDrops": 2,
+                "hopExhaustedPackets": 10,
+                "routerHopsPreserved": 800
+            }
+        }
+    },
+    "id": 4016498609,
+    "rxTime": 1747429215,
+    "rxSnr": 3.0,
+    "hopLimit": 3,
+    "fromId": "!fee7cff4",
+    "toId": "^all"
+}

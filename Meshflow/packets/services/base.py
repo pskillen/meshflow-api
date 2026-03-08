@@ -2,6 +2,7 @@
 
 import abc
 
+from common.mesh_node_helpers import meshtastic_id_to_hex
 from nodes.models import ManagedNode, ObservedNode
 from packets.models import PacketObservation, RawPacket
 from packets.signals import new_node_observed
@@ -44,7 +45,15 @@ class BasePacketService(abc.ABC):
             try:
                 self.from_node = ObservedNode.objects.get(node_id=self.packet.from_int)
             except ObservedNode.DoesNotExist:
-                self.from_node = ObservedNode.objects.create(node_id=self.packet.from_int)
+                node_id_str = (
+                    self.packet.from_str if self.packet.from_str else meshtastic_id_to_hex(self.packet.from_int)
+                )
+                self.from_node = ObservedNode.objects.create(
+                    node_id=self.packet.from_int,
+                    node_id_str=node_id_str,
+                    long_name="Unknown Node " + node_id_str,
+                    short_name=node_id_str[-4:] if len(node_id_str) >= 4 else "????",
+                )
                 new_node_observed.send(sender=self, node=self.from_node, observer=self.observer)
         else:
             raise ValueError("Packet has no from_int")

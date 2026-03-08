@@ -1,0 +1,26 @@
+{
+    "from": 1128088724,
+    "to": 4294967295,
+    "channel": 1,
+    "decoded": {
+        "portnum": "NODEINFO_APP",
+        "bitfield": 0,
+        "user": {
+            "id": "!433d4494",
+            "longName": "Paddy Meshsense",
+            "shortName": "PDYm",
+            "macaddr": "SMpDPUSU",
+            "hwModel": "HELTEC_V3",
+            "role": "CLIENT_MUTE",
+            "publicKey": "c1OCe93DrrJwtPKC5VJbneJIrK37WxHBZyPkrYTI/nw="
+        }
+    },
+    "id": 1002277110,
+    "rxTime": 1745331000,
+    "rxSnr": 6.5,
+    "hopLimit": 4,
+    "hopStart": 4,
+    "relayNode": 148,
+    "fromId": "!433d4494",
+    "toId": "^all"
+}

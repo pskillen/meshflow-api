@@ -1,0 +1,21 @@
+{
+    "from": 1129933592,
+    "to": 4294967295,
+    "decoded": {
+        "portnum": "TEXT_MESSAGE_APP",
+        "payload": "b'\\xf0\\x9f\\x91\\x82'",
+        "replyId": 2056158277,
+        "emoji": 1,
+        "bitfield": 0,
+        "text": "\ud83d\udc42"
+    },
+    "id": 3807585350,
+    "rxTime": 1745330938,
+    "rxSnr": 6.75,
+    "hopLimit": 4,
+    "rxRssi": -55,
+    "hopStart": 4,
+    "relayNode": 24,
+    "fromId": "!43596b18",
+    "toId": "^all"
+}

@@ -1,0 +1,24 @@
+{
+    "from": 4276604913,
+    "to": 4294967295,
+    "channel": 1,
+    "decoded": {
+        "portnum": "TELEMETRY_APP",
+        "bitfield": 0,
+        "telemetry": {
+            "time": 1747429180,
+            "powerMetrics": {
+                "ch1Voltage": 12.5,
+                "ch1Current": 2.3,
+                "ch2Voltage": 12.4,
+                "ch2Current": 2.1
+            }
+        }
+    },
+    "id": 4016498606,
+    "rxTime": 1747429185,
+    "rxSnr": 1.5,
+    "hopLimit": 3,
+    "fromId": "!fee7cff1",
+    "toId": "^all"
+}

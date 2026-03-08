@@ -1,0 +1,31 @@
+{
+    "from": 3665144108,
+    "to": 4294967295,
+    "channel": 1,
+    "decoded": {
+        "portnum": "POSITION_APP",
+        "bitfield": 0,
+        "position": {
+            "latitudeI": 558628864,
+            "longitudeI": -41156608,
+            "altitude": 61,
+            "time": 1745331135,
+            "locationSource": "LOC_INTERNAL",
+            "PDOP": 155,
+            "groundSpeed": 0,
+            "groundTrack": 35279000,
+            "satsInView": 11,
+            "precisionBits": 13,
+            "latitude": 55.8628864,
+            "longitude": -4.1156608
+        }
+    },
+    "id": 2510895340,
+    "rxTime": 1745331138,
+    "rxSnr": -15.25,
+    "hopLimit": 2,
+    "rxRssi": -120,
+    "hopStart": 3,
+    "fromId": "!da75a92c",
+    "toId": "^all"
+}

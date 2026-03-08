@@ -1,24 +1,23 @@
 ---
-name: meshflow
+# Docker Compose for running integration tests locally.
+# Start with: docker compose -f docker-compose.test.yaml up -d
+# Then: seed_integration_tests, then pytest tests/integration/
+
+name: meshflow-test
 
 services:
-  postgres:
+  db:
     image: postgres:17-alpine
-    restart: unless-stopped
-    # TODO: always change these in a real working environment
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: postgres
-    volumes:
-      - pg_data:/var/lib/postgresql/data
-      - ./deploy/docker/initdb:/docker-entrypoint-initdb.d
+      POSTGRES_USER: meshflow
+      POSTGRES_PASSWORD: meshflow
+      POSTGRES_DB: meshflow
     ports:
       - "5432:5432"
     networks:
       - meshflow_net
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U meshflow"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -27,17 +26,15 @@ services:
     build:
       context: .
       dockerfile: Dockerfile-migrations
-    container_name: meshflow-migrations
-    restart: no
     environment:
       DEBUG: true
       POSTGRES_DB: meshflow
       POSTGRES_USER: meshflow
       POSTGRES_PASSWORD: meshflow
-      POSTGRES_HOST: postgres
+      POSTGRES_HOST: db
       POSTGRES_PORT: 5432
     depends_on:
-      postgres:
+      db:
         condition: service_healthy
     networks:
       - meshflow_net
@@ -46,37 +43,22 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: meshflow-manager
-    restart: unless-stopped
     environment:
       DEBUG: true
       POSTGRES_DB: meshflow
       POSTGRES_USER: meshflow
       POSTGRES_PASSWORD: meshflow
-      POSTGRES_HOST: postgres
+      POSTGRES_HOST: db
       POSTGRES_PORT: 5432
-      ALLOWED_HOSTS: meshflow-manager
     ports:
       - "8000:8000"
     depends_on:
-      postgres:
+      migrations:
+        condition: service_completed_successfully
+      db:
         condition: service_healthy
     networks:
       - meshflow_net
-
-  docs:
-    build:
-      context: .
-      dockerfile: Dockerfile-redocly
-    container_name: meshflow-docs
-    restart: unless-stopped
-    ports:
-      - "8080:8080"
-    networks:
-      - meshflow_net
-
-volumes:
-  pg_data:
 
 networks:
   meshflow_net:
