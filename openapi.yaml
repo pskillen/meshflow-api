@@ -600,6 +600,32 @@ components:
               type: string
               description: The username of the owner
               readOnly: true
+        claim:
+          $ref: '#/components/schemas/ObservedNodeClaim'
+          description: >
+            The current user's claim for this node, if any. Only present for authenticated requests.
+            Null when the user has no claim. Use accepted_at to distinguish pending vs accepted claims.
+
+    ObservedNodeClaim:
+      type: object
+      description: >
+        Embedded claim info for the current user on an ObservedNode. Returned as part of the node
+        response to avoid a separate claim API call. Null when the user has no claim.
+        Only the claim owner sees their own claim. Does NOT include claim_key (sensitive;
+        use the claims API for that).
+      nullable: true
+      properties:
+        created_at:
+          type: string
+          format: date-time
+          description: When the claim was created
+          readOnly: true
+        accepted_at:
+          type: string
+          format: date-time
+          description: When the claim was accepted (null if pending)
+          nullable: true
+          readOnly: true
 
     ObservedNodeSearch:
       type: object

@@ -636,6 +636,7 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
     latest_health_metrics = serializers.SerializerMethodField()
     latest_host_metrics = serializers.SerializerMethodField()
     owner = OwnerSerializer(source="claimed_by", read_only=True)
+    claim = serializers.SerializerMethodField()
 
     def to_internal_value(self, data):
         if "node_id" in data:
@@ -663,6 +664,7 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
             "latest_health_metrics",
             "latest_host_metrics",
             "owner",
+            "claim",
         ]
         read_only_fields = [
             "internal_id",
@@ -676,7 +678,26 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
             "latest_health_metrics",
             "latest_host_metrics",
             "owner",
+            "claim",
         ]
+
+    def get_claim(self, obj):
+        """
+        Return the current user's claim for this node, if any.
+        Only included for authenticated requests. Returns null when no claim exists.
+        Only the claim owner sees their own claim (pending or accepted).
+        Does NOT include claim_key; that is sensitive and only sent via the claims API.
+        """
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated:
+            return None
+        claim = NodeOwnerClaim.objects.filter(node=obj, user=request.user).first()
+        if not claim:
+            return None
+        return {
+            "created_at": claim.created_at,
+            "accepted_at": claim.accepted_at,
+        }
 
     def _get_latest_status(self, obj):
         """Get NodeLatestStatus for ObservedNode (obj has latest_status)."""
