@@ -1,0 +1,26 @@
+{
+    "from": 3333444455,
+    "to": 4294967295,
+    "channel": 1,
+    "decoded": {
+        "portnum": "POSITION_APP",
+        "bitfield": 0,
+        "position": {
+            "latitudeI": 558628864,
+            "longitudeI": -41156608,
+            "altitude": 61,
+            "time": 1745331200,
+            "locationSource": "LOC_INTERNAL",
+            "latitude": 55.8628864,
+            "longitude": -4.1156608
+        }
+    },
+    "id": 6666555443,
+    "rxTime": 1745331250,
+    "rxSnr": -15.25,
+    "hopLimit": 2,
+    "rxRssi": -120,
+    "hopStart": 3,
+    "fromId": "!c6b05367",
+    "toId": "^all"
+}

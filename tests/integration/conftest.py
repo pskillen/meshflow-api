@@ -133,6 +133,15 @@ def api_client(api_base_url, wait_for_api, jwt_token):
                 timeout=10,
             )
 
+        def post_claim(self, node_id):
+            """Create a NodeOwnerClaim for the given node. Returns response with claim_key."""
+            url = f"{self.base}/api/nodes/observed-nodes/{node_id}/claim/"
+            return requests.post(
+                url,
+                headers={"Authorization": f"Bearer {self.jwt}"},
+                timeout=10,
+            )
+
     return Client()
 
 

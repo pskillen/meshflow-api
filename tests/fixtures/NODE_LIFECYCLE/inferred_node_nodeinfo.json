@@ -1,0 +1,27 @@
+{
+    "from": 1111222233,
+    "to": 4294967295,
+    "channel": 1,
+    "decoded": {
+        "portnum": "NODEINFO_APP",
+        "bitfield": 0,
+        "user": {
+            "id": "!423be7d9",
+            "longName": "Test Node After Update",
+            "shortName": "Tst1",
+            "macaddr": "SMpDPUSU",
+            "hwModel": "HELTEC_V3",
+            "swVersion": "2.0.0",
+            "role": "CLIENT_MUTE",
+            "publicKey": "c1OCe93DrrJwtPKC5VJbneJIrK37WxHBZyPkrYTI/nw="
+        }
+    },
+    "id": 8888777667,
+    "rxTime": 1745331200,
+    "rxSnr": 6.5,
+    "hopLimit": 4,
+    "hopStart": 4,
+    "relayNode": 148,
+    "fromId": "!423be7d9",
+    "toId": "^all"
+}
