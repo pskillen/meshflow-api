@@ -1,0 +1,19 @@
+{
+    "from": 3333444455,
+    "to": 999999999,
+    "decoded": {
+        "portnum": "TEXT_MESSAGE_APP",
+        "payload": "b'alpha beta 99'",
+        "bitfield": 0,
+        "text": "alpha beta 99"
+    },
+    "id": 6666555444,
+    "rxTime": 1745331300,
+    "rxSnr": 6.25,
+    "hopLimit": 6,
+    "rxRssi": -44,
+    "hopStart": 6,
+    "relayNode": 13,
+    "fromId": "!c6b05367",
+    "toId": "!3b9ac9ff"
+}
