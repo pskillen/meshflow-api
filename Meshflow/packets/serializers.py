@@ -323,23 +323,33 @@ class NodeInfoPacketSerializer(BasePacketSerializer):
             hwModel = serializers.CharField(source="hw_model", required=False, allow_null=True, allow_blank=True)
             swVersion = serializers.CharField(source="sw_version", required=False, allow_null=True, allow_blank=True)
             publicKey = serializers.CharField(source="public_key", required=False, allow_null=True, allow_blank=True)
-            mac_address = serializers.CharField(source="macaddr", required=False, allow_null=True)
+            macaddr = serializers.CharField(required=False, allow_null=True)
             role = serializers.CharField(required=False, allow_null=True)
             isLicensed = serializers.BooleanField(source="is_licensed", required=False, allow_null=True)
             isUnmessagable = serializers.BooleanField(source="is_unmessagable", required=False, allow_null=True)
 
         user = UserSerializer()
 
-    decoded = DecodedSerializer(source="*")
+    decoded = DecodedSerializer()
 
     def to_internal_value(self, data):
         """Handle role conversion and flatten nested user data."""
         validated_data = super().to_internal_value(data)
 
-        # Flatten the nested user data
+        # Flatten decoded, then user (decoded contains user)
+        if "decoded" in validated_data:
+            decoded_data = validated_data.pop("decoded")
+            validated_data.update(decoded_data)
         if "user" in validated_data:
             user_data = validated_data.pop("user")
             validated_data.update(user_data)
+
+        # DRF uses source as validated_data key for fields with source=; UserSerializer has
+        # mac_address=CharField(source="macaddr") so we get "macaddr". Normalize to mac_address.
+        # Normalize to mac_address for create() and downstream conversion.
+        mac_raw = validated_data.get("mac_address") or validated_data.pop("macaddr", None)
+        if mac_raw is not None:
+            validated_data["mac_address"] = mac_raw
 
         # Convert base64 MAC address to colon-separated hex (Meshtastic sends bytes as base64)
         mac_raw = validated_data.get("mac_address")
