@@ -656,6 +656,8 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
             "sw_version",
             "public_key",
             "role",
+            "is_licensed",
+            "is_unmessagable",
             "last_heard",
             "latest_position",
             "latest_device_metrics",
@@ -850,6 +852,7 @@ class ObservedNodeSearchSerializer(ObservedNodeSerializer):
             "node_id_str",
             "long_name",
             "short_name",
+            "public_key",
             "last_heard",
             "owner",
         ]

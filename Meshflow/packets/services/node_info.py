@@ -23,7 +23,8 @@ class NodeInfoPacketService(BasePacketService):
         sender.hw_model = self.packet.hw_model
         sender.sw_version = self.packet.sw_version
         sender.role = self.packet.role
-
-        # we don't store public keys yet
-        # I don't see a use case for updating the MAC address
+        sender.public_key = self.packet.public_key
+        sender.mac_addr = self.packet.mac_address
+        sender.is_licensed = self.packet.is_licensed
+        sender.is_unmessagable = self.packet.is_unmessagable
         sender.save()

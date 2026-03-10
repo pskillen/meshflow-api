@@ -323,6 +323,8 @@ class NodeInfoPacketSerializerTest(BasePacketSerializerTestCase):
                     "publicKey": "public_key",
                     "macaddr": "00:11:22:33:44:55",
                     "role": "ROUTER",
+                    "isLicensed": True,
+                    "isUnmessagable": False,
                 },
             },
             "rxTime": 1672531200,
@@ -341,6 +343,29 @@ class NodeInfoPacketSerializerTest(BasePacketSerializerTestCase):
         self.assertEqual(validated_data["public_key"], "public_key")
         self.assertEqual(validated_data["mac_address"], "00:11:22:33:44:55")
         self.assertEqual(validated_data["role"], RoleSource.ROUTER)
+        self.assertEqual(validated_data["is_licensed"], True)
+        self.assertEqual(validated_data["is_unmessagable"], False)
+
+    def test_node_info_packet_mac_base64_conversion(self):
+        """Test that base64 MAC address from Meshtastic is converted to colon-separated hex."""
+        # Meshtastic sends macaddr as base64 (protobuf bytes). AAECAwQFBg== decodes to 00:01:02:03:04:05:06
+        data = {
+            "id": 456,
+            "from": self.from_node.node_id,
+            "fromId": self.from_node.node_id_str,
+            "decoded": {
+                "portnum": "NODEINFO_APP",
+                "user": {
+                    "id": "!789012",
+                    "shortName": "TEST",
+                    "macaddr": "AAECAwQFBg==",
+                },
+            },
+            "rxTime": 1672531200,
+        }
+        serializer = NodeInfoPacketSerializer(data=data, context=self.context)
+        assert_serializer_valid(serializer)
+        self.assertEqual(serializer.validated_data["mac_address"], "00:01:02:03:04:05:06")
 
     def test_create_node_info_packet(self):
         """Test creating a node info packet."""

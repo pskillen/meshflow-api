@@ -7,7 +7,7 @@ from django.utils import timezone as django_timezone
 
 from rest_framework import serializers
 
-from common.mesh_node_helpers import meshtastic_hex_to_int, meshtastic_id_to_hex
+from common.mesh_node_helpers import meshtastic_hex_to_int, meshtastic_id_to_hex, parse_b64_mac_address
 from constellations.models import MessageChannel
 from nodes.models import DeviceMetrics, ManagedNode, NodeLatestStatus, ObservedNode, Position
 
@@ -323,21 +323,41 @@ class NodeInfoPacketSerializer(BasePacketSerializer):
             hwModel = serializers.CharField(source="hw_model", required=False, allow_null=True, allow_blank=True)
             swVersion = serializers.CharField(source="sw_version", required=False, allow_null=True, allow_blank=True)
             publicKey = serializers.CharField(source="public_key", required=False, allow_null=True, allow_blank=True)
-            macaddr = serializers.CharField(source="mac_address", required=False, allow_null=True)
+            macaddr = serializers.CharField(required=False, allow_null=True)
             role = serializers.CharField(required=False, allow_null=True)
+            isLicensed = serializers.BooleanField(source="is_licensed", required=False, allow_null=True)
+            isUnmessagable = serializers.BooleanField(source="is_unmessagable", required=False, allow_null=True)
 
         user = UserSerializer()
 
-    decoded = DecodedSerializer(source="*")
+    decoded = DecodedSerializer()
 
     def to_internal_value(self, data):
         """Handle role conversion and flatten nested user data."""
         validated_data = super().to_internal_value(data)
 
-        # Flatten the nested user data
+        # Flatten decoded, then user (decoded contains user)
+        if "decoded" in validated_data:
+            decoded_data = validated_data.pop("decoded")
+            validated_data.update(decoded_data)
         if "user" in validated_data:
             user_data = validated_data.pop("user")
             validated_data.update(user_data)
+
+        # DRF uses source as validated_data key for fields with source=; UserSerializer has
+        # mac_address=CharField(source="macaddr") so we get "macaddr". Normalize to mac_address.
+        # Normalize to mac_address for create() and downstream conversion.
+        mac_raw = validated_data.get("mac_address") or validated_data.pop("macaddr", None)
+        if mac_raw is not None:
+            validated_data["mac_address"] = mac_raw
+
+        # Convert base64 MAC address to colon-separated hex (Meshtastic sends bytes as base64)
+        mac_raw = validated_data.get("mac_address")
+        if mac_raw and isinstance(mac_raw, str) and ":" not in mac_raw:
+            try:
+                validated_data["mac_address"] = parse_b64_mac_address(mac_raw)
+            except ValueError:
+                pass  # Leave as-is if not valid base64
 
         # Convert role from string or integer to RoleSource value (matches Meshtastic config.proto)
         if "role" in validated_data and validated_data["role"] is not None:
@@ -392,6 +412,8 @@ class NodeInfoPacketSerializer(BasePacketSerializer):
             public_key=validated_data.get("public_key"),
             mac_address=validated_data.get("mac_address"),
             role=validated_data.get("role"),
+            is_licensed=validated_data.get("is_licensed"),
+            is_unmessagable=validated_data.get("is_unmessagable"),
         )
 
         # Create the observation

@@ -1,6 +1,9 @@
 ### IDE files
 *.iml
 
+## Mac stuff
+.DS_Store
+
 ### app outputs
 state.json
 nodes.json

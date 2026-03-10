@@ -116,6 +116,7 @@ def test_node_info_updates_inferred_node(api_client):
     assert node_data["hw_model"] == user["hwModel"]
     assert node_data.get("sw_version") == user.get("swVersion")
     assert node_data["role"] is not None
+    assert node_data.get("public_key") == user.get("publicKey")
 
 
 def test_node_id_str_inferred_from_from_int(api_client):
