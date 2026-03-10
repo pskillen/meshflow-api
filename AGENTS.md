@@ -68,6 +68,7 @@ See **tests/TESTING.md** for detailed instructions (unit tests, integration test
 
 ## Conventions
 
+- When catching multiple exception types, do not use parentheses (e.g. `except ValueError, TypeError`). The project linter prefers this style.
 - Add or update unit and integration tests when changing behaviour.
 - Use `timezone.now()` for timestamps; keep `last_heard` timezone-aware.
 - Node IDs: `node_id` (BigInteger), `node_id_str` (hex, e.g. `!12345678`). Use `common.mesh_node_helpers` for conversion.
