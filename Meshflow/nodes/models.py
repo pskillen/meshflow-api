@@ -121,6 +121,8 @@ class ObservedNode(models.Model):
     sw_version = models.CharField(max_length=12, null=True, blank=True)
     public_key = models.CharField(max_length=64, null=True, blank=True)
     role = models.IntegerField(choices=RoleSource.choices, null=True, blank=True)
+    is_licensed = models.BooleanField(null=True, blank=True)
+    is_unmessagable = models.BooleanField(null=True, blank=True)
 
     last_heard = models.DateTimeField(null=True, blank=True, db_index=True)
 

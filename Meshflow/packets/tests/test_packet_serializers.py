@@ -323,6 +323,8 @@ class NodeInfoPacketSerializerTest(BasePacketSerializerTestCase):
                     "publicKey": "public_key",
                     "macaddr": "00:11:22:33:44:55",
                     "role": "ROUTER",
+                    "isLicensed": True,
+                    "isUnmessagable": False,
                 },
             },
             "rxTime": 1672531200,
@@ -341,6 +343,8 @@ class NodeInfoPacketSerializerTest(BasePacketSerializerTestCase):
         self.assertEqual(validated_data["public_key"], "public_key")
         self.assertEqual(validated_data["mac_address"], "00:11:22:33:44:55")
         self.assertEqual(validated_data["role"], RoleSource.ROUTER)
+        self.assertEqual(validated_data["is_licensed"], True)
+        self.assertEqual(validated_data["is_unmessagable"], False)
 
     def test_create_node_info_packet(self):
         """Test creating a node info packet."""

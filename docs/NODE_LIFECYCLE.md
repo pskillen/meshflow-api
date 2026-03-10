@@ -75,8 +75,7 @@ Later NodeInfo packets can update these fields.
 - **Location**: `Meshflow/packets/services/node_info.py`
 - **Trigger**: Ingested NODEINFO_APP packet
 - **Logic**: If packet describes the sender (see note below), update ObservedNode:
-  - `short_name`, `long_name`, `hw_model`, `sw_version`, `role`
-  - Not stored: `public_key`, `mac_address`
+  - `short_name`, `long_name`, `hw_model`, `sw_version`, `role`, `public_key`, `mac_addr`, `is_licensed`, `is_unmessagable`
 
 **Implementation note**: The current check `sender.node_id == self.packet.node_id` compares `int` vs `str` and never matches, so the early return never triggers and the update always runs. In practice NodeInfo packets are typically from the node describing itself (`from` == `decoded.user.id` in hex), so this is usually correct.
 
@@ -87,6 +86,10 @@ sender.long_name = self.packet.long_name
 sender.hw_model = self.packet.hw_model
 sender.sw_version = self.packet.sw_version
 sender.role = self.packet.role
+sender.public_key = self.packet.public_key
+sender.mac_addr = self.packet.mac_address
+sender.is_licensed = self.packet.is_licensed
+sender.is_unmessagable = self.packet.is_unmessagable
 sender.save()
 ```
 

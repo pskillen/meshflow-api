@@ -52,6 +52,9 @@ def test_node_info_packet_creation(create_node_info_packet):
     assert packet.sw_version == "2.0.0"
     assert packet.mac_address == "00:11:22:33:44:55"
     assert packet.role == RoleSource.ROUTER
+    assert packet.public_key == "c1OCe93DrrJwtPKC5VJbneJIrK37WxHBZyPkrYTI/nw="
+    assert packet.is_licensed is True
+    assert packet.is_unmessagable is False
 
 
 @pytest.mark.django_db

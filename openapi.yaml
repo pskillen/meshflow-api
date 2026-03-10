@@ -571,6 +571,18 @@ components:
           type: string
           description: The public key of the node
           nullable: true
+        role:
+          type: integer
+          description: The Meshtastic role of the node (e.g. CLIENT, ROUTER)
+          nullable: true
+        is_licensed:
+          type: boolean
+          description: Whether the node operator is a licensed ham radio operator
+          nullable: true
+        is_unmessagable:
+          type: boolean
+          description: Whether the node can receive messages
+          nullable: true
         last_heard:
           type: string
           format: date-time
@@ -645,6 +657,10 @@ components:
         short_name:
           type: string
           description: The short name of the node
+          nullable: true
+        public_key:
+          type: string
+          description: The public key of the node
           nullable: true
         last_heard:
           type: string

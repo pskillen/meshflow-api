@@ -36,6 +36,9 @@ Node information packets contain device details:
 | decoded.user.hwModel   | string    | Hardware model         | e.g. "HELTEC_V3"      |
 | decoded.user.role      | string    | Node role              | e.g. "CLIENT_MUTE"    |
 | decoded.user.publicKey | string    | Public key             | Base64 encoded        |
+| decoded.user.swVersion | string   | Software/firmware version | e.g. "2.0.0"       |
+| decoded.user.isLicensed | boolean  | Ham radio operator flag | -                    |
+| decoded.user.isUnmessagable | boolean | Whether node can receive messages | -        |
 
 ### POSITION_APP
 
@@ -223,4 +226,4 @@ Text message packets contain communication data:
 | publicKey       | string    | Public key             | Base64 encoded            |
 | pkiEncrypted    | boolean   | Encryption status      | true/false                |
 | nextHop         | integer   | Next hop node ID       | -                         |
-| relayNode       | integer   | Relay node ID          | -                         | 
+| relayNode       | integer   | Relay node ID          | -                         |

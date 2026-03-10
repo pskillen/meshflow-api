@@ -85,6 +85,8 @@ class NodeInfoPacket(RawPacket):
     public_key = models.CharField(max_length=64, null=True)
     mac_address = models.CharField(max_length=20, null=True)
     role = models.IntegerField(choices=RoleSource.choices, null=True)
+    is_licensed = models.BooleanField(null=True)
+    is_unmessagable = models.BooleanField(null=True)
 
     class Meta:
         verbose_name = _("Node info packet")

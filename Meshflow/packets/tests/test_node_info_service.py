@@ -58,13 +58,17 @@ def test_process_node_info_packet_same_node(
     assert from_node.hw_model == packet.hw_model
     assert from_node.sw_version == packet.sw_version
     assert from_node.role == packet.role
+    assert from_node.public_key == packet.public_key
+    assert from_node.mac_addr == packet.mac_address
+    assert from_node.is_licensed == packet.is_licensed
+    assert from_node.is_unmessagable == packet.is_unmessagable
 
 
 @pytest.mark.django_db
 def test_process_node_info_packet_different_node(
     create_node_info_packet, create_managed_node, create_packet_observation, create_user
 ):
-    """Test processing a node info packet for a different node."""
+    """Test processing a node info packet for a different node (node_id != from_int)."""
     service = NodeInfoPacketService()
 
     # Create a packet where the node_id is different from the from_int
@@ -92,3 +96,7 @@ def test_process_node_info_packet_different_node(
     assert from_node.hw_model == packet.hw_model
     assert from_node.sw_version == packet.sw_version
     assert from_node.role == packet.role
+    assert from_node.public_key == packet.public_key
+    assert from_node.mac_addr == packet.mac_address
+    assert from_node.is_licensed == packet.is_licensed
+    assert from_node.is_unmessagable == packet.is_unmessagable

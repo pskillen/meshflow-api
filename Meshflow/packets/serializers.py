@@ -325,6 +325,8 @@ class NodeInfoPacketSerializer(BasePacketSerializer):
             publicKey = serializers.CharField(source="public_key", required=False, allow_null=True, allow_blank=True)
             macaddr = serializers.CharField(source="mac_address", required=False, allow_null=True)
             role = serializers.CharField(required=False, allow_null=True)
+            isLicensed = serializers.BooleanField(source="is_licensed", required=False, allow_null=True)
+            isUnmessagable = serializers.BooleanField(source="is_unmessagable", required=False, allow_null=True)
 
         user = UserSerializer()
 
@@ -392,6 +394,8 @@ class NodeInfoPacketSerializer(BasePacketSerializer):
             public_key=validated_data.get("public_key"),
             mac_address=validated_data.get("mac_address"),
             role=validated_data.get("role"),
+            is_licensed=validated_data.get("is_licensed"),
+            is_unmessagable=validated_data.get("is_unmessagable"),
         )
 
         # Create the observation
