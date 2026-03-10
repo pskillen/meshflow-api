@@ -14,7 +14,8 @@
                 "--bind", "0.0.0.0",
                 "--port", "8000"
             ],
-            "cwd": "${workspaceFolder}/Meshflow"
+            "cwd": "${workspaceFolder}/Meshflow",
+            "python": "${workspaceFolder}/venv/bin/python"
         },
         {
             "name": "Meshflow API (runserver)",
@@ -29,7 +30,7 @@
             "autoStartBrowser": false,
             "program": "${workspaceFolder}/Meshflow/manage.py",
             "cwd": "${workspaceFolder}/Meshflow",
-            "python": "${workspaceFolder}/Meshflow/venv-mf-api/bin/python"
+            "python": "${workspaceFolder}/venv/bin/python"
         },
         {
             "name": "Meshflow API (uvicorn, autoreload)",
@@ -42,7 +43,8 @@
                 "--port", "8000",
                 "--reload"
             ],
-            "cwd": "${workspaceFolder}/Meshflow"
+            "cwd": "${workspaceFolder}/Meshflow",
+            "python": "${workspaceFolder}/venv/bin/python"
         }
     ]
 }
