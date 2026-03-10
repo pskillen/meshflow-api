@@ -44,6 +44,7 @@ All endpoints under `/api/`:
 
 ```bash
 cd Meshflow
+source venv/bin/activate
 pip install -r requirements.txt
 python manage.py migrate
 python manage.py runserver
@@ -56,6 +57,8 @@ When making changes, **add or update unit and integration tests** as needed. New
 
 - **Unit tests**: `Meshflow/` – Django TestCase/pytest, run with `python -m pytest Meshflow/ -v`
 - **Integration tests**: `tests/integration/` – HTTP client tests against live API, run with `pytest tests/integration/ -v` (requires API running and `seed_integration_tests`)
+
+Make sure to activate the venv `venv/bin/activate`
 
 See **tests/TESTING.md** for detailed instructions (unit tests, integration tests via Docker Compose or local Django).
 
