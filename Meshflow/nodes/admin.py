@@ -398,13 +398,11 @@ class ObservedNodeAdmin(admin.ModelAdmin):
         "node_id",
         "node_id_str",
         "hw_model",
-        "sw_version",
         "claimed_by",
         "role",
     )
     list_filter = (
         "hw_model",
-        "sw_version",
         "claimed_by",
         "role",
     )
@@ -415,7 +413,6 @@ class ObservedNodeAdmin(admin.ModelAdmin):
         "node_id_str",
         "mac_addr",
         "hw_model",
-        "sw_version",
         "public_key",
         "claimed_by__username",
     )
@@ -436,7 +433,6 @@ class ObservedNodeAdmin(admin.ModelAdmin):
             "long_name",
             "short_name",
             "hw_model",
-            "sw_version",
             "public_key",
             "claimed_by",
             "role",

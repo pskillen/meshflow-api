@@ -31,7 +31,6 @@ def observed_node_data():
         "short_name": "TEST",
         "mac_addr": "00:11:22:33:44:55",
         "hw_model": "T-Beam",
-        "sw_version": "2.0.0",
     }
 
 

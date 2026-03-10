@@ -29,7 +29,6 @@ def test_observed_node_creation(create_observed_node):
     assert node.short_name == "TEST"
     assert node.mac_addr == "00:11:22:33:44:55"
     assert node.hw_model == "T-Beam"
-    assert node.sw_version == "2.0.0"
     assert node.node_id_str == "!3ade68b1"
 
 

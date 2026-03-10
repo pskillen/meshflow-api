@@ -81,7 +81,6 @@ def node_info_packet_data():
         "short_name": "TEST",
         "long_name": "Test Node",
         "hw_model": "T-Beam",
-        "sw_version": "2.0.0",
         "public_key": "c1OCe93DrrJwtPKC5VJbneJIrK37WxHBZyPkrYTI/nw=",
         "mac_address": "00:11:22:33:44:55",
         "role": RoleSource.ROUTER,

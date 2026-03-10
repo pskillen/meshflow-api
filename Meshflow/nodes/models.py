@@ -118,7 +118,6 @@ class ObservedNode(models.Model):
     short_name = models.CharField(max_length=5)
 
     hw_model = models.CharField(max_length=50, null=True, blank=True)
-    sw_version = models.CharField(max_length=12, null=True, blank=True)
     public_key = models.CharField(max_length=64, null=True, blank=True)
     role = models.IntegerField(choices=RoleSource.choices, null=True, blank=True)
     is_licensed = models.BooleanField(null=True, blank=True)

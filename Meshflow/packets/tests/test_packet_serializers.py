@@ -319,7 +319,6 @@ class NodeInfoPacketSerializerTest(BasePacketSerializerTestCase):
                     "shortName": "TEST",
                     "longName": "Test Node",
                     "hwModel": "TBEAM",
-                    "swVersion": "2.0.0",
                     "publicKey": "public_key",
                     "macaddr": "00:11:22:33:44:55",
                     "role": "ROUTER",
@@ -339,7 +338,6 @@ class NodeInfoPacketSerializerTest(BasePacketSerializerTestCase):
         self.assertEqual(validated_data["short_name"], "TEST")
         self.assertEqual(validated_data["long_name"], "Test Node")
         self.assertEqual(validated_data["hw_model"], "TBEAM")
-        self.assertEqual(validated_data["sw_version"], "2.0.0")
         self.assertEqual(validated_data["public_key"], "public_key")
         self.assertEqual(validated_data["mac_address"], "00:11:22:33:44:55")
         self.assertEqual(validated_data["role"], RoleSource.ROUTER)

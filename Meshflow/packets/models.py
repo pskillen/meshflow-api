@@ -81,7 +81,6 @@ class NodeInfoPacket(RawPacket):
     short_name = models.CharField(max_length=5, null=True)
     long_name = models.CharField(max_length=50, null=True)
     hw_model = models.CharField(max_length=50, null=True)
-    sw_version = models.CharField(max_length=12, null=True)
     public_key = models.CharField(max_length=64, null=True)
     mac_address = models.CharField(max_length=20, null=True)
     role = models.IntegerField(choices=RoleSource.choices, null=True)
