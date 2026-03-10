@@ -21,7 +21,6 @@ class NodeInfoPacketService(BasePacketService):
         sender.short_name = self.packet.short_name
         sender.long_name = self.packet.long_name
         sender.hw_model = self.packet.hw_model
-        sender.sw_version = self.packet.sw_version
         sender.role = self.packet.role
         sender.public_key = self.packet.public_key
         sender.mac_addr = self.packet.mac_address

@@ -207,10 +207,6 @@ components:
                       type: string
                       nullable: true
                       description: The hardware model of the node
-                    swVersion:
-                      type: string
-                      nullable: true
-                      description: The software version of the node
                     publicKey:
                       type: string
                       nullable: true
@@ -562,10 +558,6 @@ components:
         hw_model:
           type: string
           description: The hardware model of the node
-          nullable: true
-        sw_version:
-          type: string
-          description: The software version of the node
           nullable: true
         public_key:
           type: string

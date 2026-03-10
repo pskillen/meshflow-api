@@ -44,7 +44,6 @@ def test_process_node_info_packet_same_node(
     from_node.short_name = "OLD_NAME"
     from_node.long_name = "Old Name"
     from_node.hw_model = "Old Model"
-    from_node.sw_version = "1.0.0"
     from_node.role = RoleSource.CLIENT
     from_node.save()
 
@@ -56,7 +55,6 @@ def test_process_node_info_packet_same_node(
     assert from_node.short_name == packet.short_name
     assert from_node.long_name == packet.long_name
     assert from_node.hw_model == packet.hw_model
-    assert from_node.sw_version == packet.sw_version
     assert from_node.role == packet.role
     assert from_node.public_key == packet.public_key
     assert from_node.mac_addr == packet.mac_address
@@ -82,7 +80,6 @@ def test_process_node_info_packet_different_node(
     from_node.short_name = "OLD_NAME"
     from_node.long_name = "Old Name"
     from_node.hw_model = "Old Model"
-    from_node.sw_version = "1.0.0"
     from_node.role = RoleSource.CLIENT
     from_node.save()
 
@@ -94,7 +91,6 @@ def test_process_node_info_packet_different_node(
     assert from_node.short_name == packet.short_name
     assert from_node.long_name == packet.long_name
     assert from_node.hw_model == packet.hw_model
-    assert from_node.sw_version == packet.sw_version
     assert from_node.role == packet.role
     assert from_node.public_key == packet.public_key
     assert from_node.mac_addr == packet.mac_address

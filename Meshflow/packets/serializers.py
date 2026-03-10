@@ -321,7 +321,6 @@ class NodeInfoPacketSerializer(BasePacketSerializer):
             shortName = serializers.CharField(source="short_name", required=False, allow_null=True)
             longName = serializers.CharField(source="long_name", required=False, allow_null=True)
             hwModel = serializers.CharField(source="hw_model", required=False, allow_null=True, allow_blank=True)
-            swVersion = serializers.CharField(source="sw_version", required=False, allow_null=True, allow_blank=True)
             publicKey = serializers.CharField(source="public_key", required=False, allow_null=True, allow_blank=True)
             macaddr = serializers.CharField(required=False, allow_null=True)
             role = serializers.CharField(required=False, allow_null=True)
@@ -408,7 +407,6 @@ class NodeInfoPacketSerializer(BasePacketSerializer):
             short_name=validated_data.get("short_name"),
             long_name=validated_data.get("long_name"),
             hw_model=validated_data.get("hw_model"),
-            sw_version=validated_data.get("sw_version"),
             public_key=validated_data.get("public_key"),
             mac_address=validated_data.get("mac_address"),
             role=validated_data.get("role"),

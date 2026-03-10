@@ -653,7 +653,6 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
             "long_name",
             "short_name",
             "hw_model",
-            "sw_version",
             "public_key",
             "role",
             "is_licensed",
