@@ -17,6 +17,7 @@ from packets.models import (
     NodeInfoPacket,
     PositionPacket,
     RoleSource,
+    TraceroutePacket,
 )
 from packets.serializers import (
     BasePacketSerializer,
@@ -582,6 +583,40 @@ class PacketIngestSerializerTest(BasePacketSerializerTestCase):
         self.assertIsInstance(packet, PositionPacket)
         self.assertEqual(packet.latitude, 37.7749)
         self.assertEqual(packet.longitude, -122.4194)
+
+    def test_traceroute_packet_ingest(self):
+        """Test ingesting a TRACEROUTE_APP packet."""
+        data = {
+            "id": 987654321,
+            "from": 1623194643,
+            "fromId": "!60b0e093",
+            "to": 123456789,
+            "toId": "!499602d",
+            "decoded": {
+                "portnum": "TRACEROUTE_APP",
+                "traceroute": {
+                    "route": [111111, 222222],
+                    "routeBack": [222222, 111111],
+                },
+            },
+            "rxTime": 1745330928,
+            "hopLimit": 6,
+            "hopStart": 6,
+        }
+
+        serializer = PacketIngestSerializer(data=data, context=self.context)
+        assert_serializer_valid(serializer)
+        packet = serializer.save()
+
+        # Verify correct packet type was created
+        self.assertIsInstance(packet, TraceroutePacket)
+        self.assertEqual(packet.route, [111111, 222222])
+        self.assertEqual(packet.route_back, [222222, 111111])
+        self.assertEqual(packet.from_int, 1623194643)
+        self.assertEqual(packet.to_int, 123456789)
+        # Verify PacketObservation was created
+        self.assertEqual(packet.observations.count(), 1)
+        self.assertEqual(packet.observations.first().observer, self.observer)
 
     def test_invalid_packet_type(self):
         """Test handling of invalid packet type."""

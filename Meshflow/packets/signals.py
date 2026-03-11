@@ -23,6 +23,7 @@ health_metrics_packet_received = Signal()
 host_metrics_packet_received = Signal()
 power_metrics_packet_received = Signal()
 traffic_management_stats_packet_received = Signal()
+traceroute_packet_received = Signal()
 
 
 # Converted packet signals

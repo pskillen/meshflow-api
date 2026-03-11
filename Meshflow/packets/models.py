@@ -275,6 +275,17 @@ class TrafficManagementStatsPacket(BaseTelemetryPacket):
         verbose_name_plural = _("Traffic management stats packets")
 
 
+class TraceroutePacket(RawPacket):
+    """Model for storing TRACEROUTE_APP packets."""
+
+    route = models.JSONField(default=list, help_text="List of node_ids, path from source to dest")
+    route_back = models.JSONField(default=list, help_text="List of node_ids, path from dest back to source")
+
+    class Meta:
+        verbose_name = _("Traceroute packet")
+        verbose_name_plural = _("Traceroute packets")
+
+
 class PacketObservation(models.Model):
     """Relates packets to node(s) which observed the packet."""
 

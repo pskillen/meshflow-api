@@ -15,6 +15,7 @@ from .models import (
     PacketObservation,
     PositionPacket,
     PowerMetricsPacket,
+    TraceroutePacket,
     TrafficManagementStatsPacket,
 )
 from .services.air_quality import AirQualityMetricsPacketService
@@ -36,6 +37,7 @@ from .signals import (
     node_info_packet_received,
     position_packet_received,
     power_metrics_packet_received,
+    traceroute_packet_received,
     traffic_management_stats_packet_received,
 )
 
@@ -142,3 +144,11 @@ def on_traffic_management_stats_packet_received(
 ):
     """Handle a traffic management stats packet received signal. Packet is stored by serializer; no service."""
     logger.info(f"Traffic management stats packet received: {packet.id}")
+
+
+@receiver(traceroute_packet_received)
+def on_traceroute_packet_received(
+    sender, packet: TraceroutePacket, observer: ObservedNode, observation: PacketObservation, **kwargs
+):
+    """Handle a traceroute packet received signal. Packet is stored by serializer; no service."""
+    logger.info(f"Traceroute packet received: {packet.id}")

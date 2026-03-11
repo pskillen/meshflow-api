@@ -10,6 +10,7 @@ from .conftest import load_fixture
 
 INGEST_FIXTURES = [
     ("TEXT_MESSAGE_APP/minimal.json", "TEXT_MESSAGE_APP"),
+    ("TRACEROUTE_APP/minimal.json", "TRACEROUTE_APP"),
     ("TEXT_MESSAGE_APP/with_reply_emoji.json", "TEXT_MESSAGE_APP"),
     ("POSITION_APP/minimal.json", "POSITION_APP"),
     ("POSITION_APP/with_optional_fields.json", "POSITION_APP"),

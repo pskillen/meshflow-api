@@ -25,6 +25,7 @@ from .models import (
     PositionPacket,
     PowerMetricsPacket,
     RoleSource,
+    TraceroutePacket,
     TrafficManagementStatsPacket,
 )
 
@@ -1084,6 +1085,48 @@ class TrafficManagementStatsPacketSerializer(BasePacketSerializer):
         return packet
 
 
+class TraceroutePacketSerializer(BasePacketSerializer):
+    """Serializer for TRACEROUTE_APP packets."""
+
+    def to_internal_value(self, data):
+        """Flatten decoded traceroute data."""
+        validated_data = super().to_internal_value(data)
+
+        # Flatten the nested traceroute data (Meshtastic uses route and routeBack)
+        if "decoded" in data and "traceroute" in data["decoded"]:
+            traceroute_data = data["decoded"]["traceroute"]
+            validated_data["route"] = traceroute_data.get("route", []) or []
+            validated_data["route_back"] = traceroute_data.get("route_back", traceroute_data.get("routeBack", [])) or []
+
+        return validated_data
+
+    def create(self, validated_data):
+        """Create a new TraceroutePacket instance."""
+        from_int = validated_data.get("from_int")
+        packet_id = validated_data.get("packet_id")
+        rx_time = validated_data.get("rx_time")
+        existing_packet = find_existing_packet(TraceroutePacket, from_int, packet_id, rx_time)
+
+        if existing_packet:
+            self._create_observation(existing_packet, validated_data)
+            return existing_packet
+
+        packet = TraceroutePacket.objects.create(
+            packet_id=validated_data.get("packet_id"),
+            from_int=validated_data.get("from_int"),
+            from_str=validated_data.get("from_str"),
+            to_int=validated_data.get("to_int"),
+            to_str=validated_data.get("to_str"),
+            port_num=validated_data.get("port_num"),
+            first_reported_time=validated_data.get("first_reported_time", validated_data.get("rx_time")),
+            route=validated_data.get("route", []),
+            route_back=validated_data.get("route_back", []),
+        )
+
+        self._create_observation(packet, validated_data)
+        return packet
+
+
 class PacketIngestSerializer(serializers.Serializer):
     """Serializer for ingesting packets of any type."""
 
@@ -1136,6 +1179,8 @@ class PacketIngestSerializer(serializers.Serializer):
                         "hostMetrics, trafficManagementStats"
                     }
                 )
+        elif portnum == "TRACEROUTE_APP":
+            validated_data = TraceroutePacketSerializer().to_internal_value(data)
         else:
             raise serializers.ValidationError({"decoded.portnum": f"Unknown packet type: {portnum}"})
 
@@ -1178,6 +1223,8 @@ class PacketIngestSerializer(serializers.Serializer):
                         "hostMetrics, trafficManagementStats"
                     }
                 )
+        elif portnum == "TRACEROUTE_APP":
+            self.child_serializer = TraceroutePacketSerializer(context=self.context)
         else:
             raise serializers.ValidationError({"decoded.portnum": f"Unknown packet type: {portnum}"})
 
