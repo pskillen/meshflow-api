@@ -1,3 +1,5 @@
-"""Pytest fixtures for stats tests."""
+"""Pytest fixtures for stats tests.
 
-pytest_plugins = ["nodes.tests.conftest", "packets.tests.conftest"]
+Fixtures from nodes.tests.conftest and packets.tests.conftest are loaded
+via pytest_plugins in Meshflow/conftest.py.
+"""
