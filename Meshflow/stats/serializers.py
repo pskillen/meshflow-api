@@ -22,6 +22,31 @@ class NodeStatsSerializer(serializers.Serializer):
     intervals = IntervalSerializer(many=True)
 
 
+class NeighbourStatsCandidateSerializer(serializers.Serializer):
+    """Serializer for a candidate node matching a source."""
+
+    node_id = serializers.IntegerField()
+    node_id_str = serializers.CharField(allow_blank=True)
+    short_name = serializers.CharField(allow_null=True, allow_blank=True)
+
+
+class NeighbourStatsSerializer(serializers.Serializer):
+    """Serializer for neighbour (by-source) stats response."""
+
+    class BySourceSerializer(serializers.Serializer):
+        """Serializer for a single source's packet count and candidate nodes."""
+
+        source = serializers.IntegerField()
+        source_type = serializers.ChoiceField(choices=["lsb", "full"])
+        count = serializers.IntegerField()
+        candidates = NeighbourStatsCandidateSerializer(many=True)
+
+    start_date = serializers.DateTimeField(allow_null=True)
+    end_date = serializers.DateTimeField(allow_null=True)
+    by_source = BySourceSerializer(many=True)
+    total_packets = serializers.IntegerField()
+
+
 class GlobalStatsSerializer(serializers.Serializer):
     """Serializer for global stats response."""
 

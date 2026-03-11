@@ -1198,6 +1198,64 @@ components:
           type: integer
           description: Number of packets in this interval
 
+    NeighbourStatsCandidate:
+      type: object
+      description: A candidate node matching a source (full node_id or LSB match)
+      properties:
+        node_id:
+          type: integer
+          description: The node ID
+        node_id_str:
+          type: string
+          description: The node ID in Meshtastic !hex format
+        short_name:
+          type: string
+          nullable: true
+          description: Short name of the node if known
+
+    NeighbourStatsBySource:
+      type: object
+      description: Packet count from a source with candidate nodes (direct or LSB-ambiguous)
+      properties:
+        source:
+          type: integer
+          description: Raw value (LSB 0-255 or full node_id)
+        source_type:
+          type: string
+          enum: [lsb, full]
+          description: "lsb when from relay_node header (1 byte), full when from from_int"
+        count:
+          type: integer
+          description: Number of packets received from this source
+        candidates:
+          type: array
+          description: ObservedNodes matching this source (all with same LSB, or single match)
+          items:
+            $ref: '#/components/schemas/NeighbourStatsCandidate'
+
+    NeighbourStats:
+      type: object
+      description: Packet statistics grouped by source node for a managed node
+      properties:
+        start_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: Start of the time range
+        end_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: End of the time range
+        by_source:
+          type: array
+          description: Packet counts by source node, ordered by count descending
+          items:
+            $ref: '#/components/schemas/NeighbourStatsBySource'
+        total_packets:
+          type: integer
+          description: Total number of packets in the time range
+
     PacketObservation:
       type: object
       description: Information about a node that observed a packet
@@ -2948,6 +3006,36 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/PacketStats'
+        '400':
+          description: Invalid request parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /stats/nodes/{node_id}/neighbours/:
+    get:
+      summary: Get neighbour stats for a managed node
+      description: >
+        Returns packet counts grouped by source node (direct sender or last-hop relay)
+        for packets received by the specified managed node.
+      tags: [Nodes]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: node_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - $ref: '#/components/schemas/DateRangeQuery'
+      responses:
+        '200':
+          description: Neighbour stats for the node
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NeighbourStats'
         '400':
           description: Invalid request parameters
           content:

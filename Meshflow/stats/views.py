@@ -1,18 +1,19 @@
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Optional, Tuple
 
-from django.db.models import Count, Q
-from django.db.models.functions import Trunc
+from django.db.models import BigIntegerField, Case, Count, F, Q, When
+from django.db.models.functions import Mod, Trunc
 
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from common.mesh_node_helpers import meshtastic_id_to_hex
 from nodes.models import ManagedNode, ObservedNode
 from packets.models import PacketObservation, RawPacket
 
-from .serializers import GlobalStatsSerializer, NodeStatsSerializer
+from .serializers import GlobalStatsSerializer, NeighbourStatsSerializer, NodeStatsSerializer
 
 
 def parse_stats_params(request) -> Tuple[Optional[datetime], Optional[datetime], int, str]:
@@ -273,6 +274,128 @@ def node_received_stats(request, node_id: int):
     if not serializer.is_valid():
         return Response(
             {"status": "error", "message": "Invalid response data"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+    return Response(serializer.validated_data)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def node_neighbour_stats(request, node_id: int):
+    """
+    Get statistics for packets received by a managed node, grouped by source
+    (direct sender or last-hop relay).
+
+    Args:
+        request: The HTTP request
+        node_id: The ID of the managed node
+
+    Returns:
+        Response containing packet counts by source node
+    """
+    try:
+        managed_node = ManagedNode.objects.get(node_id=node_id)
+    except ManagedNode.DoesNotExist:
+        return Response(
+            {"start_date": None, "end_date": None, "by_source": [], "total_packets": 0},
+            status=status.HTTP_200_OK,
+        )
+
+    try:
+        start_date, end_date, _interval, _interval_type = parse_stats_params(request)
+    except ValueError as e:
+        return Response({"status": "error", "message": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        observations = (
+            PacketObservation.objects.filter(observer=managed_node)
+            .select_related("packet")
+            .annotate(
+                source_node_id=Case(
+                    When(relay_node__isnull=False, relay_node__gt=0, then=F("relay_node")),
+                    default=F("packet__from_int"),
+                    output_field=BigIntegerField(),
+                )
+            )
+        )
+
+        if start_date:
+            observations = observations.filter(rx_time__gte=start_date)
+        if end_date:
+            observations = observations.filter(rx_time__lt=end_date)
+
+        # Exclude packets where the source is the node itself
+        observations = observations.exclude(
+            Q(relay_node__isnull=False, relay_node__gt=0, relay_node=node_id)
+            | Q(Q(relay_node__isnull=True) | Q(relay_node=0), packet__from_int=node_id)
+        )
+
+        by_source_rows = observations.values("source_node_id").annotate(count=Count("id")).order_by("-count")
+
+        by_source = []
+        for row in by_source_rows:
+            source_val = row["source_node_id"]
+            count_val = row["count"]
+
+            if source_val is None or source_val == node_id:
+                continue
+            if source_val <= 255:
+                source_type = "lsb"
+                candidates_qs = (
+                    ObservedNode.objects.annotate(lsb=Mod(F("node_id"), 256))
+                    .filter(lsb=source_val)
+                    .only("node_id", "node_id_str", "short_name")
+                )
+                candidates = [
+                    {"node_id": n.node_id, "node_id_str": n.node_id_str, "short_name": n.short_name}
+                    for n in candidates_qs
+                ]
+            else:
+                source_type = "full"
+                try:
+                    obs = ObservedNode.objects.only("node_id", "node_id_str", "short_name").get(node_id=source_val)
+                    candidates = [
+                        {
+                            "node_id": obs.node_id,
+                            "node_id_str": obs.node_id_str,
+                            "short_name": obs.short_name,
+                        }
+                    ]
+                except ObservedNode.DoesNotExist:
+                    candidates = [
+                        {
+                            "node_id": source_val,
+                            "node_id_str": meshtastic_id_to_hex(source_val),
+                            "short_name": None,
+                        }
+                    ]
+
+            by_source.append(
+                {
+                    "source": source_val,
+                    "source_type": source_type,
+                    "count": count_val,
+                    "candidates": candidates,
+                }
+            )
+
+        total_packets = sum(s["count"] for s in by_source)
+
+        response_data = {
+            "start_date": start_date,
+            "end_date": end_date,
+            "by_source": by_source,
+            "total_packets": total_packets,
+        }
+
+    except Exception:
+        raise
+
+    serializer = NeighbourStatsSerializer(data=response_data)
+    if not serializer.is_valid():
+        return Response(
+            {"status": "error", "message": "Invalid response data"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
 
     return Response(serializer.validated_data)
