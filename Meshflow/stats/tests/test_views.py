@@ -29,9 +29,7 @@ def test_node_neighbour_stats_returns_empty_for_non_managed_node(create_user):
 
 
 @pytest.mark.django_db
-def test_node_neighbour_stats_uses_from_int_when_relay_node_null(
-    create_managed_node, create_user
-):
+def test_node_neighbour_stats_uses_from_int_when_relay_node_null(create_managed_node, create_user):
     """When relay_node is null, source should be packet.from_int."""
     user = create_user()
     managed = create_managed_node(owner=user, node_id=111111111)
@@ -81,9 +79,7 @@ def test_node_neighbour_stats_uses_from_int_when_relay_node_null(
 
 
 @pytest.mark.django_db
-def test_node_neighbour_stats_uses_relay_node_when_set(
-    create_managed_node, create_user
-):
+def test_node_neighbour_stats_uses_relay_node_when_set(create_managed_node, create_user):
     """When relay_node is set, source should be relay_node (last hop)."""
     user = create_user()
     managed = create_managed_node(owner=user, node_id=111111111)
@@ -133,9 +129,7 @@ def test_node_neighbour_stats_uses_relay_node_when_set(
 
 
 @pytest.mark.django_db
-def test_node_neighbour_stats_uses_from_int_when_relay_node_zero(
-    create_managed_node, create_user
-):
+def test_node_neighbour_stats_uses_from_int_when_relay_node_zero(create_managed_node, create_user):
     """When relay_node is 0, source should fall back to packet.from_int."""
     user = create_user()
     managed = create_managed_node(owner=user, node_id=555555555)
@@ -177,9 +171,7 @@ def test_node_neighbour_stats_uses_from_int_when_relay_node_zero(
 
 
 @pytest.mark.django_db
-def test_node_neighbour_stats_aggregates_multiple_sources(
-    create_managed_node, create_user
-):
+def test_node_neighbour_stats_aggregates_multiple_sources(create_managed_node, create_user):
     """Multiple packets from different sources should be aggregated correctly."""
     user = create_user()
     managed = create_managed_node(owner=user, node_id=777777777)
@@ -220,9 +212,7 @@ def test_node_neighbour_stats_aggregates_multiple_sources(
 
 
 @pytest.mark.django_db
-def test_node_neighbour_stats_lsb_returns_candidates(
-    create_managed_node, create_user
-):
+def test_node_neighbour_stats_lsb_returns_candidates(create_managed_node, create_user):
     """When relay_node is LSB (<=255), source_type is lsb and candidates list all matching nodes."""
     user = create_user()
     managed = create_managed_node(owner=user, node_id=888888888)
@@ -274,3 +264,63 @@ def test_node_neighbour_stats_lsb_returns_candidates(
     candidate_ids = {c["node_id"] for c in item["candidates"]}
     assert 1129933592 in candidate_ids
     assert 3456789016 in candidate_ids
+
+
+@pytest.mark.django_db
+def test_node_neighbour_stats_excludes_self_packets(create_managed_node, create_user):
+    """Packets where the source is the node itself should be excluded."""
+    user = create_user()
+    managed = create_managed_node(owner=user, node_id=555555555)
+    channel = managed.channel_0
+
+    rx_time = timezone.make_aware(datetime(2025, 6, 15, 12, 0, 0))
+
+    # Packet from another node
+    packet_other = MessagePacket.objects.create(
+        packet_id=1,
+        from_int=111111111,
+        from_str="!069f6b67",
+        to_int=4294967295,
+        to_str="^all",
+        port_num="TEXT_MESSAGE_APP",
+        message_text="From other",
+        first_reported_time=rx_time,
+    )
+    PacketObservation.objects.create(
+        packet=packet_other,
+        observer=managed,
+        channel=channel,
+        rx_time=rx_time,
+        relay_node=None,
+    )
+
+    # Packet from self (direct, relay_node null)
+    packet_self = MessagePacket.objects.create(
+        packet_id=2,
+        from_int=555555555,
+        from_str="!211d91a7",
+        to_int=4294967295,
+        to_str="^all",
+        port_num="TEXT_MESSAGE_APP",
+        message_text="From self",
+        first_reported_time=rx_time,
+    )
+    PacketObservation.objects.create(
+        packet=packet_self,
+        observer=managed,
+        channel=channel,
+        rx_time=rx_time,
+        relay_node=None,
+    )
+
+    client = APIClient()
+    client.force_authenticate(user=user)
+
+    response = client.get(
+        reverse("stats:node-neighbour-stats", kwargs={"node_id": managed.node_id}),
+        {"start_date": "2025-01-01", "end_date": "2025-12-31"},
+    )
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data["total_packets"] == 1
+    assert len(response.data["by_source"]) == 1
+    assert response.data["by_source"][0]["source"] == 111111111

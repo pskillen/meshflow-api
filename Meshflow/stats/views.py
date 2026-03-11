@@ -324,18 +324,20 @@ def node_neighbour_stats(request, node_id: int):
         if end_date:
             observations = observations.filter(rx_time__lt=end_date)
 
-        by_source_rows = (
-            observations.values("source_node_id")
-            .annotate(count=Count("id"))
-            .order_by("-count")
+        # Exclude packets where the source is the node itself
+        observations = observations.exclude(
+            Q(relay_node__isnull=False, relay_node__gt=0, relay_node=node_id)
+            | Q(Q(relay_node__isnull=True) | Q(relay_node=0), packet__from_int=node_id)
         )
+
+        by_source_rows = observations.values("source_node_id").annotate(count=Count("id")).order_by("-count")
 
         by_source = []
         for row in by_source_rows:
             source_val = row["source_node_id"]
             count_val = row["count"]
 
-            if source_val is None:
+            if source_val is None or source_val == node_id:
                 continue
             if source_val <= 255:
                 source_type = "lsb"
@@ -351,9 +353,7 @@ def node_neighbour_stats(request, node_id: int):
             else:
                 source_type = "full"
                 try:
-                    obs = ObservedNode.objects.only("node_id", "node_id_str", "short_name").get(
-                        node_id=source_val
-                    )
+                    obs = ObservedNode.objects.only("node_id", "node_id_str", "short_name").get(node_id=source_val)
                     candidates = [
                         {
                             "node_id": obs.node_id,
@@ -379,7 +379,7 @@ def node_neighbour_stats(request, node_id: int):
                 }
             )
 
-        total_packets = sum(row["count"] for row in by_source_rows)
+        total_packets = sum(s["count"] for s in by_source)
 
         response_data = {
             "start_date": start_date,
