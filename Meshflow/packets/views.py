@@ -17,6 +17,7 @@ from packets.models import (
     NodeInfoPacket,
     PositionPacket,
     PowerMetricsPacket,
+    TraceroutePacket,
     TrafficManagementStatsPacket,
 )
 
@@ -33,6 +34,7 @@ from .signals import (
     packet_received,
     position_packet_received,
     power_metrics_packet_received,
+    traceroute_packet_received,
     traffic_management_stats_packet_received,
 )
 
@@ -137,6 +139,10 @@ class PacketIngestView(APIView):
                     )
                 elif isinstance(packet, TrafficManagementStatsPacket):
                     traffic_management_stats_packet_received.send(
+                        sender=self, packet=packet, observer=observer, observation=observation
+                    )
+                elif isinstance(packet, TraceroutePacket):
+                    traceroute_packet_received.send(
                         sender=self, packet=packet, observer=observer, observation=observation
                     )
 

@@ -226,3 +226,15 @@ Text message packets contain communication data:
 | pkiEncrypted    | boolean   | Encryption status      | true/false                |
 | nextHop         | integer   | Next hop node ID       | -                         |
 | relayNode       | integer   | Relay node ID          | -                         |
+
+### TRACEROUTE_APP
+
+Traceroute packets contain routing path information:
+
+| Field Name                    | Data Type | Description            | Notes                                      |
+|-------------------------------|-----------|------------------------|--------------------------------------------|
+| decoded.portnum               | string    | Packet type identifier | Always "TRACEROUTE_APP"                    |
+| decoded.traceroute.route      | array     | Path from source to dest | List of node IDs (integers)               |
+| decoded.traceroute.routeBack  | array     | Path from dest to source | List of node IDs (integers)              |
+
+In the response packet, `from` is the target node (responder), `to` is the source node (initiator).

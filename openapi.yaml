@@ -493,6 +493,32 @@ components:
                       type: object
                       description: See meshtastic/telemetry.proto TrafficManagementStats
 
+    TraceroutePacket:
+      allOf:
+        - $ref: '#/components/schemas/BaseIncomingPacket'
+        - type: object
+          description: TRACEROUTE_APP packet with route and routeBack
+          properties:
+            decoded:
+              type: object
+              properties:
+                portnum:
+                  type: string
+                  enum: [TRACEROUTE_APP]
+                traceroute:
+                  type: object
+                  properties:
+                    route:
+                      type: array
+                      description: List of node IDs, path from source to dest
+                      items:
+                        type: integer
+                    routeBack:
+                      type: array
+                      description: List of node IDs, path from dest back to source
+                      items:
+                        type: integer
+
     IncomingPacket:
       oneOf:
         - $ref: '#/components/schemas/TextMessagePacket'
@@ -506,6 +532,7 @@ components:
         - $ref: '#/components/schemas/HealthTelemetryPacket'
         - $ref: '#/components/schemas/HostTelemetryPacket'
         - $ref: '#/components/schemas/TrafficManagementStatsTelemetryPacket'
+        - $ref: '#/components/schemas/TraceroutePacket'
 
     Constellation:
       type: object

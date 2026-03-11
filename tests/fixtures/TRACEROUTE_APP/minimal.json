@@ -1,0 +1,20 @@
+{
+    "from": 1623194643,
+    "to": 123456789,
+    "decoded": {
+        "portnum": "TRACEROUTE_APP",
+        "traceroute": {
+            "route": [111111, 222222],
+            "routeBack": [222222, 111111]
+        }
+    },
+    "id": 987654321,
+    "rxTime": 1745330928,
+    "rxSnr": 6.25,
+    "hopLimit": 6,
+    "rxRssi": -44,
+    "hopStart": 6,
+    "relayNode": 13,
+    "fromId": "!60b0e093",
+    "toId": "!499602d"
+}
