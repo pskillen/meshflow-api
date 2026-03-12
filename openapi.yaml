@@ -583,6 +583,56 @@ components:
               snr:
                 type: number
                 nullable: true
+        route_nodes:
+          type: array
+          description: Enriched route with node details and position for map display
+          readOnly: true
+          items:
+            type: object
+            properties:
+              node_id:
+                type: integer
+              node_id_str:
+                type: string
+              short_name:
+                type: string
+                nullable: true
+              position:
+                type: object
+                nullable: true
+                properties:
+                  latitude:
+                    type: number
+                  longitude:
+                    type: number
+              snr:
+                type: number
+                nullable: true
+        route_back_nodes:
+          type: array
+          description: Enriched route_back with node details and position for map display
+          readOnly: true
+          items:
+            type: object
+            properties:
+              node_id:
+                type: integer
+              node_id_str:
+                type: string
+              short_name:
+                type: string
+                nullable: true
+              position:
+                type: object
+                nullable: true
+                properties:
+                  latitude:
+                    type: number
+                  longitude:
+                    type: number
+              snr:
+                type: number
+                nullable: true
         raw_packet:
           type: string
           format: uuid
