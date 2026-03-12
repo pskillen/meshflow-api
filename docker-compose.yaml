@@ -34,9 +34,10 @@ services:
   migrations:
     build:
       context: .
-      dockerfile: Dockerfile-migrations
+      dockerfile: Dockerfile
     container_name: meshflow-migrations
     restart: no
+    command: python manage.py migrate
     environment:
       DEBUG: true
       POSTGRES_DB: meshflow
