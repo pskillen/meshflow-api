@@ -1020,6 +1020,10 @@ components:
             map_color:
               type: string
               description: The color used for the constellation on maps
+        allow_auto_traceroute:
+          type: boolean
+          description: If true, this node may be used for auto-scheduled traceroutes and manual triggers
+          default: false
         position:
           type: object
           description: The latest known position of the node

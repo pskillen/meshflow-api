@@ -81,6 +81,11 @@ class ManagedNode(models.Model):
         "constellations.MessageChannel", on_delete=models.CASCADE, null=True, blank=True, related_name="+"
     )
 
+    allow_auto_traceroute = models.BooleanField(
+        default=False,
+        help_text=_("If True, this node may be used for auto-scheduled traceroutes and manual triggers."),
+    )
+
     class Meta:
         """Model metadata."""
 

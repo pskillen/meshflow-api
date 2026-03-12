@@ -16,6 +16,7 @@ from nodes.models import ManagedNode, ObservedNode
 from .models import AutoTraceRoute
 from .permissions import CanTriggerTraceroute
 from .serializers import AutoTraceRouteSerializer, TriggerTracerouteSerializer
+from .target_selection import pick_traceroute_target
 
 
 class TraceroutePagination(PageNumberPagination):
@@ -121,6 +122,12 @@ def traceroute_trigger(request):
             status=status.HTTP_404_NOT_FOUND,
         )
 
+    if not source_node.allow_auto_traceroute:
+        return Response(
+            {"detail": "This managed node does not allow traceroutes (allow_auto_traceroute is disabled)."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
     # Check constellation permission (CanTriggerTraceroute allows staff; for non-staff check membership)
     if not request.user.is_staff:
         has_perm = ConstellationUserMembership.objects.filter(
@@ -143,11 +150,10 @@ def traceroute_trigger(request):
                 status=status.HTTP_404_NOT_FOUND,
             )
     else:
-        # Auto-select target: pick a recently-heard node from the same mesh (simplified: any ObservedNode)
-        target_node = ObservedNode.objects.filter(last_heard__isnull=False).order_by("-last_heard").first()
+        target_node = pick_traceroute_target(source_node)
         if not target_node:
             return Response(
-                {"detail": "No ObservedNode available for auto-selection. Specify target_node_id."},
+                {"detail": "No ObservedNode available for auto-selection. " "Specify target_node_id."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 

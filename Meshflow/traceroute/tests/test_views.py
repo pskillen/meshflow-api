@@ -37,7 +37,11 @@ def editor_managed_node(editor_user, create_constellation, create_managed_node):
     """Managed node in a constellation where editor_user has editor role."""
     membership = ConstellationUserMembership.objects.filter(user=editor_user, role="editor").first()
     constellation = membership.constellation
-    return create_managed_node(owner=membership.constellation.created_by, constellation=constellation)
+    return create_managed_node(
+        owner=membership.constellation.created_by,
+        constellation=constellation,
+        allow_auto_traceroute=True,
+    )
 
 
 @pytest.fixture
@@ -146,3 +150,31 @@ class TestTracerouteTrigger:
         assert data["trigger_type"] == "user"
         assert data["status"] == "sent"
         assert AutoTraceRoute.objects.filter(id=data["id"]).exists()
+
+    def test_trigger_rejects_when_allow_auto_traceroute_disabled(
+        self,
+        api_client,
+        editor_user,
+        create_user,
+        create_managed_node,
+        create_observed_node,
+        create_constellation,
+    ):
+        """Trigger returns 400 when managed node has allow_auto_traceroute=False."""
+        creator = create_user()
+        constellation = create_constellation(created_by=creator)
+        ConstellationUserMembership.objects.create(user=editor_user, constellation=constellation, role="editor")
+        mn = create_managed_node(
+            owner=creator,
+            constellation=constellation,
+            allow_auto_traceroute=False,
+        )
+        on = create_observed_node()
+        api_client.force_authenticate(user=editor_user)
+        resp = api_client.post(
+            "/api/traceroutes/trigger/",
+            {"managed_node_id": mn.node_id, "target_node_id": on.node_id},
+            format="json",
+        )
+        assert resp.status_code == 400
+        assert "allow_auto_traceroute" in resp.json().get("detail", "").lower()

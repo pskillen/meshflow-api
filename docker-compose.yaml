@@ -2,6 +2,14 @@
 name: meshflow
 
 services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    networks:
+      - meshflow_net
+
   postgres:
     image: postgres:17-alpine
     restart: unless-stopped
@@ -55,12 +63,67 @@ services:
       POSTGRES_PASSWORD: meshflow
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      CELERY_BROKER_URL: redis://redis:6379/1
       ALLOWED_HOSTS: meshflow-manager
     ports:
       - "8000:8000"
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - meshflow_net
+
+  celery-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: meshflow-celery-worker
+    restart: unless-stopped
+    command: celery -A Meshflow worker -l info
+    environment:
+      DEBUG: true
+      POSTGRES_DB: meshflow
+      POSTGRES_USER: meshflow
+      POSTGRES_PASSWORD: meshflow
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      CELERY_BROKER_URL: redis://redis:6379/1
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - meshflow_net
+
+  celery-beat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: meshflow-celery-beat
+    restart: unless-stopped
+    command: celery -A Meshflow beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    environment:
+      DEBUG: true
+      POSTGRES_DB: meshflow
+      POSTGRES_USER: meshflow
+      POSTGRES_PASSWORD: meshflow
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      CELERY_BROKER_URL: redis://redis:6379/1
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
     networks:
       - meshflow_net
 

@@ -76,6 +76,7 @@ INSTALLED_APPS = [
     "text_messages",
     "traceroute",
     "ws",
+    "django_celery_beat",
 ]
 
 MIDDLEWARE = [
@@ -126,6 +127,12 @@ CHANNEL_LAYERS = {
         },
     },
 }
+
+# Celery (use Redis DB 1 for broker; channels use DB 0)
+_celery_broker_url = f"redis://:{_redis_password}@{_redis_host}:{_redis_port}/1"
+CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", _celery_broker_url)
+CELERY_RESULT_BACKEND = CELERY_BROKER_URL
+CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
 
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases

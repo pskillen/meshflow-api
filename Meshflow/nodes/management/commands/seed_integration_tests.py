@@ -90,6 +90,7 @@ class Command(BaseCommand):
                 "name": "Integration Test Observer",
                 "channel_0": ch0,
                 "channel_1": ch1,
+                "allow_auto_traceroute": True,
             },
         )
         if mn_created:
@@ -97,6 +98,7 @@ class Command(BaseCommand):
         else:
             managed_node.owner = user
             managed_node.constellation = constellation
+            managed_node.allow_auto_traceroute = True
             managed_node.save()
 
         managed_node_2, mn2_created = ManagedNode.objects.get_or_create(
@@ -107,6 +109,7 @@ class Command(BaseCommand):
                 "name": "Integration Test Observer 2",
                 "channel_0": ch0,
                 "channel_1": ch1,
+                "allow_auto_traceroute": True,
             },
         )
         if mn2_created:
@@ -114,6 +117,7 @@ class Command(BaseCommand):
         else:
             managed_node_2.owner = user
             managed_node_2.constellation = constellation
+            managed_node_2.allow_auto_traceroute = True
             managed_node_2.save()
 
         api_key, ak_created = NodeAPIKey.objects.update_or_create(
