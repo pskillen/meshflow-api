@@ -69,6 +69,15 @@ class TestTracerouteList:
         assert "results" in resp.json()
         assert resp.json()["count"] >= 1
 
+    def test_list_status_comma_separated(self, api_client, create_user, create_auto_traceroute):
+        """status param accepts comma-separated values."""
+        user = create_user()
+        api_client.force_authenticate(user=user)
+        create_auto_traceroute(triggered_by=user, status=AutoTraceRoute.STATUS_COMPLETED)
+        resp = api_client.get("/api/traceroutes/?status=completed,pending,sent")
+        assert resp.status_code == 200
+        assert "results" in resp.json()
+
 
 @pytest.mark.django_db
 class TestTracerouteDetail:

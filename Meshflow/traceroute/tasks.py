@@ -2,6 +2,9 @@
 
 import logging
 import random
+from datetime import timedelta
+
+from django.utils import timezone
 
 from asgiref.sync import async_to_sync
 from celery import shared_task
@@ -11,8 +14,11 @@ from nodes.models import ManagedNode
 
 from .models import AutoTraceRoute
 from .target_selection import pick_traceroute_target
+from .ws_notify import notify_traceroute_status_changed
 
 logger = logging.getLogger(__name__)
+
+STALE_TR_TIMEOUT_SECONDS = 180
 
 
 @shared_task
@@ -60,3 +66,29 @@ def schedule_traceroutes():
     )
 
     return {"created": 1}
+
+
+@shared_task
+def mark_stale_traceroutes_failed():
+    """
+    Run every 60 seconds. Mark traceroutes still pending/sent after 180s as failed.
+    Broadcast each update to WebSocket clients.
+    """
+    cutoff = timezone.now() - timedelta(seconds=STALE_TR_TIMEOUT_SECONDS)
+    stale = AutoTraceRoute.objects.filter(
+        status__in=[AutoTraceRoute.STATUS_PENDING, AutoTraceRoute.STATUS_SENT],
+        triggered_at__lt=cutoff,
+    )
+    updated = 0
+    for auto_tr in stale:
+        auto_tr.status = AutoTraceRoute.STATUS_FAILED
+        auto_tr.completed_at = timezone.now()
+        auto_tr.error_message = "Timed out after 180s"
+        auto_tr.save(update_fields=["status", "completed_at", "error_message"])
+        notify_traceroute_status_changed(auto_tr.id, AutoTraceRoute.STATUS_FAILED)
+        updated += 1
+        logger.info(
+            "mark_stale_traceroutes_failed: TR id=%s marked failed (timed out)",
+            auto_tr.id,
+        )
+    return {"updated": updated}

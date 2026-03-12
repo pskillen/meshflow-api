@@ -192,4 +192,8 @@ def on_traceroute_packet_received(sender, packet: TraceroutePacket, observer, ob
     auto_tr.raw_packet = packet
     auto_tr.completed_at = timezone.now()
     auto_tr.save(update_fields=["status", "route", "route_back", "raw_packet", "completed_at"])
+
+    from traceroute.ws_notify import notify_traceroute_status_changed
+
+    notify_traceroute_status_changed(auto_tr.id, AutoTraceRoute.STATUS_COMPLETED)
     logger.info(f"Linked TraceroutePacket {packet.id} to AutoTraceRoute {auto_tr.id}")

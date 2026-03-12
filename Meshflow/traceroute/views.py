@@ -59,7 +59,9 @@ def traceroute_list(request):
 
     status_filter = request.query_params.get("status")
     if status_filter:
-        qs = qs.filter(status=status_filter)
+        statuses = [s.strip() for s in status_filter.split(",") if s.strip()]
+        if statuses:
+            qs = qs.filter(status__in=statuses)
 
     trigger_type = request.query_params.get("trigger_type")
     if trigger_type:

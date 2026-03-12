@@ -86,6 +86,7 @@ class AutoTraceRoute(models.Model):
             models.Index(fields=["target_node"]),
             models.Index(fields=["triggered_at"]),
             models.Index(fields=["status"]),
+            models.Index(fields=["status", "triggered_at"]),
         ]
         permissions = [
             ("trigger_traceroute", "Can trigger traceroute commands"),
