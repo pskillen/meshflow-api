@@ -1,5 +1,12 @@
 from .base import *  # noqa
 
+# Use in-memory channel layer for testing (no Redis required)
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels.layers.InMemoryChannelLayer",
+    },
+}
+
 # Use SQLite for testing
 DATABASES = {
     "default": {

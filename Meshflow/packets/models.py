@@ -280,6 +280,14 @@ class TraceroutePacket(RawPacket):
 
     route = models.JSONField(default=list, help_text="List of node_ids, path from source to dest")
     route_back = models.JSONField(default=list, help_text="List of node_ids, path from dest back to source")
+    snr_towards = models.JSONField(
+        default=list,
+        help_text="SNR (dB) per hop for forward path. Scaled by 4 in protocol; stored as dB.",
+    )
+    snr_back = models.JSONField(
+        default=list,
+        help_text="SNR (dB) per hop for return path. Scaled by 4 in protocol; stored as dB.",
+    )
 
     class Meta:
         verbose_name = _("Traceroute packet")

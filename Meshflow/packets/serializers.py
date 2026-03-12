@@ -1092,13 +1092,35 @@ class TraceroutePacketSerializer(BasePacketSerializer):
         """Flatten decoded traceroute data."""
         validated_data = super().to_internal_value(data)
 
-        # Flatten the nested traceroute data (Meshtastic uses route and routeBack)
+        # Flatten the nested traceroute data (Meshtastic uses route, routeBack, snrTowards, snrBack)
         if "decoded" in data and "traceroute" in data["decoded"]:
             traceroute_data = data["decoded"]["traceroute"]
             validated_data["route"] = traceroute_data.get("route", []) or []
             validated_data["route_back"] = traceroute_data.get("route_back", traceroute_data.get("routeBack", [])) or []
+            # SNR values are scaled by 4 in protocol; convert to dB. -128 = unknown (omit or use None)
+            validated_data["snr_towards"] = self._parse_snr_list(
+                traceroute_data.get("snrTowards", traceroute_data.get("snr_towards", []))
+            )
+            validated_data["snr_back"] = self._parse_snr_list(
+                traceroute_data.get("snrBack", traceroute_data.get("snr_back", []))
+            )
 
         return validated_data
+
+    def _parse_snr_list(self, raw):
+        """Convert protocol SNR values (scaled by 4) to dB. -128 = unknown -> None."""
+        if not raw:
+            return []
+        result = []
+        for v in raw:
+            if v is None or (isinstance(v, (int, float)) and v <= -128):
+                result.append(None)  # Unknown
+            else:
+                try:
+                    result.append(float(v) / 4.0)
+                except TypeError, ValueError:
+                    result.append(None)
+        return result
 
     def create(self, validated_data):
         """Create a new TraceroutePacket instance."""
@@ -1121,6 +1143,8 @@ class TraceroutePacketSerializer(BasePacketSerializer):
             first_reported_time=validated_data.get("first_reported_time", validated_data.get("rx_time")),
             route=validated_data.get("route", []),
             route_back=validated_data.get("route_back", []),
+            snr_towards=validated_data.get("snr_towards", []),
+            snr_back=validated_data.get("snr_back", []),
         )
 
         self._create_observation(packet, validated_data)
