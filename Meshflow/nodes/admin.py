@@ -279,10 +279,12 @@ class ManagedNodeAdmin(admin.ModelAdmin):
         "name",
         "owner",
         "constellation",
+        "allow_auto_traceroute",
     )
     list_filter = (
         "owner",
         "constellation",
+        "allow_auto_traceroute",
     )
     search_fields = (
         "node_id",
@@ -298,6 +300,7 @@ class ManagedNodeAdmin(admin.ModelAdmin):
             "name",
             "owner",
             "constellation",
+            "allow_auto_traceroute",
             "latlong",
             "channel_0",
             "channel_1",

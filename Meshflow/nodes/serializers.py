@@ -197,6 +197,7 @@ class ManagedNodeSerializer(serializers.ModelSerializer):
             "owner",
             "constellation_id",
             "constellation",
+            "allow_auto_traceroute",
             "position",
             "device_metrics",
             "latest_environment_metrics",

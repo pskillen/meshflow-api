@@ -1,5 +1,7 @@
 from django.contrib import admin
 
+import django_celery_beat.admin  # noqa: F401 - register PeriodicTask, CrontabSchedule, etc.
+
 from .models import AutoTraceRoute
 
 
