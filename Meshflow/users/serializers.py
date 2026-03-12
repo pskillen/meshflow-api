@@ -6,14 +6,14 @@ from .models import User
 
 
 class UserSerializer(serializers.ModelSerializer):
-    """Serializer for users."""
+    """Serializer for users. Used for /api/auth/user/ and registration."""
 
     password = serializers.CharField(write_only=True, required=True)
 
     class Meta:
         model = User
-        fields = ["id", "username", "email", "display_name", "password"]
-        read_only_fields = ["id"]
+        fields = ["id", "username", "email", "display_name", "is_staff", "password"]
+        read_only_fields = ["id", "is_staff"]
 
     def create(self, validated_data):
         """Create and return a new user."""

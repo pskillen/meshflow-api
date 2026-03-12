@@ -22,6 +22,8 @@ tags:
     description: Send and retrieve text messages between nodes
   - name: WebSocket
     description: WebSocket endpoints for real-time node commands
+  - name: Traceroutes
+    description: Traceroute history and manual triggering
 
 components:
   parameters:
@@ -530,6 +532,118 @@ components:
                       description: SNR per hop for return path (scaled by 4 in protocol)
                       items:
                         type: number
+
+    AutoTraceRoute:
+      type: object
+      description: A traceroute request (manual or auto) and its result
+      properties:
+        id:
+          type: integer
+        source_node:
+          $ref: '#/components/schemas/ManagedNodeRead'
+        target_node:
+          $ref: '#/components/schemas/ObservedNode'
+        trigger_type:
+          type: string
+          enum: [auto, user]
+        triggered_by:
+          type: integer
+          nullable: true
+        triggered_by_username:
+          type: string
+          nullable: true
+        trigger_source:
+          type: string
+          nullable: true
+        triggered_at:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [pending, sent, completed, failed]
+        route:
+          type: array
+          nullable: true
+          items:
+            type: object
+            properties:
+              node_id:
+                type: integer
+              snr:
+                type: number
+                nullable: true
+        route_back:
+          type: array
+          nullable: true
+          items:
+            type: object
+            properties:
+              node_id:
+                type: integer
+              snr:
+                type: number
+                nullable: true
+        route_nodes:
+          type: array
+          description: Enriched route with node details and position for map display
+          readOnly: true
+          items:
+            type: object
+            properties:
+              node_id:
+                type: integer
+              node_id_str:
+                type: string
+              short_name:
+                type: string
+                nullable: true
+              position:
+                type: object
+                nullable: true
+                properties:
+                  latitude:
+                    type: number
+                  longitude:
+                    type: number
+              snr:
+                type: number
+                nullable: true
+        route_back_nodes:
+          type: array
+          description: Enriched route_back with node details and position for map display
+          readOnly: true
+          items:
+            type: object
+            properties:
+              node_id:
+                type: integer
+              node_id_str:
+                type: string
+              short_name:
+                type: string
+                nullable: true
+              position:
+                type: object
+                nullable: true
+                properties:
+                  latitude:
+                    type: number
+                  longitude:
+                    type: number
+              snr:
+                type: number
+                nullable: true
+        raw_packet:
+          type: string
+          format: uuid
+          nullable: true
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+        error_message:
+          type: string
+          nullable: true
 
     IncomingPacket:
       oneOf:
@@ -3118,6 +3232,153 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+
+  /traceroutes/:
+    get:
+      summary: List traceroutes
+      description: List AutoTraceRoute records with optional filters. All authenticated users.
+      tags: [Traceroutes]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: managed_node
+          in: query
+          required: false
+          schema:
+            type: integer
+            description: Filter by source ManagedNode node_id
+        - name: source_node
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: target_node
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [pending, sent, completed, failed]
+        - name: trigger_type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [auto, user]
+        - name: triggered_after
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: triggered_before
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - $ref: '#/components/parameters/PaginationPage'
+        - $ref: '#/components/parameters/PaginationPageSize'
+      responses:
+        '200':
+          description: Paginated list of traceroutes
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                  next:
+                    type: string
+                    nullable: true
+                  previous:
+                    type: string
+                    nullable: true
+                  results:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AutoTraceRoute'
+
+  /traceroutes/can_trigger/:
+    get:
+      summary: Check if user can trigger traceroutes
+      description: Returns whether the current user has permission to trigger traceroutes.
+      tags: [Traceroutes]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Permission check result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  can_trigger:
+                    type: boolean
+
+  /traceroutes/trigger/:
+    post:
+      summary: Trigger a traceroute
+      description: Manually trigger a traceroute. Admin/editor only.
+      tags: [Traceroutes]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - managed_node_id
+              properties:
+                managed_node_id:
+                  type: integer
+                  description: Node ID of the ManagedNode (source/bot)
+                target_node_id:
+                  type: integer
+                  description: Target ObservedNode node_id (optional for auto-selection)
+                  nullable: true
+      responses:
+        '201':
+          description: Traceroute triggered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AutoTraceRoute'
+        '403':
+          description: Forbidden
+        '404':
+          description: ManagedNode or ObservedNode not found
+
+  /traceroutes/{id}/:
+    get:
+      summary: Get traceroute detail
+      description: Get a single AutoTraceRoute by ID.
+      tags: [Traceroutes]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Traceroute detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AutoTraceRoute'
+        '404':
+          description: Not found
 
   /nodes/claims/mine/:
     get:

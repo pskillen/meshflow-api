@@ -74,6 +74,7 @@ INSTALLED_APPS = [
     "nodes",
     "packets",
     "text_messages",
+    "traceroute",
     "ws",
 ]
 
