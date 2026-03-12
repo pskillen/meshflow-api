@@ -144,7 +144,12 @@ def traceroute_trigger(request):
             )
     else:
         # Auto-select target: pick a recently-heard node from the same mesh (simplified: any ObservedNode)
-        target_node = ObservedNode.objects.filter(last_heard__isnull=False).order_by("-last_heard").first()
+        # exclude the source node to avoid sending traceroutes to the same node
+        target_node = ObservedNode.objects \
+            .filter(last_heard__isnull=False) \
+            .exclude(node_id=source_node.node_id) \
+            .order_by("-last_heard") \
+            .first()
         if not target_node:
             return Response(
                 {"detail": "No ObservedNode available for auto-selection. Specify target_node_id."},
