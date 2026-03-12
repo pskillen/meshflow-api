@@ -20,6 +20,8 @@ tags:
     description: Node and API key management endpoints
   - name: Text Messages
     description: Send and retrieve text messages between nodes
+  - name: WebSocket
+    description: WebSocket endpoints for real-time node commands
 
 components:
   parameters:
@@ -3297,9 +3299,55 @@ paths:
           console.log('New message:', message);
         };
         ```
-      tags: [Text Messages]
+      tags: [Text Messages, WebSocket]
       security:
         - BearerAuth: []
+      responses:
+        '101':
+          description: WebSocket connection established
+
+  /ws/nodes/:
+    get:
+      summary: WebSocket connection for node commands (e.g. traceroute)
+      description: |
+        This endpoint provides a WebSocket connection for ManagedNode bots to receive
+        commands from the server (e.g. traceroute requests). Used by meshtastic-bot when
+        configured with a storage API and NodeAPIKey.
+
+        ## Connection
+        Connect using the WebSocket protocol with NodeAPIKey as a query parameter:
+        ```
+        ws://{host}/ws/nodes/?api_key={node_api_key}
+        ```
+
+        Authentication uses the same NodeAPIKey as packet ingest (X-API-Key header).
+        For WebSocket, the key must be passed as the `api_key` query parameter.
+
+        ## Commands
+        The server pushes JSON commands to the client. Supported command types:
+
+        - **traceroute**: `{"type": "traceroute", "target": <node_id>}` — requests the bot
+          to run sendTraceRoute to the target node. TRACEROUTE_APP responses are uploaded
+          via the packet ingest API.
+
+        ## Example
+        ```javascript
+        const socket = new WebSocket(`ws://example.com/ws/nodes/?api_key=${nodeApiKey}`);
+        socket.onmessage = (event) => {
+          const cmd = JSON.parse(event.data);
+          if (cmd.type === 'traceroute') {
+            console.log('Traceroute to:', cmd.target);
+          }
+        };
+        ```
+      tags: [WebSocket]
+      parameters:
+        - name: api_key
+          in: query
+          required: true
+          schema:
+            type: string
+            description: NodeAPIKey for authentication (same key used for packet ingest)
       responses:
         '101':
           description: WebSocket connection established
