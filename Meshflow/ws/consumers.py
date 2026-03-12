@@ -47,7 +47,9 @@ class NodeConsumer(AsyncWebsocketConsumer):
     async def disconnect(self, close_code):
         if hasattr(self, "node_group"):
             await self.channel_layer.group_discard(self.node_group, self.channel_name)
-        logger.info(f"NodeConsumer: bot disconnected for node " f"{getattr(self.managed_node, 'node_id', 'unknown')}")
+        managed_node = getattr(self, "managed_node", None)
+        node_id = getattr(managed_node, "node_id", "unknown") if managed_node else "unknown"
+        logger.info(f"NodeConsumer: bot disconnected for node {node_id}")
 
     async def receive(self, text_data):
         pass
