@@ -1,6 +1,7 @@
 import logging
 
 from django.dispatch import receiver
+from django.utils import timezone
 
 from nodes.models import ObservedNode
 
@@ -148,7 +149,47 @@ def on_traffic_management_stats_packet_received(
 
 @receiver(traceroute_packet_received)
 def on_traceroute_packet_received(
-    sender, packet: TraceroutePacket, observer: ObservedNode, observation: PacketObservation, **kwargs
+    sender, packet: TraceroutePacket, observer, observation: PacketObservation, **kwargs
 ):
-    """Handle a traceroute packet received signal. Packet is stored by serializer; no service."""
+    """Handle a traceroute packet received signal. Link to pending AutoTraceRoute if match."""
     logger.info(f"Traceroute packet received: {packet.id}")
+
+    from traceroute.models import AutoTraceRoute
+
+    # observer is ManagedNode (from PacketObservation)
+    source_node = observer
+    target_node_id = packet.from_int  # TR response: from = target (who sent the response)
+    cutoff = timezone.now() - timezone.timedelta(seconds=120)
+
+    auto_tr = (
+        AutoTraceRoute.objects.filter(
+            source_node=source_node,
+            target_node__node_id=target_node_id,
+            triggered_at__gte=cutoff,
+            status__in=[AutoTraceRoute.STATUS_PENDING, AutoTraceRoute.STATUS_SENT],
+        )
+        .order_by("-triggered_at")
+        .first()
+    )
+
+    if not auto_tr:
+        logger.warning(f"No AutoTraceRoute found for packet {packet.id} from {source_node.node_id_str} to {target_node_id}")
+        return
+
+    # Build route/route_back with SNR: TraceroutePacket has route, route_back (node_ids) and snr_towards, snr_back
+    route = []
+    for i, nid in enumerate(packet.route):
+        snr = packet.snr_towards[i] if i < len(packet.snr_towards) else None
+        route.append({"node_id": nid, "snr": snr})
+    route_back = []
+    for i, nid in enumerate(packet.route_back):
+        snr = packet.snr_back[i] if i < len(packet.snr_back) else None
+        route_back.append({"node_id": nid, "snr": snr})
+
+    auto_tr.status = AutoTraceRoute.STATUS_COMPLETED
+    auto_tr.route = route
+    auto_tr.route_back = route_back
+    auto_tr.raw_packet = packet
+    auto_tr.completed_at = timezone.now()
+    auto_tr.save(update_fields=["status", "route", "route_back", "raw_packet", "completed_at"])
+    logger.info(f"Linked TraceroutePacket {packet.id} to AutoTraceRoute {auto_tr.id}")
