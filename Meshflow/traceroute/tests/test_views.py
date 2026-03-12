@@ -3,10 +3,10 @@
 import pytest
 from rest_framework.test import APIClient
 
+import nodes.tests.conftest  # noqa: F401 - load fixtures
+import users.tests.conftest  # noqa: F401 - load fixtures
 from constellations.models import ConstellationUserMembership
-from nodes.tests.conftest import create_managed_node, create_observed_node
 from traceroute.models import AutoTraceRoute
-from users.tests.conftest import create_user
 
 
 @pytest.fixture
@@ -130,9 +130,7 @@ class TestTracerouteTrigger:
         )
         assert resp.status_code == 403
 
-    def test_trigger_creates_auto_traceroute(
-        self, api_client, editor_user, editor_managed_node, create_observed_node
-    ):
+    def test_trigger_creates_auto_traceroute(self, api_client, editor_user, editor_managed_node, create_observed_node):
         mn = editor_managed_node
         on = create_observed_node()
         api_client.force_authenticate(user=editor_user)

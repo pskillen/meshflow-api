@@ -1,13 +1,12 @@
 import pytest
 
-from constellations.models import ConstellationUserMembership
-from nodes.tests.conftest import create_managed_node, create_observed_node  # noqa: F401
+import nodes.tests.conftest  # noqa: F401 - load fixtures
+import users.tests.conftest  # noqa: F401 - load fixtures
 from traceroute.models import AutoTraceRoute
-from users.tests.conftest import create_user  # noqa: F401
 
 
 @pytest.fixture
-def create_auto_traceroute(create_managed_node, create_observed_node, create_user):  # noqa: F811
+def create_auto_traceroute(create_managed_node, create_observed_node, create_user):
     def make_auto_traceroute(**kwargs):
         if "source_node" not in kwargs:
             kwargs["source_node"] = create_managed_node()

@@ -1,10 +1,8 @@
 """Views for traceroute list, detail, and trigger."""
 
-from asgiref.sync import async_to_sync
-
-from django.utils import timezone
 from django.shortcuts import get_object_or_404
 
+from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
@@ -30,16 +28,16 @@ class TraceroutePagination(PageNumberPagination):
 @permission_classes([IsAuthenticated])
 def traceroute_list(request):
     """List AutoTraceRoute with filters. All authenticated users."""
-    qs = AutoTraceRoute.objects.select_related(
-        "source_node", "target_node", "triggered_by", "raw_packet"
-    ).order_by("-triggered_at")
+    qs = AutoTraceRoute.objects.select_related("source_node", "target_node", "triggered_by", "raw_packet").order_by(
+        "-triggered_at"
+    )
 
     managed_node = request.query_params.get("managed_node")
     if managed_node:
         try:
             mn = ManagedNode.objects.get(node_id=int(managed_node))
             qs = qs.filter(source_node=mn)
-        except (ValueError, ManagedNode.DoesNotExist):
+        except ValueError, ManagedNode.DoesNotExist:
             pass
 
     source_node = request.query_params.get("source_node")
@@ -47,7 +45,7 @@ def traceroute_list(request):
         try:
             mn = ManagedNode.objects.get(node_id=int(source_node))
             qs = qs.filter(source_node=mn)
-        except (ValueError, ManagedNode.DoesNotExist):
+        except ValueError, ManagedNode.DoesNotExist:
             pass
 
     target_node = request.query_params.get("target_node")
@@ -55,7 +53,7 @@ def traceroute_list(request):
         try:
             on = ObservedNode.objects.get(node_id=int(target_node))
             qs = qs.filter(target_node=on)
-        except (ValueError, ObservedNode.DoesNotExist):
+        except ValueError, ObservedNode.DoesNotExist:
             pass
 
     status_filter = request.query_params.get("status")
@@ -70,20 +68,22 @@ def traceroute_list(request):
     if triggered_after:
         try:
             from django.utils.dateparse import parse_datetime
+
             dt = parse_datetime(triggered_after)
             if dt:
                 qs = qs.filter(triggered_at__gte=dt)
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             pass
 
     triggered_before = request.query_params.get("triggered_before")
     if triggered_before:
         try:
             from django.utils.dateparse import parse_datetime
+
             dt = parse_datetime(triggered_before)
             if dt:
                 qs = qs.filter(triggered_at__lte=dt)
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             pass
 
     paginator = TraceroutePagination()
@@ -96,7 +96,9 @@ def traceroute_list(request):
 @permission_classes([IsAuthenticated])
 def traceroute_detail(request, pk):
     """Single AutoTraceRoute. All authenticated users."""
-    obj = get_object_or_404(AutoTraceRoute.objects.select_related("source_node", "target_node", "triggered_by", "raw_packet"), pk=pk)
+    obj = get_object_or_404(
+        AutoTraceRoute.objects.select_related("source_node", "target_node", "triggered_by", "raw_packet"), pk=pk
+    )
     serializer = AutoTraceRouteSerializer(obj)
     return Response(serializer.data)
 
@@ -176,8 +178,11 @@ def traceroute_trigger(request):
 @permission_classes([IsAuthenticated])
 def traceroute_can_trigger(request):
     """Returns whether the current user can trigger traceroutes."""
-    can = request.user.is_staff or ConstellationUserMembership.objects.filter(
-        user=request.user,
-        role__in=["admin", "editor"],
-    ).exists()
+    can = (
+        request.user.is_staff
+        or ConstellationUserMembership.objects.filter(
+            user=request.user,
+            role__in=["admin", "editor"],
+        ).exists()
+    )
     return Response({"can_trigger": can})

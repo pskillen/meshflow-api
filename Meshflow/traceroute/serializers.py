@@ -28,42 +28,47 @@ def _enrich_route_nodes(route_data):
     node_ids = [item["node_id"] for item in route_data]
     # Bulk fetch ObservedNodes with latest_status
     observed_by_id = {
-        o.node_id: o
-        for o in ObservedNode.objects.filter(node_id__in=node_ids).select_related("latest_status")
+        o.node_id: o for o in ObservedNode.objects.filter(node_id__in=node_ids).select_related("latest_status")
     }
     result = []
     for item in route_data:
         nid = item["node_id"]
         snr = item.get("snr")
         if nid == UNKNOWN_NODE_ID:
-            result.append({
-                "node_id": nid,
-                "node_id_str": "!ffffffff",
-                "short_name": "unknown",
-                "position": None,
-                "snr": snr,
-            })
+            result.append(
+                {
+                    "node_id": nid,
+                    "node_id_str": "!ffffffff",
+                    "short_name": "unknown",
+                    "position": None,
+                    "snr": snr,
+                }
+            )
             continue
         obs = observed_by_id.get(nid)
         if obs:
             pos = None
             if obs.latest_status and obs.latest_status.latitude is not None and obs.latest_status.longitude is not None:
                 pos = {"latitude": obs.latest_status.latitude, "longitude": obs.latest_status.longitude}
-            result.append({
-                "node_id": obs.node_id,
-                "node_id_str": obs.node_id_str,
-                "short_name": obs.short_name,
-                "position": pos,
-                "snr": snr,
-            })
+            result.append(
+                {
+                    "node_id": obs.node_id,
+                    "node_id_str": obs.node_id_str,
+                    "short_name": obs.short_name,
+                    "position": pos,
+                    "snr": snr,
+                }
+            )
         else:
-            result.append({
-                "node_id": nid,
-                "node_id_str": meshtastic_id_to_hex(nid),
-                "short_name": None,
-                "position": None,
-                "snr": snr,
-            })
+            result.append(
+                {
+                    "node_id": nid,
+                    "node_id_str": meshtastic_id_to_hex(nid),
+                    "short_name": None,
+                    "position": None,
+                    "snr": snr,
+                }
+            )
     return result
 
 
@@ -109,4 +114,6 @@ class TriggerTracerouteSerializer(serializers.Serializer):
     """Serializer for POST /api/traceroutes/trigger/."""
 
     managed_node_id = serializers.IntegerField(help_text="Node ID of the ManagedNode (source/bot)")
-    target_node_id = serializers.IntegerField(required=False, allow_null=True, help_text="Target ObservedNode node_id (optional for auto)")
+    target_node_id = serializers.IntegerField(
+        required=False, allow_null=True, help_text="Target ObservedNode node_id (optional for auto)"
+    )

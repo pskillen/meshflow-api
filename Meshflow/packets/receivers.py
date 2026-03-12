@@ -148,9 +148,7 @@ def on_traffic_management_stats_packet_received(
 
 
 @receiver(traceroute_packet_received)
-def on_traceroute_packet_received(
-    sender, packet: TraceroutePacket, observer, observation: PacketObservation, **kwargs
-):
+def on_traceroute_packet_received(sender, packet: TraceroutePacket, observer, observation: PacketObservation, **kwargs):
     """Handle a traceroute packet received signal. Link to pending AutoTraceRoute if match."""
     logger.info(f"Traceroute packet received: {packet.id}")
 
@@ -173,7 +171,9 @@ def on_traceroute_packet_received(
     )
 
     if not auto_tr:
-        logger.warning(f"No AutoTraceRoute found for packet {packet.id} from {source_node.node_id_str} to {target_node_id}")
+        logger.warning(
+            f"No AutoTraceRoute found for packet {packet.id} from {source_node.node_id_str} to {target_node_id}"
+        )
         return
 
     # Build route/route_back with SNR: TraceroutePacket has route, route_back (node_ids) and snr_towards, snr_back
