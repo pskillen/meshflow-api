@@ -5,7 +5,9 @@
         "portnum": "TRACEROUTE_APP",
         "traceroute": {
             "route": [111111, 222222],
-            "routeBack": [222222, 111111]
+            "routeBack": [222222, 111111],
+            "snrTowards": [18, -12],
+            "snrBack": [8]
         }
     },
     "id": 987654321,

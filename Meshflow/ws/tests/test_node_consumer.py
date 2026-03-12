@@ -48,7 +48,6 @@ async def test_node_consumer_accepts_valid_api_key(create_node_auth):
 async def test_node_consumer_receives_traceroute_command(create_node_auth):
     """When channel layer sends node_command, client receives the command JSON."""
     from channels.layers import get_channel_layer
-    from channels.db import database_sync_to_async
 
     node_auth = create_node_auth()
     api_key = node_auth.api_key.key

@@ -5,9 +5,10 @@ The bot must be connected to the WebSocket (ws/nodes/) and linked to the given
 ManagedNode via NodeAPIKey. Use this to manually trigger a traceroute for testing.
 """
 
+from django.core.management.base import BaseCommand
+
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
-from django.core.management.base import BaseCommand
 
 from nodes.models import ManagedNode, NodeAuth
 
@@ -40,19 +41,13 @@ class Command(BaseCommand):
         if api_key:
             node_auth = NodeAuth.objects.filter(api_key__key=api_key).select_related("node").first()
             if not node_auth:
-                self.stderr.write(
-                    self.style.ERROR("No NodeAuth found for API key (key may be invalid)")
-                )
+                self.stderr.write(self.style.ERROR("No NodeAuth found for API key (key may be invalid)"))
                 return
             managed_node_id = node_auth.node.node_id
             self.stdout.write(f"Resolved managed_node_id={managed_node_id} from API key")
 
         if managed_node_id is None:
-            self.stderr.write(
-                self.style.ERROR(
-                    "Provide --managed-node-id or --by-api-key to identify the bot"
-                )
-            )
+            self.stderr.write(self.style.ERROR("Provide --managed-node-id or --by-api-key to identify the bot"))
             return
 
         if not ManagedNode.objects.filter(node_id=managed_node_id).exists():
@@ -71,10 +66,7 @@ class Command(BaseCommand):
         )
 
         self.stdout.write(
-            self.style.SUCCESS(
-                f"Sent traceroute command to group node_{managed_node_id}: "
-                f"target={target_node_id}"
-            )
+            self.style.SUCCESS(f"Sent traceroute command to group node_{managed_node_id}: " f"target={target_node_id}")
         )
         self.stdout.write(
             "Tip: If the bot did not receive it, ensure managed_node_id matches the "

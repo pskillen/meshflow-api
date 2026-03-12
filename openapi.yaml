@@ -520,6 +520,16 @@ components:
                       description: List of node IDs, path from dest back to source
                       items:
                         type: integer
+                    snrTowards:
+                      type: array
+                      description: SNR per hop for forward path (scaled by 4 in protocol)
+                      items:
+                        type: number
+                    snrBack:
+                      type: array
+                      description: SNR per hop for return path (scaled by 4 in protocol)
+                      items:
+                        type: number
 
     IncomingPacket:
       oneOf:

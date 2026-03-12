@@ -2,10 +2,10 @@ import json
 import logging
 
 from django.contrib.auth.models import AnonymousUser
+from django.utils import timezone
 
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
-from django.utils import timezone
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from rest_framework_simplejwt.tokens import AccessToken
 
@@ -47,10 +47,7 @@ class NodeConsumer(AsyncWebsocketConsumer):
     async def disconnect(self, close_code):
         if hasattr(self, "node_group"):
             await self.channel_layer.group_discard(self.node_group, self.channel_name)
-        logger.info(
-            f"NodeConsumer: bot disconnected for node "
-            f"{getattr(self.managed_node, 'node_id', 'unknown')}"
-        )
+        logger.info(f"NodeConsumer: bot disconnected for node " f"{getattr(self.managed_node, 'node_id', 'unknown')}")
 
     async def receive(self, text_data):
         pass
