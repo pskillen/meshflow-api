@@ -15,7 +15,10 @@
                 "--port", "8000"
             ],
             "cwd": "${workspaceFolder}/Meshflow",
-            "python": "${workspaceFolder}/venv/bin/python"
+            "python": "${workspaceFolder}/venv/bin/python",
+            "env": {
+                "DJANGO_SETTINGS_MODULE": "Meshflow.settings.monolith"
+            }
         },
         {
             "name": "Meshflow API (runserver)",
@@ -44,7 +47,10 @@
                 "--reload"
             ],
             "cwd": "${workspaceFolder}/Meshflow",
-            "python": "${workspaceFolder}/venv/bin/python"
+            "python": "${workspaceFolder}/venv/bin/python",
+            "env": {
+                "DJANGO_SETTINGS_MODULE": "Meshflow.settings.monolith"
+            }
         }
     ]
 }
