@@ -1,6 +1,8 @@
 """Tests for traceroute views."""
 
 import pytest
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from rest_framework.test import APIClient
 
 import nodes.tests.conftest  # noqa: F401 - load fixtures
@@ -77,6 +79,48 @@ class TestTracerouteList:
         resp = api_client.get("/api/traceroutes/?status=completed,pending,sent")
         assert resp.status_code == 200
         assert "results" in resp.json()
+
+    def test_list_response_shape(self, api_client, create_user, create_auto_traceroute):
+        """List response has expected structure for source_node and target_node."""
+        user = create_user()
+        api_client.force_authenticate(user=user)
+        create_auto_traceroute(triggered_by=user)
+        resp = api_client.get("/api/traceroutes/")
+        assert resp.status_code == 200
+        results = resp.json()["results"]
+        assert len(results) >= 1
+        tr = results[0]
+        # TracerouteListSourceNodeSerializer fields
+        assert "source_node" in tr
+        sn = tr["source_node"]
+        assert "node_id" in sn
+        assert "name" in sn
+        assert "short_name" in sn
+        assert "node_id_str" in sn
+        assert "constellation" in sn
+        assert "allow_auto_traceroute" in sn
+        # TracerouteTargetNodeSerializer fields
+        assert "target_node" in tr
+        tn = tr["target_node"]
+        assert "node_id" in tn
+        assert "node_id_str" in tn
+        assert "short_name" in tn
+        assert "last_heard" in tn
+        assert "latest_position" in tn
+        assert "claim" in tn
+
+    def test_list_query_count_bounded(self, api_client, create_user, create_auto_traceroute):
+        """List endpoint uses bounded queries (no N+1)."""
+        user = create_user()
+        api_client.force_authenticate(user=user)
+        # Create 10 traceroutes to exercise bulk prefetch
+        for _ in range(10):
+            create_auto_traceroute(triggered_by=user)
+        with CaptureQueriesContext(connection) as ctx:
+            resp = api_client.get("/api/traceroutes/")
+        assert resp.status_code == 200
+        # Should be well under 50 queries (was 400+ before optimization)
+        assert len(ctx.captured_queries) < 25
 
 
 @pytest.mark.django_db
