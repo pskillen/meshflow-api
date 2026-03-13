@@ -63,7 +63,9 @@ class TracerouteTargetNodeSerializer(serializers.ModelSerializer):
 
     def get_latest_position(self, obj):
         status = getattr(obj, "latest_status", None)
-        if status is None or (status.position_reported_time is None and status.latitude is None and status.longitude is None):
+        if status is None or (
+            status.position_reported_time is None and status.latitude is None and status.longitude is None
+        ):
             return None
         data = {
             "latest_latitude": status.latitude,
@@ -109,8 +111,7 @@ def _enrich_route_nodes(route_data, observed_by_id=None):
     node_ids = [item["node_id"] for item in route_data]
     if observed_by_id is None:
         observed_by_id = {
-            o.node_id: o
-            for o in ObservedNode.objects.filter(node_id__in=node_ids).select_related("latest_status")
+            o.node_id: o for o in ObservedNode.objects.filter(node_id__in=node_ids).select_related("latest_status")
         }
     result = []
     for item in route_data:

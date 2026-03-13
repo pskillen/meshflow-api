@@ -1,8 +1,9 @@
 """Tests for traceroute views."""
 
-import pytest
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
+
+import pytest
 from rest_framework.test import APIClient
 
 import nodes.tests.conftest  # noqa: F401 - load fixtures

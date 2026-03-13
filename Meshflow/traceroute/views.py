@@ -15,7 +15,7 @@ from nodes.models import ManagedNode, NodeOwnerClaim, ObservedNode
 
 from .models import AutoTraceRoute
 from .permissions import CanTriggerTraceroute
-from .serializers import AutoTraceRouteSerializer, TriggerTracerouteSerializer, TracerouteListSerializer
+from .serializers import AutoTraceRouteSerializer, TracerouteListSerializer, TriggerTracerouteSerializer
 from .target_selection import pick_traceroute_target
 
 
