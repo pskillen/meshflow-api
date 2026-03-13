@@ -16,6 +16,7 @@ isort~=8.0
 # live reload
 watchfiles~=1.1
 uvicorn~=0.41
+uvicorn[standard]~=0.41
 
 # Include production requirements
 -r requirements.txt
