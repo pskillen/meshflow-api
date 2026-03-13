@@ -11,11 +11,11 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from constellations.models import ConstellationUserMembership
-from nodes.models import ManagedNode, ObservedNode
+from nodes.models import ManagedNode, NodeOwnerClaim, ObservedNode
 
 from .models import AutoTraceRoute
 from .permissions import CanTriggerTraceroute
-from .serializers import AutoTraceRouteSerializer, TriggerTracerouteSerializer
+from .serializers import AutoTraceRouteSerializer, TracerouteListSerializer, TriggerTracerouteSerializer
 from .target_selection import pick_traceroute_target
 
 
@@ -29,9 +29,12 @@ class TraceroutePagination(PageNumberPagination):
 @permission_classes([IsAuthenticated])
 def traceroute_list(request):
     """List AutoTraceRoute with filters. All authenticated users."""
-    qs = AutoTraceRoute.objects.select_related("source_node", "target_node", "triggered_by", "raw_packet").order_by(
-        "-triggered_at"
-    )
+    qs = AutoTraceRoute.objects.select_related(
+        "source_node__constellation",
+        "target_node__latest_status",
+        "triggered_by",
+        "raw_packet",
+    ).order_by("-triggered_at")
 
     managed_node = request.query_params.get("managed_node")
     if managed_node:
@@ -91,7 +94,39 @@ def traceroute_list(request):
 
     paginator = TraceroutePagination()
     page = paginator.paginate_queryset(qs, request)
-    serializer = AutoTraceRouteSerializer(page, many=True)
+
+    # Bulk-fetch for list view to avoid N+1
+    source_node_ids = list({item.source_node.node_id for item in page if item.source_node})
+    observed_short_names = {}
+    if source_node_ids:
+        for row in ObservedNode.objects.filter(node_id__in=source_node_ids).values("node_id", "short_name"):
+            observed_short_names[row["node_id"]] = row["short_name"]
+
+    all_route_node_ids = set()
+    for item in page:
+        if item.route:
+            all_route_node_ids.update(x["node_id"] for x in item.route)
+        if item.route_back:
+            all_route_node_ids.update(x["node_id"] for x in item.route_back)
+    all_route_node_ids.discard(0xFFFFFFFF)
+    observed_by_id = {}
+    if all_route_node_ids:
+        for o in ObservedNode.objects.filter(node_id__in=all_route_node_ids).select_related("latest_status"):
+            observed_by_id[o.node_id] = o
+
+    target_node_pks = list({item.target_node_id for item in page if item.target_node})
+    user_claims_by_node = {}
+    if target_node_pks and request.user.is_authenticated:
+        for c in NodeOwnerClaim.objects.filter(node_id__in=target_node_pks, user=request.user):
+            user_claims_by_node[c.node_id] = c
+
+    serializer_context = {
+        "request": request,
+        "observed_short_names": observed_short_names,
+        "observed_by_id": observed_by_id,
+        "user_claims_by_node": user_claims_by_node,
+    }
+    serializer = TracerouteListSerializer(page, many=True, context=serializer_context)
     return paginator.get_paginated_response(serializer.data)
 
 
@@ -100,7 +135,10 @@ def traceroute_list(request):
 def traceroute_detail(request, pk):
     """Single AutoTraceRoute. All authenticated users."""
     obj = get_object_or_404(
-        AutoTraceRoute.objects.select_related("source_node", "target_node", "triggered_by", "raw_packet"), pk=pk
+        AutoTraceRoute.objects.select_related(
+            "source_node", "target_node__latest_status", "triggered_by", "raw_packet"
+        ),
+        pk=pk,
     )
     serializer = AutoTraceRouteSerializer(obj)
     return Response(serializer.data)
