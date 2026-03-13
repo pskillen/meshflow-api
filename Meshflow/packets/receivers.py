@@ -186,14 +186,29 @@ def on_traceroute_packet_received(sender, packet: TraceroutePacket, observer, ob
         snr = packet.snr_back[i] if i < len(packet.snr_back) else None
         route_back.append({"node_id": nid, "snr": snr})
 
-    auto_tr.status = AutoTraceRoute.STATUS_COMPLETED
-    auto_tr.route = route
-    auto_tr.route_back = route_back
-    auto_tr.raw_packet = packet
-    auto_tr.completed_at = timezone.now()
-    auto_tr.save(update_fields=["status", "route", "route_back", "raw_packet", "completed_at"])
+    # Empty route+route_back indicates timeout/failure from device; mark failed rather than completed
+    if not route and not route_back:
+        auto_tr.status = AutoTraceRoute.STATUS_FAILED
+        auto_tr.route = route
+        auto_tr.route_back = route_back
+        auto_tr.raw_packet = packet
+        auto_tr.completed_at = timezone.now()
+        auto_tr.error_message = "Timed out"
+        auto_tr.save(update_fields=["status", "route", "route_back", "raw_packet", "completed_at", "error_message"])
 
-    from traceroute.ws_notify import notify_traceroute_status_changed
+        from traceroute.ws_notify import notify_traceroute_status_changed
 
-    notify_traceroute_status_changed(auto_tr.id, AutoTraceRoute.STATUS_COMPLETED)
-    logger.info(f"Linked TraceroutePacket {packet.id} to AutoTraceRoute {auto_tr.id}")
+        notify_traceroute_status_changed(auto_tr.id, AutoTraceRoute.STATUS_FAILED)
+        logger.info(f"Linked TraceroutePacket {packet.id} to AutoTraceRoute {auto_tr.id} (failed: empty route)")
+    else:
+        auto_tr.status = AutoTraceRoute.STATUS_COMPLETED
+        auto_tr.route = route
+        auto_tr.route_back = route_back
+        auto_tr.raw_packet = packet
+        auto_tr.completed_at = timezone.now()
+        auto_tr.save(update_fields=["status", "route", "route_back", "raw_packet", "completed_at"])
+
+        from traceroute.ws_notify import notify_traceroute_status_changed
+
+        notify_traceroute_status_changed(auto_tr.id, AutoTraceRoute.STATUS_COMPLETED)
+        logger.info(f"Linked TraceroutePacket {packet.id} to AutoTraceRoute {auto_tr.id}")
