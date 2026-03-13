@@ -3266,7 +3266,9 @@ paths:
           required: false
           schema:
             type: string
-            enum: [pending, sent, completed, failed]
+            description: >
+              Filter by status. Accepts comma-separated values (e.g. completed,pending,sent).
+              Valid values: pending, sent, completed, failed.
         - name: trigger_type
           in: query
           required: false

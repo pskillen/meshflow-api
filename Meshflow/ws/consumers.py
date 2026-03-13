@@ -162,3 +162,61 @@ class TextMessageConsumer(AsyncWebsocketConsumer):
             return User.objects.get(id=user_id)
         except User.DoesNotExist:
             return AnonymousUser()
+
+
+class TracerouteConsumer(AsyncWebsocketConsumer):
+    """
+    WebSocket consumer for traceroute status updates.
+
+    Authenticated users connect with JWT via query param: ws/traceroutes/?token=<jwt>
+    On connect, join group "traceroutes". Receive traceroute_update events when
+    any traceroute's status changes (completed or failed).
+    """
+
+    async def connect(self):
+        self.user = self.scope.get("user", AnonymousUser())
+
+        query_string = self.scope.get("query_string", b"").decode("utf-8")
+        query_params = dict(param.split("=", 1) for param in query_string.split("&") if "=" in param)
+        token = query_params.get("token")
+
+        if token:
+            try:
+                access_token = AccessToken(token)
+                user_id = access_token.get("user_id")
+                if user_id:
+                    self.user = await self.get_user_from_id(user_id)
+            except (TokenError, InvalidToken) as e:
+                logger.warning("TracerouteConsumer: invalid token: %s", e)
+                await self.close()
+                return
+
+        if self.user.is_anonymous:
+            logger.warning("TracerouteConsumer: anonymous user tried to connect")
+            await self.close()
+            return
+
+        await self.channel_layer.group_add("traceroutes", self.channel_name)
+        await self.accept()
+        logger.info("TracerouteConsumer: user %s connected", self.user.username)
+
+    async def disconnect(self, close_code):
+        await self.channel_layer.group_discard("traceroutes", self.channel_name)
+        logger.info("TracerouteConsumer: user %s disconnected", getattr(self.user, "username", "unknown"))
+
+    async def receive(self, text_data):
+        pass
+
+    async def traceroute_update(self, event):
+        """Handle traceroute_update from channel layer. Forward {id, status} to client."""
+        await self.send(text_data=json.dumps({"id": event["id"], "status": event["status"]}))
+
+    @database_sync_to_async
+    def get_user_from_id(self, user_id):
+        from django.contrib.auth import get_user_model
+
+        User = get_user_model()
+        try:
+            return User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return AnonymousUser()
