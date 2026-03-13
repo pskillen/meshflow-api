@@ -3362,6 +3362,16 @@ paths:
           description: Forbidden
         '404':
           description: ManagedNode or ObservedNode not found
+        '429':
+          description: Rate limited - node's last traceroute was less than 60s ago
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+                    example: "Traceroute rate limited. This node's last traceroute was less than 30s ago. Try again in 25s."
 
   /traceroutes/{id}/:
     get:

@@ -232,3 +232,24 @@ class TestTracerouteTrigger:
         )
         assert resp.status_code == 400
         assert "allow_auto_traceroute" in resp.json().get("detail", "").lower()
+
+    def test_trigger_rejects_when_rate_limited(
+        self, api_client, editor_user, editor_managed_node, create_observed_node
+    ):
+        """Trigger returns 429 when node's last traceroute was within 30s."""
+        mn = editor_managed_node
+        on = create_observed_node()
+        api_client.force_authenticate(user=editor_user)
+        resp1 = api_client.post(
+            "/api/traceroutes/trigger/",
+            {"managed_node_id": mn.node_id, "target_node_id": on.node_id},
+            format="json",
+        )
+        assert resp1.status_code == 201
+        resp2 = api_client.post(
+            "/api/traceroutes/trigger/",
+            {"managed_node_id": mn.node_id, "target_node_id": on.node_id},
+            format="json",
+        )
+        assert resp2.status_code == 429
+        assert "rate limited" in resp2.json().get("detail", "").lower()
