@@ -55,7 +55,7 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}:${{ inputs.ENVIRONMENT == 'dev' && 'latest-dev-docs' || inputs.VERSION_LABEL }}-docs
+            ghcr.io/${{ github.repository }}:${{ inputs.ENVIRONMENT == 'dev' && 'latest-dev' || inputs.VERSION_LABEL }}-docs
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
