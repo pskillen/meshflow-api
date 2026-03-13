@@ -1,6 +1,9 @@
 """Views for traceroute list, detail, and trigger."""
 
+from datetime import timedelta
+
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
@@ -17,6 +20,10 @@ from .models import AutoTraceRoute
 from .permissions import CanTriggerTraceroute
 from .serializers import AutoTraceRouteSerializer, TracerouteListSerializer, TriggerTracerouteSerializer
 from .target_selection import pick_traceroute_target
+
+# Firmware enforces ~30s minimum between traceroutes per node. Reject requests within this window.
+# set to 60 seconds to prevent spamming the network
+TR_MIN_INTERVAL_SEC = 60
 
 
 class TraceroutePagination(PageNumberPagination):
@@ -167,6 +174,24 @@ def traceroute_trigger(request):
             {"detail": "This managed node does not allow traceroutes (allow_auto_traceroute is disabled)."},
             status=status.HTTP_400_BAD_REQUEST,
         )
+
+    # Rate limit: firmware enforces ~30s between traceroutes per node
+    last_tr = (
+        AutoTraceRoute.objects.filter(source_node=source_node).order_by("-triggered_at").values("triggered_at").first()
+    )
+    if last_tr:
+        cutoff = timezone.now() - timedelta(seconds=TR_MIN_INTERVAL_SEC)
+        if last_tr["triggered_at"] > cutoff:
+            next_allowed = last_tr["triggered_at"] + timedelta(seconds=TR_MIN_INTERVAL_SEC)
+            remaining = max(0, (next_allowed - timezone.now()).total_seconds())
+            return Response(
+                {
+                    "detail": f"Traceroute rate limited. "
+                    f"This node's last traceroute was less than {TR_MIN_INTERVAL_SEC}s ago. "
+                    f"Try again in {int(remaining)}s."
+                },
+                status=status.HTTP_429_TOO_MANY_REQUESTS,
+            )
 
     # Check constellation permission (CanTriggerTraceroute allows staff; for non-staff check membership)
     if not request.user.is_staff:
