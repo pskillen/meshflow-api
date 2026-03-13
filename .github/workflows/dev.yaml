@@ -1,7 +1,9 @@
-name: Manual release
+name: dev
 
 on:
-  workflow_dispatch:
+  push:
+    branches:
+      - dev
 
 permissions:
   contents: read
@@ -17,8 +19,8 @@ jobs:
       - name: Get short SHA
         id: get_sha
         run: |
-          SHORT_SHA=$(git rev-parse --short HEAD)
-          echo "VERSION_LABEL=$SHORT_SHA" >> "$GITHUB_OUTPUT"
+          SHORT_SHA=$(echo $GITHUB_SHA | cut -c1-7)
+          echo "VERSION_LABEL=dev-$SHORT_SHA" >> "$GITHUB_OUTPUT"
 
     outputs:
       VERSION_LABEL: ${{ steps.get_sha.outputs.VERSION_LABEL }}
@@ -29,4 +31,4 @@ jobs:
     uses: ./.github/workflows/docker-build.yaml
     with:
       VERSION_LABEL: ${{ needs.extract-dev-tag.outputs.VERSION_LABEL }}
-      ENVIRONMENT: dev 
+      ENVIRONMENT: dev

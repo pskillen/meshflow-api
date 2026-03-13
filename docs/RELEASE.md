@@ -4,32 +4,18 @@ This document describes how Docker images are built and pushed to GitHub Contain
 
 ## Docker Image Tags
 
-Each build produces three images:
+Each build produces two images (API and docs) in the same package with distinct tags:
 
-| Image | Purpose |
-| ----- | ------- |
-| **API** | Main application |
-| **Migrations** | Database migrations |
-| **Docs** | Redocly API documentation |
+| Tag pattern | Purpose |
+| ----------- | ------- |
+| `:latest`, `:latest-dev`, `:1.2.3` | Main API application |
+| `:latest-docs`, `:latest-dev-docs`, `:1.2.3-docs` | Redocly API documentation |
+
+Migrations run via the API image with a command override (`python manage.py migrate`); no separate migrations image.
 
 ## Release Triggers
 
-### 1. Manual Release
-
-**Workflow:** [manual-release.yaml](../.github/workflows/manual-release.yaml)
-
-**Trigger:** Run manually via GitHub Actions → "Manual release" → "Run workflow"
-
-**Tags pushed:**
-
-- `latest-dev`, `latest-dev-migrations`, `latest-dev-docs`
-- `{short-sha}`, `{short-sha}-migrations`, `{short-sha}-docs` (e.g. `abc1234`)
-
-Use this to build and push from the current `main` branch without merging new commits.
-
----
-
-### 2. Push to `main`
+### 1. Push to `main`
 
 **Workflow:** [main.yaml](../.github/workflows/main.yaml)
 
@@ -37,12 +23,12 @@ Use this to build and push from the current `main` branch without merging new co
 
 **Tags pushed:**
 
-- `latest-dev`, `latest-dev-migrations`, `latest-dev-docs`
-- `dev-{short-sha}`, `dev-{short-sha}-migrations`, `dev-{short-sha}-docs` (e.g. `dev-abc1234`)
+- `latest-dev`, `latest-dev-docs` (overwrite each time)
+- Baked version: `main-{short-sha}`
 
 ---
 
-### 3. Pre-release (Release Candidate)
+### 2. Pre-release (Release Candidate)
 
 **Workflow:** [pre-release.yaml](../.github/workflows/pre-release.yaml)
 
@@ -50,12 +36,12 @@ Use this to build and push from the current `main` branch without merging new co
 
 **Tags pushed:**
 
-- `latest-rc`, `latest-rc-migrations`, `latest-rc-docs`
-- `{semver}`, `{semver}-migrations`, `{semver}-docs` (e.g. `1.2.3-rc.4`)
+- `latest-rc`, `latest-rc-docs`
+- `{semver}`, `{semver}-docs` (e.g. `1.2.3-rc.4`)
 
 ---
 
-### 4. Production Release
+### 3. Production Release
 
 **Workflow:** [release.yaml](../.github/workflows/release.yaml)
 
@@ -63,8 +49,9 @@ Use this to build and push from the current `main` branch without merging new co
 
 **Tags pushed:**
 
-- `latest`, `latest-migrations`, `latest-docs`
-- `{semver}`, `{semver}-migrations`, `{semver}-docs` (e.g. `1.2.3`)
+- `latest`, `latest-docs`
+- `{semver}`, `{semver}-docs` (e.g. `1.2.3`)
+- Semver components: `1`, `1.2`, `1-docs`, `1.2-docs`
 
 ---
 
@@ -72,17 +59,14 @@ Use this to build and push from the current `main` branch without merging new co
 
 | Trigger | Rolling tags | Version tags |
 | ------- | ------------ | ------------ |
-| Manual release | `latest-dev`, `latest-dev-migrations`, `latest-dev-docs` | `{sha}`, `{sha}-migrations`, `{sha}-docs` |
-| Push to `main` | `latest-dev`, `latest-dev-migrations`, `latest-dev-docs` | `dev-{sha}`, `dev-{sha}-migrations`, `dev-{sha}-docs` |
-| Pre-release | `latest-rc`, `latest-rc-migrations`, `latest-rc-docs` | `1.2.3-rc.4`, `1.2.3-rc.4-migrations`, `1.2.3-rc.4-docs` |
-| Release | `latest`, `latest-migrations`, `latest-docs` | `1.2.3`, `1.2.3-migrations`, `1.2.3-docs` |
+| Push to `main` | `latest-dev`, `latest-dev-docs` | (baked: main-{sha}) |
+| Pre-release | `latest-rc`, `latest-rc-docs` | `1.2.3-rc.4`, `1.2.3-rc.4-docs` |
+| Release | `latest`, `latest-docs` | `1`, `1.2`, `1.2.3` and `*-docs` variants |
 
 ## Pulling Images
 
-Replace `OWNER/REPO` with your GitHub org/repo (e.g. `myorg/meshflow-api`):
-
 ```bash
-# Latest production
+# Latest production API
 docker pull ghcr.io/pskillen/meshflow-api:latest
 
 # Specific version
@@ -93,4 +77,11 @@ docker pull ghcr.io/pskillen/meshflow-api:latest-dev
 
 # Latest release candidate
 docker pull ghcr.io/pskillen/meshflow-api:latest-rc
+
+# Docs (same package, -docs suffix)
+docker pull ghcr.io/pskillen/meshflow-api:latest-docs
 ```
+
+## PR Builds
+
+PR builds do **not** push images to the registry. The workflow builds locally and runs smoke + integration tests in a single job.

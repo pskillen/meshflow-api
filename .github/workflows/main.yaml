@@ -20,7 +20,7 @@ jobs:
         id: get_sha
         run: |
           SHORT_SHA=$(echo $GITHUB_SHA | cut -c1-7)
-          echo "VERSION_LABEL=dev-$SHORT_SHA" >> "$GITHUB_OUTPUT"
+          echo "VERSION_LABEL=main-$SHORT_SHA" >> "$GITHUB_OUTPUT"
 
     outputs:
       VERSION_LABEL: ${{ steps.get_sha.outputs.VERSION_LABEL }}
