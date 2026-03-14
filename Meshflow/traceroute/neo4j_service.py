@@ -4,6 +4,7 @@ import logging
 from datetime import datetime
 
 from django.conf import settings
+
 from neo4j import GraphDatabase
 
 from common.mesh_node_helpers import meshtastic_id_to_hex
@@ -34,12 +35,10 @@ def ensure_schema(driver=None):
     driver = driver or get_driver()
     with driver.session() as session:
         # Neo4j 5: CREATE CONSTRAINT IF NOT EXISTS
-        session.run(
-            """
+        session.run("""
             CREATE CONSTRAINT mesh_node_node_id_unique IF NOT EXISTS
             FOR (n:MeshNode) REQUIRE n.node_id IS UNIQUE
-            """
-        )
+            """)
     logger.info("Neo4j schema ensured: MeshNode.node_id unique constraint")
 
 
@@ -84,10 +83,7 @@ def _get_node_coords(
 
     # Source node: ManagedNode default_location or ObservedNode.latest_status
     if node_id == source_node.node_id:
-        if (
-            source_node.default_location_latitude is not None
-            and source_node.default_location_longitude is not None
-        ):
+        if source_node.default_location_latitude is not None and source_node.default_location_longitude is not None:
             return (
                 source_node.default_location_latitude,
                 source_node.default_location_longitude,
@@ -158,10 +154,9 @@ def add_traceroute_edges(auto_traceroute: AutoTraceRoute, driver=None):
     driver = driver or get_driver()
 
     auto_tr = (
-        AutoTraceRoute.objects \
-            .filter(pk=auto_traceroute.pk) \
-            .select_related("source_node", "target_node", "target_node__latest_status") \
-            .first()
+        AutoTraceRoute.objects.filter(pk=auto_traceroute.pk)
+        .select_related("source_node", "target_node", "target_node__latest_status")
+        .first()
     )
     if not auto_tr or not auto_tr.route and not auto_tr.route_back:
         return
@@ -176,24 +171,17 @@ def add_traceroute_edges(auto_traceroute: AutoTraceRoute, driver=None):
     node_ids.add(auto_tr.target_node.node_id)
 
     observed_by_id = {
-        o.node_id: o
-        for o in ObservedNode.objects.filter(node_id__in=node_ids).select_related(
-            "latest_status"
-        )
+        o.node_id: o for o in ObservedNode.objects.filter(node_id__in=node_ids).select_related("latest_status")
     }
 
     # Build coords and names maps
     coords = {}
     names = {}
     for nid in node_ids:
-        pos = _get_node_coords(
-            nid, auto_tr.source_node, auto_tr.target_node, observed_by_id
-        )
+        pos = _get_node_coords(nid, auto_tr.source_node, auto_tr.target_node, observed_by_id)
         if pos:
             coords[nid] = pos
-            names[nid] = _get_node_names(
-                nid, auto_tr.source_node, auto_tr.target_node, observed_by_id
-            )
+            names[nid] = _get_node_names(nid, auto_tr.source_node, auto_tr.target_node, observed_by_id)
 
     # Extract edges
     edges = []
@@ -265,10 +253,11 @@ def export_all_traceroutes_to_neo4j(driver=None, batch_size: int = 100):
     driver = driver or get_driver()
     ensure_schema(driver)
 
-    qs = AutoTraceRoute.objects \
-        .filter(status=AutoTraceRoute.STATUS_COMPLETED) \
-        .select_related("source_node", "target_node") \
+    qs = (
+        AutoTraceRoute.objects.filter(status=AutoTraceRoute.STATUS_COMPLETED)
+        .select_related("source_node", "target_node")
         .order_by("id")
+    )
 
     total = qs.count()
     exported = 0
@@ -292,3 +281,139 @@ def export_all_traceroutes_to_neo4j(driver=None, batch_size: int = 100):
         total,
     )
     return {"total": total, "exported": exported}
+
+
+def run_heatmap_query(
+    triggered_at_after=None,
+    bbox=None,
+    constellation_id=None,
+    driver=None,
+):
+    """
+    Query Neo4j for aggregated heatmap edges (bidirectional) and nodes.
+    Returns dict with edges, nodes, and meta.
+    """
+    driver = driver or get_driver()
+
+    # Build Cypher with optional filters
+    where_clauses = [
+        "a.latitude IS NOT NULL AND b.latitude IS NOT NULL",
+    ]
+    params = {}
+
+    if triggered_at_after:
+        where_clauses.append("r.triggered_at >= datetime($triggered_at_after)")
+        params["triggered_at_after"] = (
+            triggered_at_after.isoformat() if hasattr(triggered_at_after, "isoformat") else str(triggered_at_after)
+        )
+
+    if bbox and len(bbox) >= 4:
+        min_lat, min_lon, max_lat, max_lon = bbox[:4]
+        where_clauses.append(
+            "a.latitude >= $min_lat AND a.latitude <= $max_lat "
+            "AND a.longitude >= $min_lon AND a.longitude <= $max_lon "
+            "AND b.latitude >= $min_lat AND b.latitude <= $max_lat "
+            "AND b.longitude >= $min_lon AND b.longitude <= $max_lon"
+        )
+        params["min_lat"] = min_lat
+        params["min_lon"] = min_lon
+        params["max_lat"] = max_lat
+        params["max_lon"] = max_lon
+
+    constellation_node_ids = None
+    if constellation_id is not None:
+        from constellations.models import Constellation
+
+        try:
+            constellation = Constellation.objects.get(pk=constellation_id)
+            constellation_node_ids = list(constellation.nodes.values_list("node_id", flat=True))
+        except Constellation.DoesNotExist:
+            constellation_node_ids = []
+        if not constellation_node_ids:
+            return {
+                "edges": [],
+                "nodes": [],
+                "meta": {"active_nodes_count": 0, "total_trace_routes_count": 0},
+            }
+        where_clauses.append("(a.node_id IN $constellation_node_ids OR b.node_id IN $constellation_node_ids)")
+        params["constellation_node_ids"] = constellation_node_ids
+
+    where_str = " AND ".join(where_clauses)
+
+    # Bidirectional: use canonical direction (a.node_id < b.node_id) and sum weights
+    query = f"""
+    MATCH (a:MeshNode)-[r:ROUTED_TO]-(b:MeshNode)
+    WHERE {where_str}
+    WITH a, b, sum(r.weight) AS weight
+    WHERE a.node_id < b.node_id
+    RETURN a.node_id AS from_node_id,
+           a.latitude AS from_lat, a.longitude AS from_lng,
+           a.node_id_str AS from_node_id_str,
+           a.short_name AS from_short_name, a.long_name AS from_long_name,
+           b.node_id AS to_node_id,
+           b.latitude AS to_lat, b.longitude AS to_lng,
+           b.node_id_str AS to_node_id_str,
+           b.short_name AS to_short_name, b.long_name AS to_long_name,
+           weight
+    """
+
+    edges = []
+    nodes_by_id = {}
+
+    with driver.session() as session:
+        result = session.run(query, params)
+        for record in result:
+            from_id = record["from_node_id"]
+            to_id = record["to_node_id"]
+            edges.append(
+                {
+                    "from_node_id": from_id,
+                    "to_node_id": to_id,
+                    "from_lat": record["from_lat"],
+                    "from_lng": record["from_lng"],
+                    "to_lat": record["to_lat"],
+                    "to_lng": record["to_lng"],
+                    "weight": record["weight"],
+                }
+            )
+            if from_id not in nodes_by_id:
+                nodes_by_id[from_id] = {
+                    "node_id": from_id,
+                    "node_id_str": record["from_node_id_str"] or meshtastic_id_to_hex(from_id),
+                    "lat": record["from_lat"],
+                    "lng": record["from_lng"],
+                    "short_name": record["from_short_name"] or "",
+                    "long_name": record["from_long_name"] or "",
+                }
+            if to_id not in nodes_by_id:
+                nodes_by_id[to_id] = {
+                    "node_id": to_id,
+                    "node_id_str": record["to_node_id_str"] or meshtastic_id_to_hex(to_id),
+                    "lat": record["to_lat"],
+                    "lng": record["to_lng"],
+                    "short_name": record["to_short_name"] or "",
+                    "long_name": record["to_long_name"] or "",
+                }
+
+    nodes = list(nodes_by_id.values())
+
+    # Meta: approximate counts (from Django for total TR, from Neo4j for nodes)
+    from .models import AutoTraceRoute
+
+    total_tr = AutoTraceRoute.objects.filter(status=AutoTraceRoute.STATUS_COMPLETED).count()
+    if triggered_at_after:
+        total_tr = AutoTraceRoute.objects.filter(
+            status=AutoTraceRoute.STATUS_COMPLETED,
+            triggered_at__gte=triggered_at_after,
+        ).count()
+
+    meta = {
+        "active_nodes_count": len(nodes),
+        "total_trace_routes_count": total_tr,
+    }
+
+    return {
+        "edges": edges,
+        "nodes": nodes,
+        "meta": meta,
+    }

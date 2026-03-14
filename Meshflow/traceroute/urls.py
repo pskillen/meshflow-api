@@ -6,6 +6,7 @@ app_name = "traceroute"
 
 urlpatterns = [
     path("", views.traceroute_list, name="traceroute-list"),
+    path("heatmap-edges/", views.heatmap_edges, name="traceroute-heatmap-edges"),
     path("can_trigger/", views.traceroute_can_trigger, name="traceroute-can-trigger"),
     path("trigger/", views.traceroute_trigger, name="traceroute-trigger"),
     path("<int:pk>/", views.traceroute_detail, name="traceroute-detail"),
