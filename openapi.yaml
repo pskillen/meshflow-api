@@ -3310,6 +3310,92 @@ paths:
                     items:
                       $ref: '#/components/schemas/AutoTraceRoute'
 
+  /traceroutes/heatmap-edges/:
+    get:
+      summary: Get heatmap edges and nodes
+      description: >
+        Aggregated traceroute edges and nodes for heatmap visualization.
+        Queries Neo4j for bidirectional edge weights. All authenticated users.
+      tags: [Traceroutes]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: triggered_at_after
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+            description: Filter edges by triggered_at >= value (ISO 8601)
+        - name: constellation_id
+          in: query
+          required: false
+          schema:
+            type: integer
+            description: Restrict to nodes in this constellation
+        - name: bbox
+          in: query
+          required: false
+          schema:
+            type: string
+            description: Viewport bounding box as min_lat,min_lon,max_lat,max_lon
+      responses:
+        '200':
+          description: Heatmap edges and nodes
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [edges, nodes, meta]
+                properties:
+                  edges:
+                    type: array
+                    items:
+                      type: object
+                      required: [from_node_id, to_node_id, from_lat, from_lng, to_lat, to_lng, weight]
+                      properties:
+                        from_node_id:
+                          type: integer
+                        to_node_id:
+                          type: integer
+                        from_lat:
+                          type: number
+                        from_lng:
+                          type: number
+                        to_lat:
+                          type: number
+                        to_lng:
+                          type: number
+                        weight:
+                          type: integer
+                  nodes:
+                    type: array
+                    items:
+                      type: object
+                      required: [node_id, node_id_str, lat, lng]
+                      properties:
+                        node_id:
+                          type: integer
+                        node_id_str:
+                          type: string
+                        lat:
+                          type: number
+                        lng:
+                          type: number
+                        short_name:
+                          type: string
+                        long_name:
+                          type: string
+                  meta:
+                    type: object
+                    properties:
+                      active_nodes_count:
+                        type: integer
+                      total_trace_routes_count:
+                        type: integer
+        '503':
+          description: Neo4j unavailable
+
   /traceroutes/can_trigger/:
     get:
       summary: Check if user can trigger traceroutes

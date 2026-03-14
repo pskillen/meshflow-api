@@ -247,6 +247,55 @@ def traceroute_trigger(request):
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
+def heatmap_edges(request):
+    """Aggregated traceroute edges and nodes for heatmap visualization. Queries Neo4j."""
+    from django.utils.dateparse import parse_datetime
+
+    from .neo4j_service import run_heatmap_query
+
+    triggered_at_after = None
+    if request.query_params.get("triggered_at_after"):
+        dt = parse_datetime(request.query_params["triggered_at_after"])
+        if dt:
+            triggered_at_after = dt
+
+    constellation_id = request.query_params.get("constellation_id")
+    if constellation_id is not None:
+        try:
+            constellation_id = int(constellation_id)
+        except ValueError:
+            constellation_id = None
+
+    bbox = None
+    bbox_param = request.query_params.get("bbox")
+    if bbox_param:
+        parts = [p.strip() for p in bbox_param.split(",")]
+        if len(parts) >= 4:
+            try:
+                bbox = [float(parts[0]), float(parts[1]), float(parts[2]), float(parts[3])]
+            except ValueError:
+                pass
+
+    try:
+        data = run_heatmap_query(
+            triggered_at_after=triggered_at_after,
+            bbox=bbox,
+            constellation_id=constellation_id,
+        )
+    except Exception as e:
+        import logging
+
+        logging.getLogger(__name__).exception("heatmap_edges: Neo4j query failed: %s", e)
+        return Response(
+            {"detail": "Failed to fetch heatmap data."},
+            status=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+
+    return Response(data)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
 def traceroute_can_trigger(request):
     """Returns whether the current user can trigger traceroutes."""
     can = (

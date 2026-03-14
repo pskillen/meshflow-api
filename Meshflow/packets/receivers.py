@@ -208,7 +208,9 @@ def on_traceroute_packet_received(sender, packet: TraceroutePacket, observer, ob
         auto_tr.completed_at = timezone.now()
         auto_tr.save(update_fields=["status", "route", "route_back", "raw_packet", "completed_at"])
 
+        from traceroute.tasks import push_traceroute_to_neo4j
         from traceroute.ws_notify import notify_traceroute_status_changed
 
         notify_traceroute_status_changed(auto_tr.id, AutoTraceRoute.STATUS_COMPLETED)
+        push_traceroute_to_neo4j.delay(auto_tr.id)
         logger.info(f"Linked TraceroutePacket {packet.id} to AutoTraceRoute {auto_tr.id}")
