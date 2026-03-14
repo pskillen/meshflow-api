@@ -128,6 +128,11 @@ CHANNEL_LAYERS = {
     },
 }
 
+# Neo4j (traceroute heatmap graph)
+NEO4J_URI = os.environ.get("NEO4J_URI", "bolt://localhost:7687")
+NEO4J_USER = os.environ.get("NEO4J_USER", "neo4j")
+NEO4J_PASSWORD = os.environ.get("NEO4J_PASSWORD", "neo4j")
+
 # Celery (use Redis DB 1 for broker; channels use DB 0)
 _celery_broker_url = f"redis://:{_redis_password}@{_redis_host}:{_redis_port}/1"
 CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", _celery_broker_url)
