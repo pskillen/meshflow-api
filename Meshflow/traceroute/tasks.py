@@ -69,6 +69,46 @@ def schedule_traceroutes():
 
 
 @shared_task
+def export_traceroutes_to_neo4j():
+    """
+    One-off export of all completed AutoTraceRoute records to Neo4j.
+    Idempotent; can re-run.
+    """
+    from .neo4j_service import export_all_traceroutes_to_neo4j
+
+    return export_all_traceroutes_to_neo4j()
+
+
+@shared_task
+def push_traceroute_to_neo4j(auto_traceroute_id: int):
+    """
+    Push a single completed AutoTraceRoute to Neo4j.
+    Called when a traceroute completes (from packet receiver).
+    """
+    from .neo4j_service import add_traceroute_edges, get_driver
+
+    auto_tr = AutoTraceRoute.objects.filter(pk=auto_traceroute_id).first()
+    if not auto_tr or auto_tr.status != AutoTraceRoute.STATUS_COMPLETED:
+        logger.debug(
+            "push_traceroute_to_neo4j: skipping AutoTraceRoute %s (not completed)",
+            auto_traceroute_id,
+        )
+        return {"skipped": True}
+
+    try:
+        driver = get_driver()
+        add_traceroute_edges(auto_tr, driver=driver)
+        return {"pushed": True}
+    except Exception as e:
+        logger.exception(
+            "push_traceroute_to_neo4j: failed for AutoTraceRoute %s: %s",
+            auto_traceroute_id,
+            e,
+        )
+        raise
+
+
+@shared_task
 def mark_stale_traceroutes_failed():
     """
     Run every 60 seconds. Mark traceroutes still pending/sent after 180s as failed.
