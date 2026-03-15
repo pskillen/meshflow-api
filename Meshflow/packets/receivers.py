@@ -1,8 +1,10 @@
 import logging
+import os
 
 from django.dispatch import receiver
 from django.utils import timezone
 
+from common.mesh_node_helpers import meshtastic_id_to_hex
 from nodes.models import ObservedNode
 
 from .models import (
@@ -35,6 +37,7 @@ from .signals import (
     health_metrics_packet_received,
     host_metrics_packet_received,
     message_packet_received,
+    new_node_observed,
     node_info_packet_received,
     position_packet_received,
     power_metrics_packet_received,
@@ -43,6 +46,9 @@ from .signals import (
 )
 
 logger = logging.getLogger(__name__)
+
+STALE_TR_TIMEOUT_SECONDS = os.environ.get("STALE_TR_TIMEOUT_SECONDS", 180)
+STALE_TR_TIMEOUT_SECONDS = int(STALE_TR_TIMEOUT_SECONDS)
 
 
 @receiver(position_packet_received)
@@ -149,7 +155,7 @@ def on_traffic_management_stats_packet_received(
 
 @receiver(traceroute_packet_received)
 def on_traceroute_packet_received(sender, packet: TraceroutePacket, observer, observation: PacketObservation, **kwargs):
-    """Handle a traceroute packet received signal. Link to pending AutoTraceRoute if match."""
+    """Handle a traceroute packet received signal. Link to AutoTraceRoute if match, or infer one for cross-env."""
     logger.info(f"Traceroute packet received: {packet.id}")
 
     from traceroute.models import AutoTraceRoute
@@ -157,24 +163,49 @@ def on_traceroute_packet_received(sender, packet: TraceroutePacket, observer, ob
     # observer is ManagedNode (from PacketObservation)
     source_node = observer
     target_node_id = packet.from_int  # TR response: from = target (who sent the response)
-    cutoff = timezone.now() - timezone.timedelta(seconds=120)
+    cutoff = timezone.now() - timezone.timedelta(seconds=STALE_TR_TIMEOUT_SECONDS)  # 5 minutes
 
     auto_tr = (
         AutoTraceRoute.objects.filter(
             source_node=source_node,
             target_node__node_id=target_node_id,
             triggered_at__gte=cutoff,
-            status__in=[AutoTraceRoute.STATUS_PENDING, AutoTraceRoute.STATUS_SENT],
+            status__in=[
+                AutoTraceRoute.STATUS_PENDING,
+                AutoTraceRoute.STATUS_SENT,
+                AutoTraceRoute.STATUS_FAILED,
+            ],
         )
         .order_by("-triggered_at")
         .first()
     )
 
     if not auto_tr:
-        logger.warning(
-            f"No AutoTraceRoute found for packet {packet.id} from {source_node.node_id_str} to {target_node_id}"
+        # No match within 5 mins: infer AutoTraceRoute (cross-env or orphaned response)
+        logger.info(
+            f"No AutoTraceRoute found for packet {packet.id} from {source_node.node_id_str} to {target_node_id}; "
+            "creating inferred record"
         )
-        return
+        node_id_str = packet.from_str if packet.from_str else meshtastic_id_to_hex(target_node_id)
+        target_node, created = ObservedNode.objects.get_or_create(
+            node_id=target_node_id,
+            defaults={
+                "node_id_str": node_id_str,
+                "long_name": "Unknown Node " + node_id_str,
+                "short_name": node_id_str[-4:] if len(node_id_str) >= 4 else "????",
+            },
+        )
+        if created:
+            new_node_observed.send(sender=None, node=target_node, observer=source_node)
+        auto_tr = AutoTraceRoute.objects.create(
+            source_node=source_node,
+            target_node=target_node,
+            trigger_type=AutoTraceRoute.TRIGGER_TYPE_AUTO,
+            trigger_source="inferred",
+            triggered_by=None,
+            triggered_at=timezone.now(),
+            status=AutoTraceRoute.STATUS_PENDING,
+        )
 
     # Build route/route_back with SNR: TraceroutePacket has route, route_back (node_ids) and snr_towards, snr_back
     route = []
