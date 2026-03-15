@@ -181,10 +181,10 @@ def on_traceroute_packet_received(sender, packet: TraceroutePacket, observer, ob
     )
 
     if not auto_tr:
-        # No match within 5 mins: infer AutoTraceRoute (cross-env or orphaned response)
+        # No match within window: create external AutoTraceRoute (cross-env or orphaned response)
         logger.info(
             f"No AutoTraceRoute found for packet {packet.id} from {source_node.node_id_str} to {target_node_id}; "
-            "creating inferred record"
+            "creating external record"
         )
         node_id_str = packet.from_str if packet.from_str else meshtastic_id_to_hex(target_node_id)
         target_node, created = ObservedNode.objects.get_or_create(
@@ -200,8 +200,8 @@ def on_traceroute_packet_received(sender, packet: TraceroutePacket, observer, ob
         auto_tr = AutoTraceRoute.objects.create(
             source_node=source_node,
             target_node=target_node,
-            trigger_type=AutoTraceRoute.TRIGGER_TYPE_AUTO,
-            trigger_source="inferred",
+            trigger_type=AutoTraceRoute.TRIGGER_TYPE_EXTERNAL,
+            trigger_source=None,
             triggered_by=None,
             triggered_at=timezone.now(),
             status=AutoTraceRoute.STATUS_PENDING,

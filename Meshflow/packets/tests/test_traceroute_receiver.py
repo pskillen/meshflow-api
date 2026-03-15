@@ -124,8 +124,7 @@ def test_traceroute_receiver_inferred_creation(
             traceroute_packet_received.send(sender=None, packet=packet, observer=source_node, observation=observation)
 
     auto_tr = AutoTraceRoute.objects.get(source_node=source_node, target_node__node_id=target_node_id)
-    assert auto_tr.trigger_source == "inferred"
-    assert auto_tr.trigger_type == AutoTraceRoute.TRIGGER_TYPE_AUTO
+    assert auto_tr.trigger_type == AutoTraceRoute.TRIGGER_TYPE_EXTERNAL
     assert auto_tr.triggered_by is None
     assert auto_tr.status == AutoTraceRoute.STATUS_COMPLETED
     assert auto_tr.raw_packet_id == packet.id
@@ -176,6 +175,6 @@ def test_traceroute_receiver_late_response_updates_failed(
     assert AutoTraceRoute.objects.count() == initial_count
     auto_tr.refresh_from_db()
     assert auto_tr.status == AutoTraceRoute.STATUS_COMPLETED
-    assert auto_tr.trigger_source != "inferred"  # Original record, not inferred
+    assert auto_tr.trigger_type != AutoTraceRoute.TRIGGER_TYPE_EXTERNAL  # Original record, not external
     assert auto_tr.raw_packet_id == packet.id
     mock_push.delay.assert_called_once_with(auto_tr.id)
