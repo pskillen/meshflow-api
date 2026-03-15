@@ -1,6 +1,7 @@
 """Celery tasks for traceroute scheduling."""
 
 import logging
+import os
 import random
 from datetime import timedelta
 
@@ -18,7 +19,8 @@ from .ws_notify import notify_traceroute_status_changed
 
 logger = logging.getLogger(__name__)
 
-STALE_TR_TIMEOUT_SECONDS = 180
+FAILED_TR_TIMEOUT_SECONDS = os.environ.get("FAILED_TR_TIMEOUT_SECONDS", 180)
+FAILED_TR_TIMEOUT_SECONDS = int(FAILED_TR_TIMEOUT_SECONDS)
 
 
 @shared_task
@@ -114,7 +116,7 @@ def mark_stale_traceroutes_failed():
     Run every 60 seconds. Mark traceroutes still pending/sent after 180s as failed.
     Broadcast each update to WebSocket clients.
     """
-    cutoff = timezone.now() - timedelta(seconds=STALE_TR_TIMEOUT_SECONDS)
+    cutoff = timezone.now() - timedelta(seconds=FAILED_TR_TIMEOUT_SECONDS)
     stale = AutoTraceRoute.objects.filter(
         status__in=[AutoTraceRoute.STATUS_PENDING, AutoTraceRoute.STATUS_SENT],
         triggered_at__lt=cutoff,
@@ -123,7 +125,7 @@ def mark_stale_traceroutes_failed():
     for auto_tr in stale:
         auto_tr.status = AutoTraceRoute.STATUS_FAILED
         auto_tr.completed_at = timezone.now()
-        auto_tr.error_message = "Timed out after 180s"
+        auto_tr.error_message = f"Timed out after {FAILED_TR_TIMEOUT_SECONDS}s"
         auto_tr.save(update_fields=["status", "completed_at", "error_message"])
         notify_traceroute_status_changed(auto_tr.id, AutoTraceRoute.STATUS_FAILED)
         updated += 1
