@@ -350,6 +350,42 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
         serializer = DeviceMetricsSerializer(metrics, many=True)
         return Response(serializer.data)
 
+    @action(detail=True, methods=["get"], url_path="traceroute-links")
+    def traceroute_links(self, request, node_id=None):
+        """
+        Get traceroute links for this node from Neo4j.
+        Returns edges (with avg SNR in/out), nodes, and snr_history per peer.
+
+        Query parameters:
+        - triggered_at_after: ISO 8601 datetime to filter edges
+        """
+        from django.utils.dateparse import parse_datetime
+
+        from traceroute.neo4j_service import run_node_links_query
+
+        node = self.get_object()
+        nid = node.node_id
+
+        triggered_at_after = None
+        if request.query_params.get("triggered_at_after"):
+            dt = parse_datetime(request.query_params.get("triggered_at_after"))
+            if dt:
+                if timezone.is_naive(dt):
+                    dt = timezone.make_aware(dt)
+                triggered_at_after = dt
+
+        try:
+            result = run_node_links_query(nid, triggered_at_after=triggered_at_after)
+            return Response(result)
+        except Exception as e:
+            import logging
+
+            logging.getLogger(__name__).exception("traceroute_links: Neo4j query failed: %s", e)
+            return Response(
+                {"detail": "Failed to fetch traceroute links."},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
     @action(detail=False, methods=["get"], url_path="infrastructure")
     def infrastructure(self, request):
         """
