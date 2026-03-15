@@ -135,14 +135,16 @@ def _get_node_names(
     return (fallback, fallback)
 
 
-def _extract_edges(route_data: list) -> list[tuple[int, int]]:
-    """Extract consecutive (from_id, to_id) pairs from route list of {node_id, snr}."""
+def _extract_edges(route_data: list) -> list[tuple[int, int, float | None]]:
+    """Extract consecutive (from_id, to_id, snr) from route list of {node_id, snr}.
+    SNR at receiving node (b) is the SNR of the link a->b."""
     edges = []
     for i in range(len(route_data) - 1):
         a = route_data[i]["node_id"]
         b = route_data[i + 1]["node_id"]
+        snr = route_data[i + 1].get("snr")
         if a != UNKNOWN_NODE_ID and b != UNKNOWN_NODE_ID:
-            edges.append((a, b))
+            edges.append((a, b, snr if snr is not None else None))
     return edges
 
 
@@ -183,7 +185,7 @@ def add_traceroute_edges(auto_traceroute: AutoTraceRoute, driver=None):
             coords[nid] = pos
             names[nid] = _get_node_names(nid, auto_tr.source_node, auto_tr.target_node, observed_by_id)
 
-    # Extract edges
+    # Extract edges (from_id, to_id, snr)
     edges = []
     if auto_tr.route:
         edges.extend(_extract_edges(auto_tr.route))
@@ -191,7 +193,7 @@ def add_traceroute_edges(auto_traceroute: AutoTraceRoute, driver=None):
         edges.extend(_extract_edges(auto_tr.route_back))
 
     # Filter: both endpoints must have coords
-    valid_edges = [(a, b) for a, b in edges if a in coords and b in coords]
+    valid_edges = [(a, b, snr) for a, b, snr in edges if a in coords and b in coords]
     if not valid_edges:
         logger.debug(
             "add_traceroute_edges: no edges with coords for AutoTraceRoute %s",
@@ -208,7 +210,7 @@ def add_traceroute_edges(auto_traceroute: AutoTraceRoute, driver=None):
         triggered_at_str = datetime.utcnow().isoformat() + "Z"
 
     with driver.session() as session:
-        for a_id, b_id in valid_edges:
+        for a_id, b_id, snr in valid_edges:
             a_str = meshtastic_id_to_hex(a_id)
             b_str = meshtastic_id_to_hex(b_id)
             a_lat, a_lng = coords[a_id]
@@ -216,29 +218,38 @@ def add_traceroute_edges(auto_traceroute: AutoTraceRoute, driver=None):
             a_short, a_long = names.get(a_id, (a_str, a_str))
             b_short, b_long = names.get(b_id, (b_str, b_str))
 
+            # Build relationship props: weight, triggered_at always; snr when present
+            rel_props = "weight: 1, triggered_at: datetime($triggered_at)"
+            params = {
+                "a_id": a_id,
+                "a_str": a_str,
+                "a_lat": a_lat,
+                "a_lng": a_lng,
+                "a_short_name": a_short,
+                "a_long_name": a_long,
+                "b_id": b_id,
+                "b_str": b_str,
+                "b_lat": b_lat,
+                "b_lng": b_lng,
+                "b_short_name": b_short,
+                "b_long_name": b_long,
+                "triggered_at": triggered_at_str,
+            }
+            if snr is not None:
+                rel_props += ", snr: $snr"
+                params["snr"] = float(snr)
+
             session.run(
-                """
-                MERGE (a:MeshNode {node_id: $a_id})
+                f"""
+                MERGE (a:MeshNode {{node_id: $a_id}})
                 SET a.node_id_str = $a_str, a.latitude = $a_lat, a.longitude = $a_lng,
                     a.short_name = $a_short_name, a.long_name = $a_long_name
-                MERGE (b:MeshNode {node_id: $b_id})
+                MERGE (b:MeshNode {{node_id: $b_id}})
                 SET b.node_id_str = $b_str, b.latitude = $b_lat, b.longitude = $b_lng,
                     b.short_name = $b_short_name, b.long_name = $b_long_name
-                CREATE (a)-[:ROUTED_TO {weight: 1, triggered_at: datetime($triggered_at)}]->(b)
+                CREATE (a)-[:ROUTED_TO {{{rel_props}}}]->(b)
                 """,
-                a_id=a_id,
-                a_str=a_str,
-                a_lat=a_lat,
-                a_lng=a_lng,
-                a_short_name=a_short,
-                a_long_name=a_long,
-                b_id=b_id,
-                b_str=b_str,
-                b_lat=b_lat,
-                b_lng=b_lng,
-                b_short_name=b_short,
-                b_long_name=b_long,
-                triggered_at=triggered_at_str,
+                **params,
             )
 
     logger.info(
@@ -416,4 +427,156 @@ def run_heatmap_query(
         "edges": edges,
         "nodes": nodes,
         "meta": meta,
+    }
+
+
+def run_node_links_query(node_id: int, triggered_at_after=None, driver=None):
+    """
+    Query Neo4j for traceroute links involving a focus node.
+    Returns edges (with avg SNR in/out), nodes, and snr_history per peer.
+    """
+    driver = driver or get_driver()
+    params = {"node_id": node_id}
+    if triggered_at_after:
+        params["triggered_at_after"] = (
+            triggered_at_after.isoformat() if hasattr(triggered_at_after, "isoformat") else str(triggered_at_after)
+        )
+
+    # Outbound: focus -> peer. Inbound: peer -> focus.
+    # Use two queries and merge by peer.
+    where_time = " AND r.triggered_at >= datetime($triggered_at_after)" if triggered_at_after else ""
+    where_coords = " AND focus.latitude IS NOT NULL AND peer.latitude IS NOT NULL"
+
+    outbound_query = f"""
+    MATCH (focus:MeshNode {{node_id: $node_id}})-[r:ROUTED_TO]->(peer:MeshNode)
+    WHERE r.snr IS NOT NULL{where_time}{where_coords}
+    RETURN peer.node_id AS peer_id,
+           peer.latitude AS peer_lat, peer.longitude AS peer_lng,
+           peer.node_id_str AS peer_node_id_str,
+           peer.short_name AS peer_short_name, peer.long_name AS peer_long_name,
+           avg(r.snr) AS avg_snr_out,
+           count(r) AS count_out,
+           collect({{triggered_at: toString(r.triggered_at), snr: r.snr}}) AS outbound_history
+    """
+
+    inbound_query = f"""
+    MATCH (focus:MeshNode {{node_id: $node_id}})<-[r:ROUTED_TO]-(peer:MeshNode)
+    WHERE r.snr IS NOT NULL{where_time}{where_coords}
+    RETURN peer.node_id AS peer_id,
+           peer.latitude AS peer_lat, peer.longitude AS peer_lng,
+           peer.node_id_str AS peer_node_id_str,
+           peer.short_name AS peer_short_name, peer.long_name AS peer_long_name,
+           avg(r.snr) AS avg_snr_in,
+           count(r) AS count_in,
+           collect({{triggered_at: toString(r.triggered_at), snr: r.snr}}) AS inbound_history
+    """
+
+    peers = {}
+    focus_node = None
+
+    with driver.session() as session:
+        # Get focus node coords
+        focus_result = session.run(
+            """
+            MATCH (n:MeshNode {node_id: $node_id})
+            WHERE n.latitude IS NOT NULL
+            RETURN n.node_id AS node_id, n.latitude AS lat, n.longitude AS lng,
+                   n.node_id_str AS node_id_str, n.short_name AS short_name, n.long_name AS long_name
+            """,
+            node_id=node_id,
+        )
+        focus_record = focus_result.single()
+        if not focus_record:
+            return {"edges": [], "nodes": [], "snr_history": []}
+
+        focus_node = {
+            "node_id": focus_record["node_id"],
+            "lat": focus_record["lat"],
+            "lng": focus_record["lng"],
+            "node_id_str": focus_record["node_id_str"] or meshtastic_id_to_hex(node_id),
+            "short_name": focus_record["short_name"] or "",
+            "long_name": focus_record["long_name"] or "",
+        }
+
+        # Outbound
+        for record in session.run(outbound_query, params):
+            pid = record["peer_id"]
+            peers[pid] = {
+                "peer_id": pid,
+                "peer_lat": record["peer_lat"],
+                "peer_lng": record["peer_lng"],
+                "peer_node_id_str": record["peer_node_id_str"] or meshtastic_id_to_hex(pid),
+                "peer_short_name": record["peer_short_name"] or "",
+                "peer_long_name": record["peer_long_name"] or "",
+                "avg_snr_out": record["avg_snr_out"],
+                "count_out": record["count_out"],
+                "outbound_history": record["outbound_history"] or [],
+                "avg_snr_in": None,
+                "count_in": 0,
+                "inbound_history": [],
+            }
+
+        # Inbound
+        for record in session.run(inbound_query, params):
+            pid = record["peer_id"]
+            if pid not in peers:
+                peers[pid] = {
+                    "peer_id": pid,
+                    "peer_lat": record["peer_lat"],
+                    "peer_lng": record["peer_lng"],
+                    "peer_node_id_str": record["peer_node_id_str"] or meshtastic_id_to_hex(pid),
+                    "peer_short_name": record["peer_short_name"] or "",
+                    "peer_long_name": record["peer_long_name"] or "",
+                    "avg_snr_out": None,
+                    "count_out": 0,
+                    "outbound_history": [],
+                    "avg_snr_in": None,
+                    "count_in": 0,
+                    "inbound_history": [],
+                }
+            peers[pid]["avg_snr_in"] = record["avg_snr_in"]
+            peers[pid]["count_in"] = record["count_in"]
+            peers[pid]["inbound_history"] = record["inbound_history"] or []
+
+    # Build response
+    nodes_by_id = {node_id: focus_node}
+    edges = []
+    snr_history = []
+
+    for pid, p in peers.items():
+        nodes_by_id[pid] = {
+            "node_id": pid,
+            "lat": p["peer_lat"],
+            "lng": p["peer_lng"],
+            "node_id_str": p["peer_node_id_str"],
+            "short_name": p["peer_short_name"],
+            "long_name": p["peer_long_name"],
+        }
+        count = p["count_out"] + p["count_in"]
+        edges.append(
+            {
+                "from_node_id": node_id,
+                "to_node_id": pid,
+                "from_lat": focus_node["lat"],
+                "from_lng": focus_node["lng"],
+                "to_lat": p["peer_lat"],
+                "to_lng": p["peer_lng"],
+                "avg_snr_in": p["avg_snr_in"],
+                "avg_snr_out": p["avg_snr_out"],
+                "count": count,
+            }
+        )
+        snr_history.append(
+            {
+                "peer_node_id": pid,
+                "peer_short_name": p["peer_short_name"],
+                "inbound": [{"triggered_at": h["triggered_at"], "snr": h["snr"]} for h in p["inbound_history"]],
+                "outbound": [{"triggered_at": h["triggered_at"], "snr": h["snr"]} for h in p["outbound_history"]],
+            }
+        )
+
+    return {
+        "edges": edges,
+        "nodes": list(nodes_by_id.values()),
+        "snr_history": snr_history,
     }

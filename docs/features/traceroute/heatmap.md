@@ -5,15 +5,15 @@ The heatmap visualizes aggregated traceroute traffic between nodes as arcs on a 
 ## Neo4j Schema
 
 - **MeshNode**: Node label with `node_id` (unique), `node_id_str`, `latitude`, `longitude`, `short_name`, `long_name`.
-- **ROUTED_TO**: Relationship from one MeshNode to another. Properties: `weight` (integer, incremented per traceroute), `triggered_at` (datetime).
+- **ROUTED_TO**: Relationship from one MeshNode to another. Properties: `weight` (integer, incremented per traceroute), `triggered_at` (datetime), `snr` (float, optional – SNR at receiving node for this hop).
 
-Edges are directional in Neo4j, but the heatmap query aggregates bidirectionally (A→B and B→A are summed).
+Edges are directional in Neo4j, but the heatmap query aggregates bidirectionally (A→B and B→A are summed). The `snr` property is used by the node-links API for per-node traceroute link visualization.
 
 ## Data Flow
 
-1. When an `AutoTraceRoute` completes, `push_traceroute_to_neo4j` extracts consecutive node pairs from `route` and `route_back`.
+1. When an `AutoTraceRoute` completes, `push_traceroute_to_neo4j` extracts consecutive node pairs (with SNR) from `route` and `route_back`.
 2. For each edge (from_id, to_id), both endpoints must have coordinates (from ManagedNode default_location or ObservedNode latest_status).
-3. Nodes are upserted; `ROUTED_TO` relationships are created with `weight: 1` and `triggered_at`.
+3. Nodes are upserted; `ROUTED_TO` relationships are created with `weight: 1`, `triggered_at`, and `snr` (when present).
 
 ## Heatmap-Edges API
 

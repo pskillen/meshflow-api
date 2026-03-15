@@ -2780,6 +2780,112 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
+  /nodes/observed-nodes/{node_id}/traceroute-links/:
+    get:
+      summary: Get traceroute links for a node
+      description: >
+        Returns traceroute links involving this node from Neo4j.
+        Includes edges with avg SNR (inbound/outbound), nodes, and SNR history per peer.
+      tags: [Nodes]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: node_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: triggered_at_after
+          in: query
+          required: false
+          description: ISO 8601 datetime to filter edges
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Traceroute links with edges, nodes, and SNR history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  edges:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        from_node_id:
+                          type: integer
+                        to_node_id:
+                          type: integer
+                        from_lat:
+                          type: number
+                        from_lng:
+                          type: number
+                        to_lat:
+                          type: number
+                        to_lng:
+                          type: number
+                        avg_snr_in:
+                          type: number
+                          nullable: true
+                        avg_snr_out:
+                          type: number
+                          nullable: true
+                        count:
+                          type: integer
+                  nodes:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        node_id:
+                          type: integer
+                        lat:
+                          type: number
+                        lng:
+                          type: number
+                        short_name:
+                          type: string
+                        long_name:
+                          type: string
+                        node_id_str:
+                          type: string
+                  snr_history:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        peer_node_id:
+                          type: integer
+                        peer_short_name:
+                          type: string
+                        inbound:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              triggered_at:
+                                type: string
+                              snr:
+                                type: number
+                        outbound:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              triggered_at:
+                                type: string
+                              snr:
+                                type: number
+        '503':
+          description: Neo4j unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
   /nodes/managed-nodes/:
     get:
       summary: List managed nodes
