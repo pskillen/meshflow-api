@@ -13,9 +13,11 @@ class AutoTraceRoute(models.Model):
 
     TRIGGER_TYPE_AUTO = "auto"
     TRIGGER_TYPE_USER = "user"
+    TRIGGER_TYPE_EXTERNAL = "external"
     TRIGGER_TYPE_CHOICES = [
         (TRIGGER_TYPE_AUTO, "Auto"),
         (TRIGGER_TYPE_USER, "User"),
+        (TRIGGER_TYPE_EXTERNAL, "External"),
     ]
 
     STATUS_PENDING = "pending"

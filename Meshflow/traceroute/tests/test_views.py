@@ -140,20 +140,43 @@ class TestTracerouteDetail:
         assert resp.json()["id"] == tr.id
 
 
+@pytest.fixture
+def owner_managed_node(create_user, create_managed_node, create_constellation):
+    """ManagedNode owned by owner_user with allow_auto_traceroute=True."""
+    owner = create_user()
+    constellation = create_constellation(created_by=owner)
+    return create_managed_node(
+        owner=owner,
+        constellation=constellation,
+        allow_auto_traceroute=True,
+    )
+
+
 @pytest.mark.django_db
 class TestTracerouteCanTrigger:
     def test_can_trigger_requires_auth(self, api_client):
         resp = api_client.get("/api/traceroutes/can_trigger/")
         assert resp.status_code == 401
 
-    def test_can_trigger_true_for_staff(self, api_client, staff_user):
+    def test_can_trigger_true_for_staff(self, api_client, staff_user, create_managed_node):
+        """Staff has can_trigger=True when at least one node has allow_auto_traceroute."""
+        create_managed_node(allow_auto_traceroute=True)
         api_client.force_authenticate(user=staff_user)
         resp = api_client.get("/api/traceroutes/can_trigger/")
         assert resp.status_code == 200
         assert resp.json()["can_trigger"] is True
 
-    def test_can_trigger_true_for_editor(self, api_client, editor_user):
+    def test_can_trigger_true_for_editor(self, api_client, editor_user, editor_managed_node):
+        """Editor has can_trigger=True when they have triggerable nodes in their constellation."""
         api_client.force_authenticate(user=editor_user)
+        resp = api_client.get("/api/traceroutes/can_trigger/")
+        assert resp.status_code == 200
+        assert resp.json()["can_trigger"] is True
+
+    def test_can_trigger_true_for_owner(self, api_client, owner_managed_node):
+        """Owner of a node with allow_auto_traceroute can trigger."""
+        owner = owner_managed_node.owner
+        api_client.force_authenticate(user=owner)
         resp = api_client.get("/api/traceroutes/can_trigger/")
         assert resp.status_code == 200
         assert resp.json()["can_trigger"] is True
@@ -163,6 +186,72 @@ class TestTracerouteCanTrigger:
         resp = api_client.get("/api/traceroutes/can_trigger/")
         assert resp.status_code == 200
         assert resp.json()["can_trigger"] is False
+
+
+@pytest.mark.django_db
+class TestTracerouteTriggerableNodes:
+    def test_triggerable_nodes_requires_auth(self, api_client):
+        resp = api_client.get("/api/traceroutes/triggerable-nodes/")
+        assert resp.status_code == 401
+
+    def test_triggerable_nodes_returns_nodes_for_staff(self, api_client, staff_user, create_managed_node):
+        mn = create_managed_node(allow_auto_traceroute=True)
+        api_client.force_authenticate(user=staff_user)
+        resp = api_client.get("/api/traceroutes/triggerable-nodes/")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert isinstance(data, list)
+        node_ids = [n["node_id"] for n in data]
+        assert mn.node_id in node_ids
+
+    def test_triggerable_nodes_returns_owned_nodes_for_owner(self, api_client, owner_managed_node):
+        owner = owner_managed_node.owner
+        api_client.force_authenticate(user=owner)
+        resp = api_client.get("/api/traceroutes/triggerable-nodes/")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert isinstance(data, list)
+        node_ids = [n["node_id"] for n in data]
+        assert owner_managed_node.node_id in node_ids
+
+    def test_triggerable_nodes_returns_constellation_nodes_for_editor(
+        self, api_client, editor_user, editor_managed_node
+    ):
+        api_client.force_authenticate(user=editor_user)
+        resp = api_client.get("/api/traceroutes/triggerable-nodes/")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert isinstance(data, list)
+        node_ids = [n["node_id"] for n in data]
+        assert editor_managed_node.node_id in node_ids
+
+    def test_triggerable_nodes_empty_for_viewer(self, api_client, viewer_user, create_managed_node):
+        """Viewer has no triggerable nodes (viewer role is not admin/editor)."""
+        membership = ConstellationUserMembership.objects.filter(user=viewer_user, role="viewer").first()
+        constellation = membership.constellation
+        creator = constellation.created_by
+        mn = create_managed_node(owner=creator, constellation=constellation, allow_auto_traceroute=True)
+        api_client.force_authenticate(user=viewer_user)
+        resp = api_client.get("/api/traceroutes/triggerable-nodes/")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert isinstance(data, list)
+        node_ids = [n["node_id"] for n in data]
+        assert mn.node_id not in node_ids
+
+    def test_triggerable_nodes_response_shape(self, api_client, editor_user, editor_managed_node):
+        api_client.force_authenticate(user=editor_user)
+        resp = api_client.get("/api/traceroutes/triggerable-nodes/")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data) >= 1
+        node = data[0]
+        assert "node_id" in node
+        assert "node_id_str" in node
+        assert "short_name" in node
+        assert "long_name" in node
+        assert "allow_auto_traceroute" in node
+        assert "constellation" in node
 
 
 @pytest.mark.django_db
@@ -209,16 +298,17 @@ class TestTracerouteTrigger:
         self,
         api_client,
         editor_user,
-        create_user,
+        editor_managed_node,
         create_managed_node,
         create_observed_node,
-        create_constellation,
     ):
         """Trigger returns 400 when managed node has allow_auto_traceroute=False."""
-        creator = create_user()
-        constellation = create_constellation(created_by=creator)
-        ConstellationUserMembership.objects.create(user=editor_user, constellation=constellation, role="editor")
-        mn = create_managed_node(
+        # editor_managed_node gives editor permission (triggerable node); create a second node
+        # in same constellation with allow_auto_traceroute=False
+        constellation = editor_managed_node.constellation
+        creator = constellation.created_by
+        mn_disabled = create_managed_node(
+            node_id=editor_managed_node.node_id + 1,
             owner=creator,
             constellation=constellation,
             allow_auto_traceroute=False,
@@ -227,7 +317,7 @@ class TestTracerouteTrigger:
         api_client.force_authenticate(user=editor_user)
         resp = api_client.post(
             "/api/traceroutes/trigger/",
-            {"managed_node_id": mn.node_id, "target_node_id": on.node_id},
+            {"managed_node_id": mn_disabled.node_id, "target_node_id": on.node_id},
             format="json",
         )
         assert resp.status_code == 400
@@ -253,3 +343,46 @@ class TestTracerouteTrigger:
         )
         assert resp2.status_code == 429
         assert "rate limited" in resp2.json().get("detail", "").lower()
+
+    def test_trigger_staff_can_trigger_from_any_node(
+        self, api_client, staff_user, create_managed_node, create_observed_node
+    ):
+        """Staff can trigger from any ManagedNode with allow_auto_traceroute=True."""
+        mn = create_managed_node(allow_auto_traceroute=True)
+        on = create_observed_node()
+        api_client.force_authenticate(user=staff_user)
+        resp = api_client.post(
+            "/api/traceroutes/trigger/",
+            {"managed_node_id": mn.node_id, "target_node_id": on.node_id},
+            format="json",
+        )
+        assert resp.status_code == 201
+        assert resp.json()["source_node"]["node_id"] == mn.node_id
+
+    def test_trigger_owner_can_trigger_from_own_node(self, api_client, owner_managed_node, create_observed_node):
+        """Owner can trigger from their own ManagedNode."""
+        mn = owner_managed_node
+        owner = mn.owner
+        on = create_observed_node()
+        api_client.force_authenticate(user=owner)
+        resp = api_client.post(
+            "/api/traceroutes/trigger/",
+            {"managed_node_id": mn.node_id, "target_node_id": on.node_id},
+            format="json",
+        )
+        assert resp.status_code == 201
+        assert resp.json()["source_node"]["node_id"] == mn.node_id
+
+    def test_trigger_forbidden_when_no_permission(
+        self, api_client, viewer_user, owner_managed_node, create_observed_node
+    ):
+        """User gets 403 when trying to trigger from a node they don't have permission for."""
+        mn = owner_managed_node
+        on = create_observed_node()
+        api_client.force_authenticate(user=viewer_user)
+        resp = api_client.post(
+            "/api/traceroutes/trigger/",
+            {"managed_node_id": mn.node_id, "target_node_id": on.node_id},
+            format="json",
+        )
+        assert resp.status_code == 403
