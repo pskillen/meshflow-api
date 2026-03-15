@@ -13,12 +13,17 @@ from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from constellations.models import ConstellationUserMembership
 from nodes.models import ManagedNode, NodeOwnerClaim, ObservedNode
 
 from .models import AutoTraceRoute
+from .permission_helpers import get_triggerable_nodes_queryset, user_can_trigger_from_node
 from .permissions import CanTriggerTraceroute
-from .serializers import AutoTraceRouteSerializer, TracerouteListSerializer, TriggerTracerouteSerializer
+from .serializers import (
+    AutoTraceRouteSerializer,
+    TracerouteListSerializer,
+    TriggerableNodeSerializer,
+    TriggerTracerouteSerializer,
+)
 from .target_selection import pick_traceroute_target
 
 # Firmware enforces ~30s minimum between traceroutes per node. Reject requests within this window.
@@ -193,18 +198,11 @@ def traceroute_trigger(request):
                 status=status.HTTP_429_TOO_MANY_REQUESTS,
             )
 
-    # Check constellation permission (CanTriggerTraceroute allows staff; for non-staff check membership)
-    if not request.user.is_staff:
-        has_perm = ConstellationUserMembership.objects.filter(
-            user=request.user,
-            constellation=source_node.constellation,
-            role__in=["admin", "editor"],
-        ).exists()
-        if not has_perm:
-            return Response(
-                {"detail": "You do not have permission to trigger traceroutes for this node's constellation."},
-                status=status.HTTP_403_FORBIDDEN,
-            )
+    if not user_can_trigger_from_node(request.user, source_node):
+        return Response(
+            {"detail": "You do not have permission to trigger traceroutes from this node."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
 
     if target_node_id is not None:
         try:
@@ -296,13 +294,16 @@ def heatmap_edges(request):
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
+def traceroute_triggerable_nodes(request):
+    """Returns ManagedNodes the current user can trigger traceroutes from."""
+    qs = get_triggerable_nodes_queryset(request.user)
+    serializer = TriggerableNodeSerializer(qs, many=True)
+    return Response(serializer.data)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
 def traceroute_can_trigger(request):
-    """Returns whether the current user can trigger traceroutes."""
-    can = (
-        request.user.is_staff
-        or ConstellationUserMembership.objects.filter(
-            user=request.user,
-            role__in=["admin", "editor"],
-        ).exists()
-    )
+    """Returns whether the current user can trigger traceroutes (has at least one triggerable node)."""
+    can = get_triggerable_nodes_queryset(request.user).exists()
     return Response({"can_trigger": can})

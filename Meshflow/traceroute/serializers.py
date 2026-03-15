@@ -235,6 +235,29 @@ class AutoTraceRouteSerializer(serializers.ModelSerializer):
         return _enrich_route_nodes(obj.route_back, observed) if obj.route_back else []
 
 
+class TriggerableNodeSerializer(serializers.ModelSerializer):
+    """Minimal ManagedNode for triggerable-nodes list; short_name/long_name from ObservedNode annotation."""
+
+    node_id_str = serializers.SerializerMethodField()
+    short_name = serializers.SerializerMethodField()
+    long_name = serializers.SerializerMethodField()
+    constellation = TracerouteListConstellationSerializer(read_only=True)
+
+    class Meta:
+        model = ManagedNode
+        fields = ["node_id", "node_id_str", "short_name", "long_name", "allow_auto_traceroute", "constellation"]
+        read_only_fields = fields
+
+    def get_node_id_str(self, obj):
+        return meshtastic_id_to_hex(obj.node_id)
+
+    def get_short_name(self, obj):
+        return getattr(obj, "observed_short_name", None) or obj.name
+
+    def get_long_name(self, obj):
+        return getattr(obj, "observed_long_name", None) or obj.name
+
+
 class TriggerTracerouteSerializer(serializers.Serializer):
     """Serializer for POST /api/traceroutes/trigger/."""
 

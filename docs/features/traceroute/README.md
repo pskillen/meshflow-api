@@ -30,9 +30,19 @@ The traceroute feature tracks path discovery between Meshtastic nodes on the mes
 |----------|--------|-------------|
 | `/api/traceroutes/` | GET | List traceroutes (filter by managed_node, target_node, status, triggered_after, etc.) |
 | `/api/traceroutes/<pk>/` | GET | Single traceroute detail |
-| `/api/traceroutes/trigger/` | POST | Manual trigger (admin/editor, requires `managed_node_id`, optional `target_node_id`) |
-| `/api/traceroutes/can_trigger/` | GET | Whether current user can trigger |
+| `/api/traceroutes/trigger/` | POST | Manual trigger (requires `managed_node_id`, optional `target_node_id`; user must be staff, owner of source node, or constellation admin/editor) |
+| `/api/traceroutes/can_trigger/` | GET | Whether current user has at least one triggerable node |
+| `/api/traceroutes/triggerable-nodes/` | GET | ManagedNodes the current user can trigger traceroutes from |
 | `/api/traceroutes/heatmap-edges/` | GET | Aggregated edges/nodes for heatmap (Neo4j) |
+
+## Permissions
+
+| Role | Can trigger from |
+|------|------------------|
+| System admin (`is_staff`) | Any ManagedNode with `allow_auto_traceroute=True` |
+| Constellation admin/editor | Nodes in constellations where user has admin/editor role |
+| ManagedNode owner | Nodes they own (`ManagedNode.owner == user`) |
+| All authenticated | View traceroute list, detail, heatmap |
 
 ## Cross-Environment and Late Responses
 
