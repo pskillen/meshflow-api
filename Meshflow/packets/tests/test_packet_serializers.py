@@ -675,6 +675,35 @@ class PacketIngestSerializerTest(BasePacketSerializerTestCase):
         self.assertEqual(packet.observations.count(), 1)
         self.assertEqual(packet.observations.first().observer, self.observer)
 
+    def test_traceroute_packet_ingest_snr_longer_than_route(self):
+        """Test TRACEROUTE_APP with snrTowards one element longer than route (firmware edge case)."""
+        data = {
+            "id": 987654324,
+            "from": 1623194643,
+            "fromId": "!60b0e093",
+            "to": 123456789,
+            "toId": "!499602d",
+            "decoded": {
+                "portnum": "TRACEROUTE_APP",
+                "traceroute": {
+                    "route": [111111, 222222],
+                    "routeBack": [222222, 111111],
+                    "snrTowards": [18, -12, 4],  # 3 values for 2 route nodes
+                    "snrBack": [8, 0, -4],
+                },
+            },
+            "rxTime": 1745330931,
+            "hopLimit": 6,
+            "hopStart": 6,
+        }
+        serializer = PacketIngestSerializer(data=data, context=self.context)
+        assert_serializer_valid(serializer)
+        packet = serializer.save()
+        self.assertIsInstance(packet, TraceroutePacket)
+        self.assertEqual(packet.route, [111111, 222222])
+        self.assertEqual(packet.snr_towards, [4.5, -3.0, 1.0])  # Extra value stored, receiver uses i < len
+        self.assertEqual(packet.snr_back, [2.0, 0.0, -1.0])
+
     def test_invalid_packet_type(self):
         """Test handling of invalid packet type."""
         data = {

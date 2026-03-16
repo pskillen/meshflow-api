@@ -207,7 +207,8 @@ def on_traceroute_packet_received(sender, packet: TraceroutePacket, observer, ob
             status=AutoTraceRoute.STATUS_PENDING,
         )
 
-    # Build route/route_back with SNR: TraceroutePacket has route, route_back (node_ids) and snr_towards, snr_back
+    # Build route/route_back with SNR: 1:1 mapping route[i] <-> snr_towards[i] (SNR at which route[i] received).
+    # Per Meshtastic firmware PR #4485; firmware may send snr longer than route in edge cases — we use i < len.
     route = []
     for i, nid in enumerate(packet.route):
         snr = packet.snr_towards[i] if i < len(packet.snr_towards) else None
