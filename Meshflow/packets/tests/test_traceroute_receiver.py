@@ -137,6 +137,40 @@ def test_traceroute_receiver_inferred_creation(
 
 
 @pytest.mark.django_db
+def test_traceroute_receiver_snr_mapping_route_longer_than_snr(
+    create_traceroute_packet, create_managed_node, create_packet_observation_for_tr
+):
+    """When route is longer than snr_towards, extra nodes get snr: None (1:1 mapping, no index error)."""
+    source_node = create_managed_node()
+    target_node_id = 0xABCDEF12
+    packet = create_traceroute_packet(
+        observer=source_node,
+        from_int=target_node_id,
+        route=[0x11111111, 0x22222222, 0x33333333],
+        route_back=[0x33333333, 0x22222222, 0x11111111],
+        snr_towards=[-5.0, -3.0],  # Only 2 values for 3 route nodes
+        snr_back=[-4.0, -2.0],  # Only 2 values for 3 route_back nodes
+    )
+    observation = create_packet_observation_for_tr(packet=packet, observer=source_node)
+
+    with patch("traceroute.tasks.push_traceroute_to_neo4j"):
+        with patch("traceroute.ws_notify.notify_traceroute_status_changed"):
+            traceroute_packet_received.send(sender=None, packet=packet, observer=source_node, observation=observation)
+
+    auto_tr = AutoTraceRoute.objects.get(source_node=source_node, target_node__node_id=target_node_id)
+    assert auto_tr.route == [
+        {"node_id": 0x11111111, "snr": -5.0},
+        {"node_id": 0x22222222, "snr": -3.0},
+        {"node_id": 0x33333333, "snr": None},
+    ]
+    assert auto_tr.route_back == [
+        {"node_id": 0x33333333, "snr": -4.0},
+        {"node_id": 0x22222222, "snr": -2.0},
+        {"node_id": 0x11111111, "snr": None},
+    ]
+
+
+@pytest.mark.django_db
 def test_traceroute_receiver_late_response_updates_failed(
     create_traceroute_packet,
     create_managed_node,

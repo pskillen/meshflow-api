@@ -1092,12 +1092,13 @@ class TraceroutePacketSerializer(BasePacketSerializer):
         """Flatten decoded traceroute data."""
         validated_data = super().to_internal_value(data)
 
-        # Flatten the nested traceroute data (Meshtastic uses route, routeBack, snrTowards, snrBack)
+        # Flatten the nested traceroute data (Meshtastic uses route, routeBack, snrTowards, snrBack).
+        # SNR 1:1 with route indices: snr_towards[i] = SNR at which route[i] received (firmware PR #4485).
         if "decoded" in data and "traceroute" in data["decoded"]:
             traceroute_data = data["decoded"]["traceroute"]
             validated_data["route"] = traceroute_data.get("route", []) or []
             validated_data["route_back"] = traceroute_data.get("route_back", traceroute_data.get("routeBack", [])) or []
-            # SNR values are scaled by 4 in protocol; convert to dB. -128 = unknown (omit or use None)
+            # SNR values scaled by 4 in protocol; convert to dB. -128 = unknown (omit or use None)
             validated_data["snr_towards"] = self._parse_snr_list(
                 traceroute_data.get("snrTowards", traceroute_data.get("snr_towards", []))
             )

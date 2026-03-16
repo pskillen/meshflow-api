@@ -12,8 +12,9 @@ Edges are directional in Neo4j, but the heatmap query aggregates bidirectionally
 ## Data Flow
 
 1. When an `AutoTraceRoute` completes, `push_traceroute_to_neo4j` extracts consecutive node pairs (with SNR) from `route` and `route_back`.
-2. For each edge (from_id, to_id), both endpoints must have coordinates (from ManagedNode default_location or ObservedNode latest_status).
-3. Nodes are upserted; `ROUTED_TO` relationships are created with `weight: 1`, `triggered_at`, and `snr` (when present).
+2. **Meshtastic format:** `route` excludes the source (contains `[hop1, hop2, ..., target]`); `route_back` includes the source as the last element `[hop1', ..., source]`. SNR is 1:1 with route indices (SNR at receiving node per firmware PR #4485). A synthetic edge `(source, route[0])` is added in `add_traceroute_edges` so the originating node has outbound links.
+3. For each edge (from_id, to_id), both endpoints must have coordinates (from ManagedNode default_location or ObservedNode latest_status).
+4. Nodes are upserted; `ROUTED_TO` relationships are created with `weight: 1`, `triggered_at`, and `snr` (when present).
 
 ## Heatmap-Edges API
 

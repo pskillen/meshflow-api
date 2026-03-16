@@ -192,6 +192,14 @@ def add_traceroute_edges(auto_traceroute: AutoTraceRoute, driver=None):
     if auto_tr.route_back:
         edges.extend(_extract_edges(auto_tr.route_back))
 
+    # Prepend edge (source -> route[0]) — source is not in route per Meshtastic format
+    if auto_tr.route and len(auto_tr.route) > 0:
+        first_hop = auto_tr.route[0]
+        src_id = auto_tr.source_node.node_id
+        first_id = first_hop["node_id"]
+        if first_id != UNKNOWN_NODE_ID:
+            edges.insert(0, (src_id, first_id, first_hop.get("snr")))
+
     # Filter: both endpoints must have coords
     valid_edges = [(a, b, snr) for a, b, snr in edges if a in coords and b in coords]
     if not valid_edges:
