@@ -3689,7 +3689,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/NodeOwnerClaim'
         '400':
-          description: Claim already exists
+          description: Claim already exists, or node is already claimed by another user
           content:
             application/json:
               schema:

@@ -589,6 +589,11 @@ class ObservedNodeClaimView(APIView):
 
     def post(self, request, node_id):
         node = get_object_or_404(ObservedNode, node_id=node_id)
+        if node.claimed_by_id and node.claimed_by_id != request.user.id:
+            return Response(
+                {"detail": "Node is already claimed by another user."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         if NodeOwnerClaim.objects.filter(node=node, user=request.user).exists():
             return Response({"detail": "Claim already exists."}, status=status.HTTP_400_BAD_REQUEST)
         claim_key = generate_claim_key()
