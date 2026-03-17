@@ -8,6 +8,7 @@ from users.models import User
 
 from .models import (
     DeviceMetrics,
+    EnvironmentMetrics,
     LocationSource,
     ManagedNode,
     NodeAPIKey,
@@ -15,6 +16,7 @@ from .models import (
     NodeOwnerClaim,
     ObservedNode,
     Position,
+    PowerMetrics,
 )
 
 
@@ -180,6 +182,7 @@ class ManagedNodeSerializer(serializers.ModelSerializer):
     position = serializers.SerializerMethodField(read_only=True)
     device_metrics = serializers.SerializerMethodField(read_only=True)
     latest_environment_metrics = serializers.SerializerMethodField(read_only=True)
+    latest_power_metrics = serializers.SerializerMethodField(read_only=True)
     latest_air_quality_metrics = serializers.SerializerMethodField(read_only=True)
     latest_health_metrics = serializers.SerializerMethodField(read_only=True)
     latest_host_metrics = serializers.SerializerMethodField(read_only=True)
@@ -201,6 +204,7 @@ class ManagedNodeSerializer(serializers.ModelSerializer):
             "position",
             "device_metrics",
             "latest_environment_metrics",
+            "latest_power_metrics",
             "latest_air_quality_metrics",
             "latest_health_metrics",
             "latest_host_metrics",
@@ -301,7 +305,60 @@ class ManagedNodeSerializer(serializers.ModelSerializer):
             "temperature": status.environment_temperature,
             "relative_humidity": status.environment_relative_humidity,
             "barometric_pressure": status.environment_barometric_pressure,
+            "gas_resistance": status.environment_gas_resistance,
+            "iaq": status.environment_iaq,
+            "lux": status.environment_lux,
+            "wind_direction": status.environment_wind_direction,
+            "wind_speed": status.environment_wind_speed,
+            "radiation": status.environment_radiation,
+            "rainfall_1h": status.environment_rainfall_1h,
+            "rainfall_24h": status.environment_rainfall_24h,
             "reported_time": status.environment_reported_time,
+        }
+
+    def get_latest_power_metrics(self, obj):
+        status = self._get_managed_node_latest_status(obj)
+        if status is not None and status.power_reported_time is not None:
+            return {
+                "ch1_voltage": status.ch1_voltage,
+                "ch1_current": status.ch1_current,
+                "ch2_voltage": status.ch2_voltage,
+                "ch2_current": status.ch2_current,
+                "ch3_voltage": status.ch3_voltage,
+                "ch3_current": status.ch3_current,
+                "ch4_voltage": status.ch4_voltage,
+                "ch4_current": status.ch4_current,
+                "ch5_voltage": status.ch5_voltage,
+                "ch5_current": status.ch5_current,
+                "ch6_voltage": status.ch6_voltage,
+                "ch6_current": status.ch6_current,
+                "ch7_voltage": status.ch7_voltage,
+                "ch7_current": status.ch7_current,
+                "ch8_voltage": status.ch8_voltage,
+                "ch8_current": status.ch8_current,
+                "reported_time": status.power_reported_time,
+            }
+        latest = PowerMetrics.objects.filter(node__node_id=obj.node_id).order_by("-reported_time").first()
+        if latest is None:
+            return None
+        return {
+            "ch1_voltage": latest.ch1_voltage,
+            "ch1_current": latest.ch1_current,
+            "ch2_voltage": latest.ch2_voltage,
+            "ch2_current": latest.ch2_current,
+            "ch3_voltage": latest.ch3_voltage,
+            "ch3_current": latest.ch3_current,
+            "ch4_voltage": latest.ch4_voltage,
+            "ch4_current": latest.ch4_current,
+            "ch5_voltage": latest.ch5_voltage,
+            "ch5_current": latest.ch5_current,
+            "ch6_voltage": latest.ch6_voltage,
+            "ch6_current": latest.ch6_current,
+            "ch7_voltage": latest.ch7_voltage,
+            "ch7_current": latest.ch7_current,
+            "ch8_voltage": latest.ch8_voltage,
+            "ch8_current": latest.ch8_current,
+            "reported_time": latest.reported_time,
         }
 
     def get_latest_air_quality_metrics(self, obj):
@@ -621,6 +678,70 @@ class DeviceMetricsSerializer(serializers.ModelSerializer):
         return super().to_representation(instance)
 
 
+class EnvironmentMetricsSerializer(serializers.ModelSerializer):
+    """Serializer for environment metrics (history endpoint)."""
+
+    class Meta:
+        model = EnvironmentMetrics
+        fields = [
+            "id",
+            "node",
+            "logged_time",
+            "reported_time",
+            "temperature",
+            "relative_humidity",
+            "barometric_pressure",
+            "gas_resistance",
+            "iaq",
+            "voltage",
+            "current",
+            "distance",
+            "lux",
+            "white_lux",
+            "ir_lux",
+            "uv_lux",
+            "wind_direction",
+            "wind_speed",
+            "weight",
+            "wind_gust",
+            "wind_lull",
+            "radiation",
+            "rainfall_1h",
+            "rainfall_24h",
+            "soil_moisture",
+            "soil_temperature",
+        ]
+
+
+class PowerMetricsSerializer(serializers.ModelSerializer):
+    """Serializer for power metrics (history endpoint)."""
+
+    class Meta:
+        model = PowerMetrics
+        fields = [
+            "id",
+            "node",
+            "logged_time",
+            "reported_time",
+            "ch1_voltage",
+            "ch1_current",
+            "ch2_voltage",
+            "ch2_current",
+            "ch3_voltage",
+            "ch3_current",
+            "ch4_voltage",
+            "ch4_current",
+            "ch5_voltage",
+            "ch5_current",
+            "ch6_voltage",
+            "ch6_current",
+            "ch7_voltage",
+            "ch7_current",
+            "ch8_voltage",
+            "ch8_current",
+        ]
+
+
 class ObservedNodeSerializer(serializers.ModelSerializer):
     """Serializer for observed nodes."""
 
@@ -633,6 +754,7 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
     latest_position = serializers.SerializerMethodField()
     latest_device_metrics = serializers.SerializerMethodField()
     latest_environment_metrics = serializers.SerializerMethodField()
+    latest_power_metrics = serializers.SerializerMethodField()
     latest_air_quality_metrics = serializers.SerializerMethodField()
     latest_health_metrics = serializers.SerializerMethodField()
     latest_host_metrics = serializers.SerializerMethodField()
@@ -662,6 +784,7 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
             "latest_position",
             "latest_device_metrics",
             "latest_environment_metrics",
+            "latest_power_metrics",
             "latest_air_quality_metrics",
             "latest_health_metrics",
             "latest_host_metrics",
@@ -676,6 +799,7 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
             "latest_position",
             "latest_device_metrics",
             "latest_environment_metrics",
+            "latest_power_metrics",
             "latest_air_quality_metrics",
             "latest_health_metrics",
             "latest_host_metrics",
@@ -806,7 +930,60 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
             "temperature": status.environment_temperature,
             "relative_humidity": status.environment_relative_humidity,
             "barometric_pressure": status.environment_barometric_pressure,
+            "gas_resistance": status.environment_gas_resistance,
+            "iaq": status.environment_iaq,
+            "lux": status.environment_lux,
+            "wind_direction": status.environment_wind_direction,
+            "wind_speed": status.environment_wind_speed,
+            "radiation": status.environment_radiation,
+            "rainfall_1h": status.environment_rainfall_1h,
+            "rainfall_24h": status.environment_rainfall_24h,
             "reported_time": status.environment_reported_time,
+        }
+
+    def get_latest_power_metrics(self, obj):
+        status = self._get_latest_status(obj)
+        if status is not None and status.power_reported_time is not None:
+            return {
+                "ch1_voltage": status.ch1_voltage,
+                "ch1_current": status.ch1_current,
+                "ch2_voltage": status.ch2_voltage,
+                "ch2_current": status.ch2_current,
+                "ch3_voltage": status.ch3_voltage,
+                "ch3_current": status.ch3_current,
+                "ch4_voltage": status.ch4_voltage,
+                "ch4_current": status.ch4_current,
+                "ch5_voltage": status.ch5_voltage,
+                "ch5_current": status.ch5_current,
+                "ch6_voltage": status.ch6_voltage,
+                "ch6_current": status.ch6_current,
+                "ch7_voltage": status.ch7_voltage,
+                "ch7_current": status.ch7_current,
+                "ch8_voltage": status.ch8_voltage,
+                "ch8_current": status.ch8_current,
+                "reported_time": status.power_reported_time,
+            }
+        latest = PowerMetrics.objects.filter(node=obj).order_by("-reported_time").first()
+        if latest is None:
+            return None
+        return {
+            "ch1_voltage": latest.ch1_voltage,
+            "ch1_current": latest.ch1_current,
+            "ch2_voltage": latest.ch2_voltage,
+            "ch2_current": latest.ch2_current,
+            "ch3_voltage": latest.ch3_voltage,
+            "ch3_current": latest.ch3_current,
+            "ch4_voltage": latest.ch4_voltage,
+            "ch4_current": latest.ch4_current,
+            "ch5_voltage": latest.ch5_voltage,
+            "ch5_current": latest.ch5_current,
+            "ch6_voltage": latest.ch6_voltage,
+            "ch6_current": latest.ch6_current,
+            "ch7_voltage": latest.ch7_voltage,
+            "ch7_current": latest.ch7_current,
+            "ch8_voltage": latest.ch8_voltage,
+            "ch8_current": latest.ch8_current,
+            "reported_time": latest.reported_time,
         }
 
     def get_latest_air_quality_metrics(self, obj):
