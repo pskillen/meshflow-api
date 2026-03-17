@@ -678,6 +678,49 @@ class DeviceMetricsSerializer(serializers.ModelSerializer):
         return super().to_representation(instance)
 
 
+class EnvironmentMetricsBulkSerializer(serializers.ModelSerializer):
+    """
+    Lightweight serializer for bulk environment metrics response.
+    Includes node_id, node_id_str, short_name for frontend grouping by node.
+    """
+
+    node_id = serializers.IntegerField(source="node.node_id", read_only=True)
+    node_id_str = serializers.CharField(source="node.node_id_str", read_only=True)
+    short_name = serializers.CharField(source="node.short_name", read_only=True, allow_null=True)
+
+    class Meta:
+        model = EnvironmentMetrics
+        fields = [
+            "node_id",
+            "node_id_str",
+            "short_name",
+            "reported_time",
+            "logged_time",
+            "temperature",
+            "relative_humidity",
+            "barometric_pressure",
+            "gas_resistance",
+            "iaq",
+            "voltage",
+            "current",
+            "distance",
+            "lux",
+            "white_lux",
+            "ir_lux",
+            "uv_lux",
+            "wind_direction",
+            "wind_speed",
+            "weight",
+            "wind_gust",
+            "wind_lull",
+            "radiation",
+            "rainfall_1h",
+            "rainfall_24h",
+            "soil_moisture",
+            "soil_temperature",
+        ]
+
+
 class EnvironmentMetricsSerializer(serializers.ModelSerializer):
     """Serializer for environment metrics (history endpoint)."""
 

@@ -5,6 +5,7 @@ from rest_framework.routers import DefaultRouter
 from nodes.views import (
     APIKeyViewSet,
     DeviceMetricsBulkView,
+    EnvironmentMetricsBulkView,
     ManagedNodeViewSet,
     ObservedNodeClaimView,
     ObservedNodeViewSet,
@@ -24,6 +25,11 @@ urlpatterns = [
         "device-metrics-bulk/",
         DeviceMetricsBulkView.as_view(),
         name="device-metrics-bulk",
+    ),
+    path(
+        "environment-metrics-bulk/",
+        EnvironmentMetricsBulkView.as_view(),
+        name="environment-metrics-bulk",
     ),
     path("observed-nodes/<int:node_id>/claim/", ObservedNodeClaimView.as_view(), name="observed-node-claim"),
     path("claims/mine/", UserNodeClaimsView.as_view(), name="user-node-claims"),
