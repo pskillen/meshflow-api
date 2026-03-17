@@ -2764,6 +2764,40 @@ paths:
                         items:
                           $ref: '#/components/schemas/ObservedNode'
 
+  /nodes/observed-nodes/weather/:
+    get:
+      summary: List weather nodes
+      description: >
+        Get observed nodes that have reported environment metrics within the cutoff.
+        Returns nodes with latest_environment_metrics and latest_position for map/cards.
+      tags: [Nodes]
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PaginationPage'
+        - $ref: '#/components/parameters/PaginationPageSize'
+        - name: environment_reported_after
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+            description: Filter nodes with environment metrics reported after this time (ISO 8601). Default 24h ago.
+      responses:
+        '200':
+          description: List of weather nodes with environment metrics
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedResponse'
+                  - type: object
+                    properties:
+                      results:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ObservedNode'
+
   /nodes/device-metrics-bulk/:
     get:
       summary: Bulk device metrics for multiple nodes
@@ -2828,6 +2862,96 @@ paths:
           description: Invalid request (e.g. missing node_ids)
     post:
       summary: Bulk device metrics (POST)
+      description: Same as GET but with node_ids, start_date, end_date in request body
+      tags: [Nodes]
+      security:
+        - BearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                node_ids:
+                  type: array
+                  items:
+                    type: integer
+                start_date:
+                  type: string
+                  format: date-time
+                end_date:
+                  type: string
+                  format: date-time
+      responses:
+        '200':
+          description: Same as GET
+        '400':
+          description: Invalid request
+
+  /nodes/environment-metrics-bulk/:
+    get:
+      summary: Bulk environment metrics for multiple nodes
+      description: >
+        Get environment metrics (temperature, humidity, pressure, etc.) for multiple nodes in one request.
+        Returns flat list; frontend groups by node_id for per-node charts. Used by Weather page.
+      tags: [Nodes]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: node_ids
+          in: query
+          required: true
+          schema:
+            type: string
+            description: Comma-separated node IDs (e.g. "1,2,3,4,5")
+        - name: start_date
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: end_date
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Flat list of environment metrics with node_id, node_id_str, short_name per item
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        node_id:
+                          type: integer
+                        node_id_str:
+                          type: string
+                        short_name:
+                          type: string
+                          nullable: true
+                        reported_time:
+                          type: string
+                          format: date-time
+                        temperature:
+                          type: number
+                          nullable: true
+                        relative_humidity:
+                          type: number
+                          nullable: true
+                        barometric_pressure:
+                          type: number
+                          nullable: true
+        '400':
+          description: Invalid request (e.g. missing node_ids)
+    post:
+      summary: Bulk environment metrics (POST)
       description: Same as GET but with node_ids, start_date, end_date in request body
       tags: [Nodes]
       security:

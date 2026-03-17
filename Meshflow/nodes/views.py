@@ -30,6 +30,7 @@ from nodes.serializers import (
     APIKeySerializer,
     DeviceMetricsBulkSerializer,
     DeviceMetricsSerializer,
+    EnvironmentMetricsBulkSerializer,
     EnvironmentMetricsSerializer,
     ManagedNodeSerializer,
     NodeOwnerClaimSerializer,
@@ -40,6 +41,7 @@ from nodes.serializers import (
     PowerMetricsSerializer,
 )
 from nodes.services.device_metrics import get_device_metrics_bulk
+from nodes.services.environment_metrics import get_environment_metrics_bulk
 
 from .utils import generate_claim_key
 
@@ -501,6 +503,41 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(qs, many=True)
         return Response(serializer.data)
 
+    @action(detail=False, methods=["get"], url_path="weather")
+    def weather(self, request):
+        """
+        Get observed nodes that have reported environment metrics within the cutoff.
+
+        Query params: environment_reported_after (ISO 8601, default 24h ago), page, page_size
+        """
+        default_cutoff = timezone.now() - timedelta(hours=24)
+        environment_reported_after = request.query_params.get("environment_reported_after")
+        if environment_reported_after:
+            try:
+                cutoff = timezone.datetime.fromisoformat(environment_reported_after.replace("Z", "+00:00"))
+                if timezone.is_naive(cutoff):
+                    cutoff = timezone.make_aware(cutoff)
+            except ValueError, TypeError:
+                cutoff = default_cutoff
+        else:
+            cutoff = default_cutoff
+
+        qs = (
+            ObservedNode.objects.filter(
+                latest_status__environment_reported_time__isnull=False,
+                latest_status__environment_reported_time__gte=cutoff,
+            )
+            .order_by("-latest_status__environment_reported_time", "node_id")
+            .select_related("latest_status")
+        )
+
+        page = self.paginate_queryset(qs)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        serializer = self.get_serializer(qs, many=True)
+        return Response(serializer.data)
+
 
 class DeviceMetricsBulkView(APIView):
     """
@@ -568,6 +605,75 @@ class DeviceMetricsBulkView(APIView):
         end_date = self._parse_date(request.data.get("end_date"))
         metrics = get_device_metrics_bulk(node_ids, start_date, end_date)
         serializer = DeviceMetricsBulkSerializer(metrics, many=True)
+        return Response({"results": serializer.data})
+
+
+class EnvironmentMetricsBulkView(APIView):
+    """
+    Bulk environment metrics for multiple nodes in one request.
+    Used by Weather page for mini charts.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def _parse_node_ids(self, request):
+        """Extract node_ids from GET (comma-separated) or POST body."""
+        if request.method == "GET":
+            node_ids_param = request.query_params.get("node_ids", "")
+            if not node_ids_param:
+                return None
+            try:
+                return [int(x.strip()) for x in node_ids_param.split(",") if x.strip()]
+            except ValueError:
+                return None
+        # POST
+        node_ids = request.data.get("node_ids", [])
+        if not isinstance(node_ids, list):
+            return None
+        try:
+            return [int(x) for x in node_ids]
+        except ValueError, TypeError:
+            return None
+
+    def _parse_date(self, value):
+        """Parse ISO 8601 or YYYY-MM-DD date."""
+        if not value:
+            return None
+        try:
+            dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+            if timezone.is_naive(dt):
+                dt = timezone.make_aware(dt)
+            return dt
+        except ValueError:
+            try:
+                return timezone.datetime.strptime(str(value), "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            except ValueError:
+                return None
+
+    def get(self, request):
+        node_ids = self._parse_node_ids(request)
+        if not node_ids:
+            return Response(
+                {"error": "node_ids query parameter required (comma-separated integers)"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        start_date = self._parse_date(request.query_params.get("start_date"))
+        end_date = self._parse_date(request.query_params.get("end_date"))
+        metrics = get_environment_metrics_bulk(node_ids, start_date, end_date)
+        serializer = EnvironmentMetricsBulkSerializer(metrics, many=True)
+        return Response({"results": serializer.data})
+
+    def post(self, request):
+        node_ids = self._parse_node_ids(request)
+        if not node_ids:
+            return Response(
+                {"error": "node_ids required in body (array of integers)"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        start_date = self._parse_date(request.data.get("start_date"))
+        end_date = self._parse_date(request.data.get("end_date"))
+        metrics = get_environment_metrics_bulk(node_ids, start_date, end_date)
+        serializer = EnvironmentMetricsBulkSerializer(metrics, many=True)
         return Response({"results": serializer.data})
 
 
