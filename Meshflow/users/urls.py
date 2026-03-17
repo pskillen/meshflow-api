@@ -1,6 +1,9 @@
 from django.urls import include, path
 
 from users.social_auth import (
+    DiscordCallbackRedirectView,
+    DiscordLoginRedirectView,
+    DiscordLoginView,
     GithubCallbackRedirectView,
     GithubLoginRedirectView,
     GithubLoginView,
@@ -21,4 +24,7 @@ urlpatterns = [
     path("social/github/", GithubLoginRedirectView.as_view(), name="github_login"),
     path("social/github/callback/", GithubCallbackRedirectView.as_view(), name="github_login_callback"),
     path("social/github/token/", GithubLoginView.as_view(), name="github_token"),
+    path("social/discord/", DiscordLoginRedirectView.as_view(), name="discord_login"),
+    path("social/discord/callback/", DiscordCallbackRedirectView.as_view(), name="discord_login_callback"),
+    path("social/discord/token/", DiscordLoginView.as_view(), name="discord_token"),
 ]
