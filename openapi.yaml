@@ -739,6 +739,8 @@ components:
           $ref: '#/components/schemas/DeviceMetrics'
         latest_environment_metrics:
           $ref: '#/components/schemas/LatestEnvironmentMetrics'
+        latest_power_metrics:
+          $ref: '#/components/schemas/LatestPowerMetrics'
         latest_air_quality_metrics:
           $ref: '#/components/schemas/LatestAirQualityMetrics'
         latest_health_metrics:
@@ -1037,6 +1039,8 @@ components:
               description: The longitude of the node
         latest_environment_metrics:
           $ref: '#/components/schemas/LatestEnvironmentMetrics'
+        latest_power_metrics:
+          $ref: '#/components/schemas/LatestPowerMetrics'
         latest_air_quality_metrics:
           $ref: '#/components/schemas/LatestAirQualityMetrics'
         latest_health_metrics:
@@ -1191,9 +1195,206 @@ components:
         barometric_pressure:
           type: number
           nullable: true
+        gas_resistance:
+          type: number
+          nullable: true
+        iaq:
+          type: integer
+          nullable: true
+        lux:
+          type: number
+          nullable: true
+        wind_direction:
+          type: integer
+          nullable: true
+        wind_speed:
+          type: number
+          nullable: true
+        radiation:
+          type: number
+          nullable: true
+        rainfall_1h:
+          type: number
+          nullable: true
+        rainfall_24h:
+          type: number
+          nullable: true
         reported_time:
           type: string
           format: date-time
+          nullable: true
+
+    LatestPowerMetrics:
+      type: object
+      description: Latest power metrics from NodeLatestStatus
+      nullable: true
+      properties:
+        ch1_voltage:
+          type: number
+          nullable: true
+        ch1_current:
+          type: number
+          nullable: true
+        ch2_voltage:
+          type: number
+          nullable: true
+        ch2_current:
+          type: number
+          nullable: true
+        ch3_voltage:
+          type: number
+          nullable: true
+        ch3_current:
+          type: number
+          nullable: true
+        ch4_voltage:
+          type: number
+          nullable: true
+        ch4_current:
+          type: number
+          nullable: true
+        ch5_voltage:
+          type: number
+          nullable: true
+        ch5_current:
+          type: number
+          nullable: true
+        ch6_voltage:
+          type: number
+          nullable: true
+        ch6_current:
+          type: number
+          nullable: true
+        ch7_voltage:
+          type: number
+          nullable: true
+        ch7_current:
+          type: number
+          nullable: true
+        ch8_voltage:
+          type: number
+          nullable: true
+        ch8_current:
+          type: number
+          nullable: true
+        reported_time:
+          type: string
+          format: date-time
+          nullable: true
+
+    EnvironmentMetrics:
+      type: object
+      description: Environment metrics record (history endpoint)
+      properties:
+        id:
+          type: integer
+        node:
+          type: integer
+        logged_time:
+          type: string
+          format: date-time
+          nullable: true
+        reported_time:
+          type: string
+          format: date-time
+          nullable: true
+        temperature:
+          type: number
+          nullable: true
+        relative_humidity:
+          type: number
+          nullable: true
+        barometric_pressure:
+          type: number
+          nullable: true
+        gas_resistance:
+          type: number
+          nullable: true
+        iaq:
+          type: integer
+          nullable: true
+        lux:
+          type: number
+          nullable: true
+        wind_direction:
+          type: integer
+          nullable: true
+        wind_speed:
+          type: number
+          nullable: true
+        radiation:
+          type: number
+          nullable: true
+        rainfall_1h:
+          type: number
+          nullable: true
+        rainfall_24h:
+          type: number
+          nullable: true
+
+    PowerMetrics:
+      type: object
+      description: Power metrics record (history endpoint)
+      properties:
+        id:
+          type: integer
+        node:
+          type: integer
+        logged_time:
+          type: string
+          format: date-time
+          nullable: true
+        reported_time:
+          type: string
+          format: date-time
+          nullable: true
+        ch1_voltage:
+          type: number
+          nullable: true
+        ch1_current:
+          type: number
+          nullable: true
+        ch2_voltage:
+          type: number
+          nullable: true
+        ch2_current:
+          type: number
+          nullable: true
+        ch3_voltage:
+          type: number
+          nullable: true
+        ch3_current:
+          type: number
+          nullable: true
+        ch4_voltage:
+          type: number
+          nullable: true
+        ch4_current:
+          type: number
+          nullable: true
+        ch5_voltage:
+          type: number
+          nullable: true
+        ch5_current:
+          type: number
+          nullable: true
+        ch6_voltage:
+          type: number
+          nullable: true
+        ch6_current:
+          type: number
+          nullable: true
+        ch7_voltage:
+          type: number
+          nullable: true
+        ch7_current:
+          type: number
+          nullable: true
+        ch8_voltage:
+          type: number
+          nullable: true
+        ch8_current:
+          type: number
           nullable: true
 
     LatestAirQualityMetrics:
@@ -2796,6 +2997,66 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/DeviceMetrics'
+        '400':
+          description: Invalid request parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /nodes/observed-nodes/{node_id}/environment_metrics/:
+    get:
+      summary: Get environment metrics for a specific node
+      description: Returns a list of environment metrics for a specific node with optional date filtering
+      tags: [Nodes]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: node_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - $ref: '#/components/schemas/DateRangeQuery'
+      responses:
+        '200':
+          description: List of environment metrics for the node
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EnvironmentMetrics'
+        '400':
+          description: Invalid request parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /nodes/observed-nodes/{node_id}/power_metrics/:
+    get:
+      summary: Get power metrics for a specific node
+      description: Returns a list of power metrics for a specific node with optional date filtering
+      tags: [Nodes]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: node_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - $ref: '#/components/schemas/DateRangeQuery'
+      responses:
+        '200':
+          description: List of power metrics for the node
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PowerMetrics'
         '400':
           description: Invalid request parameters
           content:

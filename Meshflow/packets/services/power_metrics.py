@@ -1,12 +1,12 @@
 """Service for processing power metrics packets."""
 
-from nodes.models import PowerMetrics
+from nodes.models import NodeLatestStatus, PowerMetrics
 from packets.models import PowerMetricsPacket
 from packets.services.base import BasePacketService
 
 
 class PowerMetricsPacketService(BasePacketService):
-    """Service for processing power metrics packets. Stores only; no NodeLatestStatus update."""
+    """Service for processing power metrics packets."""
 
     def _process_packet(self) -> None:
         """Process the power metrics packet and create a PowerMetrics record."""
@@ -34,4 +34,27 @@ class PowerMetricsPacketService(BasePacketService):
             ch7_current=self.packet.ch7_current,
             ch8_voltage=self.packet.ch8_voltage,
             ch8_current=self.packet.ch8_current,
+        )
+
+        NodeLatestStatus.objects.update_or_create(
+            node=self.from_node,
+            defaults={
+                "ch1_voltage": self.packet.ch1_voltage,
+                "ch1_current": self.packet.ch1_current,
+                "ch2_voltage": self.packet.ch2_voltage,
+                "ch2_current": self.packet.ch2_current,
+                "ch3_voltage": self.packet.ch3_voltage,
+                "ch3_current": self.packet.ch3_current,
+                "ch4_voltage": self.packet.ch4_voltage,
+                "ch4_current": self.packet.ch4_current,
+                "ch5_voltage": self.packet.ch5_voltage,
+                "ch5_current": self.packet.ch5_current,
+                "ch6_voltage": self.packet.ch6_voltage,
+                "ch6_current": self.packet.ch6_current,
+                "ch7_voltage": self.packet.ch7_voltage,
+                "ch7_current": self.packet.ch7_current,
+                "ch8_voltage": self.packet.ch8_voltage,
+                "ch8_current": self.packet.ch8_current,
+                "power_reported_time": reported_time,
+            },
         )

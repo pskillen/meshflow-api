@@ -181,6 +181,14 @@ class NodeLatestStatus(models.Model):
     environment_temperature = models.FloatField(null=True, blank=True)
     environment_relative_humidity = models.FloatField(null=True, blank=True)
     environment_barometric_pressure = models.FloatField(null=True, blank=True)
+    environment_gas_resistance = models.FloatField(null=True, blank=True)
+    environment_iaq = models.IntegerField(null=True, blank=True)
+    environment_lux = models.FloatField(null=True, blank=True)
+    environment_wind_direction = models.IntegerField(null=True, blank=True)
+    environment_wind_speed = models.FloatField(null=True, blank=True)
+    environment_radiation = models.FloatField(null=True, blank=True)
+    environment_rainfall_1h = models.FloatField(null=True, blank=True)
+    environment_rainfall_24h = models.FloatField(null=True, blank=True)
     environment_reported_time = models.DateTimeField(null=True, blank=True)
 
     # Air quality metrics fields
@@ -198,6 +206,25 @@ class NodeLatestStatus(models.Model):
     host_uptime_seconds = models.IntegerField(null=True, blank=True)
     host_freemem_bytes = models.BigIntegerField(null=True, blank=True)
     host_reported_time = models.DateTimeField(null=True, blank=True)
+
+    # Power metrics fields
+    ch1_voltage = models.FloatField(null=True, blank=True)
+    ch1_current = models.FloatField(null=True, blank=True)
+    ch2_voltage = models.FloatField(null=True, blank=True)
+    ch2_current = models.FloatField(null=True, blank=True)
+    ch3_voltage = models.FloatField(null=True, blank=True)
+    ch3_current = models.FloatField(null=True, blank=True)
+    ch4_voltage = models.FloatField(null=True, blank=True)
+    ch4_current = models.FloatField(null=True, blank=True)
+    ch5_voltage = models.FloatField(null=True, blank=True)
+    ch5_current = models.FloatField(null=True, blank=True)
+    ch6_voltage = models.FloatField(null=True, blank=True)
+    ch6_current = models.FloatField(null=True, blank=True)
+    ch7_voltage = models.FloatField(null=True, blank=True)
+    ch7_current = models.FloatField(null=True, blank=True)
+    ch8_voltage = models.FloatField(null=True, blank=True)
+    ch8_current = models.FloatField(null=True, blank=True)
+    power_reported_time = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         verbose_name = _("Node latest status")
