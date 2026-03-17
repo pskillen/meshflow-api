@@ -24,7 +24,7 @@ class ConstellationAdmin(admin.ModelAdmin):
         "get_member_count",
         "get_admin_count",
         "get_node_count",
-        "colored_map_color",
+        "map_color",
     )
     list_filter = ("created_by",)
     search_fields = ("name", "description", "created_by__username", "created_by__email")
@@ -34,7 +34,7 @@ class ConstellationAdmin(admin.ModelAdmin):
     _COLOR_FIELD_TEMPLATE = (
         '<div style="background:{}; width: 100%; height: 24px; border-radius: 4px; '
         'border: 1px solid #ccc; text-align:center; color: {};">'
-        "{color}"
+        "{map_color}"
         "</div>"
     )
 
