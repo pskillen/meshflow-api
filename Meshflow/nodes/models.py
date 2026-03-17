@@ -129,6 +129,7 @@ class ObservedNode(models.Model):
     is_unmessagable = models.BooleanField(null=True, blank=True)
 
     last_heard = models.DateTimeField(null=True, blank=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
 
     claimed_by = models.ForeignKey(
         "users.User",

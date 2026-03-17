@@ -47,6 +47,18 @@ class NeighbourStatsSerializer(serializers.Serializer):
     total_packets = serializers.IntegerField()
 
 
+class StatsSnapshotSerializer(serializers.ModelSerializer):
+    """Serializer for a single stats snapshot."""
+
+    constellation_id = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        from .models import StatsSnapshot
+
+        model = StatsSnapshot
+        fields = ["id", "recorded_at", "stat_type", "constellation_id", "value"]
+
+
 class GlobalStatsSerializer(serializers.Serializer):
     """Serializer for global stats response."""
 

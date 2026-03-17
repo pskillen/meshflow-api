@@ -11,6 +11,7 @@ from rest_framework.test import APIClient
 
 from nodes.models import ObservedNode
 from packets.models import MessagePacket, PacketObservation
+from stats.models import StatsSnapshot
 
 
 @pytest.mark.django_db
@@ -324,3 +325,40 @@ def test_node_neighbour_stats_excludes_self_packets(create_managed_node, create_
     assert response.data["total_packets"] == 1
     assert len(response.data["by_source"]) == 1
     assert response.data["by_source"][0]["source"] == 111111111
+
+
+@pytest.mark.django_db
+def test_stats_snapshots_list_requires_auth():
+    """Stats snapshots endpoint requires authentication."""
+    client = APIClient()
+    response = client.get(reverse("stats:stats-snapshots"))
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+
+@pytest.mark.django_db
+def test_stats_snapshots_list_returns_paginated_results(create_user):
+    """Stats snapshots list returns paginated results with filters."""
+    user = create_user()
+    client = APIClient()
+    client.force_authenticate(user=user)
+
+    now = timezone.now()
+    StatsSnapshot.objects.create(
+        recorded_at=now,
+        stat_type="online_nodes",
+        constellation=None,
+        value={"count": 42, "window_hours": 2},
+        run_id=None,
+    )
+
+    response = client.get(
+        reverse("stats:stats-snapshots"),
+        {"stat_type": "online_nodes"},
+    )
+    assert response.status_code == status.HTTP_200_OK
+    assert "results" in response.data
+    assert len(response.data["results"]) >= 1
+    item = response.data["results"][0]
+    assert item["stat_type"] == "online_nodes"
+    assert item["constellation_id"] is None
+    assert item["value"]["count"] == 42

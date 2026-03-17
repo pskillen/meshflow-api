@@ -1355,6 +1355,29 @@ components:
           type: integer
           description: Number of packets in this interval
 
+    StatsSnapshot:
+      type: object
+      description: A stored stats snapshot at a point in time
+      properties:
+        id:
+          type: integer
+          description: Primary key
+        recorded_at:
+          type: string
+          format: date-time
+          description: When the snapshot was taken
+        stat_type:
+          type: string
+          enum: [online_nodes, new_nodes, packet_volume]
+          description: Type of stat
+        constellation_id:
+          type: integer
+          nullable: true
+          description: Constellation ID (null for global)
+        value:
+          type: object
+          description: Stat value (e.g. {"count": N, "window_hours": 2})
+
     NeighbourStatsCandidate:
       type: object
       description: A candidate node matching a source (full node_id or LSB match)
@@ -3342,6 +3365,66 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+
+  /stats/snapshots/:
+    get:
+      summary: List stats snapshots
+      description: >
+        List stored stats snapshots with optional filters.
+        Supports pagination (page, page_size).
+      tags: [Stats]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: stat_type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [online_nodes, new_nodes, packet_volume]
+            description: Filter by stat type
+        - name: constellation_id
+          in: query
+          required: false
+          schema:
+            type: integer
+            description: Filter by constellation (omit for global)
+        - name: recorded_at_after
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+            description: Filter snapshots recorded at or after this time
+        - name: recorded_at_before
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+            description: Filter snapshots recorded at or before this time
+      responses:
+        '200':
+          description: Paginated list of stats snapshots
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                  next:
+                    type: string
+                    nullable: true
+                    format: uri
+                  previous:
+                    type: string
+                    nullable: true
+                    format: uri
+                  results:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/StatsSnapshot'
 
   /traceroutes/:
     get:
