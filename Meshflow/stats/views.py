@@ -13,7 +13,8 @@ from common.mesh_node_helpers import meshtastic_id_to_hex
 from nodes.models import ManagedNode, ObservedNode
 from packets.models import PacketObservation, RawPacket
 
-from .serializers import GlobalStatsSerializer, NeighbourStatsSerializer, NodeStatsSerializer
+from .models import StatsSnapshot
+from .serializers import GlobalStatsSerializer, NeighbourStatsSerializer, NodeStatsSerializer, StatsSnapshotSerializer
 
 
 def parse_stats_params(request) -> Tuple[Optional[datetime], Optional[datetime], int, str]:
@@ -473,3 +474,64 @@ def global_packet_stats(request):
         )
 
     return Response(serializer.validated_data)
+
+
+def _parse_datetime_param(value):
+    """Parse ISO 8601 or YYYY-MM-DD datetime from query param."""
+    if not value:
+        return None
+    from django.utils.dateparse import parse_datetime
+
+    dt = parse_datetime(value.replace("Z", "+00:00"))
+    if dt:
+        return dt
+    try:
+        from datetime import datetime
+
+        return datetime.strptime(value, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+    except ValueError:
+        return None
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def stats_snapshots_list(request):
+    """
+    List stored stats snapshots with optional filters.
+
+    Query params: stat_type, constellation_id, recorded_at_after, recorded_at_before
+    """
+    from rest_framework.pagination import PageNumberPagination
+
+    qs = StatsSnapshot.objects.all().order_by("-recorded_at")
+
+    stat_type = request.query_params.get("stat_type")
+    if stat_type:
+        qs = qs.filter(stat_type=stat_type)
+
+    constellation_id = request.query_params.get("constellation_id")
+    if constellation_id:
+        if constellation_id == "-1":
+            qs = qs.filter(constellation__isnull=True)
+        else:
+            try:
+                qs = qs.filter(constellation_id=int(constellation_id))
+            except ValueError:
+                pass
+
+    recorded_at_after = _parse_datetime_param(request.query_params.get("recorded_at_after"))
+    if recorded_at_after:
+        qs = qs.filter(recorded_at__gte=recorded_at_after)
+
+    recorded_at_before = _parse_datetime_param(request.query_params.get("recorded_at_before"))
+    if recorded_at_before:
+        qs = qs.filter(recorded_at__lte=recorded_at_before)
+
+    paginator = PageNumberPagination()
+    paginator.page_size = 100
+    paginator.page_size_query_param = "page_size"
+    paginator.max_page_size = 1000
+    page = paginator.paginate_queryset(qs, request)
+
+    serializer = StatsSnapshotSerializer(page, many=True)
+    return paginator.get_paginated_response(serializer.data)

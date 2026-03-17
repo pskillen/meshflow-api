@@ -73,6 +73,7 @@ INSTALLED_APPS = [
     "constellations",
     "nodes",
     "packets",
+    "stats",
     "text_messages",
     "traceroute",
     "ws",
