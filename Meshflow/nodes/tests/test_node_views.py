@@ -4,6 +4,8 @@ import pytest
 from rest_framework import status
 from rest_framework.test import APIClient
 
+from common.mesh_node_helpers import meshtastic_id_to_hex
+
 
 @pytest.mark.django_db
 def test_managed_node_list_view(create_managed_node, create_user):
@@ -102,3 +104,25 @@ def test_node_api_key_detail_view(create_node_api_key, create_user):
     response = client.get(reverse("api-keys-detail", kwargs={"pk": api_key.id}))
     assert response.status_code == status.HTTP_200_OK
     assert response.data["id"] == str(api_key.id)
+
+
+@pytest.mark.django_db
+def test_claim_post_rejected_when_node_owned_by_another_user(create_observed_node, create_user):
+    """POST to create claim returns 400 when node is already claimed by another user."""
+    owner = create_user()
+    other_user = create_user()
+    node_id = 111222333444
+    node = create_observed_node(
+        node_id=node_id,
+        node_id_str=meshtastic_id_to_hex(node_id),
+        claimed_by=owner,
+    )
+
+    client = APIClient()
+    client.force_authenticate(user=other_user)
+
+    response = client.post(
+        reverse("observed-node-claim", kwargs={"node_id": node.node_id}),
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "already claimed" in response.data["detail"].lower()
