@@ -1,6 +1,6 @@
-# Social Authentication Flow (Google/GitHub)
+# Social Authentication Flow (Google/GitHub/Discord)
 
-This document explains how social authentication (Google/GitHub OAuth2) is implemented in this project, including the flow between the frontend (React) and backend (Django REST Framework with dj-rest-auth/allauth).
+This document explains how social authentication (Google/GitHub/Discord OAuth2) is implemented in this project, including the flow between the frontend (React) and backend (Django REST Framework with dj-rest-auth/allauth).
 
 ---
 
@@ -20,9 +20,9 @@ sequenceDiagram
     participant User
     participant Frontend
     participant Backend
-    participant Provider as Google/GitHub
+    participant Provider as Google/GitHub/Discord
 
-    User->>Frontend: Clicks "Login with Google/GitHub"
+    User->>Frontend: Clicks "Login with Google/GitHub/Discord"
     Frontend->>Backend: GET /api/auth/social/google/ (get auth URL)
     Backend->>Frontend: Returns provider auth URL
     Frontend->>Provider: Redirect user to provider
@@ -45,7 +45,7 @@ sequenceDiagram
 - Backend returns the URL with proper state and redirect_uri.
 
 ### 2. **User Authenticates with Provider**
-- User is redirected to Google/GitHub and authenticates.
+- User is redirected to Google/GitHub/Discord and authenticates.
 
 ### 3. **Provider Redirects to Backend Callback**
 - Provider redirects to backend callback URL (e.g., `/api/auth/social/google/callback/`) with `?code=...&state=...`.
@@ -55,7 +55,7 @@ sequenceDiagram
 - Instead, it redirects the user to the frontend (e.g., `/social-callback?code=...&state=...`).
 
 ### 5. **Frontend Exchanges Code for JWT**
-- Frontend reads the code from the URL and POSTs it to `/api/auth/google/` (or `/api/auth/github/`).
+- Frontend reads the code from the URL and POSTs it to `/api/auth/social/google/token/`, `/api/auth/social/github/token/`, or `/api/auth/social/discord/token/`.
 - Backend (dj-rest-auth/allauth) exchanges the code for an access token, authenticates/creates the user, and issues a JWT.
 - Backend returns the JWT (and user info) to the frontend.
 

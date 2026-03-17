@@ -6,6 +6,7 @@ from django.shortcuts import redirect
 
 import requests
 from allauth.socialaccount.models import SocialApp
+from allauth.socialaccount.providers.discord.views import DiscordOAuth2Adapter
 from allauth.socialaccount.providers.github.views import GitHubOAuth2Adapter
 from allauth.socialaccount.providers.google.views import GoogleOAuth2Adapter
 from allauth.socialaccount.providers.oauth2.client import OAuth2Client
@@ -92,6 +93,17 @@ class GithubLoginRedirectView(BaseLoginRedirectView):
         self.adapter_class = GitHubOAuth2Adapter
 
 
+class DiscordLoginRedirectView(BaseLoginRedirectView):
+    """
+    View for Discord OAuth2 authentication.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.provider_name = "discord"
+        self.adapter_class = DiscordOAuth2Adapter
+
+
 class CompatibleOAuth2Client(OAuth2Client):
     """
     Compatibility shim for dj-rest-auth and django-allauth OAuth2Client.
@@ -135,6 +147,12 @@ class GithubLoginView(SocialLoginView):
     adapter_class = GitHubOAuth2Adapter
     client_class = CompatibleOAuth2Client
     callback_url = settings.CALLBACK_URL_BASE + "/api/auth/social/github/callback/"
+
+
+class DiscordLoginView(SocialLoginView):
+    adapter_class = DiscordOAuth2Adapter
+    client_class = CompatibleOAuth2Client
+    callback_url = settings.CALLBACK_URL_BASE + "/api/auth/social/discord/callback/"
 
 
 class BaseCallbackView(APIView):
@@ -261,6 +279,17 @@ class GithubCallbackRedirectView(BaseCallbackRedirectView):
         self.adapter_class = GitHubOAuth2Adapter
 
 
+class DiscordCallbackRedirectView(BaseCallbackRedirectView):
+    """
+    Handles Discord OAuth2 callback: verified state and forwards code to frontend.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.provider_name = "discord"
+        self.adapter_class = DiscordOAuth2Adapter
+
+
 class GoogleCallbackView(BaseCallbackView):
     """
     Handles Google OAuth2 callback: exchanges code for access token, logs in user, issues JWT, redirects to frontend.
@@ -281,3 +310,14 @@ class GithubCallbackView(BaseCallbackView):
         super().__init__(*args, **kwargs)
         self.provider_name = "github"
         self.adapter_class = GitHubOAuth2Adapter
+
+
+class DiscordCallbackView(BaseCallbackView):
+    """
+    Handles Discord OAuth2 callback: exchanges code for access token, logs in user, issues JWT, redirects to frontend.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.provider_name = "discord"
+        self.adapter_class = DiscordOAuth2Adapter

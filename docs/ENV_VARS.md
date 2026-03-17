@@ -45,6 +45,8 @@ This document describes all environment variables used by the Meshflow Django pr
 | `GOOGLE_CLIENT_SECRET`  | (empty) | Google OAuth client secret.                  | Any string              |
 | `GITHUB_CLIENT_ID`      | (empty) | GitHub OAuth client ID.                      | Any string              |
 | `GITHUB_CLIENT_SECRET`  | (empty) | GitHub OAuth client secret.                  | Any string              |
+| `DISCORD_CLIENT_ID`     | (empty) | Discord OAuth client ID.                      | Any string              |
+| `DISCORD_CLIENT_SECRET` | (empty) | Discord OAuth client secret.                  | Any string              |
 
 ---
 
@@ -105,6 +107,7 @@ This document describes all environment variables used by the Meshflow Django pr
 - **SITE_ID**: Used by django-allauth for multi-site support.
 - **GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET**: Credentials for Google OAuth.
 - **GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET**: Credentials for GitHub OAuth.
+- **DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET**: Credentials for Discord OAuth. Create an app at [Discord Developer Portal](https://discord.com/developers/applications) and add redirect URI `{CALLBACK_URL_BASE}/api/auth/social/discord/callback/`.
 
 ## 5. URLs & Frontend
 
@@ -149,6 +152,8 @@ GOOGLE_CLIENT_ID=your-google-client-id
 GOOGLE_CLIENT_SECRET=your-google-client-secret
 GITHUB_CLIENT_ID=your-github-client-id
 GITHUB_CLIENT_SECRET=your-github-client-secret
+DISCORD_CLIENT_ID=your-discord-client-id
+DISCORD_CLIENT_SECRET=your-discord-client-secret
 
 CALLBACK_URL_BASE=https://api.yourdomain.com
 FRONTEND_URL=https://yourdomain.com

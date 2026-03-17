@@ -65,6 +65,7 @@ INSTALLED_APPS = [
     "allauth.socialaccount",
     "allauth.socialaccount.providers.google",
     "allauth.socialaccount.providers.github",
+    "allauth.socialaccount.providers.discord",
     "dj_rest_auth",
     "dj_rest_auth.registration",
     # Project apps
@@ -290,6 +291,13 @@ SOCIALACCOUNT_PROVIDERS = {
             "client_id": os.environ.get("GITHUB_CLIENT_ID", ""),
             "secret": os.environ.get("GITHUB_CLIENT_SECRET", ""),
         }
+    },
+    "discord": {
+        "APP": {
+            "client_id": os.environ.get("DISCORD_CLIENT_ID", ""),
+            "secret": os.environ.get("DISCORD_CLIENT_SECRET", ""),
+        },
+        "SCOPE": ["identify", "email"],
     },
 }
 
