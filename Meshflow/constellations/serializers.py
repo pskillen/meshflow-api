@@ -10,7 +10,16 @@ class ConstellationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Constellation
-        fields = ["id", "name", "description", "created_by", "channels", "map_color"]
+        fields = [
+            "id",
+            "name",
+            "description",
+            "created_by",
+            "channels",
+            "map_color",
+            "bot_default_ignore_portnums",
+            "bot_default_hop_limit",
+        ]
         read_only_fields = ["created_by"]
 
     def get_channels(self, obj):

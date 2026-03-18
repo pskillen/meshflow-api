@@ -39,8 +39,25 @@ class NodeOwnerClaimSerializer(serializers.ModelSerializer):
         read_only_fields = ["node", "user", "claim_key", "created_at", "accepted_at"]
 
 
+class APIKeyConstellationSerializer(serializers.ModelSerializer):
+    """Minimal constellation for API key response, includes bot setup defaults."""
+
+    class Meta:
+        model = Constellation
+        fields = [
+            "id",
+            "name",
+            "map_color",
+            "bot_default_ignore_portnums",
+            "bot_default_hop_limit",
+        ]
+        read_only_fields = ["name", "map_color", "bot_default_ignore_portnums", "bot_default_hop_limit"]
+
+
 class APIKeySerializer(serializers.ModelSerializer):
     """Serializer for API keys."""
+
+    constellation = APIKeyConstellationSerializer(read_only=True)
 
     class Meta:
         model = NodeAPIKey
@@ -162,8 +179,14 @@ class ManagedNodeSerializer(serializers.ModelSerializer):
     class ConstellationSerializer(serializers.ModelSerializer):
         class Meta:
             model = Constellation
-            fields = ["id", "name", "map_color"]
-            read_only_fields = ["name", "map_color"]
+            fields = [
+                "id",
+                "name",
+                "map_color",
+                "bot_default_ignore_portnums",
+                "bot_default_hop_limit",
+            ]
+            read_only_fields = ["name", "map_color", "bot_default_ignore_portnums", "bot_default_hop_limit"]
 
     owner_id = serializers.PrimaryKeyRelatedField(
         queryset=User.objects.all(), source="owner", write_only=True, required=True

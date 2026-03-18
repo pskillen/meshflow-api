@@ -680,7 +680,19 @@ components:
           description: The channels that are part of the constellation
           items:
             $ref: '#/components/schemas/MessageChannel'
-
+        map_color:
+          type: string
+          description: The color used for the constellation on maps
+        bot_default_ignore_portnums:
+          type: string
+          nullable: true
+          description: Comma-separated portnums for IGNORE_PORTNUMS env var in generated docker-compose
+        bot_default_hop_limit:
+          type: integer
+          nullable: true
+          minimum: 1
+          maximum: 7
+          description: Default for TR_HOPS_LIMIT and TEXT_MESSAGE_MAX_HOPS env vars in generated docker-compose
 
     ObservedNode:
       type: object
@@ -827,6 +839,30 @@ components:
               description: The username of the owner
               readOnly: true
 
+    NodeAPIKeyConstellation:
+      type: object
+      description: Constellation info for API key, includes bot setup defaults.
+      properties:
+        id:
+          type: integer
+          description: The ID of the constellation
+        name:
+          type: string
+          description: The name of the constellation
+        map_color:
+          type: string
+          description: The color used for the constellation on maps
+        bot_default_ignore_portnums:
+          type: string
+          nullable: true
+          description: Comma-separated portnums for IGNORE_PORTNUMS env var
+        bot_default_hop_limit:
+          type: integer
+          nullable: true
+          minimum: 1
+          maximum: 7
+          description: Default for TR_HOPS_LIMIT and TEXT_MESSAGE_MAX_HOPS env vars
+
     NodeAPIKey:
       type: object
       description: >
@@ -845,9 +881,8 @@ components:
           type: string
           description: The name of the API key
         constellation:
-          type: integer
-          description: The ID of the constellation that the API key is scoped to
-          readOnly: true
+          $ref: '#/components/schemas/NodeAPIKeyConstellation'
+          description: The constellation that the API key is scoped to
         created_at:
           type: string
           readOnly: true
@@ -1022,6 +1057,16 @@ components:
             map_color:
               type: string
               description: The color used for the constellation on maps
+            bot_default_ignore_portnums:
+              type: string
+              nullable: true
+              description: Comma-separated portnums for IGNORE_PORTNUMS env var
+            bot_default_hop_limit:
+              type: integer
+              nullable: true
+              minimum: 1
+              maximum: 7
+              description: Default for TR_HOPS_LIMIT and TEXT_MESSAGE_MAX_HOPS env vars
         allow_auto_traceroute:
           type: boolean
           description: If true, this node may be used for auto-scheduled traceroutes and manual triggers
