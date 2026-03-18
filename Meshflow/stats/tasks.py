@@ -204,10 +204,14 @@ def collect_stats_snapshots():
     """
     Run periodically (hourly). Collect online_nodes (hourly), packet_volume, and new_nodes (per-run)
     snapshots for global and per-constellation scope.
+
+    Records the *completed* previous hour (not the current hour), since the current hour
+    has only just started when this runs at minute 5.
     """
     now = timezone.now()
     run_id = uuid.uuid4()
-    hour_start = now.replace(minute=0, second=0, microsecond=0)
+    current_hour = now.replace(minute=0, second=0, microsecond=0)
+    hour_start = current_hour - timedelta(hours=1)  # Record completed previous hour
     last_run_started_at = _get_last_run_started_at()
 
     created = 0
