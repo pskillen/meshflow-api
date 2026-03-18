@@ -45,6 +45,8 @@ def _snapshot_exists(recorded_at: datetime, stat_type: str, constellation_id: Op
 
 def _collect_online_nodes(
     recorded_at: datetime,
+    *,
+    run_id: Optional[uuid.UUID] = None,
     skip_existing: bool = False,
     use_raw_packet_for_global: bool = False,
 ) -> tuple[int, int]:
@@ -86,7 +88,7 @@ def _collect_online_nodes(
             stat_type="online_nodes",
             constellation=None,
             value={"count": global_count, "window_hours": ONLINE_NODE_WINDOW_HOURS},
-            run_id=None,
+            run_id=run_id,
         )
         created += 1
 
@@ -109,14 +111,19 @@ def _collect_online_nodes(
                 stat_type="online_nodes",
                 constellation=constellation,
                 value={"count": count, "window_hours": ONLINE_NODE_WINDOW_HOURS},
-                run_id=None,
+                run_id=run_id,
             )
             created += 1
 
     return (created, skipped)
 
 
-def _collect_packet_volume(recorded_at: datetime, skip_existing: bool = False) -> tuple[int, int]:
+def _collect_packet_volume(
+    recorded_at: datetime,
+    *,
+    run_id: Optional[uuid.UUID] = None,
+    skip_existing: bool = False,
+) -> tuple[int, int]:
     """
     Collect packet_volume snapshot (hourly) for global - count of RawPackets in the hour.
     Returns (created, skipped).
@@ -134,69 +141,113 @@ def _collect_packet_volume(recorded_at: datetime, skip_existing: bool = False) -
         stat_type="packet_volume",
         constellation=None,
         value={"count": count},
-        run_id=None,
+        run_id=run_id,
     )
     return (1, 0)
 
 
-def _collect_new_nodes(now: datetime, run_id: uuid.UUID, last_run_started_at: Optional[datetime]) -> int:
+def _collect_new_nodes(
+    recorded_at: datetime,
+    *,
+    run_id: Optional[uuid.UUID] = None,
+    skip_existing: bool = False,
+    last_run_started_at: Optional[datetime] = None,
+    for_backfill: bool = False,
+) -> tuple[int, int]:
     """
-    Collect new_nodes snapshots (per-run) for global and per-constellation.
-    Returns the number of snapshots created.
+    Collect new_nodes snapshots for global and per-constellation.
+    Returns (created, skipped).
+
+    When for_backfill=True: counts nodes with created_at in [recorded_at, recorded_at+1h).
+    When for_backfill=False: counts nodes with created_at >= last_run_started_at (delta since last run).
     """
+    hour_end = recorded_at + timedelta(hours=1)
     created = 0
+    skipped = 0
+
+    if for_backfill:
+        # Hour window: nodes created in [recorded_at, hour_end)
+        global_filter = {"created_at__gte": recorded_at, "created_at__lt": hour_end}
+
+        def per_constellation_filter(obs_node_ids):
+            return ObservedNode.objects.filter(
+                node_id__in=obs_node_ids,
+                created_at__gte=recorded_at,
+                created_at__lt=hour_end,
+            )
+
+    else:
+        # Delta since last run
+        if last_run_started_at is not None:
+            global_filter = {"created_at__gte": last_run_started_at}
+
+            def per_constellation_filter(obs_node_ids):
+                return ObservedNode.objects.filter(
+                    node_id__in=obs_node_ids,
+                    created_at__gte=last_run_started_at,
+                )
+
+        else:
+            global_filter = {"created_at__isnull": False}
+
+            def per_constellation_filter(obs_node_ids):
+                return ObservedNode.objects.filter(
+                    node_id__in=obs_node_ids,
+                    created_at__isnull=False,
+                )
 
     # Global
-    if last_run_started_at is not None:
-        new_global_count = ObservedNode.objects.filter(created_at__gte=last_run_started_at).count()
+    if skip_existing and _snapshot_exists(recorded_at, "new_nodes", None):
+        skipped += 1
     else:
-        new_global_count = ObservedNode.objects.filter(created_at__isnull=False).count()
-
-    StatsSnapshot.objects.create(
-        recorded_at=now,
-        stat_type="new_nodes",
-        constellation=None,
-        value={"count": new_global_count},
-        run_id=run_id,
-    )
-    created += 1
-
-    # Per-constellation
-    for constellation in Constellation.objects.all():
-        if last_run_started_at is not None:
-            observed_node_ids = (
-                PacketObservation.objects.filter(
-                    observer__constellation=constellation,
-                    rx_time__gte=last_run_started_at,
-                )
-                .values_list("packet__from_int", flat=True)
-                .distinct()
-            )
-            new_count = ObservedNode.objects.filter(
-                node_id__in=observed_node_ids,
-                created_at__gte=last_run_started_at,
-            ).count()
-        else:
-            observed_node_ids = (
-                PacketObservation.objects.filter(observer__constellation=constellation)
-                .values_list("packet__from_int", flat=True)
-                .distinct()
-            )
-            new_count = ObservedNode.objects.filter(
-                node_id__in=observed_node_ids,
-                created_at__isnull=False,
-            ).count()
-
+        count = ObservedNode.objects.filter(**global_filter).count()
         StatsSnapshot.objects.create(
-            recorded_at=now,
+            recorded_at=recorded_at,
             stat_type="new_nodes",
-            constellation=constellation,
-            value={"count": new_count},
+            constellation=None,
+            value={"count": count},
             run_id=run_id,
         )
         created += 1
 
-    return created
+    # Per-constellation
+    for constellation in Constellation.objects.all():
+        if skip_existing and _snapshot_exists(recorded_at, "new_nodes", constellation.id):
+            skipped += 1
+        else:
+            if for_backfill:
+                observed_node_ids = (
+                    PacketObservation.objects.filter(observer__constellation=constellation)
+                    .values_list("packet__from_int", flat=True)
+                    .distinct()
+                )
+            else:
+                if last_run_started_at is not None:
+                    observed_node_ids = (
+                        PacketObservation.objects.filter(
+                            observer__constellation=constellation,
+                            rx_time__gte=last_run_started_at,
+                        )
+                        .values_list("packet__from_int", flat=True)
+                        .distinct()
+                    )
+                else:
+                    observed_node_ids = (
+                        PacketObservation.objects.filter(observer__constellation=constellation)
+                        .values_list("packet__from_int", flat=True)
+                        .distinct()
+                    )
+            count = per_constellation_filter(observed_node_ids).count()
+            StatsSnapshot.objects.create(
+                recorded_at=recorded_at,
+                stat_type="new_nodes",
+                constellation=constellation,
+                value={"count": count},
+                run_id=run_id,
+            )
+            created += 1
+
+    return (created, skipped)
 
 
 @shared_task
@@ -208,18 +259,18 @@ def collect_stats_snapshots():
     Records the *completed* previous hour (not the current hour), since the current hour
     has only just started when this runs at minute 5.
     """
-    now = timezone.now()
     run_id = uuid.uuid4()
-    current_hour = now.replace(minute=0, second=0, microsecond=0)
+    current_hour = timezone.now().replace(minute=0, second=0, microsecond=0)
     hour_start = current_hour - timedelta(hours=1)  # Record completed previous hour
     last_run_started_at = _get_last_run_started_at()
 
     created = 0
-    c, _ = _collect_online_nodes(hour_start)
+    c, _ = _collect_online_nodes(hour_start, run_id=run_id)
     created += c
-    c, _ = _collect_packet_volume(hour_start)
+    c, _ = _collect_packet_volume(hour_start, run_id=run_id)
     created += c
-    created += _collect_new_nodes(now, run_id, last_run_started_at)
+    c, _ = _collect_new_nodes(hour_start, run_id=run_id, last_run_started_at=last_run_started_at)
+    created += c
 
     logger.info(
         "collect_stats_snapshots: completed run_id=%s, created=%d",
@@ -232,11 +283,11 @@ def collect_stats_snapshots():
 @shared_task
 def backfill_stats_snapshots(days: int = 30):
     """
-    Backfill online_nodes and packet_volume snapshots for the last N days.
+    Backfill online_nodes, packet_volume, and new_nodes snapshots for the last N days.
     Idempotent: skips hours that already have snapshots (when run sequentially).
-    Uses the same _collect_online_nodes and _collect_packet_volume as collect_stats_snapshots.
     """
     now = timezone.now()
+    run_id = uuid.uuid4()
     end_hour = now.replace(minute=0, second=0, microsecond=0)
     start_hour = end_hour - timedelta(days=days)
 
@@ -246,13 +297,17 @@ def backfill_stats_snapshots(days: int = 30):
 
     for i in tqdm(range(total_hours), unit="stats", desc="Backfilling stats"):
         hour = start_hour + timedelta(hours=i)
-        c, s = _collect_online_nodes(hour, skip_existing=True, use_raw_packet_for_global=True)
+        c, s = _collect_online_nodes(hour, run_id=run_id, skip_existing=True, use_raw_packet_for_global=True)
         created += c
         skipped += s
 
-        c2, s2 = _collect_packet_volume(hour, skip_existing=True)
+        c2, s2 = _collect_packet_volume(hour, run_id=run_id, skip_existing=True)
         created += c2
         skipped += s2
+
+        c3, s3 = _collect_new_nodes(hour, run_id=run_id, skip_existing=True, for_backfill=True)
+        created += c3
+        skipped += s3
 
     logger.info(
         "Finished backfilling stats snapshots for the last %d days: created=%d, skipped=%d",
