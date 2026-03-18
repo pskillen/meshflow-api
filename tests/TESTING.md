@@ -64,6 +64,7 @@ If you run the API locally (e.g. `python manage.py runserver`):
 # In one terminal: start Django (ensure DB is migrated and reachable)
 cd Meshflow
 python manage.py migrate
+python manage.py run_deploy_tasks
 python manage.py runserver
 
 # Seed integration test data (run once)

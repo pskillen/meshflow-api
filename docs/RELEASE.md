@@ -11,7 +11,8 @@ Each build produces two images (API and docs) in the same package with distinct 
 | `:latest`, `:latest-dev`, `:1.2.3` | Main API application |
 | `:latest-docs`, `:latest-dev-docs`, `:1.2.3-docs` | Redocly API documentation |
 
-Migrations run via the API image with a command override (`python manage.py migrate`); no separate migrations image.
+Migrations run via the API image with a command override (`python manage.py migrate && python manage.py run_deploy_tasks`); 
+no separate migrations image.
 
 ## Release Triggers
 

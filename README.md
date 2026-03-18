@@ -83,7 +83,7 @@ cd Meshflow
 pip install -r requirements.txt
 
 # Run migrations
-python manage.py migrate
+python manage.py migrate && python manage.py run_deploy_tasks
 
 # Start development server
 python manage.py runserver
