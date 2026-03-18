@@ -25,11 +25,26 @@ class ConstellationAdmin(admin.ModelAdmin):
         "get_admin_count",
         "get_node_count",
         "map_color",
+        "bot_default_ignore_portnums",
+        "bot_default_hop_limit",
     )
     list_filter = ("created_by",)
     search_fields = ("name", "description", "created_by__username", "created_by__email")
     ordering = ("name",)
     readonly_fields = ("created_by",)
+    fieldsets = (
+        (None, {"fields": ("name", "description", "created_by", "map_color")}),
+        (
+            _("Bot setup defaults"),
+            {
+                "fields": ("bot_default_ignore_portnums", "bot_default_hop_limit"),
+                "description": _(
+                    "Default env vars for generated docker-compose/.env during onboarding. "
+                    "Leave blank to omit from generated config."
+                ),
+            },
+        ),
+    )
 
     _COLOR_FIELD_TEMPLATE = (
         '<div style="background:{}; width: 100%; height: 24px; border-radius: 4px; '

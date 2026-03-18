@@ -25,6 +25,15 @@ def test_api_key_serializer_valid_data(create_node_api_key):
     assert "last_used" in data
     assert "is_active" in data
 
+    # Constellation is nested object with bot setup defaults
+    constellation = data["constellation"]
+    assert isinstance(constellation, dict)
+    assert "id" in constellation
+    assert "name" in constellation
+    assert "map_color" in constellation
+    assert "bot_default_ignore_portnums" in constellation
+    assert "bot_default_hop_limit" in constellation
+
 
 @pytest.mark.django_db
 def test_api_key_node_serializer_valid_data(create_node_auth):
@@ -54,6 +63,12 @@ def test_api_key_detail_serializer_valid_data(create_node_auth):
     assert "last_used" in data
     assert "is_active" in data
     assert "nodes" in data
+
+    # Constellation is nested object with bot setup defaults
+    constellation = data["constellation"]
+    assert isinstance(constellation, dict)
+    assert "bot_default_ignore_portnums" in constellation
+    assert "bot_default_hop_limit" in constellation
 
 
 @pytest.mark.django_db

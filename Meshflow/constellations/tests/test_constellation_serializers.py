@@ -14,6 +14,23 @@ def test_constellation_serializer_valid_data(create_constellation):
     assert data["name"] == "Test Constellation"
     assert data["description"] == "Test Description"
     assert "created_by" in data
+    assert "bot_default_ignore_portnums" in data
+    assert "bot_default_hop_limit" in data
+
+
+@pytest.mark.django_db
+def test_constellation_serializer_bot_defaults(create_constellation):
+    """Test ConstellationSerializer includes bot setup defaults."""
+    constellation = create_constellation()
+    constellation.bot_default_ignore_portnums = "345,ROUTING_APP"
+    constellation.bot_default_hop_limit = 5
+    constellation.save()
+
+    serializer = ConstellationSerializer(constellation)
+    data = serializer.data
+
+    assert data["bot_default_ignore_portnums"] == "345,ROUTING_APP"
+    assert data["bot_default_hop_limit"] == 5
 
 
 @pytest.mark.django_db
