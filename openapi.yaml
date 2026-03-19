@@ -745,6 +745,12 @@ components:
           format: date-time
           description: The timestamp when the node was last heard from
           nullable: true
+        inferred_max_hops:
+          type: integer
+          nullable: true
+          description: >
+            Inferred from packet hop_start when received; the node's max hops setting.
+            Helps identify nodes with suboptimal hop limits (e.g. below recommended 7).
         latest_position:
           $ref: '#/components/schemas/Position'
         latest_device_metrics:

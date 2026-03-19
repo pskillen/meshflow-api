@@ -5,7 +5,7 @@ from django.dispatch import receiver
 from django.utils import timezone
 
 from common.mesh_node_helpers import meshtastic_id_to_hex
-from nodes.models import ObservedNode
+from nodes.models import NodeLatestStatus, ObservedNode
 
 from .models import (
     AirQualityMetricsPacket,
@@ -39,6 +39,7 @@ from .signals import (
     message_packet_received,
     new_node_observed,
     node_info_packet_received,
+    packet_received,
     position_packet_received,
     power_metrics_packet_received,
     traceroute_packet_received,
@@ -46,6 +47,50 @@ from .signals import (
 )
 
 logger = logging.getLogger(__name__)
+
+STALE_TR_TIMEOUT_SECONDS = os.environ.get("STALE_TR_TIMEOUT_SECONDS", 180)
+
+
+# Packet types that already update NodeLatestStatus (and set inferred_max_hops there)
+_PACKET_TYPES_WITH_NLS_UPDATE = (
+    PositionPacket,
+    DeviceMetricsPacket,
+    EnvironmentMetricsPacket,
+    PowerMetricsPacket,
+    HealthMetricsPacket,
+    HostMetricsPacket,
+    AirQualityMetricsPacket,
+)
+
+
+@receiver(packet_received)
+def on_packet_received_update_inferred_max_hops(sender, packet, observer, observation, **kwargs):
+    """Update NodeLatestStatus.inferred_max_hops for packet types that don't update NodeLatestStatus."""
+    if isinstance(packet, _PACKET_TYPES_WITH_NLS_UPDATE):
+        return
+    hop_start = observation.hop_start if observation else None
+    if hop_start is None:
+        return
+    sender_node_id = getattr(packet, "from_int", None)
+    if sender_node_id is None:
+        return
+    node_id_str = getattr(packet, "from_str", None) or meshtastic_id_to_hex(sender_node_id)
+    observed_node, _ = ObservedNode.objects.get_or_create(
+        node_id=sender_node_id,
+        defaults={
+            "node_id_str": node_id_str,
+            "long_name": "Unknown Node " + node_id_str,
+            "short_name": node_id_str[-4:] if len(node_id_str) >= 4 else "????",
+        },
+    )
+    node_status, created = NodeLatestStatus.objects.get_or_create(
+        node=observed_node,
+        defaults={"inferred_max_hops": hop_start},
+    )
+    if not created and node_status.inferred_max_hops != hop_start:
+        node_status.inferred_max_hops = hop_start
+        node_status.save(update_fields=["inferred_max_hops"])
+
 
 STALE_TR_TIMEOUT_SECONDS = os.environ.get("STALE_TR_TIMEOUT_SECONDS", 180)
 STALE_TR_TIMEOUT_SECONDS = int(STALE_TR_TIMEOUT_SECONDS)

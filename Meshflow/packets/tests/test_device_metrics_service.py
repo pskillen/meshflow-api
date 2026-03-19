@@ -173,3 +173,4 @@ def test_process_device_metrics_packet_updates_nodelateststatus(
     assert latest_status.air_util_tx == 0.25
     assert latest_status.uptime_seconds == 7200
     assert latest_status.metrics_reported_time is not None
+    assert latest_status.inferred_max_hops == observation.hop_start

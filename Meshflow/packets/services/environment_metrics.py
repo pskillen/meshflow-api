@@ -57,5 +57,6 @@ class EnvironmentMetricsPacketService(BasePacketService):
                 "environment_rainfall_1h": self.packet.rainfall_1h,
                 "environment_rainfall_24h": self.packet.rainfall_24h,
                 "environment_reported_time": reported_time,
+                "inferred_max_hops": self.observation.hop_start,
             },
         )

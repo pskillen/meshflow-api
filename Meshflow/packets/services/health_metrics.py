@@ -30,5 +30,6 @@ class HealthMetricsPacketService(BasePacketService):
                 "health_spo2": self.packet.spo2,
                 "health_temperature": self.packet.temperature,
                 "health_reported_time": reported_time,
+                "inferred_max_hops": self.observation.hop_start,
             },
         )
