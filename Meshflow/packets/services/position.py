@@ -42,5 +42,6 @@ class PositionPacketService(BasePacketService):
                 "ground_speed": self.packet.ground_speed,
                 "ground_track": self.packet.ground_track,
                 "position_reported_time": reported_time,
+                "inferred_max_hops": self.observation.hop_start,
             },
         )

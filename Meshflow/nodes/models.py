@@ -226,6 +226,12 @@ class NodeLatestStatus(models.Model):
     ch8_current = models.FloatField(null=True, blank=True)
     power_reported_time = models.DateTimeField(null=True, blank=True)
 
+    inferred_max_hops = models.SmallIntegerField(
+        null=True,
+        blank=True,
+        help_text=_("Inferred from packet hop_start when received; the node's max hops setting."),
+    )
+
     class Meta:
         verbose_name = _("Node latest status")
         verbose_name_plural = _("Node latest statuses")

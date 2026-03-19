@@ -386,6 +386,7 @@ class NodeLatestStatusInline(admin.StackedInline):
         "air_util_tx",
         "uptime_seconds",
         "metrics_reported_time",
+        "inferred_max_hops",
     )
 
     def has_add_permission(self, request, obj=None):
@@ -401,9 +402,15 @@ class ObservedNodeAdmin(admin.ModelAdmin):
         "node_id",
         "node_id_str",
         "hw_model",
+        "get_inferred_max_hops",
         "claimed_by",
         "role",
     )
+
+    def get_inferred_max_hops(self, obj):
+        return obj.latest_status.inferred_max_hops if obj.latest_status else None
+
+    get_inferred_max_hops.short_description = "Inferred max hops"
     list_filter = (
         "hw_model",
         "claimed_by",

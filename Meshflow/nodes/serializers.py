@@ -824,6 +824,7 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
     latest_air_quality_metrics = serializers.SerializerMethodField()
     latest_health_metrics = serializers.SerializerMethodField()
     latest_host_metrics = serializers.SerializerMethodField()
+    inferred_max_hops = serializers.SerializerMethodField()
     owner = OwnerSerializer(source="claimed_by", read_only=True)
     claim = serializers.SerializerMethodField()
 
@@ -854,6 +855,7 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
             "latest_air_quality_metrics",
             "latest_health_metrics",
             "latest_host_metrics",
+            "inferred_max_hops",
             "owner",
             "claim",
         ]
@@ -869,9 +871,14 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
             "latest_air_quality_metrics",
             "latest_health_metrics",
             "latest_host_metrics",
+            "inferred_max_hops",
             "owner",
             "claim",
         ]
+
+    def get_inferred_max_hops(self, obj):
+        status = self._get_latest_status(obj)
+        return status.inferred_max_hops if status else None
 
     def get_claim(self, obj):
         """

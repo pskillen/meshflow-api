@@ -36,5 +36,6 @@ class DeviceMetricsPacketService(BasePacketService):
                 "air_util_tx": self.packet.air_util_tx or 0.0,
                 "uptime_seconds": self.packet.uptime_seconds or 0,
                 "metrics_reported_time": reported_time,
+                "inferred_max_hops": self.observation.hop_start,
             },
         )

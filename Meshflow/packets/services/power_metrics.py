@@ -39,6 +39,7 @@ class PowerMetricsPacketService(BasePacketService):
         NodeLatestStatus.objects.update_or_create(
             node=self.from_node,
             defaults={
+                "inferred_max_hops": self.observation.hop_start,
                 "ch1_voltage": self.packet.ch1_voltage,
                 "ch1_current": self.packet.ch1_current,
                 "ch2_voltage": self.packet.ch2_voltage,
