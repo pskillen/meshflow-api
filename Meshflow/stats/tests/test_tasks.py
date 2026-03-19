@@ -68,6 +68,7 @@ def test_backfill_stats_snapshots_creates_online_nodes_and_packet_volume(
     assert pv.count() == 24
     hour_12 = pv.get(recorded_at=timezone.make_aware(datetime(2025, 3, 15, 12, 0, 0)))
     assert hour_12.value["count"] == 1
+    assert "by_type" in hour_12.value
 
 
 @pytest.mark.django_db
@@ -112,3 +113,35 @@ def test_backfill_stats_snapshots_idempotent(
 
     assert data2["created"] == 0
     assert data2["skipped"] == created_first
+
+
+@pytest.mark.django_db
+def test_packet_volume_includes_by_type(create_managed_node):
+    """packet_volume snapshots include by_type breakdown."""
+    from packets.models import MessagePacket, PositionPacket
+    from stats.tasks import _collect_packet_volume
+
+    hour = timezone.make_aware(datetime(2025, 3, 15, 12, 0, 0))
+
+    MessagePacket.objects.create(
+        packet_id=1,
+        from_int=111111111,
+        first_reported_time=hour,
+        message_text="hi",
+    )
+    PositionPacket.objects.create(
+        packet_id=2,
+        from_int=222222222,
+        first_reported_time=hour + timezone.timedelta(minutes=30),
+        latitude=55.0,
+        longitude=-3.0,
+    )
+
+    c, s = _collect_packet_volume(hour, run_id=None)
+    assert c == 1
+    assert s == 0
+
+    snap = StatsSnapshot.objects.get(stat_type="packet_volume", recorded_at=hour)
+    assert snap.value["count"] == 2
+    assert snap.value["by_type"]["text_message"] == 1
+    assert snap.value["by_type"]["position"] == 1

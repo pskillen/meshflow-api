@@ -44,7 +44,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    command: python manage.py migrate && python manage.py run_deploy_tasks
+    command: ["sh", "-c", "python manage.py migrate && python manage.py run_deploy_tasks"]
     environment:
       DEBUG: true
       POSTGRES_DB: meshflow
