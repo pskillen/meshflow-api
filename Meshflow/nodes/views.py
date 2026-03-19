@@ -721,15 +721,39 @@ class ManagedNodeViewSet(viewsets.ModelViewSet):
 
     def get_serializer_class(self):
         """Return different serializers based on the action."""
-        if self.action == "mine":
-            return OwnedManagedNodeSerializer
-        if self.action == "create":
+        if self.action in ("mine", "create", "update", "partial_update"):
             return OwnedManagedNodeSerializer
         return ManagedNodeSerializer
+
+    def _managed_node_mutate_allowed(self, managed_node):
+        user = self.request.user
+        if user.is_staff or managed_node.owner_id == user.id:
+            return
+        self.permission_denied(
+            self.request,
+            message="You do not have permission to modify this managed node.",
+        )
+
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        context = self.get_serializer_context()
+        if request.user.is_staff or instance.owner_id == request.user.id:
+            serializer = OwnedManagedNodeSerializer(instance, context=context)
+        else:
+            serializer = ManagedNodeSerializer(instance, context=context)
+        return Response(serializer.data)
 
     def perform_create(self, serializer):
         """Create a new managed node and set the owner."""
         serializer.save(owner=self.request.user)
+
+    def perform_update(self, serializer):
+        self._managed_node_mutate_allowed(serializer.instance)
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        self._managed_node_mutate_allowed(instance)
+        super().perform_destroy(instance)
 
     @action(detail=False, methods=["get"])
     def mine(self, request):

@@ -3416,6 +3416,9 @@ paths:
   /nodes/managed-nodes/{node_id}/:
     get:
       summary: Get managed node details
+      description: >-
+        Returns full details. If the current user is the node owner or staff, the response includes
+        OwnedManagedNode fields (e.g. channel_0–channel_7 as nested MessageChannel). Other authenticated users receive ManagedNodeRead without channel mappings.
       tags: [Nodes]
       security:
         - BearerAuth: []
@@ -3427,7 +3430,7 @@ paths:
             type: integer
       responses:
         '200':
-          description: Node details
+          description: Node details (OwnedManagedNode shape for owner/staff; else ManagedNodeRead)
           content:
             application/json:
               schema:
@@ -3456,6 +3459,43 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/OwnedManagedNode'
+        '403':
+          description: Not the node owner and not staff
+
+    patch:
+      summary: Partially update managed node
+      description: >-
+        Owner or staff only. Typical body fields include channel_0–channel_7 (nullable MessageChannel IDs),
+        name, allow_auto_traceroute, default location via position, etc. Non-owners receive 403.
+      tags: [Nodes]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: node_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              description: >-
+                Any subset of OwnedManagedNode writable fields (e.g. channel_0–channel_7 as integer IDs or null).
+      responses:
+        '200':
+          description: Updated managed node
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OwnedManagedNode'
+        '400':
+          description: Validation error (e.g. channel not in node constellation)
+        '403':
+          description: Not the node owner and not staff
 
     delete:
       summary: Delete managed node
