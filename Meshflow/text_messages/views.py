@@ -21,10 +21,13 @@ class TextMessageViewSet(viewsets.ModelViewSet):
 
         constellation_id = self.request.query_params.get("constellation_id")
         channel_id = self.request.query_params.get("channel_id")
+        sender_node_id = self.request.query_params.get("sender_node_id")
         if constellation_id:
             queryset = queryset.filter(channel__constellation_id=constellation_id)
         if channel_id:
             queryset = queryset.filter(channel_id=channel_id)
+        if sender_node_id:
+            queryset = queryset.filter(sender__node_id=int(sender_node_id))
 
         # filter out any DMs (i.e. recipient_node_id must be '^all')
         queryset = queryset.filter(recipient_node_id=BROADCAST_ID)

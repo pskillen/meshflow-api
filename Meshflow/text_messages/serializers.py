@@ -17,12 +17,17 @@ class TextMessageSerializer(serializers.ModelSerializer):
     sender = ObservedNodeSerializer(read_only=True)
     channel = serializers.PrimaryKeyRelatedField(queryset=MessageChannel.objects.all())
     heard = serializers.SerializerMethodField()
+    packet_id = serializers.SerializerMethodField()
+
+    def get_packet_id(self, obj):
+        return obj.original_packet.packet_id if obj.original_packet else None
 
     class Meta:
         model = TextMessage
         fields = [
             "id",
             "original_packet_id",
+            "packet_id",
             "sender",
             "recipient_node_id",
             "channel",
@@ -36,6 +41,7 @@ class TextMessageSerializer(serializers.ModelSerializer):
         read_only_fields = [
             "id",
             "original_packet_id",
+            "packet_id",
             "sender",
             "recipient_node_id",
             "channel",
