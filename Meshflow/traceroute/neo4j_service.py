@@ -6,6 +6,7 @@ from datetime import datetime
 from django.conf import settings
 
 from neo4j import GraphDatabase
+from tqdm import tqdm
 
 from common.mesh_node_helpers import meshtastic_id_to_hex
 from nodes.models import ManagedNode, ObservedNode
@@ -148,10 +149,11 @@ def _extract_edges(route_data: list) -> list[tuple[int, int, float | None]]:
     return edges
 
 
-def add_traceroute_edges(auto_traceroute: AutoTraceRoute, driver=None):
+def add_traceroute_edges(auto_traceroute: AutoTraceRoute, driver=None, *, quiet: bool = False):
     """
     Extract edges from route/route_back, upsert nodes, create ROUTED_TO relationships.
     Only creates edges where both endpoints have coordinates.
+    When quiet=True, suppresses success logging (for bulk export to avoid clashing with tqdm).
     """
     driver = driver or get_driver()
 
@@ -260,11 +262,12 @@ def add_traceroute_edges(auto_traceroute: AutoTraceRoute, driver=None):
                 **params,
             )
 
-    logger.info(
-        "add_traceroute_edges: pushed %d edges for AutoTraceRoute %s",
-        len(valid_edges),
-        auto_tr.id,
-    )
+    if not quiet:
+        logger.info(
+            "add_traceroute_edges: pushed %d edges for AutoTraceRoute %s",
+            len(valid_edges),
+            auto_tr.id,
+        )
 
 
 def export_all_traceroutes_to_neo4j(driver=None, batch_size: int = 100):
@@ -281,18 +284,20 @@ def export_all_traceroutes_to_neo4j(driver=None, batch_size: int = 100):
     total = qs.count()
     exported = 0
 
-    for offset in range(0, total, batch_size):
-        batch = list(qs[offset : offset + batch_size])
-        for auto_tr in batch:
-            try:
-                add_traceroute_edges(auto_tr, driver=driver)
-                exported += 1
-            except Exception as e:
-                logger.exception(
-                    "export_all_traceroutes_to_neo4j: failed for AutoTraceRoute %s: %s",
-                    auto_tr.id,
-                    e,
-                )
+    with tqdm(total=total, unit="tr", desc="Exporting to Neo4j") as pbar:
+        for offset in range(0, total, batch_size):
+            batch = list(qs[offset : offset + batch_size])
+            for auto_tr in batch:
+                try:
+                    add_traceroute_edges(auto_tr, driver=driver, quiet=True)
+                    exported += 1
+                except Exception as e:
+                    logger.exception(
+                        "export_all_traceroutes_to_neo4j: failed for AutoTraceRoute %s: %s",
+                        auto_tr.id,
+                        e,
+                    )
+                pbar.update(1)
 
     logger.info(
         "export_all_traceroutes_to_neo4j: exported %d of %d traceroutes",
@@ -306,11 +311,14 @@ def run_heatmap_query(
     triggered_at_after=None,
     bbox=None,
     constellation_id=None,
+    edge_metric="packets",
     driver=None,
 ):
     """
     Query Neo4j for aggregated heatmap edges (bidirectional) and nodes.
     Returns dict with edges, nodes, and meta.
+
+    edge_metric: "packets" (default) - edges colored by sum of packet count; "snr" - by avg link quality.
     """
     driver = driver or get_driver()
 
@@ -359,11 +367,18 @@ def run_heatmap_query(
 
     where_str = " AND ".join(where_clauses)
 
-    # Bidirectional: use canonical direction (a.node_id < b.node_id) and sum weights
+    # Bidirectional: use canonical direction (a.node_id < b.node_id)
+    # packets: sum(weight); snr: also avg(snr) for link quality
+    agg = "sum(r.weight) AS weight"
+    ret_extra = ""
+    if edge_metric == "snr":
+        agg += ", avg(r.snr) AS avg_snr"
+        ret_extra = ", avg_snr"
+
     query = f"""
     MATCH (a:MeshNode)-[r:ROUTED_TO]-(b:MeshNode)
     WHERE {where_str}
-    WITH a, b, sum(r.weight) AS weight
+    WITH a, b, {agg}
     WHERE a.node_id < b.node_id
     RETURN a.node_id AS from_node_id,
            a.latitude AS from_lat, a.longitude AS from_lng,
@@ -373,7 +388,7 @@ def run_heatmap_query(
            b.latitude AS to_lat, b.longitude AS to_lng,
            b.node_id_str AS to_node_id_str,
            b.short_name AS to_short_name, b.long_name AS to_long_name,
-           weight
+           weight{ret_extra}
     """
 
     edges = []
@@ -384,17 +399,26 @@ def run_heatmap_query(
         for record in result:
             from_id = record["from_node_id"]
             to_id = record["to_node_id"]
-            edges.append(
-                {
-                    "from_node_id": from_id,
-                    "to_node_id": to_id,
-                    "from_lat": record["from_lat"],
-                    "from_lng": record["from_lng"],
-                    "to_lat": record["to_lat"],
-                    "to_lng": record["to_lng"],
-                    "weight": record["weight"],
-                }
-            )
+            edge_data = {
+                "from_node_id": from_id,
+                "to_node_id": to_id,
+                "from_lat": record["from_lat"],
+                "from_lng": record["from_lng"],
+                "to_lat": record["to_lat"],
+                "to_lng": record["to_lng"],
+                "weight": record["weight"],
+            }
+
+            if edge_metric == "snr":
+                # Directly read projected value when we're in the snr query path.
+                try:
+                    avg_snr_raw = record["avg_snr"]
+                except Exception:
+                    avg_snr_raw = None
+
+                if avg_snr_raw is not None:
+                    edge_data["avg_snr"] = float(avg_snr_raw)
+            edges.append(edge_data)
             if from_id not in nodes_by_id:
                 nodes_by_id[from_id] = {
                     "node_id": from_id,

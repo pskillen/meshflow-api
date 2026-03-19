@@ -1,7 +1,10 @@
 """Views for traceroute list, detail, and trigger."""
 
+from collections import Counter
 from datetime import timedelta
 
+from django.db.models import Count
+from django.db.models.functions import TruncDate
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
@@ -274,11 +277,16 @@ def heatmap_edges(request):
             except ValueError:
                 pass
 
+    edge_metric = request.query_params.get("edge_metric", "packets")
+    if edge_metric not in ("packets", "snr"):
+        edge_metric = "packets"
+
     try:
         data = run_heatmap_query(
             triggered_at_after=triggered_at_after,
             bbox=bbox,
             constellation_id=constellation_id,
+            edge_metric=edge_metric,
         )
     except Exception as e:
         import logging
@@ -290,6 +298,131 @@ def heatmap_edges(request):
         )
 
     return Response(data)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def traceroute_stats(request):
+    """Traceroute statistics: sources, success/failure, top routers, success over time."""
+    from django.utils.dateparse import parse_datetime
+
+    from common.mesh_node_helpers import meshtastic_id_to_hex
+
+    triggered_after = None
+    if request.query_params.get("triggered_at_after"):
+        dt = parse_datetime(request.query_params["triggered_at_after"])
+        if dt:
+            triggered_after = dt
+
+    qs = AutoTraceRoute.objects.all()
+    if triggered_after:
+        qs = qs.filter(triggered_at__gte=triggered_after)
+
+    # Sources: by trigger_type
+    sources = list(qs.values("trigger_type").annotate(count=Count("id")).order_by("-count"))
+
+    # Success/failure: completed vs failed only
+    success_failure = list(
+        qs.filter(status__in=[AutoTraceRoute.STATUS_COMPLETED, AutoTraceRoute.STATUS_FAILED])
+        .values("status")
+        .annotate(count=Count("id"))
+        .order_by("-count")
+    )
+
+    # Top routers: intermediate nodes from completed traceroutes
+    UNKNOWN_NODE_ID = 0xFFFFFFFF
+    router_counts = Counter()
+    completed_qs = qs.filter(status=AutoTraceRoute.STATUS_COMPLETED).select_related("source_node", "target_node")
+    for tr in completed_qs:
+        src_id = tr.source_node.node_id if tr.source_node else None
+        tgt_id = tr.target_node.node_id if tr.target_node else None
+        exclude_ids = {src_id, tgt_id, UNKNOWN_NODE_ID}
+        for item in (tr.route or []) + (tr.route_back or []):
+            nid = item.get("node_id")
+            if nid is not None and nid not in exclude_ids:
+                router_counts[nid] += 1
+
+    top_router_node_ids = [nid for nid, _ in router_counts.most_common(15)]
+    observed_by_id = {}
+    if top_router_node_ids:
+        for o in ObservedNode.objects.filter(node_id__in=top_router_node_ids).values("node_id", "short_name"):
+            observed_by_id[o["node_id"]] = o
+
+    top_routers = [
+        {
+            "node_id": nid,
+            "node_id_str": meshtastic_id_to_hex(nid),
+            "short_name": observed_by_id.get(nid, {}).get("short_name") or meshtastic_id_to_hex(nid),
+            "count": router_counts[nid],
+        }
+        for nid in top_router_node_ids
+    ]
+
+    # Success over time: last 14 days, from StatsSnapshot or on-demand
+    fourteen_days_ago = timezone.now() - timedelta(days=14)
+    success_over_time = _get_success_over_time(fourteen_days_ago)
+
+    return Response(
+        {
+            "sources": sources,
+            "success_failure": success_failure,
+            "top_routers": top_routers,
+            "success_over_time": success_over_time,
+        }
+    )
+
+
+def _get_success_over_time(since):
+    """Return [{date, completed, failed}, ...] for last 14 days from StatsSnapshot + gaps."""
+    from datetime import date
+    from datetime import datetime as dt_class
+
+    from stats.models import StatsSnapshot
+
+    # Build date range (oldest first for ordering)
+    today = timezone.now().date()
+    dates_needed = [(today - timedelta(days=i)).isoformat() for i in range(13, -1, -1)]
+
+    # Fetch from StatsSnapshot
+    snapshots = StatsSnapshot.objects.filter(
+        stat_type="tr_success_daily",
+        constellation__isnull=True,
+        recorded_at__gte=since,
+    ).order_by("recorded_at")
+
+    result_by_date = {}
+    for s in snapshots:
+        val = s.value or {}
+        dt = val.get("date")
+        if dt:
+            result_by_date[dt] = {
+                "date": dt,
+                "completed": val.get("completed", 0),
+                "failed": val.get("failed", 0),
+            }
+
+    # Fill gaps with on-demand aggregation from AutoTraceRoute
+    gaps = [d for d in dates_needed if d not in result_by_date]
+    if gaps:
+        since_dt = timezone.make_aware(dt_class.combine(date.fromisoformat(gaps[0]), dt_class.min.time()))
+        qs = (
+            AutoTraceRoute.objects.filter(
+                triggered_at__gte=since_dt,
+                status__in=[AutoTraceRoute.STATUS_COMPLETED, AutoTraceRoute.STATUS_FAILED],
+            )
+            .annotate(date=TruncDate("triggered_at"))
+            .values("date", "status")
+            .annotate(count=Count("id"))
+        )
+        for row in qs:
+            dt_str = row["date"].isoformat() if row["date"] else None
+            if dt_str and dt_str in gaps:
+                if dt_str not in result_by_date:
+                    result_by_date[dt_str] = {"date": dt_str, "completed": 0, "failed": 0}
+                result_by_date[dt_str][row["status"]] = row["count"]
+
+    # Build ordered result (oldest first for line chart)
+    return [result_by_date.get(d, {"date": d, "completed": 0, "failed": 0}) for d in dates_needed]
 
 
 @api_view(["GET"])

@@ -3929,6 +3929,77 @@ paths:
                     items:
                       $ref: '#/components/schemas/AutoTraceRoute'
 
+  /traceroutes/stats/:
+    get:
+      summary: Get traceroute statistics
+      description: >
+        Returns traceroute stats for the given timeframe: sources (by trigger_type),
+        success/failure counts, top routers (intermediate nodes), and success over time (14d).
+        All authenticated users.
+      tags: [Traceroutes]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: triggered_at_after
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+            description: Filter stats by triggered_at >= value (ISO 8601)
+      responses:
+        '200':
+          description: Traceroute statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [sources, success_failure, top_routers, success_over_time]
+                properties:
+                  sources:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        trigger_type:
+                          type: string
+                        count:
+                          type: integer
+                  success_failure:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        status:
+                          type: string
+                        count:
+                          type: integer
+                  top_routers:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        node_id:
+                          type: integer
+                        node_id_str:
+                          type: string
+                        short_name:
+                          type: string
+                        count:
+                          type: integer
+                  success_over_time:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        date:
+                          type: string
+                          format: date
+                        completed:
+                          type: integer
+                        failed:
+                          type: integer
+
   /traceroutes/heatmap-edges/:
     get:
       summary: Get heatmap edges and nodes
@@ -3958,6 +4029,16 @@ paths:
           schema:
             type: string
             description: Viewport bounding box as min_lat,min_lon,max_lat,max_lon
+        - name: edge_metric
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [packets, snr]
+            default: packets
+            description: >
+              packets - edge color/width by packet count; snr - by average link quality (SNR).
+              When snr, only edges with SNR data are returned.
       responses:
         '200':
           description: Heatmap edges and nodes
@@ -3987,6 +4068,9 @@ paths:
                           type: number
                         weight:
                           type: integer
+                        avg_snr:
+                          type: number
+                          description: Average SNR (when edge_metric=snr)
                   nodes:
                     type: array
                     items:
