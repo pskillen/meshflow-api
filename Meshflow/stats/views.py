@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Optional, Tuple
 
-from django.db.models import BigIntegerField, Case, Count, F, Q, When
+from django.db.models import BigIntegerField, Case, Count, Exists, F, OuterRef, Q, When
 from django.db.models.functions import Mod, Trunc
 
 from rest_framework import status
@@ -145,6 +145,13 @@ def node_packet_stats(request, node_id: int):
 
     # Build base query for packets from this node
     packets = RawPacket.objects.filter(from_int=node_id)
+    # Exclude device metrics that were only observed by the sender (self-ingested)
+    packets = packets.exclude(
+        Q(devicemetricspacket__isnull=False)
+        & ~Exists(
+            PacketObservation.objects.filter(packet_id=OuterRef("id")).exclude(observer__node_id=OuterRef("from_int"))
+        )
+    )
 
     # Apply date filters if provided
     if start_date:
@@ -225,8 +232,10 @@ def node_received_stats(request, node_id: int):
     except ValueError as e:
         return Response({"status": "error", "message": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-    # Build base query for packet observations by this node
-    observations = PacketObservation.objects.filter(observer=managed_node)
+    # Build base query for packet observations (exclude self device metrics)
+    observations = PacketObservation.objects.filter(observer=managed_node).exclude(
+        Q(packet__devicemetricspacket__isnull=False) & Q(packet__from_int=F("observer__node_id"))
+    )
 
     # Apply date filters if provided
     if start_date:
@@ -310,6 +319,7 @@ def node_neighbour_stats(request, node_id: int):
     try:
         observations = (
             PacketObservation.objects.filter(observer=managed_node)
+            .exclude(Q(packet__devicemetricspacket__isnull=False) & Q(packet__from_int=F("observer__node_id")))
             .select_related("packet")
             .annotate(
                 source_node_id=Case(

@@ -10,7 +10,7 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from nodes.models import ObservedNode
-from packets.models import MessagePacket, PacketObservation
+from packets.models import DeviceMetricsPacket, MessagePacket, PacketObservation
 from stats.models import StatsSnapshot
 
 
@@ -325,6 +325,145 @@ def test_node_neighbour_stats_excludes_self_packets(create_managed_node, create_
     assert response.data["total_packets"] == 1
     assert len(response.data["by_source"]) == 1
     assert response.data["by_source"][0]["source"] == 111111111
+
+
+@pytest.mark.django_db
+def test_node_received_stats_excludes_self_device_metrics(create_managed_node, create_user):
+    """node_received_stats excludes observations of device metrics from self."""
+    user = create_user()
+    managed = create_managed_node(owner=user, node_id=111111111)
+    channel = managed.channel_0
+
+    rx_time = timezone.make_aware(datetime(2025, 6, 15, 12, 0, 0))
+
+    # Self device metrics: from_int == managed.node_id, observed by managed
+    dm_self = DeviceMetricsPacket.objects.create(
+        packet_id=1,
+        from_int=111111111,
+        from_str="!069f6b67",
+        to_int=4294967295,
+        to_str="^all",
+        port_num="TELEMETRY_APP",
+        first_reported_time=rx_time,
+        reading_time=rx_time,
+        battery_level=95.0,
+    )
+    PacketObservation.objects.create(
+        packet=dm_self,
+        observer=managed,
+        channel=channel,
+        rx_time=rx_time,
+        hop_limit=3,
+        hop_start=3,
+        rx_rssi=-60.0,
+        rx_snr=10.0,
+        upload_time=timezone.now(),
+        relay_node=None,
+    )
+
+    # Message from another node (should be included)
+    msg = MessagePacket.objects.create(
+        packet_id=2,
+        from_int=222222222,
+        from_str="!0d3b6cde",
+        to_int=4294967295,
+        to_str="^all",
+        port_num="TEXT_MESSAGE_APP",
+        message_text="Hello",
+        first_reported_time=rx_time,
+    )
+    PacketObservation.objects.create(
+        packet=msg,
+        observer=managed,
+        channel=channel,
+        rx_time=rx_time,
+        relay_node=None,
+    )
+
+    client = APIClient()
+    client.force_authenticate(user=user)
+
+    response = client.get(
+        reverse("stats:node-received-stats", kwargs={"node_id": managed.node_id}),
+        {"start_date": "2025-01-01", "end_date": "2025-12-31"},
+    )
+    assert response.status_code == status.HTTP_200_OK
+    assert len(response.data["intervals"]) == 1
+    interval = response.data["intervals"][0]
+    packet_types = {p["packet_type"]: p["count"] for p in interval["packet_types"]}
+    assert packet_types["device_metrics"] == 0
+    assert packet_types["text_message"] == 1
+
+
+@pytest.mark.django_db
+def test_node_packet_stats_excludes_self_only_device_metrics(create_managed_node, create_observed_node, create_user):
+    """node_packet_stats excludes device metrics that were only self-observed for the node."""
+    user = create_user()
+    managed = create_managed_node(owner=user, node_id=111111111)
+    channel = managed.channel_0
+
+    # ObservedNode for the node (required by node_packet_stats)
+    create_observed_node(node_id=111111111)
+
+    rx_time = timezone.make_aware(datetime(2025, 6, 15, 12, 0, 0))
+
+    # Device metrics from node 111111111, observed only by itself (self-ingested)
+    dm_self = DeviceMetricsPacket.objects.create(
+        packet_id=1,
+        from_int=111111111,
+        from_str="!069f6b67",
+        to_int=4294967295,
+        to_str="^all",
+        port_num="TELEMETRY_APP",
+        first_reported_time=rx_time,
+        reading_time=rx_time,
+        battery_level=95.0,
+    )
+    PacketObservation.objects.create(
+        packet=dm_self,
+        observer=managed,
+        channel=channel,
+        rx_time=rx_time,
+        hop_limit=3,
+        hop_start=3,
+        rx_rssi=-60.0,
+        rx_snr=10.0,
+        upload_time=timezone.now(),
+        relay_node=None,
+    )
+
+    # Message from same node (should be included)
+    msg = MessagePacket.objects.create(
+        packet_id=2,
+        from_int=111111111,
+        from_str="!069f6b67",
+        to_int=4294967295,
+        to_str="^all",
+        port_num="TEXT_MESSAGE_APP",
+        message_text="Hello",
+        first_reported_time=rx_time,
+    )
+    PacketObservation.objects.create(
+        packet=msg,
+        observer=managed,
+        channel=channel,
+        rx_time=rx_time,
+        relay_node=None,
+    )
+
+    client = APIClient()
+    client.force_authenticate(user=user)
+
+    response = client.get(
+        reverse("stats:node-packet-stats", kwargs={"node_id": 111111111}),
+        {"start_date": "2025-01-01", "end_date": "2025-12-31"},
+    )
+    assert response.status_code == status.HTTP_200_OK
+    assert len(response.data["intervals"]) == 1
+    interval = response.data["intervals"][0]
+    packet_types = {p["packet_type"]: p["count"] for p in interval["packet_types"]}
+    assert packet_types["device_metrics"] == 0
+    assert packet_types["text_message"] == 1
 
 
 @pytest.mark.django_db

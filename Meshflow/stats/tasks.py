@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime, timedelta
 from typing import Optional
 
-from django.db.models import Count, Q
+from django.db.models import Count, Exists, OuterRef, Q
 from django.utils import timezone
 
 from celery import shared_task
@@ -147,6 +147,13 @@ def _collect_packet_volume(
     base_qs = RawPacket.objects.filter(
         first_reported_time__gte=recorded_at,
         first_reported_time__lt=hour_end,
+    )
+    # Exclude device metrics that were only observed by the sender (self-ingested)
+    base_qs = base_qs.exclude(
+        Q(devicemetricspacket__isnull=False)
+        & ~Exists(
+            PacketObservation.objects.filter(packet_id=OuterRef("id")).exclude(observer__node_id=OuterRef("from_int"))
+        )
     )
 
     annotate_kwargs = {f"_{k}": Count("id", filter=v) for k, v in PACKET_TYPE_FILTERS.items()}

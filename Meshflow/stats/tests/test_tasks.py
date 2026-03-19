@@ -7,9 +7,9 @@ from django.utils import timezone
 
 import pytest
 
-from packets.models import PacketObservation
+from packets.models import DeviceMetricsPacket, PacketObservation
 from stats.models import StatsSnapshot
-from stats.tasks import backfill_stats_snapshots
+from stats.tasks import _collect_packet_volume, backfill_stats_snapshots
 
 
 @pytest.mark.django_db
@@ -145,3 +145,88 @@ def test_packet_volume_includes_by_type(create_managed_node):
     assert snap.value["count"] == 2
     assert snap.value["by_type"]["text_message"] == 1
     assert snap.value["by_type"]["position"] == 1
+
+
+@pytest.mark.django_db
+def test_packet_volume_excludes_self_only_device_metrics(create_managed_node):
+    """packet_volume excludes device metrics that were only observed by the sender."""
+    managed = create_managed_node(node_id=111111111)
+    channel = managed.channel_0
+
+    hour = timezone.make_aware(datetime(2025, 3, 15, 12, 0, 0))
+
+    # Device metrics from managed's node, observed only by managed (self-ingested)
+    dm_self = DeviceMetricsPacket.objects.create(
+        packet_id=1,
+        from_int=111111111,
+        from_str="!069f6b67",
+        to_int=4294967295,
+        to_str="^all",
+        port_num="TELEMETRY_APP",
+        first_reported_time=hour,
+        reading_time=hour,
+        battery_level=95.0,
+    )
+    PacketObservation.objects.create(
+        packet=dm_self,
+        observer=managed,
+        channel=channel,
+        rx_time=hour,
+        hop_limit=3,
+        hop_start=3,
+        rx_rssi=-60.0,
+        rx_snr=10.0,
+        upload_time=timezone.now(),
+        relay_node=None,
+    )
+
+    c, s = _collect_packet_volume(hour, run_id=None)
+    assert c == 1
+    assert s == 0
+
+    snap = StatsSnapshot.objects.get(stat_type="packet_volume", recorded_at=hour)
+    # Self-only device metrics should be excluded
+    assert snap.value["count"] == 0
+    assert snap.value["by_type"]["device_metrics"] == 0
+
+
+@pytest.mark.django_db
+def test_packet_volume_includes_device_metrics_with_other_observer(create_managed_node):
+    """packet_volume includes device metrics when observed by a non-sender."""
+    managed_b = create_managed_node(node_id=222222222)
+    channel_b = managed_b.channel_0
+
+    hour = timezone.make_aware(datetime(2025, 3, 15, 12, 0, 0))
+
+    # Device metrics from node A, observed by node B (mesh traffic)
+    dm = DeviceMetricsPacket.objects.create(
+        packet_id=1,
+        from_int=111111111,
+        from_str="!069f6b67",
+        to_int=4294967295,
+        to_str="^all",
+        port_num="TELEMETRY_APP",
+        first_reported_time=hour,
+        reading_time=hour,
+        battery_level=95.0,
+    )
+    PacketObservation.objects.create(
+        packet=dm,
+        observer=managed_b,
+        channel=channel_b,
+        rx_time=hour,
+        hop_limit=3,
+        hop_start=3,
+        rx_rssi=-60.0,
+        rx_snr=10.0,
+        upload_time=timezone.now(),
+        relay_node=None,
+    )
+
+    c, s = _collect_packet_volume(hour, run_id=None)
+    assert c == 1
+    assert s == 0
+
+    snap = StatsSnapshot.objects.get(stat_type="packet_volume", recorded_at=hour)
+    assert snap.value["count"] == 1
+    assert snap.value["by_type"]["device_metrics"] == 1
