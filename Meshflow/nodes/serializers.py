@@ -464,6 +464,35 @@ class OwnedManagedNodeSerializer(ManagedNodeSerializer):
         queryset=MessageChannel.objects.all(), required=False, allow_null=True
     )
 
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        constellation = attrs.get("constellation")
+        if constellation is None and self.instance is not None:
+            constellation = self.instance.constellation
+        if constellation is None:
+            return attrs
+
+        errors = {}
+        for i in range(8):
+            key = f"channel_{i}"
+            if key not in attrs:
+                continue
+            ch = attrs[key]
+            if ch is None:
+                continue
+            if ch.constellation_id != constellation.id:
+                errors[key] = "Message channel must belong to the managed node's constellation."
+        if errors:
+            raise serializers.ValidationError(errors)
+        return attrs
+
+    def update(self, instance, validated_data):
+        request = self.context.get("request")
+        if request is not None and not request.user.is_staff:
+            validated_data.pop("owner", None)
+            validated_data.pop("constellation", None)
+        return super().update(instance, validated_data)
+
     # For read, override to_representation
     # (or use a SerializerMethodField if you want to return the nested object)
 
