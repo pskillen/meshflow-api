@@ -6,7 +6,12 @@ import pytest
 
 import nodes.tests.conftest  # noqa: F401 - load fixtures
 import users.tests.conftest  # noqa: F401 - load fixtures
-from traceroute.neo4j_service import UNKNOWN_NODE_ID, _extract_edges, add_traceroute_edges
+from traceroute.neo4j_service import (
+    UNKNOWN_NODE_ID,
+    _extract_edges,
+    add_traceroute_edges,
+    run_heatmap_query,
+)
 
 
 class TestExtractEdges:
@@ -120,3 +125,123 @@ class TestAddTracerouteEdges:
             if "a_id" in kwargs and "b_id" in kwargs:
                 param_pairs.append((kwargs["a_id"], kwargs["b_id"]))
         assert (0xAAAAAAAA, 0xCCCCCCCC) in param_pairs, "Expected edge (source, peer) to be created"
+
+
+@pytest.mark.django_db
+class TestRunHeatmapQuery:
+    """Tests for run_heatmap_query with mocked Neo4j."""
+
+    def test_run_heatmap_query_packets_returns_weight_only(self):
+        """edge_metric=packets returns edges with weight, no avg_snr."""
+        mock_result = MagicMock()
+        mock_result.__iter__ = lambda self: iter(
+            [
+                {
+                    "from_node_id": 1,
+                    "to_node_id": 2,
+                    "from_lat": 55.0,
+                    "from_lng": -4.0,
+                    "to_lat": 55.1,
+                    "to_lng": -4.1,
+                    "from_node_id_str": "!00000001",
+                    "from_short_name": "A",
+                    "from_long_name": "Node A",
+                    "to_node_id_str": "!00000002",
+                    "to_short_name": "B",
+                    "to_long_name": "Node B",
+                    "weight": 5,
+                }
+            ]
+        )
+        mock_session = MagicMock()
+        mock_session.run.return_value = mock_result
+        mock_driver = MagicMock()
+        mock_cm = MagicMock()
+        mock_cm.__enter__.return_value = mock_session
+        mock_cm.__exit__.return_value = False
+        mock_driver.session.return_value = mock_cm
+
+        with patch("traceroute.neo4j_service.get_driver", return_value=mock_driver):
+            data = run_heatmap_query(edge_metric="packets", driver=mock_driver)
+
+        assert len(data["edges"]) == 1
+        assert data["edges"][0]["weight"] == 5
+        assert "avg_snr" not in data["edges"][0]
+        assert len(data["nodes"]) == 2
+
+    def test_run_heatmap_query_snr_returns_avg_snr_when_present(self):
+        """edge_metric=snr returns edges with weight and avg_snr when Neo4j has snr."""
+        mock_result = MagicMock()
+        mock_result.__iter__ = lambda self: iter(
+            [
+                {
+                    "from_node_id": 1,
+                    "to_node_id": 2,
+                    "from_lat": 55.0,
+                    "from_lng": -4.0,
+                    "to_lat": 55.1,
+                    "to_lng": -4.1,
+                    "from_node_id_str": "!00000001",
+                    "from_short_name": "A",
+                    "from_long_name": "Node A",
+                    "to_node_id_str": "!00000002",
+                    "to_short_name": "B",
+                    "to_long_name": "Node B",
+                    "weight": 3,
+                    "avg_snr": -2.5,
+                }
+            ]
+        )
+        mock_session = MagicMock()
+        mock_session.run.return_value = mock_result
+        mock_driver = MagicMock()
+        mock_cm = MagicMock()
+        mock_cm.__enter__.return_value = mock_session
+        mock_cm.__exit__.return_value = False
+        mock_driver.session.return_value = mock_cm
+
+        with patch("traceroute.neo4j_service.get_driver", return_value=mock_driver):
+            data = run_heatmap_query(edge_metric="snr", driver=mock_driver)
+
+        assert len(data["edges"]) == 1
+        assert data["edges"][0]["weight"] == 3
+        assert data["edges"][0]["avg_snr"] == -2.5
+        assert len(data["nodes"]) == 2
+
+    def test_run_heatmap_query_snr_omits_avg_snr_when_null(self):
+        """edge_metric=snr omits avg_snr when Neo4j returns null (no snr on relationships)."""
+        mock_result = MagicMock()
+        mock_result.__iter__ = lambda self: iter(
+            [
+                {
+                    "from_node_id": 1,
+                    "to_node_id": 2,
+                    "from_lat": 55.0,
+                    "from_lng": -4.0,
+                    "to_lat": 55.1,
+                    "to_lng": -4.1,
+                    "from_node_id_str": "!00000001",
+                    "from_short_name": "A",
+                    "from_long_name": "Node A",
+                    "to_node_id_str": "!00000002",
+                    "to_short_name": "B",
+                    "to_long_name": "Node B",
+                    "weight": 2,
+                    "avg_snr": None,
+                }
+            ]
+        )
+        mock_session = MagicMock()
+        mock_session.run.return_value = mock_result
+        mock_driver = MagicMock()
+        mock_cm = MagicMock()
+        mock_cm.__enter__.return_value = mock_session
+        mock_cm.__exit__.return_value = False
+        mock_driver.session.return_value = mock_cm
+
+        with patch("traceroute.neo4j_service.get_driver", return_value=mock_driver):
+            data = run_heatmap_query(edge_metric="snr", driver=mock_driver)
+
+        assert len(data["edges"]) == 1
+        assert data["edges"][0]["weight"] == 2
+        assert "avg_snr" not in data["edges"][0]
