@@ -6,6 +6,7 @@ import uuid
 from datetime import datetime, timedelta
 from typing import Optional
 
+from django.db.models import Count, Q
 from django.utils import timezone
 
 from celery import shared_task
@@ -118,6 +119,17 @@ def _collect_online_nodes(
     return (created, skipped)
 
 
+PACKET_TYPE_FILTERS = {
+    "text_message": Q(messagepacket__isnull=False),
+    "position": Q(positionpacket__isnull=False),
+    "node_info": Q(nodeinfopacket__isnull=False),
+    "device_metrics": Q(devicemetricspacket__isnull=False),
+    "local_stats": Q(localstatspacket__isnull=False),
+    "environment_metrics": Q(environmentmetricspacket__isnull=False),
+    "traceroute": Q(traceroutepacket__isnull=False),
+}
+
+
 def _collect_packet_volume(
     recorded_at: datetime,
     *,
@@ -125,22 +137,29 @@ def _collect_packet_volume(
     skip_existing: bool = False,
 ) -> tuple[int, int]:
     """
-    Collect packet_volume snapshot (hourly) for global - count of RawPackets in the hour.
-    Returns (created, skipped).
+    Collect packet_volume snapshot (hourly) for global - count of RawPackets in the hour,
+    with per-type breakdown. Returns (created, skipped).
     """
     if skip_existing and _snapshot_exists(recorded_at, "packet_volume", None):
         return (0, 1)
 
     hour_end = recorded_at + timedelta(hours=1)
-    count = RawPacket.objects.filter(
+    base_qs = RawPacket.objects.filter(
         first_reported_time__gte=recorded_at,
         first_reported_time__lt=hour_end,
-    ).count()
+    )
+
+    annotate_kwargs = {f"_{k}": Count("id", filter=v) for k, v in PACKET_TYPE_FILTERS.items()}
+    agg = base_qs.aggregate(**annotate_kwargs)
+
+    by_type = {k: agg[f"_{k}"] for k in PACKET_TYPE_FILTERS}
+    total = base_qs.count()
+
     StatsSnapshot.objects.create(
         recorded_at=recorded_at,
         stat_type="packet_volume",
         constellation=None,
-        value={"count": count},
+        value={"count": total, "by_type": by_type},
         run_id=run_id,
     )
     return (1, 0)
