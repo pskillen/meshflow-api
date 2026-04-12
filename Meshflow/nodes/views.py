@@ -6,6 +6,7 @@ from django.utils import timezone
 
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -13,6 +14,7 @@ from common.mesh_node_helpers import meshtastic_hex_to_int
 from constellations.models import ConstellationUserMembership
 from nodes.models import (
     DeviceMetrics,
+    EnvironmentExposure,
     EnvironmentMetrics,
     ManagedNode,
     NodeAPIKey,
@@ -23,7 +25,9 @@ from nodes.models import (
     Position,
     PowerMetrics,
     RoleSource,
+    WeatherUse,
 )
+from nodes.permission_helpers import user_can_edit_observed_node_environment_settings
 from nodes.serializers import (
     APIKeyCreateSerializer,
     APIKeyDetailSerializer,
@@ -34,6 +38,7 @@ from nodes.serializers import (
     EnvironmentMetricsSerializer,
     ManagedNodeSerializer,
     NodeOwnerClaimSerializer,
+    ObservedNodeEnvironmentSettingsSerializer,
     ObservedNodeSearchSerializer,
     ObservedNodeSerializer,
     OwnedManagedNodeSerializer,
@@ -47,6 +52,17 @@ from .utils import generate_claim_key
 
 # Infrastructure roles: ROUTER, ROUTER_CLIENT, REPEATER, ROUTER_LATE (optionally CLIENT_BASE)
 INFRASTRUCTURE_ROLES = [RoleSource.ROUTER, RoleSource.ROUTER_CLIENT, RoleSource.REPEATER, RoleSource.ROUTER_LATE]
+
+
+def _multi_query_strings(request, name):
+    """Collect repeated or comma-separated query values for `name`."""
+    out = []
+    for raw in request.query_params.getlist(name):
+        for part in raw.split(","):
+            p = part.strip()
+            if p:
+                out.append(p)
+    return out
 
 
 class APIKeyViewSet(viewsets.ModelViewSet):
@@ -531,12 +547,58 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
             .select_related("latest_status")
         )
 
+        weather_use_labels = _multi_query_strings(request, "weather_use")
+        if weather_use_labels:
+            w_map = {w.label: w.value for w in WeatherUse}
+            try:
+                w_vals = [w_map[label] for label in weather_use_labels]
+            except KeyError:
+                return Response(
+                    {"error": "Invalid weather_use; use unknown, include, or exclude."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            qs = qs.filter(weather_use__in=w_vals)
+
+        exposure_labels = _multi_query_strings(request, "environment_exposure")
+        if exposure_labels:
+            e_map = {e.label: e.value for e in EnvironmentExposure}
+            try:
+                e_vals = [e_map[label] for label in exposure_labels]
+            except KeyError:
+                return Response(
+                    {"error": "Invalid environment_exposure; use unknown, indoor, outdoor, or sheltered."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            qs = qs.filter(environment_exposure__in=e_vals)
+
         page = self.paginate_queryset(qs)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
             return self.get_paginated_response(serializer.data)
         serializer = self.get_serializer(qs, many=True)
         return Response(serializer.data)
+
+    @action(detail=True, methods=["patch"], url_path="environment-settings")
+    def environment_settings(self, request, node_id=None):
+        """Update environment_exposure and/or weather_use (staff or claim owner only)."""
+        node = self.get_object()
+        if not user_can_edit_observed_node_environment_settings(request.user, node):
+            raise PermissionDenied()
+        ser = ObservedNodeEnvironmentSettingsSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        vd = ser.validated_data
+        update_fields = []
+        if "environment_exposure" in vd:
+            node.environment_exposure = next(
+                c.value for c in EnvironmentExposure if c.label == vd["environment_exposure"]
+            )
+            update_fields.append("environment_exposure")
+        if "weather_use" in vd:
+            node.weather_use = next(c.value for c in WeatherUse if c.label == vd["weather_use"])
+            update_fields.append("weather_use")
+        node.save(update_fields=update_fields)
+        out = ObservedNodeSerializer(node, context=self.get_serializer_context())
+        return Response(out.data)
 
 
 class DeviceMetricsBulkView(APIView):

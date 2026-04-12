@@ -403,6 +403,8 @@ class ObservedNodeAdmin(admin.ModelAdmin):
         "node_id_str",
         "hw_model",
         "get_inferred_max_hops",
+        "environment_exposure",
+        "weather_use",
         "claimed_by",
         "role",
     )
@@ -413,6 +415,8 @@ class ObservedNodeAdmin(admin.ModelAdmin):
     get_inferred_max_hops.short_description = "Inferred max hops"
     list_filter = (
         "hw_model",
+        "environment_exposure",
+        "weather_use",
         "claimed_by",
         "role",
     )
@@ -444,6 +448,8 @@ class ObservedNodeAdmin(admin.ModelAdmin):
             "short_name",
             "hw_model",
             "public_key",
+            "environment_exposure",
+            "weather_use",
             "claimed_by",
             "role",
         ]

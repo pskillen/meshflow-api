@@ -112,6 +112,23 @@ class ManagedNode(models.Model):
         return getattr(self, f"channel_{channel_idx}")
 
 
+class EnvironmentExposure(models.IntegerChoices):
+    """Where environment / weather sensors are placed (operator-set)."""
+
+    UNKNOWN = 0, "unknown"
+    INDOOR = 1, "indoor"
+    OUTDOOR = 2, "outdoor"
+    SHELTERED = 3, "sheltered"
+
+
+class WeatherUse(models.IntegerChoices):
+    """Whether this node should appear in public weather aggregates."""
+
+    UNKNOWN = 0, "unknown"
+    INCLUDE = 1, "include"
+    EXCLUDE = 2, "exclude"
+
+
 class ObservedNode(models.Model):
     """Model representing a mesh network node."""
 
@@ -127,6 +144,19 @@ class ObservedNode(models.Model):
     role = models.IntegerField(choices=RoleSource.choices, null=True, blank=True)
     is_licensed = models.BooleanField(null=True, blank=True)
     is_unmessagable = models.BooleanField(null=True, blank=True)
+
+    environment_exposure = models.IntegerField(
+        choices=EnvironmentExposure.choices,
+        default=EnvironmentExposure.UNKNOWN,
+        db_index=True,
+        help_text=_("Physical placement of environment sensors (for weather suitability)."),
+    )
+    weather_use = models.IntegerField(
+        choices=WeatherUse.choices,
+        default=WeatherUse.UNKNOWN,
+        db_index=True,
+        help_text=_("Include or exclude from weather-style views."),
+    )
 
     last_heard = models.DateTimeField(null=True, blank=True, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
