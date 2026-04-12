@@ -8,6 +8,7 @@ from users.models import User
 
 from .models import (
     DeviceMetrics,
+    EnvironmentExposure,
     EnvironmentMetrics,
     LocationSource,
     ManagedNode,
@@ -17,7 +18,27 @@ from .models import (
     ObservedNode,
     Position,
     PowerMetrics,
+    WeatherUse,
 )
+from .permission_helpers import user_can_edit_observed_node_environment_settings
+
+
+class ObservedNodeEnvironmentSettingsSerializer(serializers.Serializer):
+    """PATCH body for observed-node environment / weather classification."""
+
+    environment_exposure = serializers.ChoiceField(
+        choices=[c.label for c in EnvironmentExposure],
+        required=False,
+    )
+    weather_use = serializers.ChoiceField(
+        choices=[c.label for c in WeatherUse],
+        required=False,
+    )
+
+    def validate(self, attrs):
+        if not attrs:
+            raise serializers.ValidationError("At least one of environment_exposure, weather_use must be provided.")
+        return attrs
 
 
 class NodeOwnerClaimSerializer(serializers.ModelSerializer):
@@ -854,6 +875,9 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
     latest_health_metrics = serializers.SerializerMethodField()
     latest_host_metrics = serializers.SerializerMethodField()
     inferred_max_hops = serializers.SerializerMethodField()
+    environment_exposure = serializers.SerializerMethodField()
+    weather_use = serializers.SerializerMethodField()
+    environment_settings_editable = serializers.SerializerMethodField()
     owner = OwnerSerializer(source="claimed_by", read_only=True)
     claim = serializers.SerializerMethodField()
 
@@ -885,6 +909,9 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
             "latest_health_metrics",
             "latest_host_metrics",
             "inferred_max_hops",
+            "environment_exposure",
+            "weather_use",
+            "environment_settings_editable",
             "owner",
             "claim",
         ]
@@ -901,9 +928,24 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
             "latest_health_metrics",
             "latest_host_metrics",
             "inferred_max_hops",
+            "environment_exposure",
+            "weather_use",
+            "environment_settings_editable",
             "owner",
             "claim",
         ]
+
+    def get_environment_exposure(self, obj):
+        return EnvironmentExposure(obj.environment_exposure).label
+
+    def get_weather_use(self, obj):
+        return WeatherUse(obj.weather_use).label
+
+    def get_environment_settings_editable(self, obj):
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated:
+            return False
+        return user_can_edit_observed_node_environment_settings(request.user, obj)
 
     def get_inferred_max_hops(self, obj):
         status = self._get_latest_status(obj)

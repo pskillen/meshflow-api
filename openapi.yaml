@@ -751,6 +751,19 @@ components:
           description: >
             Inferred from packet hop_start when received; the node's max hops setting.
             Helps identify nodes with suboptimal hop limits (e.g. below recommended 7).
+        environment_exposure:
+          type: string
+          enum: [unknown, indoor, outdoor, sheltered]
+          description: Physical placement of environment sensors (weather suitability).
+        weather_use:
+          type: string
+          enum: [unknown, include, exclude]
+          description: Whether to include this node in weather-style aggregates.
+        environment_settings_editable:
+          type: boolean
+          description: >
+            True when the authenticated user may PATCH environment-settings for this node
+            (staff or claim owner). Omitted or false for unauthenticated requests.
         latest_position:
           $ref: '#/components/schemas/Position'
         latest_device_metrics:
@@ -782,6 +795,19 @@ components:
           description: >
             The current user's claim for this node, if any. Only present for authenticated requests.
             Null when the user has no claim. Use accepted_at to distinguish pending vs accepted claims.
+
+    ObservedNodeEnvironmentSettingsPatch:
+      type: object
+      description: >
+        Partial update for environment_exposure and/or weather_use. At least one field required.
+        Allowed for staff or the user who has claimed the node (claimed_by).
+      properties:
+        environment_exposure:
+          type: string
+          enum: [unknown, indoor, outdoor, sheltered]
+        weather_use:
+          type: string
+          enum: [unknown, include, exclude]
 
     ObservedNodeClaim:
       type: object
@@ -2834,7 +2860,25 @@ paths:
             type: string
             format: date-time
             description: Filter nodes with environment metrics reported after this time (ISO 8601). Default 24h ago.
+        - name: weather_use
+          in: query
+          required: false
+          schema:
+            type: string
+          description: >
+            Filter by weather_use. Repeat the parameter or use comma-separated values:
+            unknown, include, exclude.
+        - name: environment_exposure
+          in: query
+          required: false
+          schema:
+            type: string
+          description: >
+            Filter by environment_exposure. Repeat the parameter or use comma-separated values:
+            unknown, indoor, outdoor, sheltered.
       responses:
+        '400':
+          description: Invalid filter value
         '200':
           description: List of weather nodes with environment metrics
           content:
@@ -3344,6 +3388,38 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+
+  /nodes/observed-nodes/{node_id}/environment-settings/:
+    patch:
+      summary: Update observed node environment / weather classification
+      description: >
+        Set environment_exposure and/or weather_use. Staff or the claim owner (claimed_by) only.
+      tags: [Nodes]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: node_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ObservedNodeEnvironmentSettingsPatch'
+      responses:
+        '200':
+          description: Updated observed node
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObservedNode'
+        '400':
+          description: Invalid body (e.g. no fields provided)
+        '403':
+          description: Forbidden (not staff or claim owner)
 
   /nodes/managed-nodes/:
     get:
