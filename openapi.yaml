@@ -2320,6 +2320,56 @@ paths:
               schema:
                 $ref: '#/components/schemas/SocialAuthJWTToken'
 
+  /auth/social/discord/connect/:
+    get:
+      summary: Start Discord account link (authenticated)
+      description: >-
+        Returns a Discord OAuth2 authorization URL that uses a dedicated callback
+        (`/api/auth/social/discord/connect/callback/`). After the user authorizes, the API attaches the Discord
+        SocialAccount to the **current** Meshflow user (JWT subject) and redirects to the frontend with a fresh JWT.
+        Use this when the user signed in with Google/GitHub/password and must link Discord without switching identity.
+        Requires `Authorization: Bearer` (same as other authenticated routes).
+      tags: [Authentication]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Authorization URL for Discord OAuth
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [authorization_url]
+                properties:
+                  authorization_url:
+                    type: string
+                    format: uri
+        '401':
+          description: Not authenticated
+
+  /auth/social/discord/connect/callback/:
+    get:
+      summary: Discord OAuth callback for account linking
+      description: >-
+        Browser redirect target registered in the Discord application. Exchanges `code`, attaches Discord to the user
+        encoded in signed `state`, issues JWT, redirects to `FRONTEND_URL` + `FRONTEND_OAUTH_CALLBACK_PATH` with `token=`
+        or `error=discord_connect_*`.
+      tags: [Authentication]
+      parameters:
+        - name: code
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: state
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '302':
+          description: Redirect to frontend with JWT or error query param
+
   /auth/discord/notifications/:
     get:
       summary: Get Discord notification prefs

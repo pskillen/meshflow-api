@@ -3,6 +3,8 @@ from django.urls import include, path
 from users import views_discord
 from users.social_auth import (
     DiscordCallbackRedirectView,
+    DiscordConnectAuthView,
+    DiscordConnectCallbackView,
     DiscordLoginRedirectView,
     DiscordLoginView,
     GithubCallbackRedirectView,
@@ -35,6 +37,12 @@ urlpatterns = [
     path("social/github/", GithubLoginRedirectView.as_view(), name="github_login"),
     path("social/github/callback/", GithubCallbackRedirectView.as_view(), name="github_login_callback"),
     path("social/github/token/", GithubLoginView.as_view(), name="github_token"),
+    path("social/discord/connect/", DiscordConnectAuthView.as_view(), name="discord_connect_auth"),
+    path(
+        "social/discord/connect/callback/",
+        DiscordConnectCallbackView.as_view(),
+        name="discord_connect_callback",
+    ),
     path("social/discord/", DiscordLoginRedirectView.as_view(), name="discord_login"),
     path("social/discord/callback/", DiscordCallbackRedirectView.as_view(), name="discord_login_callback"),
     path("social/discord/token/", DiscordLoginView.as_view(), name="discord_token"),
