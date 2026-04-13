@@ -8,16 +8,16 @@ Who can trigger traceroutes and from which nodes:
 
 | Role | Can trigger from |
 |------|------------------|
-| System admin (`is_staff`) | Any ManagedNode with `allow_auto_traceroute=True` |
-| Constellation admin/editor | Nodes in constellations where user has admin/editor role |
-| ManagedNode owner | Nodes they own (`ManagedNode.owner == user`) |
+| System admin (`is_staff`) | ManagedNodes with `allow_auto_traceroute=True` and recent ingestion as `PacketObservation.observer` |
+| Constellation admin/editor | Same eligibility, in constellations where user has admin/editor role |
+| ManagedNode owner | Same eligibility for nodes they own |
 | All authenticated | View traceroute list, detail, heatmap |
 
-The UI fetches `GET /api/traceroutes/triggerable-nodes/` to show only nodes the user can trigger from. The trigger view validates `user_can_trigger_from_node(user, source_node)` before sending the command.
+The UI fetches `GET /api/traceroutes/triggerable-nodes/` to list sources that are both permitted and recently ingesting (same rule as the Celery scheduler). The trigger view validates eligibility, `user_can_trigger_from_node(user, source_node)`, and rate limits before sending the command.
 
 ## 1. Trigger
 
-**Manual**: User calls `POST /api/traceroutes/trigger/` with `managed_node_id` and optional `target_node_id`. Requires constellation admin/editor role. Rate limit: 60s per node.
+**Manual**: User calls `POST /api/traceroutes/trigger/` with `managed_node_id` and optional `target_node_id`. Source must match the same eligibility as auto-schedule (recent ingestion window `SCHEDULE_TRACEROUTE_SOURCE_RECENCY_SECONDS`). Requires permission as above. Rate limit: 60s per node.
 
 **Automatic**: Celery task `schedule_traceroutes` runs periodically. Picks one random ManagedNode with `allow_auto_traceroute=True` **and** recent packet ingestion as `PacketObservation.observer` (within `SCHEDULE_TRACEROUTE_SOURCE_RECENCY_SECONDS`, default 600s), uses `pick_traceroute_target()` to select a target (geography-aware, prioritises periphery and less-recently-traced nodes), creates `AutoTraceRoute` with `trigger_type=auto`.
 

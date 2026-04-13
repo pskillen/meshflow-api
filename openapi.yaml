@@ -4224,7 +4224,7 @@ paths:
   /traceroutes/can_trigger/:
     get:
       summary: Check if user can trigger traceroutes
-      description: Returns whether the current user has at least one triggerable node (staff, constellation admin/editor, or ManagedNode owner).
+      description: Returns whether the current user has at least one triggerable node (staff, constellation admin/editor, or ManagedNode owner). Nodes must have allow_auto_traceroute and recent packet ingestion as PacketObservation.observer (same window as SCHEDULE_TRACEROUTE_SOURCE_RECENCY_SECONDS for the Celery scheduler).
       tags: [Traceroutes]
       security:
         - BearerAuth: []
@@ -4242,7 +4242,7 @@ paths:
   /traceroutes/triggerable-nodes/:
     get:
       summary: List nodes user can trigger traceroutes from
-      description: Returns ManagedNodes the current user can trigger traceroutes from (staff=all, constellation admin/editor=nodes in their constellations, owner=their nodes). Only nodes with allow_auto_traceroute=True.
+      description: Returns ManagedNodes the current user can trigger traceroutes from (staff=all, constellation admin/editor=nodes in their constellations, owner=their nodes). Only nodes with allow_auto_traceroute=True and recent packet ingestion as observer (SCHEDULE_TRACEROUTE_SOURCE_RECENCY_SECONDS), matching Celery schedule_traceroutes source selection.
       tags: [Traceroutes]
       security:
         - BearerAuth: []
@@ -4280,7 +4280,7 @@ paths:
   /traceroutes/trigger/:
     post:
       summary: Trigger a traceroute
-      description: Manually trigger a traceroute. Requires permission to trigger from the source node (staff, constellation admin/editor, or ManagedNode owner).
+      description: Manually trigger a traceroute. Requires permission to trigger from the source node (staff, constellation admin/editor, or ManagedNode owner). The source must have allow_auto_traceroute and recent packet ingestion as observer (same eligibility as schedule_traceroutes).
       tags: [Traceroutes]
       security:
         - BearerAuth: []
@@ -4307,6 +4307,15 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AutoTraceRoute'
+        '400':
+          description: Bad request (e.g. allow_auto_traceroute disabled, or no recent packet ingestion from monitor bot)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
         '403':
           description: Forbidden
         '404':

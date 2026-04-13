@@ -27,6 +27,7 @@ from .serializers import (
     TriggerableNodeSerializer,
     TriggerTracerouteSerializer,
 )
+from .source_eligibility import is_managed_node_eligible_traceroute_source
 from .target_selection import pick_traceroute_target
 
 # Firmware enforces ~30s minimum between traceroutes per node. Reject requests within this window.
@@ -169,9 +170,8 @@ def traceroute_trigger(request):
     managed_node_id = serializer.validated_data["managed_node_id"]
     target_node_id = serializer.validated_data.get("target_node_id")
 
-    try:
-        source_node = ManagedNode.objects.get(node_id=managed_node_id)
-    except ManagedNode.DoesNotExist:
+    source_node = ManagedNode.objects.filter(node_id=managed_node_id).order_by("internal_id").first()
+    if source_node is None:
         return Response(
             {"managed_node_id": ["ManagedNode with this node_id not found."]},
             status=status.HTTP_404_NOT_FOUND,
@@ -180,6 +180,18 @@ def traceroute_trigger(request):
     if not source_node.allow_auto_traceroute:
         return Response(
             {"detail": "This managed node does not allow traceroutes (allow_auto_traceroute is disabled)."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if not is_managed_node_eligible_traceroute_source(source_node):
+        return Response(
+            {
+                "detail": (
+                    "This managed node has no recent packet ingestion from the monitor bot "
+                    "(within SCHEDULE_TRACEROUTE_SOURCE_RECENCY_SECONDS). "
+                    "It cannot be used as a traceroute source until the bot reports packets again."
+                )
+            },
             status=status.HTTP_400_BAD_REQUEST,
         )
 

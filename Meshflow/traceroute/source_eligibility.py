@@ -37,3 +37,8 @@ def eligible_auto_traceroute_sources_queryset():
         .filter(_has_recent_ingestion=True)
         .select_related("constellation")
     )
+
+
+def is_managed_node_eligible_traceroute_source(managed_node: ManagedNode) -> bool:
+    """True if this managed node may be used as a traceroute source (scheduler or API trigger)."""
+    return eligible_auto_traceroute_sources_queryset().filter(pk=managed_node.pk).exists()

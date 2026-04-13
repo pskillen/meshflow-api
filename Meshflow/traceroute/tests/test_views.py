@@ -2,14 +2,43 @@
 
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
+from django.utils import timezone
 
 import pytest
 from rest_framework.test import APIClient
 
 import nodes.tests.conftest  # noqa: F401 - load fixtures
+import packets.tests.conftest  # noqa: F401 - load fixtures
 import users.tests.conftest  # noqa: F401 - load fixtures
-from constellations.models import ConstellationUserMembership
+from constellations.models import ConstellationUserMembership, MessageChannel
+from packets.models import PacketObservation
 from traceroute.models import AutoTraceRoute
+
+
+@pytest.fixture
+def add_traceroute_source_ingestion(create_raw_packet):
+    """Record a PacketObservation for observer (no extra ManagedNode). Depends only on create_raw_packet."""
+
+    def _add(observer):
+        packet = create_raw_packet()
+        channel = MessageChannel.objects.create(
+            name=f"tr-ingest-{observer.internal_id}",
+            constellation=observer.constellation,
+        )
+        return PacketObservation.objects.create(
+            packet=packet,
+            observer=observer,
+            channel=channel,
+            hop_limit=3,
+            hop_start=3,
+            rx_time=timezone.now(),
+            rx_rssi=-60.0,
+            rx_snr=10.0,
+            upload_time=timezone.now(),
+            relay_node=None,
+        )
+
+    return _add
 
 
 @pytest.fixture
@@ -36,15 +65,17 @@ def editor_user(create_user, create_constellation):
 
 
 @pytest.fixture
-def editor_managed_node(editor_user, create_constellation, create_managed_node):
+def editor_managed_node(editor_user, create_constellation, create_managed_node, add_traceroute_source_ingestion):
     """Managed node in a constellation where editor_user has editor role."""
     membership = ConstellationUserMembership.objects.filter(user=editor_user, role="editor").first()
     constellation = membership.constellation
-    return create_managed_node(
+    mn = create_managed_node(
         owner=membership.constellation.created_by,
         constellation=constellation,
         allow_auto_traceroute=True,
     )
+    add_traceroute_source_ingestion(mn)
+    return mn
 
 
 @pytest.fixture
@@ -141,15 +172,17 @@ class TestTracerouteDetail:
 
 
 @pytest.fixture
-def owner_managed_node(create_user, create_managed_node, create_constellation):
+def owner_managed_node(create_user, create_managed_node, create_constellation, add_traceroute_source_ingestion):
     """ManagedNode owned by owner_user with allow_auto_traceroute=True."""
     owner = create_user()
     constellation = create_constellation(created_by=owner)
-    return create_managed_node(
+    mn = create_managed_node(
         owner=owner,
         constellation=constellation,
         allow_auto_traceroute=True,
     )
+    add_traceroute_source_ingestion(mn)
+    return mn
 
 
 @pytest.mark.django_db
@@ -158,9 +191,12 @@ class TestTracerouteCanTrigger:
         resp = api_client.get("/api/traceroutes/can_trigger/")
         assert resp.status_code == 401
 
-    def test_can_trigger_true_for_staff(self, api_client, staff_user, create_managed_node):
-        """Staff has can_trigger=True when at least one node has allow_auto_traceroute."""
-        create_managed_node(allow_auto_traceroute=True)
+    def test_can_trigger_true_for_staff(
+        self, api_client, staff_user, create_managed_node, add_traceroute_source_ingestion
+    ):
+        """Staff has can_trigger=True when at least one eligible node exists."""
+        mn = create_managed_node(allow_auto_traceroute=True)
+        add_traceroute_source_ingestion(mn)
         api_client.force_authenticate(user=staff_user)
         resp = api_client.get("/api/traceroutes/can_trigger/")
         assert resp.status_code == 200
@@ -194,8 +230,11 @@ class TestTracerouteTriggerableNodes:
         resp = api_client.get("/api/traceroutes/triggerable-nodes/")
         assert resp.status_code == 401
 
-    def test_triggerable_nodes_returns_nodes_for_staff(self, api_client, staff_user, create_managed_node):
+    def test_triggerable_nodes_returns_nodes_for_staff(
+        self, api_client, staff_user, create_managed_node, add_traceroute_source_ingestion
+    ):
         mn = create_managed_node(allow_auto_traceroute=True)
+        add_traceroute_source_ingestion(mn)
         api_client.force_authenticate(user=staff_user)
         resp = api_client.get("/api/traceroutes/triggerable-nodes/")
         assert resp.status_code == 200
@@ -252,6 +291,15 @@ class TestTracerouteTriggerableNodes:
         assert "long_name" in node
         assert "allow_auto_traceroute" in node
         assert "constellation" in node
+
+    def test_triggerable_nodes_excludes_without_recent_ingestion(self, api_client, staff_user, create_managed_node):
+        """Nodes with allow_auto_traceroute but no recent PacketObservation as observer are omitted."""
+        mn = create_managed_node(allow_auto_traceroute=True)
+        api_client.force_authenticate(user=staff_user)
+        resp = api_client.get("/api/traceroutes/triggerable-nodes/")
+        assert resp.status_code == 200
+        node_ids = [n["node_id"] for n in resp.json()]
+        assert mn.node_id not in node_ids
 
 
 @pytest.mark.django_db
@@ -345,10 +393,11 @@ class TestTracerouteTrigger:
         assert "rate limited" in resp2.json().get("detail", "").lower()
 
     def test_trigger_staff_can_trigger_from_any_node(
-        self, api_client, staff_user, create_managed_node, create_observed_node
+        self, api_client, staff_user, create_managed_node, create_observed_node, add_traceroute_source_ingestion
     ):
-        """Staff can trigger from any ManagedNode with allow_auto_traceroute=True."""
+        """Staff can trigger from any eligible ManagedNode."""
         mn = create_managed_node(allow_auto_traceroute=True)
+        add_traceroute_source_ingestion(mn)
         on = create_observed_node()
         api_client.force_authenticate(user=staff_user)
         resp = api_client.post(
@@ -386,3 +435,30 @@ class TestTracerouteTrigger:
             format="json",
         )
         assert resp.status_code == 403
+
+    def test_trigger_rejects_without_recent_ingestion(
+        self,
+        api_client,
+        editor_user,
+        create_managed_node,
+        create_observed_node,
+    ):
+        """Trigger returns 400 when source has permission but no recent ingestion as observer."""
+        membership = ConstellationUserMembership.objects.filter(user=editor_user, role="editor").first()
+        constellation = membership.constellation
+        creator = constellation.created_by
+        mn = create_managed_node(
+            owner=creator,
+            constellation=constellation,
+            allow_auto_traceroute=True,
+            node_id=888_777_666,
+        )
+        on = create_observed_node()
+        api_client.force_authenticate(user=editor_user)
+        resp = api_client.post(
+            "/api/traceroutes/trigger/",
+            {"managed_node_id": mn.node_id, "target_node_id": on.node_id},
+            format="json",
+        )
+        assert resp.status_code == 400
+        assert "ingestion" in resp.json().get("detail", "").lower()
