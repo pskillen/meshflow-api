@@ -1,3 +1,4 @@
+import logging
 import uuid
 from types import SimpleNamespace
 
@@ -11,10 +12,12 @@ from allauth.socialaccount.providers.github.views import GitHubOAuth2Adapter
 from allauth.socialaccount.providers.google.views import GoogleOAuth2Adapter
 from allauth.socialaccount.providers.oauth2.client import OAuth2Client
 from dj_rest_auth.registration.views import SocialLoginView
-from rest_framework import status
+from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
+
+logger = logging.getLogger(__name__)
 
 
 class BaseLoginRedirectView(APIView):
@@ -153,6 +156,14 @@ class DiscordLoginView(SocialLoginView):
     adapter_class = DiscordOAuth2Adapter
     client_class = CompatibleOAuth2Client
     callback_url = settings.CALLBACK_URL_BASE + "/api/auth/social/discord/callback/"
+
+    def post(self, request, *args, **kwargs):
+        response = super().post(request, *args, **kwargs)
+        if response.status_code == status.HTTP_200_OK and getattr(self, "user", None):
+            from users.discord_sync import sync_discord_notify_from_social_accounts
+
+            sync_discord_notify_from_social_accounts(self.user)
+        return response
 
 
 class BaseCallbackView(APIView):
@@ -321,3 +332,145 @@ class DiscordCallbackView(BaseCallbackView):
         super().__init__(*args, **kwargs)
         self.provider_name = "discord"
         self.adapter_class = DiscordOAuth2Adapter
+
+
+class DiscordConnectAuthView(APIView):
+    """
+    Authenticated: return Discord OAuth authorization URL to link Discord to the current Meshflow user.
+    Uses a dedicated callback URL and signed state (see users.discord_connect_oauth).
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        from users.discord_connect_oauth import create_discord_connect_state
+
+        try:
+            app = SocialApp.objects.get(provider="discord", sites=settings.SITE_ID)
+        except SocialApp.DoesNotExist:
+            provider_settings = settings.SOCIALACCOUNT_PROVIDERS["discord"]["APP"]
+            app = SimpleNamespace(
+                client_id=provider_settings["client_id"],
+                secret=provider_settings["secret"],
+            )
+
+        state = create_discord_connect_state(request.user.pk)
+        callback_url = f"{settings.CALLBACK_URL_BASE.rstrip('/')}/api/auth/social/discord/connect/callback/"
+
+        adapter = DiscordOAuth2Adapter(request)
+        provider = adapter.get_provider()
+        client = CompatibleOAuth2Client(
+            request=request,
+            consumer_key=app.client_id,
+            consumer_secret=app.secret,
+            access_token_url=adapter.access_token_url,
+            access_token_method=adapter.access_token_method,
+            callback_url=callback_url,
+        )
+        auth_params = provider.get_auth_params()
+        auth_params["state"] = state
+
+        auth_url = client.get_redirect_url(
+            adapter.authorize_url,
+            provider.get_scope(),
+            auth_params,
+        )
+        return Response({"authorization_url": auth_url}, status=status.HTTP_200_OK)
+
+
+class DiscordConnectCallbackView(APIView):
+    """
+    OAuth callback for Discord connect flow: attach Discord SocialAccount to signed user, issue JWT, redirect to SPA.
+    """
+
+    permission_classes = []
+    authentication_classes = []
+
+    def get(self, request, *args, **kwargs):
+        from django.contrib.auth import get_user_model
+
+        from users.discord_connect_oauth import (
+            DiscordAccountAlreadyLinkedError,
+            attach_discord_to_user,
+            consume_discord_connect_state,
+            fetch_discord_me,
+        )
+        from users.discord_sync import sync_discord_notify_from_social_accounts
+
+        code = request.GET.get("code")
+        state = request.GET.get("state")
+        frontend = getattr(settings, "FRONTEND_URL", "http://localhost:5173").rstrip("/")
+        callback_path = settings.FRONTEND_OAUTH_CALLBACK_PATH
+
+        def fail_redirect(reason: str):
+            return redirect(f"{frontend}{callback_path}?error=discord_connect_{reason}")
+
+        if not code or not state:
+            return fail_redirect("missing_params")
+
+        try:
+            user_id = consume_discord_connect_state(state)
+        except ValueError:
+            logger.info("Discord connect: invalid or replayed state")
+            return fail_redirect("invalid_state")
+
+        User = get_user_model()
+        try:
+            user = User.objects.get(pk=user_id)
+        except User.DoesNotExist:
+            return fail_redirect("user_missing")
+
+        if not user.is_active:
+            return fail_redirect("disabled")
+
+        token_url, client_id, client_secret, redirect_uri = _discord_connect_token_params(request)
+        data = {
+            "code": code,
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "redirect_uri": redirect_uri,
+            "grant_type": "authorization_code",
+        }
+        token_resp = requests.post(token_url, data=data, headers={"Accept": "application/json"})
+        if not token_resp.ok:
+            logger.warning("Discord connect token exchange failed: %s", token_resp.text)
+            return fail_redirect("token_exchange")
+
+        access_token = token_resp.json().get("access_token")
+        if not access_token:
+            return fail_redirect("no_access_token")
+
+        try:
+            discord_user = fetch_discord_me(access_token)
+        except requests.RequestException as e:
+            logger.warning("Discord connect @me failed: %s", e)
+            return fail_redirect("discord_profile")
+
+        try:
+            attach_discord_to_user(user, discord_user)
+        except DiscordAccountAlreadyLinkedError:
+            return fail_redirect("account_in_use")
+
+        sync_discord_notify_from_social_accounts(user)
+
+        refresh = RefreshToken.for_user(user)
+        jwt_token = str(refresh.access_token)
+        return redirect(f"{frontend}{callback_path}?token={jwt_token}")
+
+
+def _discord_connect_token_params(request):
+    """Token endpoint URL, client credentials, and redirect_uri for connect callback (must match authorize step)."""
+    adapter = DiscordOAuth2Adapter(request)
+    access_token_url = adapter.access_token_url
+    redirect_uri = f"{settings.CALLBACK_URL_BASE.rstrip('/')}/api/auth/social/discord/connect/callback/"
+
+    try:
+        app = SocialApp.objects.get(provider="discord", sites=settings.SITE_ID)
+    except SocialApp.DoesNotExist:
+        provider_settings = settings.SOCIALACCOUNT_PROVIDERS["discord"]["APP"]
+        app = SimpleNamespace(
+            client_id=provider_settings["client_id"],
+            secret=provider_settings["secret"],
+        )
+
+    return access_token_url, app.client_id, app.secret, redirect_uri

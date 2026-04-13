@@ -301,6 +301,10 @@ SOCIALACCOUNT_PROVIDERS = {
     },
 }
 
+# Discord bot token for server-side DMs (Mesh Monitoring / test endpoint).
+# This is separate from DISCORD_CLIENT_* used for OAuth login.
+DISCORD_BOT_TOKEN = os.environ.get("DISCORD_BOT_TOKEN", "")
+
 # HATE trailing slashes!
 APPEND_SLASH = True
 

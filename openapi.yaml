@@ -1877,6 +1877,23 @@ components:
             email:
               type: string
 
+    DiscordNotificationPrefs:
+      type: object
+      description: Discord DM notification eligibility for the current user.
+      properties:
+        discord_linked:
+          type: boolean
+          description: Whether a Discord social account is linked (OAuth).
+        discord_notify_verified:
+          type: boolean
+          description: Whether DM target is verified (linked Discord uid matches stored id).
+
+    DiscordTestNotificationResponse:
+      type: object
+      properties:
+        detail:
+          type: string
+
 
 paths:
   /status/:
@@ -2302,6 +2319,114 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SocialAuthJWTToken'
+
+  /auth/social/discord/connect/:
+    get:
+      summary: Start Discord account link (authenticated)
+      description: >-
+        Returns a Discord OAuth2 authorization URL that uses a dedicated callback
+        (`/api/auth/social/discord/connect/callback/`). After the user authorizes, the API attaches the Discord
+        SocialAccount to the **current** Meshflow user (JWT subject) and redirects to the frontend with a fresh JWT.
+        Use this when the user signed in with Google/GitHub/password and must link Discord without switching identity.
+        Requires `Authorization: Bearer` (same as other authenticated routes).
+      tags: [Authentication]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Authorization URL for Discord OAuth
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [authorization_url]
+                properties:
+                  authorization_url:
+                    type: string
+                    format: uri
+        '401':
+          description: Not authenticated
+
+  /auth/social/discord/connect/callback/:
+    get:
+      summary: Discord OAuth callback for account linking
+      description: >-
+        Browser redirect target registered in the Discord application. Exchanges `code`, attaches Discord to the user
+        encoded in signed `state`, issues JWT, redirects to `FRONTEND_URL` + `FRONTEND_OAUTH_CALLBACK_PATH` with `token=`
+        or `error=discord_connect_*`.
+      tags: [Authentication]
+      parameters:
+        - name: code
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: state
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '302':
+          description: Redirect to frontend with JWT or error query param
+
+  /auth/discord/notifications/:
+    get:
+      summary: Get Discord notification prefs
+      description: >-
+        Returns whether the user has linked Discord (OAuth) and whether DM notifications are verified.
+        Verified users may call the test endpoint when DISCORD_BOT_TOKEN is configured.
+      tags: [Authentication]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Current prefs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiscordNotificationPrefs'
+        '401':
+          description: Not authenticated
+    patch:
+      summary: Re-sync Discord notification prefs from SocialAccount
+      description: >-
+        Re-reads the linked Discord SocialAccount and updates discord_notify_user_id / verified_at.
+      tags: [Authentication]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Updated prefs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiscordNotificationPrefs'
+        '401':
+          description: Not authenticated
+
+  /auth/discord/notifications/test/:
+    post:
+      summary: Send a Discord test DM
+      description: >-
+        Sends a short test message to the user's verified Discord user id via the bot token.
+        Requires discord_notify_verified and DISCORD_BOT_TOKEN.
+      tags: [Authentication]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Message sent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiscordTestNotificationResponse'
+        '400':
+          description: Discord not verified / not linked
+        '401':
+          description: Not authenticated
+        '503':
+          description: Discord API or bot token misconfiguration
 
   /packets/ingest/:
     post:
