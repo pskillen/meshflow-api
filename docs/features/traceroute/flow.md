@@ -19,7 +19,7 @@ The UI fetches `GET /api/traceroutes/triggerable-nodes/` to show only nodes the 
 
 **Manual**: User calls `POST /api/traceroutes/trigger/` with `managed_node_id` and optional `target_node_id`. Requires constellation admin/editor role. Rate limit: 60s per node.
 
-**Automatic**: Celery task `schedule_traceroutes` runs every 2 hours. Picks one random ManagedNode with `allow_auto_traceroute=True`, uses `pick_traceroute_target()` to select a target (geography-aware, prioritises periphery and less-recently-traced nodes), creates `AutoTraceRoute` with `trigger_type=auto`.
+**Automatic**: Celery task `schedule_traceroutes` runs periodically. Picks one random ManagedNode with `allow_auto_traceroute=True` **and** recent packet ingestion as `PacketObservation.observer` (within `SCHEDULE_TRACEROUTE_SOURCE_RECENCY_SECONDS`, default 600s), uses `pick_traceroute_target()` to select a target (geography-aware, prioritises periphery and less-recently-traced nodes), creates `AutoTraceRoute` with `trigger_type=auto`.
 
 ## 2. Command Delivery
 
