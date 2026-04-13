@@ -313,3 +313,6 @@ class PacketObservation(models.Model):
     class Meta:
         verbose_name = _("Packet observation")
         verbose_name_plural = _("Packet observations")
+        indexes = [
+            models.Index(fields=["observer", "upload_time"], name="packets_po_obs_upload_idx"),
+        ]

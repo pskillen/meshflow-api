@@ -13,9 +13,8 @@ from celery import shared_task
 from channels.layers import get_channel_layer
 from tqdm import tqdm
 
-from nodes.models import ManagedNode
-
 from .models import AutoTraceRoute
+from .source_eligibility import eligible_auto_traceroute_sources_queryset
 from .target_selection import pick_traceroute_target
 from .ws_notify import notify_traceroute_status_changed
 
@@ -28,13 +27,17 @@ FAILED_TR_TIMEOUT_SECONDS = int(FAILED_TR_TIMEOUT_SECONDS)
 @shared_task
 def schedule_traceroutes():
     """
-    Run periodically (e.g. every 2h). Pick one random ManagedNode, pick one target,
-    create AutoTraceRoute (trigger_type=auto, trigger_source=scheduler),
-    send traceroute command via channel layer.
+    Run periodically (e.g. every 2h). Pick one random ManagedNode with recent packet
+    ingestion as observer, pick one target, create AutoTraceRoute (trigger_type=auto,
+    trigger_source=scheduler), send traceroute command via channel layer.
     """
     channel_layer = get_channel_layer()
-    managed_nodes = list(ManagedNode.objects.filter(allow_auto_traceroute=True).select_related("constellation"))
+    managed_nodes = list(eligible_auto_traceroute_sources_queryset())
     if not managed_nodes:
+        logger.info(
+            "schedule_traceroutes: no eligible sources (allow_auto_traceroute with "
+            "ingestion within SCHEDULE_TRACEROUTE_SOURCE_RECENCY_SECONDS)"
+        )
         return {"created": 0}
 
     source_node = random.choice(managed_nodes)
