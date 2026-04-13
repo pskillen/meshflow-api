@@ -1,5 +1,6 @@
 from django.urls import include, path
 
+from users import views_discord
 from users.social_auth import (
     DiscordCallbackRedirectView,
     DiscordLoginRedirectView,
@@ -13,6 +14,16 @@ from users.social_auth import (
 )
 
 urlpatterns = [
+    path(
+        "discord/notifications/",
+        views_discord.DiscordNotificationPrefsView.as_view(),
+        name="discord-notification-prefs",
+    ),
+    path(
+        "discord/notifications/test/",
+        views_discord.DiscordTestNotificationView.as_view(),
+        name="discord-notification-test",
+    ),
     # dj-rest-auth endpoints
     path("", include("dj_rest_auth.urls")),
     # path("registration/", include("dj_rest_auth.registration.urls")),

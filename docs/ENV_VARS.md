@@ -48,6 +48,12 @@ This document describes all environment variables used by the Meshflow Django pr
 | `DISCORD_CLIENT_ID`     | (empty) | Discord OAuth client ID.                      | Any string              |
 | `DISCORD_CLIENT_SECRET` | (empty) | Discord OAuth client secret.                  | Any string              |
 
+Discord **login** uses the OAuth pair above. **DM notifications** (test message and future Mesh Monitoring alerts) use a separate bot application:
+
+| Variable               | Default | Description                                                                 | Allowable values |
+|------------------------|---------|-----------------------------------------------------------------------------|------------------|
+| `DISCORD_BOT_TOKEN`    | (empty) | Bot token for `POST /users/@me/channels` and sending DMs. Not the OAuth secret. | Bot token string |
+
 ---
 
 ## 5. URLs & Frontend

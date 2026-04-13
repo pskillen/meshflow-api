@@ -154,6 +154,14 @@ class DiscordLoginView(SocialLoginView):
     client_class = CompatibleOAuth2Client
     callback_url = settings.CALLBACK_URL_BASE + "/api/auth/social/discord/callback/"
 
+    def post(self, request, *args, **kwargs):
+        response = super().post(request, *args, **kwargs)
+        if response.status_code == status.HTTP_200_OK and getattr(self, "user", None):
+            from users.discord_sync import sync_discord_notify_from_social_accounts
+
+            sync_discord_notify_from_social_accounts(self.user)
+        return response
+
 
 class BaseCallbackView(APIView):
     """
