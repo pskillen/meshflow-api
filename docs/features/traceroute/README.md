@@ -50,6 +50,14 @@ When a node feeds data to multiple API instances (e.g. prod and pre-prod), a TR 
 
 Late responses: if a TR was marked `failed` (timeout) but the response arrives later, the receiver finds the failed record within the window and updates it to `completed`.
 
+## Code map (shared helpers)
+
+Auto-scheduler and permission checks share one notion of a **live** source node (recent packet ingestion as observer). Canonical implementation: **`nodes.managed_node_liveness`** (`eligible_auto_traceroute_sources_queryset`, etc.). **`traceroute.source_eligibility`** re-exports the same API for existing imports.
+
+**Target selection** for auto TR: `traceroute.target_selection.pick_traceroute_target` uses **`common.geo.haversine_km`** and **`nodes.positioning.managed_node_lat_lon`**.
+
+**Manual trigger rate limit**: **`traceroute.trigger_intervals.MANUAL_TRIGGER_MIN_INTERVAL_SEC`**. Mesh monitoring (future Celery) can use **`MONITORING_TRIGGER_MIN_INTERVAL_SEC`** for a shorter default.
+
 ## Related Documentation
 
 - [Flow](flow.md) – End-to-end lifecycle from trigger to completion
