@@ -10,7 +10,7 @@ from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from users.discord_notify import DiscordSendError, send_dm
+from push_notifications.discord import DiscordSendError, send_dm
 from users.discord_sync import sync_discord_notify_from_social_accounts, user_has_verified_discord_dm_target
 from users.serializers_discord import DiscordNotificationPrefsSerializer
 

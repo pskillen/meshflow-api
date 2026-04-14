@@ -95,7 +95,7 @@ def test_discord_test_ok_when_verified(create_user):
     mock_msg = MagicMock()
     mock_msg.ok = True
 
-    with patch("users.discord_notify.requests.post", side_effect=[mock_channel, mock_msg]):
+    with patch("push_notifications.discord.requests.post", side_effect=[mock_channel, mock_msg]):
         client = APIClient()
         client.force_authenticate(user=user)
         resp = client.post(reverse("discord-notification-test"))

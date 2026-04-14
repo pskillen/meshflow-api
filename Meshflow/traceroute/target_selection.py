@@ -1,39 +1,15 @@
 """Target selection for traceroutes (auto mode)."""
 
-import math
 from datetime import timedelta
 
 from django.db.models import Max
 from django.utils import timezone
 
+from common.geo import haversine_km
 from nodes.models import ManagedNode, ObservedNode
+from nodes.positioning import managed_node_lat_lon
 
 from .models import AutoTraceRoute
-
-
-def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    """Great-circle distance in km between two (lat, lon) points."""
-    R = 6371  # Earth radius in km
-    phi1 = math.radians(lat1)
-    phi2 = math.radians(lat2)
-    dphi = math.radians(lat2 - lat1)
-    dlam = math.radians(lon2 - lon1)
-    a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlam / 2) ** 2
-    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-    return R * c
-
-
-def _get_source_position(managed_node: ManagedNode) -> tuple[float, float] | None:
-    """Get (lat, lon) for ManagedNode: default_location or from ObservedNode."""
-    if managed_node.default_location_latitude is not None and managed_node.default_location_longitude is not None:
-        return (
-            managed_node.default_location_latitude,
-            managed_node.default_location_longitude,
-        )
-    obs = ObservedNode.objects.filter(node_id=managed_node.node_id).select_related("latest_status").first()
-    if obs and obs.latest_status and obs.latest_status.latitude is not None:
-        return obs.latest_status.latitude, obs.latest_status.longitude
-    return None
 
 
 def _get_last_traced_by_source(managed_node: ManagedNode) -> dict[int, float]:
@@ -79,7 +55,7 @@ def pick_traceroute_target(
     - Sort by (distance - demerit) descending: prioritise periphery, demerit recently traced
     - Take top 20, deterministic choice: hash(managed_node_id + date + slot) % 20
     """
-    source_pos = _get_source_position(managed_node)
+    source_pos = managed_node_lat_lon(managed_node)
     if not source_pos:
         return None
 
@@ -102,7 +78,7 @@ def pick_traceroute_target(
     for obs in candidates:
         lat = obs.latest_status.latitude
         lon = obs.latest_status.longitude
-        dist = _haversine_km(source_pos[0], source_pos[1], lat, lon)
+        dist = haversine_km(source_pos[0], source_pos[1], lat, lon)
         hours_since = last_traced_hours.get(obs.node_id)
         demerit = _demerit_hours(hours_since)
         score = dist - demerit
