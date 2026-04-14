@@ -71,6 +71,7 @@ INSTALLED_APPS = [
     # Project apps
     "Meshflow",
     "users",
+    "push_notifications",
     "constellations",
     "nodes",
     "packets",

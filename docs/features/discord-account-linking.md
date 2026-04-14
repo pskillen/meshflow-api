@@ -2,6 +2,16 @@
 
 Atomic feature: associate a Meshflow user with a Discord user so the API can send **direct messages** via a bot token (`DISCORD_BOT_TOKEN`), independent of other product features.
 
+## Where it lives in code
+
+| Concern | Django app / module |
+|--------|----------------------|
+| Discord **bot** REST (open DM channel, send message) | **`push_notifications`** — `push_notifications.discord` (`send_dm`, `DiscordSendError`, `DISCORD_BOT_TOKEN`) |
+| OAuth “Login with Discord”, **connect** flow, `SocialAccount`, sync of `discord_notify_*` on the **User** | **`users`** — `discord_sync`, signals, login/connect views |
+| Notification **prefs** and **test** HTTP API (`/api/auth/discord/notifications/…`) | **`users`** — e.g. `views_discord` (implementation calls into `push_notifications.discord` for the actual DM) |
+
+This matches the split described in [mesh-monitoring/discord.md](./mesh-monitoring/discord.md).
+
 ## Flows
 
 1. **Login with Discord** — existing `/api/auth/social/discord/` + callback + `POST .../token/`; creates session/JWT as today. `discord_notify_*` sync via signals / `DiscordLoginView`.

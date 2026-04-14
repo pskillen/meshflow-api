@@ -13,13 +13,13 @@ Who can trigger traceroutes and from which nodes:
 | ManagedNode owner | Same eligibility for nodes they own |
 | All authenticated | View traceroute list, detail, heatmap |
 
-The UI fetches `GET /api/traceroutes/triggerable-nodes/` to list sources that are both permitted and recently ingesting (same rule as the Celery scheduler). The trigger view validates eligibility, `user_can_trigger_from_node(user, source_node)`, and rate limits before sending the command.
+The UI fetches `GET /api/traceroutes/triggerable-nodes/` to list sources that are both permitted and recently ingesting (same rule as the Celery scheduler: **`nodes.managed_node_liveness`**, exposed via **`traceroute.source_eligibility`** for traceroute code). The trigger view validates eligibility, `user_can_trigger_from_node(user, source_node)`, and rate limits before sending the command.
 
 ## 1. Trigger
 
-**Manual**: User calls `POST /api/traceroutes/trigger/` with `managed_node_id` and optional `target_node_id`. Source must match the same eligibility as auto-schedule (recent ingestion window `SCHEDULE_TRACEROUTE_SOURCE_RECENCY_SECONDS`). Requires permission as above. Rate limit: 60s per node.
+**Manual**: User calls `POST /api/traceroutes/trigger/` with `managed_node_id` and optional `target_node_id`. Source must match the same eligibility as auto-schedule (recent ingestion window `SCHEDULE_TRACEROUTE_SOURCE_RECENCY_SECONDS`). Requires permission as above. Rate limit: **`traceroute.trigger_intervals.MANUAL_TRIGGER_MIN_INTERVAL_SEC`** (default 60s) per source node.
 
-**Automatic**: Celery task `schedule_traceroutes` runs periodically. Picks one random ManagedNode with `allow_auto_traceroute=True` **and** recent packet ingestion as `PacketObservation.observer` (within `SCHEDULE_TRACEROUTE_SOURCE_RECENCY_SECONDS`, default 600s), uses `pick_traceroute_target()` to select a target (geography-aware, prioritises periphery and less-recently-traced nodes), creates `AutoTraceRoute` with `trigger_type=auto`.
+**Automatic**: Celery task `schedule_traceroutes` runs periodically. Picks one random ManagedNode with `allow_auto_traceroute=True` **and** recent packet ingestion as `PacketObservation.observer` (within `SCHEDULE_TRACEROUTE_SOURCE_RECENCY_SECONDS`, default 600s; see **`nodes.managed_node_liveness`**), uses **`pick_traceroute_target()`** to select a target (geography via **`common.geo.haversine_km`** and **`nodes.positioning.managed_node_lat_lon`**, prioritises periphery and less-recently-traced nodes), creates `AutoTraceRoute` with `trigger_type=auto`.
 
 ## 2. Command Delivery
 

@@ -12,6 +12,7 @@ from rest_framework.views import APIView
 
 from common.mesh_node_helpers import meshtastic_hex_to_int
 from constellations.models import ConstellationUserMembership
+from nodes.constants import INFRASTRUCTURE_ROLES
 from nodes.models import (
     DeviceMetrics,
     EnvironmentExposure,
@@ -49,9 +50,6 @@ from nodes.services.device_metrics import get_device_metrics_bulk
 from nodes.services.environment_metrics import get_environment_metrics_bulk
 
 from .utils import generate_claim_key
-
-# Infrastructure roles: ROUTER, ROUTER_CLIENT, REPEATER, ROUTER_LATE (optionally CLIENT_BASE)
-INFRASTRUCTURE_ROLES = [RoleSource.ROUTER, RoleSource.ROUTER_CLIENT, RoleSource.REPEATER, RoleSource.ROUTER_LATE]
 
 
 def _multi_query_strings(request, name):

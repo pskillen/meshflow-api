@@ -2,7 +2,15 @@
 
 See also: [Discord account linking](../discord-account-linking.md) (OAuth connect flow vs login).
 
-User-facing Discord **direct messages** use a **bot token** (`DISCORD_BOT_TOKEN`), separate from **Discord OAuth** (`DISCORD_CLIENT_ID` / `DISCORD_CLIENT_SECRET`) used for “Login with Discord” and for **linking** Discord to an existing account (`/api/auth/social/discord/connect/`).
+**Implementation boundary** (bot transport vs account prefs):
+
+| Layer | Location |
+|-------|----------|
+| Bot DM transport (`DISCORD_BOT_TOKEN`, Discord REST) | **`push_notifications`** — `push_notifications.discord` |
+| OAuth, account link, `SocialAccount`, `discord_notify_*` sync | **`users`** — `discord_sync`, signals, login/connect views |
+| Prefs + test HTTP routes (`/api/auth/discord/notifications/…`) | **`users`** — `views_discord` (uses `push_notifications.discord` to send) |
+
+**Discord OAuth** (`DISCORD_CLIENT_ID` / `DISCORD_CLIENT_SECRET`) powers “Login with Discord” and **linking** (`/api/auth/social/discord/connect/`). That is separate from the bot token above.
 
 ## Verify ownership (anti-spam)
 

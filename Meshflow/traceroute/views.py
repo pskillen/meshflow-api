@@ -29,10 +29,7 @@ from .serializers import (
 )
 from .source_eligibility import is_managed_node_eligible_traceroute_source
 from .target_selection import pick_traceroute_target
-
-# Firmware enforces ~30s minimum between traceroutes per node. Reject requests within this window.
-# set to 60 seconds to prevent spamming the network
-TR_MIN_INTERVAL_SEC = 60
+from .trigger_intervals import MANUAL_TRIGGER_MIN_INTERVAL_SEC
 
 
 class TraceroutePagination(PageNumberPagination):
@@ -200,14 +197,14 @@ def traceroute_trigger(request):
         AutoTraceRoute.objects.filter(source_node=source_node).order_by("-triggered_at").values("triggered_at").first()
     )
     if last_tr:
-        cutoff = timezone.now() - timedelta(seconds=TR_MIN_INTERVAL_SEC)
+        cutoff = timezone.now() - timedelta(seconds=MANUAL_TRIGGER_MIN_INTERVAL_SEC)
         if last_tr["triggered_at"] > cutoff:
-            next_allowed = last_tr["triggered_at"] + timedelta(seconds=TR_MIN_INTERVAL_SEC)
+            next_allowed = last_tr["triggered_at"] + timedelta(seconds=MANUAL_TRIGGER_MIN_INTERVAL_SEC)
             remaining = max(0, (next_allowed - timezone.now()).total_seconds())
             return Response(
                 {
                     "detail": f"Traceroute rate limited. "
-                    f"This node's last traceroute was less than {TR_MIN_INTERVAL_SEC}s ago. "
+                    f"This node's last traceroute was less than {MANUAL_TRIGGER_MIN_INTERVAL_SEC}s ago. "
                     f"Try again in {int(remaining)}s."
                 },
                 status=status.HTTP_429_TOO_MANY_REQUESTS,
