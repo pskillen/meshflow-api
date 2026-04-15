@@ -212,7 +212,12 @@ def on_traffic_management_stats_packet_received(
 
 @receiver(traceroute_packet_received)
 def on_traceroute_packet_received(sender, packet: TraceroutePacket, observer, observation: PacketObservation, **kwargs):
-    """Handle a traceroute packet received signal. Link to AutoTraceRoute if match, or infer one for cross-env."""
+    """Handle a traceroute packet received signal. Link to AutoTraceRoute if match, or infer one for cross-env.
+
+    Any ingested traceroute response is treated as completed: empty ``route``/``route_back`` means a direct RF
+    path (no intermediate hops per Meshtastic firmware), not a timeout. True no-response remains ``pending``/``sent``
+    until ``mark_stale_traceroutes_failed`` runs.
+    """
     logger.info(f"Traceroute packet received: {packet.id}")
 
     from traceroute.models import AutoTraceRoute
@@ -275,33 +280,21 @@ def on_traceroute_packet_received(sender, packet: TraceroutePacket, observer, ob
         snr = packet.snr_back[i] if i < len(packet.snr_back) else None
         route_back.append({"node_id": nid, "snr": snr})
 
-    # Empty route+route_back indicates timeout/failure from device; mark failed rather than completed
-    if not route and not route_back:
-        auto_tr.status = AutoTraceRoute.STATUS_FAILED
-        auto_tr.route = route
-        auto_tr.route_back = route_back
-        auto_tr.raw_packet = packet
-        auto_tr.completed_at = timezone.now()
-        auto_tr.error_message = "Timed out"
-        auto_tr.save(update_fields=["status", "route", "route_back", "raw_packet", "completed_at", "error_message"])
+    auto_tr.status = AutoTraceRoute.STATUS_COMPLETED
+    auto_tr.route = route
+    auto_tr.route_back = route_back
+    auto_tr.raw_packet = packet
+    auto_tr.completed_at = timezone.now()
+    auto_tr.error_message = None
+    auto_tr.save(
+        update_fields=["status", "route", "route_back", "raw_packet", "completed_at", "error_message"],
+    )
 
-        from traceroute.ws_notify import notify_traceroute_status_changed
+    from mesh_monitoring.services import on_monitoring_traceroute_completed
+    from traceroute.tasks import push_traceroute_to_neo4j
+    from traceroute.ws_notify import notify_traceroute_status_changed
 
-        notify_traceroute_status_changed(auto_tr.id, AutoTraceRoute.STATUS_FAILED)
-        logger.info(f"Linked TraceroutePacket {packet.id} to AutoTraceRoute {auto_tr.id} (failed: empty route)")
-    else:
-        auto_tr.status = AutoTraceRoute.STATUS_COMPLETED
-        auto_tr.route = route
-        auto_tr.route_back = route_back
-        auto_tr.raw_packet = packet
-        auto_tr.completed_at = timezone.now()
-        auto_tr.save(update_fields=["status", "route", "route_back", "raw_packet", "completed_at"])
-
-        from mesh_monitoring.services import on_monitoring_traceroute_completed
-        from traceroute.tasks import push_traceroute_to_neo4j
-        from traceroute.ws_notify import notify_traceroute_status_changed
-
-        on_monitoring_traceroute_completed(auto_tr)
-        notify_traceroute_status_changed(auto_tr.id, AutoTraceRoute.STATUS_COMPLETED)
-        push_traceroute_to_neo4j.delay(auto_tr.id)
-        logger.info(f"Linked TraceroutePacket {packet.id} to AutoTraceRoute {auto_tr.id}")
+    on_monitoring_traceroute_completed(auto_tr)
+    notify_traceroute_status_changed(auto_tr.id, AutoTraceRoute.STATUS_COMPLETED)
+    push_traceroute_to_neo4j.delay(auto_tr.id)
+    logger.info(f"Linked TraceroutePacket {packet.id} to AutoTraceRoute {auto_tr.id}")

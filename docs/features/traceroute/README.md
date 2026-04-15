@@ -50,6 +50,8 @@ When a node feeds data to multiple API instances (e.g. prod and pre-prod), a TR 
 
 Late responses: if a TR was marked `failed` (timeout) but the response arrives later, the receiver finds the failed record within the window and updates it to `completed`.
 
+**Direct path:** `route` and `route_back` may both be empty when the source and target are in direct RF range (no repeaters on the path). Inferred `external` completions can therefore have empty hop lists; that is still a successful traceroute, not a timeout.
+
 ## Code map (shared helpers)
 
 Auto-scheduler and permission checks share one notion of a **live** source node (recent packet ingestion as observer). Canonical implementation: **`nodes.managed_node_liveness`** (`eligible_auto_traceroute_sources_queryset`, etc.). **`traceroute.source_eligibility`** re-exports the same API for existing imports.

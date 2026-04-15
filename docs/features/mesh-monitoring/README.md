@@ -35,7 +35,7 @@ A node is **watched** when there is at least one **`NodeWatch`** row: a user has
 
 ### When a node is treated as offline
 
-**Offline** is **confirmed** only after a **verification window** (on the order of a few minutes): traceroutes are attempted from up to **three** geographically close **managed** sources (with rate limits such as **`MONITORING_TRIGGER_MIN_INTERVAL_SEC`**), and success means either fresh **`last_heard`** after verification started **or** a completed TR with a **non-empty** route (reachability despite sparse packets).
+**Offline** is **confirmed** only after a **verification window** (on the order of a few minutes): traceroutes are attempted from up to **three** geographically close **managed** sources (with rate limits such as **`MONITORING_TRIGGER_MIN_INTERVAL_SEC`**), and success means either fresh **`last_heard`** after verification started **or** a **completed** monitoring traceroute (including a direct path with empty hop lists; reachability despite sparse packets).
 
 If the deadline passes without success, **`NodePresence.offline_confirmed_at`** is set, **`verification_started_at`** is cleared, and **watchers** are notified (deduped per user). **Discord** delivery uses **`push_notifications.discord.send_dm`** and the same verified-user rules as the test endpoint ([Discord notifications](../discord/notifications.md)).
 

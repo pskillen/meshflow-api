@@ -51,10 +51,11 @@ When the traceroute response is received, the bot reports it as a packet. The pa
 1. Finds a matching `AutoTraceRoute` (same source, target, triggered within configurable window, status pending/sent/failed). Window: `STALE_TR_TIMEOUT_SECONDS` (default 180s). Includes `failed` so late responses can update a previously timed-out record.
 2. If no match: creates an **external** `AutoTraceRoute` (cross-env or orphaned response). Use case: prod triggers a TR, but the response is ingested by pre-prod (shared node feeding both APIs). Pre-prod has no prior record, so it creates one with `trigger_type="external"`, `triggered_at=now()`. Target `ObservedNode` is created if missing.
 3. Builds `route` and `route_back` from packet data (node_ids + SNR).
-4. If route is empty: marks `STATUS_FAILED`, `error_message="Timed out"`.
-5. If route has data: marks `STATUS_COMPLETED`, saves route/route_back, links `raw_packet`.
-6. Broadcasts status via `notify_traceroute_status_changed()` to WebSocket clients.
-7. Queues `push_traceroute_to_neo4j.delay(auto_tr.id)` for completed traceroutes.
+4. Marks `STATUS_COMPLETED`, saves route/route_back (possibly empty for a direct RF path), links `raw_packet`, clears any prior `error_message`. Empty hop lists match Meshtastic firmware’s “no intermediate hops” case; they are not treated as failure once a response packet is ingested.
+5. Broadcasts status via `notify_traceroute_status_changed()` to WebSocket clients.
+6. Queues `push_traceroute_to_neo4j.delay(auto_tr.id)` for completed traceroutes.
+
+True no-response for API-triggered traceroutes remains `pending` or `sent` until Celery marks them failed (see §6).
 
 ## 6. Stale Timeout
 
