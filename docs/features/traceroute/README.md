@@ -5,7 +5,7 @@ The traceroute feature tracks path discovery between Meshtastic nodes on the mes
 ## Overview
 
 - **AutoTraceRoute**: Django model recording each traceroute request (manual or scheduled) and its result.
-- **Triggering**: Manual (user) or automatic (Celery scheduler every 2h).
+- **Triggering**: Manual (user) or automatic (Celery scheduler every 2h). **Mesh monitoring** (when enabled) adds verification traceroutes with `trigger_type=monitor`; see [Mesh monitoring](../mesh-monitoring/README.md).
 - **Command delivery**: WebSocket (`NodeConsumer`) sends traceroute commands to connected bots (meshtastic-bot).
 - **Completion**: Packet receiver matches incoming `TraceroutePacket` to `AutoTraceRoute` (same source/target within configurable window). If no match exists (e.g. cross-env: prod triggered, pre-prod received), creates an `AutoTraceRoute` with `trigger_type="external"`. Updates status and pushes to Neo4j.
 - **Heatmap**: Neo4j stores edges; `heatmap-edges` API returns aggregated edges/nodes for map visualization.
@@ -16,7 +16,7 @@ The traceroute feature tracks path discovery between Meshtastic nodes on the mes
 |-------|-------------|
 | `source_node` | ManagedNode that sends the traceroute |
 | `target_node` | ObservedNode (destination) |
-| `trigger_type` | `auto`, `user`, or `external` |
+| `trigger_type` | `auto`, `user`, or `external`; **`monitor`** when mesh-monitoring verification is implemented |
 | `triggered_by` | User (manual only) |
 | `trigger_source` | e.g. `scheduler` (null for external) |
 | `status` | `pending` → `sent` → `completed` or `failed` |
@@ -62,3 +62,4 @@ Auto-scheduler and permission checks share one notion of a **live** source node 
 
 - [Flow](flow.md) – End-to-end lifecycle from trigger to completion
 - [Heatmap](heatmap.md) – Neo4j schema, heatmap-edges API, visualization
+- [Mesh monitoring](../mesh-monitoring/README.md) – watches, verification rounds, `pick_traceroute_target` exclusion for nodes under monitoring
