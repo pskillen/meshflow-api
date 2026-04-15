@@ -25,7 +25,7 @@ Meshflow/
 - **ManagedNode**: User-owned node linked to a Constellation. Part of system infrastucture. Matched to ObservedNode by `node_id`.
 - **Constellation**: Subset of nodes representing a region. Has `ConstellationUserMembership` (admin/editor/viewer).
 - **NodeAPIKey**: API keys for node authentication, scoped to a Constellation.
-- **Mesh monitoring** (`mesh_monitoring`): `NodeWatch` / `NodePresence`, Celery `process_node_watch_presence`, `trigger_type=monitor` traceroutes; integrates with `packets` and `traceroute`; watch REST in a later phase.
+- **Mesh monitoring** (`mesh_monitoring`): `NodeWatch` / `NodePresence`, Celery `process_node_watch_presence`, `trigger_type=monitor` traceroutes; integrates with `packets` and `traceroute`; authenticated watch CRUD at `api/monitoring/watches/`.
 
 ## API Layout
 
@@ -36,6 +36,7 @@ All endpoints under `/api/`:
 - `api/nodes/observed-nodes/mine/` – User's claimed nodes
 - `api/nodes/managed-nodes/` – Managed nodes
 - `api/constellations/` – Constellations, memberships, channels
+- `api/monitoring/watches/` – User's mesh monitoring watches (NodeWatch CRUD)
 - `api/packets/` – Packet ingestion
 - `api/stats/` – Packet statistics
 - `api/messages/` – Text messages
