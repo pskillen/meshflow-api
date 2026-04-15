@@ -87,7 +87,15 @@ Discord **login** uses the OAuth pair above. **DM notifications** (test message 
 
 ---
 
-## 8. Monitoring / Prometheus
+## 8. Mesh monitoring
+
+| Variable                               | Default | Description                                                                 | Allowable Values         |
+|----------------------------------------|---------|-----------------------------------------------------------------------------|-------------------------|
+| `MESH_MONITORING_VERIFICATION_SECONDS` | `180`   | After silence triggers verification, max seconds to wait for `last_heard` or a successful monitoring traceroute before confirming offline. | Integer (string)        |
+
+---
+
+## 9. Monitoring / Prometheus
 
 | Variable                | Default | Description                                      | Allowable Values         |
 |-------------------------|---------|--------------------------------------------------|-------------------------|
@@ -134,7 +142,11 @@ Discord **login** uses the OAuth pair above. **DM notifications** (test message 
 
 - **PACKET_DEDUP_WINDOW_MINUTES**: Time window (minutes) within which the same sender+packet_id is treated as a duplicate. See `docs/packets/DEDUPLICATION.md`.
 
-## 8. Monitoring / Prometheus
+## 8. Mesh monitoring
+
+- **MESH_MONITORING_VERIFICATION_SECONDS**: Verification window (seconds) after `NodePresence.verification_started_at` before marking offline and notifying watchers.
+
+## 9. Monitoring / Prometheus
 
 - **PROMETHEUS_PASSWORD**: If set, enables Prometheus metrics and adds authentication.
 

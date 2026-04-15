@@ -78,6 +78,7 @@ INSTALLED_APPS = [
     "stats",
     "text_messages",
     "traceroute",
+    "mesh_monitoring",
     "ws",
     "django_celery_beat",
 ]

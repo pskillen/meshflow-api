@@ -10,11 +10,11 @@ This document describes the **intended design** (models, Celery, APIs, and integ
 |------|-------------------|
 | Shared helpers (`nodes.managed_node_liveness`, `common.geo`, `nodes.positioning`, `traceroute.trigger_intervals`, random auto TR) | Shipped in API (refactor / traceroute) |
 | Verified Discord DMs (prefs, test, `push_notifications.discord`) | Shipped (`users` + `push_notifications`) |
-| Django app **`mesh_monitoring`** (`NodeWatch`, `NodePresence`), Celery **`process_node_watch_presence`**, `AutoTraceRoute.trigger_type=monitor` | Planned (runtime phase) |
+| Django app **`mesh_monitoring`** (`NodeWatch`, `NodePresence`), Celery **`process_node_watch_presence`**, `AutoTraceRoute.trigger_type=monitor`, hooks in **`packets`** + **`traceroute.target_selection`** | **Shipped** (phase 03b); URL include stub at **`/api/monitoring/`** (empty until phase 04) |
 | Watch **REST** CRUD (e.g. `/api/monitoring/watches/`) | Planned (API phase) |
 | **UI** (My Nodes watch toggles) | Planned (frontend phase) |
 
-When the runtime is merged, update this table to match the repo.
+Env: **`MESH_MONITORING_VERIFICATION_SECONDS`** (default `180`) for the verification window after silence.
 
 ## Concepts
 
