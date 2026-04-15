@@ -6,6 +6,7 @@ from django.db.models import Max
 from django.utils import timezone
 
 from common.geo import haversine_km
+from mesh_monitoring.suppression import suppressed_observed_node_ids
 from nodes.models import ManagedNode, ObservedNode
 from nodes.positioning import managed_node_lat_lon
 
@@ -63,6 +64,7 @@ def pick_traceroute_target(
     managed_node_ids = set(ManagedNode.objects.values_list("node_id", flat=True))
     last_traced_hours = _get_last_traced_by_source(managed_node)
 
+    suppressed = list(suppressed_observed_node_ids())
     candidates = (
         ObservedNode.objects.filter(
             last_heard__gte=cutoff,
@@ -71,6 +73,7 @@ def pick_traceroute_target(
         )
         .exclude(node_id=managed_node.node_id)
         .exclude(node_id__in=managed_node_ids)
+        .exclude(pk__in=suppressed)
         .select_related("latest_status")
     )
 

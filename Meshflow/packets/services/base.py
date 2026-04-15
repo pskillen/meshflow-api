@@ -64,6 +64,9 @@ class BasePacketService(abc.ABC):
             try:
                 self.from_node.last_heard = self.packet.first_reported_time
                 self.from_node.save(update_fields=["last_heard"])
+                from mesh_monitoring.services import clear_presence_on_packet_from_node
+
+                clear_presence_on_packet_from_node(self.from_node)
             except ObservedNode.DoesNotExist:
                 # If the node doesn't exist, we don't need to update it
                 pass

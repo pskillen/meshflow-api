@@ -37,6 +37,7 @@ urlpatterns = [
                 path("nodes/", include("nodes.urls")),
                 path("stats/", include("stats.urls")),
                 path("traceroutes/", include("traceroute.urls")),
+                path("monitoring/", include("mesh_monitoring.urls")),
                 path("messages/", include("text_messages.urls")),
                 # JWT Token endpoints
                 path("token/", CustomTokenObtainPairView.as_view(), name="token_obtain_pair"),

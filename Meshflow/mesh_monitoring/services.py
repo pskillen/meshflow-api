@@ -1,0 +1,134 @@
+"""Presence state, Discord notify, hooks from packets and traceroute receiver."""
+
+from __future__ import annotations
+
+import logging
+
+from django.db.models import Q
+
+from nodes.models import ObservedNode
+from push_notifications.discord import DiscordSendError, send_dm
+from traceroute.models import AutoTraceRoute
+from users.discord_sync import user_has_verified_discord_dm_target
+
+from .eligibility import user_can_watch
+
+logger = logging.getLogger(__name__)
+
+__all__ = [
+    "user_can_watch",
+    "clear_presence_on_packet_from_node",
+    "on_monitoring_traceroute_completed",
+    "notify_watchers_node_offline",
+    "monitoring_traceroute_succeeded_since",
+]
+
+
+def clear_presence_on_packet_from_node(observed_node: ObservedNode) -> None:
+    """Reset monitoring presence when any packet advances last_heard for this node."""
+    from .models import NodePresence
+
+    updated = (
+        NodePresence.objects.filter(observed_node=observed_node)
+        .filter(Q(verification_started_at__isnull=False) | Q(offline_confirmed_at__isnull=False))
+        .update(
+            verification_started_at=None,
+            offline_confirmed_at=None,
+        )
+    )
+    if updated:
+        logger.debug("mesh_monitoring: cleared presence for observed_node %s", observed_node.node_id_str)
+
+
+def monitoring_traceroute_succeeded_since(observed_node: ObservedNode, since) -> bool:
+    """True if a monitoring TR completed with a non-empty route since `since`."""
+    qs = AutoTraceRoute.objects.filter(
+        target_node=observed_node,
+        trigger_type=AutoTraceRoute.TRIGGER_TYPE_MONITOR,
+        status=AutoTraceRoute.STATUS_COMPLETED,
+        triggered_at__gte=since,
+    )
+    for tr in qs.only("route", "route_back"):
+        route = tr.route or []
+        route_back = tr.route_back or []
+        if len(route) > 0 or len(route_back) > 0:
+            return True
+    return False
+
+
+def on_monitoring_traceroute_completed(auto_tr: AutoTraceRoute) -> None:
+    """
+    When a monitoring TR completes with a non-empty route, end verification early.
+    Called from packets receiver after route fields are saved.
+    """
+    if auto_tr.trigger_type != AutoTraceRoute.TRIGGER_TYPE_MONITOR:
+        return
+    if auto_tr.status != AutoTraceRoute.STATUS_COMPLETED:
+        return
+    route = auto_tr.route or []
+    route_back = auto_tr.route_back or []
+    if not route and not route_back:
+        return
+
+    from django.db import transaction
+
+    from .models import NodePresence
+
+    with transaction.atomic():
+        presence = (
+            NodePresence.objects.select_for_update()
+            .filter(
+                observed_node=auto_tr.target_node,
+                verification_started_at__isnull=False,
+            )
+            .first()
+        )
+        if not presence:
+            return
+        if auto_tr.triggered_at < presence.verification_started_at:
+            return
+        presence.verification_started_at = None
+        presence.save(update_fields=["verification_started_at"])
+        logger.info(
+            "mesh_monitoring: verification cleared by monitor TR id=%s target=%s",
+            auto_tr.id,
+            auto_tr.target_node.node_id_str,
+        )
+
+
+def notify_watchers_node_offline(observed_node: ObservedNode) -> int:
+    """
+    DM each distinct watcher with verified Discord settings (deduped by user).
+    Returns number of send_dm attempts.
+    """
+    from django.contrib.auth import get_user_model
+
+    from .models import NodeWatch
+
+    User = get_user_model()
+    user_ids = (
+        NodeWatch.objects.filter(observed_node=observed_node, enabled=True).values_list("user_id", flat=True).distinct()
+    )
+    users = User.objects.filter(pk__in=user_ids)
+    text = (
+        f"Meshflow mesh monitoring: node {observed_node.node_id_str} "
+        f"({observed_node.long_name}) appears offline after verification."
+    )
+    attempted = 0
+    for user in users:
+        if not user_has_verified_discord_dm_target(user):
+            logger.info(
+                "mesh_monitoring: skip notify user=%s (Discord not verified)",
+                user.pk,
+            )
+            continue
+        attempted += 1
+        try:
+            send_dm(user.discord_notify_user_id, text)
+        except DiscordSendError as e:
+            logger.warning(
+                "mesh_monitoring: Discord notify failed user=%s: %s",
+                user.pk,
+                e,
+            )
+    return attempted
