@@ -216,6 +216,50 @@ def test_traceroute_receiver_late_response_updates_failed(
 
 
 @pytest.mark.django_db
+def test_traceroute_response_updates_target_last_heard(
+    create_traceroute_packet,
+    create_managed_node,
+    create_observed_node,
+    create_auto_traceroute,
+    create_packet_observation_for_tr,
+):
+    """Ingested TR response advances target ObservedNode.last_heard (same as other packet services)."""
+    source_node = create_managed_node()
+    target_node = create_observed_node(node_id=0xBEEFCAFE)
+    old_last = timezone.now() - timedelta(days=1)
+    target_node.last_heard = old_last
+    target_node.save(update_fields=["last_heard"])
+
+    auto_tr = create_auto_traceroute(
+        source_node=source_node,
+        target_node=target_node,
+        status=AutoTraceRoute.STATUS_SENT,
+        triggered_by=None,
+    )
+    auto_tr.triggered_at = timezone.now() - timedelta(minutes=1)
+    auto_tr.save(update_fields=["triggered_at"])
+
+    rx_time = timezone.now() - timedelta(seconds=30)
+    packet = create_traceroute_packet(
+        observer=source_node,
+        from_int=target_node.node_id,
+        route=[0x11111111],
+        route_back=[0x11111111],
+        snr_towards=[-5.0],
+        snr_back=[-4.0],
+        first_reported_time=rx_time,
+    )
+    observation = create_packet_observation_for_tr(packet=packet, observer=source_node)
+
+    with patch("traceroute.tasks.push_traceroute_to_neo4j"):
+        with patch("traceroute.ws_notify.notify_traceroute_status_changed"):
+            traceroute_packet_received.send(sender=None, packet=packet, observer=source_node, observation=observation)
+
+    target_node.refresh_from_db()
+    assert target_node.last_heard == rx_time
+
+
+@pytest.mark.django_db
 def test_traceroute_receiver_external_inferred_empty_routes_completed(
     create_traceroute_packet, create_managed_node, create_packet_observation_for_tr
 ):

@@ -290,7 +290,15 @@ def on_traceroute_packet_received(sender, packet: TraceroutePacket, observer, ob
         update_fields=["status", "route", "route_back", "raw_packet", "completed_at", "error_message"],
     )
 
-    from mesh_monitoring.services import on_monitoring_traceroute_completed
+    # TR reply is from the target (packet.from_int); treat like other telemetry for last_heard + mesh monitoring.
+    from mesh_monitoring.services import clear_presence_on_packet_from_node, on_monitoring_traceroute_completed
+
+    target_observed = auto_tr.target_node
+    if packet.first_reported_time:
+        target_observed.last_heard = packet.first_reported_time
+        target_observed.save(update_fields=["last_heard"])
+        clear_presence_on_packet_from_node(target_observed)
+
     from traceroute.tasks import push_traceroute_to_neo4j
     from traceroute.ws_notify import notify_traceroute_status_changed
 
