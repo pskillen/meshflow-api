@@ -39,13 +39,15 @@ When executing the plan:
 
 ## 2. Branch Naming
 
-Format: `{repo-prefix}-{issue-number}/{author}/{short-description}`
+Format: `{issue-repo-prefix}-{issue-number}/{author}/{short-description}`
 
-| Repo | Prefix | Example |
-|------|--------|---------|
-| meshflow-api | `api` | `api-456/paddy/fix-endpoint-bug` |
-| meshtastic-bot | `bot` | `bot-123/paddy/add-traceroute-command` |
-| meshtastic-bot-ui | `ui` | `ui-78/paddy/add-cool-new-page` |
+**Which prefix?** Use the prefix for the **GitHub repository where the tracking issue lives**, not the repo you are committing in. That keeps one issue number traceable across Meshflow repos.
+
+| Issue filed in | Prefix | Use that prefix in every repo that has a branch for the work |
+|----------------|--------|----------------------------------------------------------------|
+| meshtastic-bot-ui | `ui` | e.g. UI #136 → `ui-136/paddy/...` in **both** meshtastic-bot-ui **and** meshflow-api (and meshtastic-bot if needed) |
+| meshflow-api | `api` | e.g. API #456 → `api-456/paddy/...` in every affected repo |
+| meshtastic-bot | `bot` | e.g. bot #123 → `bot-123/paddy/...` in every affected repo |
 
 Use kebab-case for the description. Keep it short.
 
@@ -127,7 +129,7 @@ When the work is done:
 | Step | Action |
 |------|--------|
 | Plan | Issue in relevant repo(s); parent in meshflow-api if multi-repo |
-| Branch | `{prefix}-{num}/{author}/{description}` |
+| Branch | `{issue-repo-prefix}-{num}/{author}/{description}` (prefix = repo where the issue lives) |
 | Pre-commit | meshflow-api/meshtastic-bot: venv + black, isort, flake8; meshtastic-bot-ui: `npm run format` |
 | Commit | Conventional commits, no "enhance" |
 | PR | Open in all affected repos, link issues and related PRs |
