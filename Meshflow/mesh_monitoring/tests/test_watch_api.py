@@ -1,0 +1,144 @@
+"""HTTP API tests for NodeWatch CRUD."""
+
+import pytest
+from rest_framework import status
+from rest_framework.test import APIClient
+
+import nodes.tests.conftest  # noqa: F401
+from mesh_monitoring.models import NodeWatch
+from nodes.constants import INFRASTRUCTURE_ROLES
+from nodes.models import RoleSource
+
+
+@pytest.fixture
+def api_client():
+    return APIClient()
+
+
+@pytest.mark.django_db
+def test_watch_list_requires_auth(api_client):
+    r = api_client.get("/api/monitoring/watches/")
+    assert r.status_code == status.HTTP_401_UNAUTHORIZED
+
+
+@pytest.mark.django_db
+def test_watch_create_requires_auth(api_client, create_observed_node):
+    obs = create_observed_node()
+    r = api_client.post(
+        "/api/monitoring/watches/",
+        {"observed_node_id": str(obs.internal_id), "offline_after": 60, "enabled": True},
+        format="json",
+    )
+    assert r.status_code == status.HTTP_401_UNAUTHORIZED
+
+
+@pytest.mark.django_db
+def test_watch_crud_claimed_node(api_client, create_user, create_observed_node):
+    user = create_user()
+    obs = create_observed_node(claimed_by=user)
+    api_client.force_authenticate(user=user)
+
+    r = api_client.post(
+        "/api/monitoring/watches/",
+        {"observed_node_id": str(obs.internal_id), "offline_after": 90, "enabled": True},
+        format="json",
+    )
+    assert r.status_code == status.HTTP_201_CREATED
+    wid = r.data["id"]
+    assert r.data["offline_after"] == 90
+    assert r.data["enabled"] is True
+    assert r.data["observed_node"]["node_id_str"] == obs.node_id_str
+    assert r.data["observed_node"]["monitoring_verification_started_at"] is None
+
+    r = api_client.get("/api/monitoring/watches/")
+    assert r.status_code == status.HTTP_200_OK
+    assert r.data["count"] == 1
+    assert r.data["results"][0]["id"] == wid
+
+    r = api_client.patch(f"/api/monitoring/watches/{wid}/", {"enabled": False}, format="json")
+    assert r.status_code == status.HTTP_200_OK
+    assert r.data["enabled"] is False
+
+    r = api_client.delete(f"/api/monitoring/watches/{wid}/")
+    assert r.status_code == status.HTTP_204_NO_CONTENT
+
+
+@pytest.mark.django_db
+def test_watch_infrastructure_node_any_user(api_client, create_user, create_observed_node):
+    user = create_user()
+    obs = create_observed_node(role=INFRASTRUCTURE_ROLES[0], claimed_by=None)
+    api_client.force_authenticate(user=user)
+    r = api_client.post(
+        "/api/monitoring/watches/",
+        {"observed_node_id": str(obs.internal_id)},
+        format="json",
+    )
+    assert r.status_code == status.HTTP_201_CREATED
+
+
+@pytest.mark.django_db
+def test_watch_reject_ineligible_node(api_client, create_user, create_observed_node):
+    user = create_user()
+    obs = create_observed_node(role=RoleSource.CLIENT, claimed_by=None)
+    api_client.force_authenticate(user=user)
+    r = api_client.post(
+        "/api/monitoring/watches/",
+        {"observed_node_id": str(obs.internal_id)},
+        format="json",
+    )
+    assert r.status_code == status.HTTP_400_BAD_REQUEST
+    assert "observed_node_id" in r.data or "non_field_errors" in r.data
+
+
+@pytest.mark.django_db
+def test_watch_duplicate(api_client, create_user, create_observed_node):
+    user = create_user()
+    obs = create_observed_node(claimed_by=user)
+    api_client.force_authenticate(user=user)
+    api_client.post(
+        "/api/monitoring/watches/",
+        {"observed_node_id": str(obs.internal_id)},
+        format="json",
+    )
+    r = api_client.post(
+        "/api/monitoring/watches/",
+        {"observed_node_id": str(obs.internal_id)},
+        format="json",
+    )
+    assert r.status_code == status.HTTP_400_BAD_REQUEST
+
+
+@pytest.mark.django_db
+def test_watch_other_user_404(api_client, create_user, create_observed_node):
+    owner = create_user()
+    other = create_user()
+    obs = create_observed_node(claimed_by=owner)
+    w = NodeWatch.objects.create(user=owner, observed_node=obs, offline_after=60, enabled=True)
+
+    api_client.force_authenticate(user=other)
+    r = api_client.get(f"/api/monitoring/watches/{w.pk}/")
+    assert r.status_code == status.HTTP_404_NOT_FOUND
+
+
+@pytest.mark.django_db
+def test_watch_presence_hints(api_client, create_user, create_observed_node):
+    from django.utils import timezone
+
+    from mesh_monitoring.models import NodePresence
+
+    user = create_user()
+    obs = create_observed_node(claimed_by=user)
+    now = timezone.now()
+    NodePresence.objects.create(
+        observed_node=obs,
+        verification_started_at=now,
+        offline_confirmed_at=None,
+    )
+    api_client.force_authenticate(user=user)
+    r = api_client.post(
+        "/api/monitoring/watches/",
+        {"observed_node_id": str(obs.internal_id)},
+        format="json",
+    )
+    assert r.status_code == status.HTTP_201_CREATED
+    assert r.data["observed_node"]["monitoring_verification_started_at"] is not None
