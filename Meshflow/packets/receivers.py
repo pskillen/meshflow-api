@@ -1,8 +1,6 @@
 import logging
-import os
 
 from django.dispatch import receiver
-from django.utils import timezone
 
 from common.mesh_node_helpers import meshtastic_id_to_hex
 from constellations.models import ConstellationUserMembership
@@ -31,6 +29,7 @@ from .services.node_info import NodeInfoPacketService
 from .services.position import PositionPacketService
 from .services.power_metrics import PowerMetricsPacketService
 from .services.text_message import TextMessagePacketService
+from .services.traceroute import TraceroutePacketService
 from .signals import (
     air_quality_metrics_packet_received,
     device_metrics_packet_received,
@@ -38,7 +37,6 @@ from .signals import (
     health_metrics_packet_received,
     host_metrics_packet_received,
     message_packet_received,
-    new_node_observed,
     node_claim_authorized,
     node_info_packet_received,
     packet_received,
@@ -49,8 +47,6 @@ from .signals import (
 )
 
 logger = logging.getLogger(__name__)
-
-STALE_TR_TIMEOUT_SECONDS = os.environ.get("STALE_TR_TIMEOUT_SECONDS", 180)
 
 
 # Packet types that already update NodeLatestStatus (and set inferred_max_hops there)
@@ -92,10 +88,6 @@ def on_packet_received_update_inferred_max_hops(sender, packet, observer, observ
     if not created and node_status.inferred_max_hops != hop_start:
         node_status.inferred_max_hops = hop_start
         node_status.save(update_fields=["inferred_max_hops"])
-
-
-STALE_TR_TIMEOUT_SECONDS = os.environ.get("STALE_TR_TIMEOUT_SECONDS", 180)
-STALE_TR_TIMEOUT_SECONDS = int(STALE_TR_TIMEOUT_SECONDS)
 
 
 @receiver(position_packet_received)
@@ -220,81 +212,5 @@ def on_traceroute_packet_received(sender, packet: TraceroutePacket, observer, ob
     """
     logger.info(f"Traceroute packet received: {packet.id}")
 
-    from traceroute.models import AutoTraceRoute
-
-    # observer is ManagedNode (from PacketObservation)
-    source_node = observer
-    target_node_id = packet.from_int  # TR response: from = target (who sent the response)
-    cutoff = timezone.now() - timezone.timedelta(seconds=STALE_TR_TIMEOUT_SECONDS)  # 5 minutes
-
-    auto_tr = (
-        AutoTraceRoute.objects.filter(
-            source_node=source_node,
-            target_node__node_id=target_node_id,
-            triggered_at__gte=cutoff,
-            status__in=[
-                AutoTraceRoute.STATUS_PENDING,
-                AutoTraceRoute.STATUS_SENT,
-                AutoTraceRoute.STATUS_FAILED,
-            ],
-        )
-        .order_by("-triggered_at")
-        .first()
-    )
-
-    if not auto_tr:
-        # No match within window: create external AutoTraceRoute (cross-env or orphaned response)
-        logger.info(
-            f"No AutoTraceRoute found for packet {packet.id} from {source_node.node_id_str} to {target_node_id}; "
-            "creating external record"
-        )
-        node_id_str = packet.from_str if packet.from_str else meshtastic_id_to_hex(target_node_id)
-        target_node, created = ObservedNode.objects.get_or_create(
-            node_id=target_node_id,
-            defaults={
-                "node_id_str": node_id_str,
-                "long_name": "Unknown Node " + node_id_str,
-                "short_name": node_id_str[-4:] if len(node_id_str) >= 4 else "????",
-            },
-        )
-        if created:
-            new_node_observed.send(sender=None, node=target_node, observer=source_node)
-        auto_tr = AutoTraceRoute.objects.create(
-            source_node=source_node,
-            target_node=target_node,
-            trigger_type=AutoTraceRoute.TRIGGER_TYPE_EXTERNAL,
-            trigger_source=None,
-            triggered_by=None,
-            triggered_at=timezone.now(),
-            status=AutoTraceRoute.STATUS_PENDING,
-        )
-
-    # Build route/route_back with SNR: 1:1 mapping route[i] <-> snr_towards[i] (SNR at which route[i] received).
-    # Per Meshtastic firmware PR #4485; firmware may send snr longer than route in edge cases — we use i < len.
-    route = []
-    for i, nid in enumerate(packet.route):
-        snr = packet.snr_towards[i] if i < len(packet.snr_towards) else None
-        route.append({"node_id": nid, "snr": snr})
-    route_back = []
-    for i, nid in enumerate(packet.route_back):
-        snr = packet.snr_back[i] if i < len(packet.snr_back) else None
-        route_back.append({"node_id": nid, "snr": snr})
-
-    auto_tr.status = AutoTraceRoute.STATUS_COMPLETED
-    auto_tr.route = route
-    auto_tr.route_back = route_back
-    auto_tr.raw_packet = packet
-    auto_tr.completed_at = timezone.now()
-    auto_tr.error_message = None
-    auto_tr.save(
-        update_fields=["status", "route", "route_back", "raw_packet", "completed_at", "error_message"],
-    )
-
-    from mesh_monitoring.services import on_monitoring_traceroute_completed
-    from traceroute.tasks import push_traceroute_to_neo4j
-    from traceroute.ws_notify import notify_traceroute_status_changed
-
-    on_monitoring_traceroute_completed(auto_tr)
-    notify_traceroute_status_changed(auto_tr.id, AutoTraceRoute.STATUS_COMPLETED)
-    push_traceroute_to_neo4j.delay(auto_tr.id)
-    logger.info(f"Linked TraceroutePacket {packet.id} to AutoTraceRoute {auto_tr.id}")
+    service = TraceroutePacketService()
+    service.process_packet(packet, observer, observation, user=None)

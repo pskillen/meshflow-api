@@ -44,16 +44,17 @@ The Meshtastic device performs the traceroute on the mesh. The firmware enforces
 
 When the traceroute response is received, the bot reports it as a packet. The packet ingestion pipeline creates a `TraceroutePacket` and emits `traceroute_packet_received`.
 
-## 5. Receiver: Match and Complete
+## 5. `TraceroutePacketService`: match, complete, `last_heard`
 
-`packets.receivers.on_traceroute_packet_received`:
+`packets.receivers.on_traceroute_packet_received` delegates to `TraceroutePacketService` — the same `BasePacketService` pattern as other packet types: resolve the sender (`from_int`) as `ObservedNode`, run `_process_packet`, then `_update_node_last_heard` and `clear_presence_on_packet_from_node` for mesh monitoring.
 
-1. Finds a matching `AutoTraceRoute` (same source, target, triggered within configurable window, status pending/sent/failed). Window: `STALE_TR_TIMEOUT_SECONDS` (default 180s). Includes `failed` so late responses can update a previously timed-out record.
-2. If no match: creates an **external** `AutoTraceRoute` (cross-env or orphaned response). Use case: prod triggers a TR, but the response is ingested by pre-prod (shared node feeding both APIs). Pre-prod has no prior record, so it creates one with `trigger_type="external"`, `triggered_at=now()`. Target `ObservedNode` is created if missing.
+`TraceroutePacketService._process_packet`:
+
+1. Finds a matching `AutoTraceRoute` (same source, target, triggered within configurable window, status pending/sent/failed). Window: `STALE_TR_TIMEOUT_SECONDS` in `packets.services.traceroute` (default 180s). Includes `failed` so late responses can update a previously timed-out record.
+2. If no match: creates an **external** `AutoTraceRoute` (cross-env or orphaned response). Use case: prod triggers a TR, but the response is ingested by pre-prod (shared node feeding both APIs). Pre-prod has no prior record, so it creates one with `trigger_type="external"`, `triggered_at=now()`. The target `ObservedNode` is ensured by `BasePacketService._get_or_create_from_node` before this step.
 3. Builds `route` and `route_back` from packet data (node_ids + SNR).
 4. Marks `STATUS_COMPLETED`, saves route/route_back (possibly empty for a direct RF path), links `raw_packet`, clears any prior `error_message`. Empty hop lists match Meshtastic firmware’s “no intermediate hops” case; they are not treated as failure once a response packet is ingested.
-5. Broadcasts status via `notify_traceroute_status_changed()` to WebSocket clients.
-6. Queues `push_traceroute_to_neo4j.delay(auto_tr.id)` for completed traceroutes.
+5. Calls `on_monitoring_traceroute_completed` for monitor traceroutes, `notify_traceroute_status_changed()` for WebSocket clients, and `push_traceroute_to_neo4j.delay(auto_tr.id)`.
 
 True no-response for API-triggered traceroutes remains `pending` or `sent` until Celery marks them failed (see §6).
 
