@@ -41,33 +41,23 @@ def clear_presence_on_packet_from_node(observed_node: ObservedNode) -> None:
 
 
 def monitoring_traceroute_succeeded_since(observed_node: ObservedNode, since) -> bool:
-    """True if a monitoring TR completed with a non-empty route since `since`."""
-    qs = AutoTraceRoute.objects.filter(
+    """True if a monitoring TR completed since `since` (including direct path with empty route/route_back)."""
+    return AutoTraceRoute.objects.filter(
         target_node=observed_node,
         trigger_type=AutoTraceRoute.TRIGGER_TYPE_MONITOR,
         status=AutoTraceRoute.STATUS_COMPLETED,
         triggered_at__gte=since,
-    )
-    for tr in qs.only("route", "route_back"):
-        route = tr.route or []
-        route_back = tr.route_back or []
-        if len(route) > 0 or len(route_back) > 0:
-            return True
-    return False
+    ).exists()
 
 
 def on_monitoring_traceroute_completed(auto_tr: AutoTraceRoute) -> None:
     """
-    When a monitoring TR completes with a non-empty route, end verification early.
+    When a monitoring TR completes, end verification early (including direct path with empty hops).
     Called from packets receiver after route fields are saved.
     """
     if auto_tr.trigger_type != AutoTraceRoute.TRIGGER_TYPE_MONITOR:
         return
     if auto_tr.status != AutoTraceRoute.STATUS_COMPLETED:
-        return
-    route = auto_tr.route or []
-    route_back = auto_tr.route_back or []
-    if not route and not route_back:
         return
 
     from django.db import transaction

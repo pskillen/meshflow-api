@@ -211,4 +211,77 @@ def test_traceroute_receiver_late_response_updates_failed(
     assert auto_tr.status == AutoTraceRoute.STATUS_COMPLETED
     assert auto_tr.trigger_type != AutoTraceRoute.TRIGGER_TYPE_EXTERNAL  # Original record, not external
     assert auto_tr.raw_packet_id == packet.id
+    assert auto_tr.error_message is None
     mock_push.delay.assert_called_once_with(auto_tr.id)
+
+
+@pytest.mark.django_db
+def test_traceroute_receiver_external_inferred_empty_routes_completed(
+    create_traceroute_packet, create_managed_node, create_packet_observation_for_tr
+):
+    """Direct path (no relay hops): external inferred AutoTraceRoute is completed, not failed."""
+    source_node = create_managed_node()
+    target_node_id = 0xABCDEF12
+    packet = create_traceroute_packet(
+        observer=source_node,
+        from_int=target_node_id,
+        route=[],
+        route_back=[],
+        snr_towards=[],
+        snr_back=[],
+    )
+    observation = create_packet_observation_for_tr(packet=packet, observer=source_node)
+
+    with patch("traceroute.tasks.push_traceroute_to_neo4j") as mock_push:
+        with patch("traceroute.ws_notify.notify_traceroute_status_changed"):
+            traceroute_packet_received.send(sender=None, packet=packet, observer=source_node, observation=observation)
+
+    auto_tr = AutoTraceRoute.objects.get(source_node=source_node, target_node__node_id=target_node_id)
+    assert auto_tr.trigger_type == AutoTraceRoute.TRIGGER_TYPE_EXTERNAL
+    assert auto_tr.status == AutoTraceRoute.STATUS_COMPLETED
+    assert auto_tr.route == []
+    assert auto_tr.route_back == []
+    assert auto_tr.error_message is None
+    mock_push.delay.assert_called_once_with(auto_tr.id)
+
+
+@pytest.mark.django_db
+def test_traceroute_receiver_late_response_empty_routes_updates_failed_to_completed(
+    create_traceroute_packet,
+    create_managed_node,
+    create_observed_node,
+    create_auto_traceroute,
+    create_packet_observation_for_tr,
+):
+    """Late response with empty route/route_back clears error_message and completes."""
+    source_node = create_managed_node()
+    target_node = create_observed_node(node_id=0xCAFEBABE)
+    auto_tr = create_auto_traceroute(
+        source_node=source_node,
+        target_node=target_node,
+        status=AutoTraceRoute.STATUS_FAILED,
+        error_message="Timed out after 180s",
+        triggered_by=None,
+    )
+    auto_tr.triggered_at = timezone.now() - timedelta(minutes=2)
+    auto_tr.save(update_fields=["triggered_at", "error_message"])
+
+    packet = create_traceroute_packet(
+        observer=source_node,
+        from_int=target_node.node_id,
+        route=[],
+        route_back=[],
+        snr_towards=[],
+        snr_back=[],
+    )
+    observation = create_packet_observation_for_tr(packet=packet, observer=source_node)
+
+    with patch("traceroute.tasks.push_traceroute_to_neo4j"):
+        with patch("traceroute.ws_notify.notify_traceroute_status_changed"):
+            traceroute_packet_received.send(sender=None, packet=packet, observer=source_node, observation=observation)
+
+    auto_tr.refresh_from_db()
+    assert auto_tr.status == AutoTraceRoute.STATUS_COMPLETED
+    assert auto_tr.error_message is None
+    assert auto_tr.route == []
+    assert auto_tr.route_back == []

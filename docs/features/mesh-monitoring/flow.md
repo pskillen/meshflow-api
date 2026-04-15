@@ -40,7 +40,7 @@ sequenceDiagram
     Bot->>Pkt: ingest TR response packet
     Pkt->>DB: complete AutoTraceRoute on_match
   end
-  alt Success last_heard or non_empty route
+  alt Success last_heard or completed monitor TR
     Celery->>DB: clear verification clear offline if_set
   else Deadline expired
     Celery->>DB: set offline_confirmed_at clear verification

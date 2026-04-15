@@ -10,6 +10,7 @@ import pytest
 import nodes.tests.conftest  # noqa: F401
 import packets.tests.conftest  # noqa: F401
 from mesh_monitoring.models import NodePresence, NodeWatch
+from mesh_monitoring.services import monitoring_traceroute_succeeded_since, on_monitoring_traceroute_completed
 from mesh_monitoring.tasks import process_node_watch_presence, send_monitoring_traceroute_command
 from nodes.models import NodeLatestStatus
 from traceroute.models import AutoTraceRoute
@@ -65,3 +66,52 @@ def test_process_node_watch_presence_starts_verification_and_creates_monitor_tr(
         trigger_source="mesh_monitoring",
     ).exists()
     channel_layer.group_send.assert_called()
+
+
+@pytest.mark.django_db
+def test_monitoring_traceroute_succeeded_since_true_when_route_empty(
+    create_user, create_observed_node, create_managed_node
+):
+    """Completed monitor TR with direct path (empty route lists) counts as success."""
+    user = create_user()
+    obs = create_observed_node(node_id=0x11223344, claimed_by=user)
+    source = create_managed_node()
+    since = timezone.now() - timedelta(minutes=10)
+    AutoTraceRoute.objects.create(
+        source_node=source,
+        target_node=obs,
+        trigger_type=AutoTraceRoute.TRIGGER_TYPE_MONITOR,
+        triggered_by=None,
+        trigger_source="mesh_monitoring",
+        status=AutoTraceRoute.STATUS_COMPLETED,
+        route=[],
+        route_back=[],
+        triggered_at=timezone.now() - timedelta(minutes=1),
+    )
+    assert monitoring_traceroute_succeeded_since(obs, since) is True
+
+
+@pytest.mark.django_db
+def test_on_monitoring_traceroute_completed_clears_verification_when_routes_empty(
+    create_user, create_observed_node, create_managed_node
+):
+    """Direct-path monitor completion clears verification_started_at."""
+    user = create_user()
+    obs = create_observed_node(node_id=0x22334455, claimed_by=user)
+    vs = timezone.now() - timedelta(minutes=2)
+    NodePresence.objects.create(observed_node=obs, verification_started_at=vs)
+    source = create_managed_node()
+    auto_tr = AutoTraceRoute.objects.create(
+        source_node=source,
+        target_node=obs,
+        trigger_type=AutoTraceRoute.TRIGGER_TYPE_MONITOR,
+        triggered_by=None,
+        trigger_source="mesh_monitoring",
+        status=AutoTraceRoute.STATUS_COMPLETED,
+        route=[],
+        route_back=[],
+        triggered_at=timezone.now() - timedelta(seconds=30),
+    )
+    on_monitoring_traceroute_completed(auto_tr)
+    presence = NodePresence.objects.get(observed_node=obs)
+    assert presence.verification_started_at is None
