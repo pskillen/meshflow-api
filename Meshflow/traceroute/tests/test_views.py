@@ -1,5 +1,7 @@
 """Tests for traceroute views."""
 
+from datetime import timedelta
+
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
@@ -462,3 +464,96 @@ class TestTracerouteTrigger:
         )
         assert resp.status_code == 400
         assert "ingestion" in resp.json().get("detail", "").lower()
+
+
+@pytest.mark.django_db
+class TestTracerouteStats:
+    def test_stats_requires_auth(self, api_client):
+        resp = api_client.get("/api/traceroutes/stats/")
+        assert resp.status_code == 401
+
+    def test_stats_includes_by_source_for_two_sources(
+        self,
+        api_client,
+        create_user,
+        create_managed_node,
+        create_observed_node,
+        create_auto_traceroute,
+    ):
+        user = create_user()
+        mn_a = create_managed_node(node_id=111_111_111)
+        mn_b = create_managed_node(node_id=222_222_222)
+        on = create_observed_node()
+        api_client.force_authenticate(user=user)
+
+        create_auto_traceroute(
+            source_node=mn_a, target_node=on, triggered_by=user, status=AutoTraceRoute.STATUS_COMPLETED
+        )
+        create_auto_traceroute(
+            source_node=mn_a, target_node=on, triggered_by=user, status=AutoTraceRoute.STATUS_COMPLETED
+        )
+        create_auto_traceroute(source_node=mn_a, target_node=on, triggered_by=user, status=AutoTraceRoute.STATUS_FAILED)
+        create_auto_traceroute(
+            source_node=mn_b, target_node=on, triggered_by=user, status=AutoTraceRoute.STATUS_PENDING
+        )
+        create_auto_traceroute(source_node=mn_b, target_node=on, triggered_by=user, status=AutoTraceRoute.STATUS_SENT)
+
+        resp = api_client.get("/api/traceroutes/stats/")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "by_source" in data
+        by_internal_id = {row["managed_node_id"]: row for row in data["by_source"]}
+
+        row_a = by_internal_id[str(mn_a.internal_id)]
+        assert row_a["total"] == 3
+        assert row_a["completed"] == 2
+        assert row_a["failed"] == 1
+        assert row_a["success_rate"] == pytest.approx(2 / 3)
+        assert row_a["node_id"] == mn_a.node_id
+        assert row_a["name"] == mn_a.name
+
+        row_b = by_internal_id[str(mn_b.internal_id)]
+        assert row_b["total"] == 2
+        assert row_b["completed"] == 0
+        assert row_b["failed"] == 0
+        assert row_b["success_rate"] is None
+
+    def test_by_source_respects_triggered_at_after(
+        self,
+        api_client,
+        create_user,
+        create_managed_node,
+        create_observed_node,
+        create_auto_traceroute,
+    ):
+        user = create_user()
+        mn = create_managed_node(node_id=333_333_333)
+        on = create_observed_node()
+        api_client.force_authenticate(user=user)
+
+        old_time = timezone.now() - timedelta(days=30)
+        tr_old = create_auto_traceroute(
+            source_node=mn,
+            target_node=on,
+            triggered_by=user,
+            status=AutoTraceRoute.STATUS_COMPLETED,
+        )
+        AutoTraceRoute.objects.filter(pk=tr_old.pk).update(triggered_at=old_time)
+
+        create_auto_traceroute(
+            source_node=mn,
+            target_node=on,
+            triggered_by=user,
+            status=AutoTraceRoute.STATUS_COMPLETED,
+        )
+
+        resp_all = api_client.get("/api/traceroutes/stats/")
+        assert resp_all.status_code == 200
+        rows_all = {r["managed_node_id"]: r for r in resp_all.json()["by_source"]}
+        assert rows_all[str(mn.internal_id)]["total"] == 2
+
+        since = (timezone.now() - timedelta(days=7)).isoformat()
+        resp_filtered = api_client.get("/api/traceroutes/stats/", {"triggered_at_after": since})
+        assert resp_filtered.status_code == 200
+        rows_f = {r["managed_node_id"]: r for r in resp_filtered.json()["by_source"]}
+        assert rows_f[str(mn.internal_id)]["total"] == 1

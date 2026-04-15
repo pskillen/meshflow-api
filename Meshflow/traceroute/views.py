@@ -3,7 +3,7 @@
 from collections import Counter
 from datetime import timedelta
 
-from django.db.models import Count
+from django.db.models import Count, Q
 from django.db.models.functions import TruncDate
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -312,7 +312,7 @@ def heatmap_edges(request):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def traceroute_stats(request):
-    """Traceroute statistics: sources, success/failure, top routers, success over time."""
+    """Traceroute statistics: sources, success/failure, top routers, by source, success over time."""
     from django.utils.dateparse import parse_datetime
 
     from common.mesh_node_helpers import meshtastic_id_to_hex
@@ -367,6 +367,47 @@ def traceroute_stats(request):
         for nid in top_router_node_ids
     ]
 
+    # Per source managed node (same triggered_at window as qs)
+    by_source_rows = list(
+        qs.values("source_node_id").annotate(
+            total=Count("id"),
+            completed=Count("id", filter=Q(status=AutoTraceRoute.STATUS_COMPLETED)),
+            failed=Count("id", filter=Q(status=AutoTraceRoute.STATUS_FAILED)),
+        )
+    )
+    source_internal_ids = [r["source_node_id"] for r in by_source_rows]
+    managed_by_internal_id = {m.internal_id: m for m in ManagedNode.objects.filter(internal_id__in=source_internal_ids)}
+    mesh_node_ids = [m.node_id for m in managed_by_internal_id.values()]
+    observed_short_by_mesh_id = {}
+    if mesh_node_ids:
+        for o in ObservedNode.objects.filter(node_id__in=mesh_node_ids).values("node_id", "short_name"):
+            observed_short_by_mesh_id[o["node_id"]] = o["short_name"]
+
+    by_source = []
+    for row in by_source_rows:
+        mn = managed_by_internal_id.get(row["source_node_id"])
+        if mn is None:
+            continue
+        completed_n = row["completed"]
+        failed_n = row["failed"]
+        finished = completed_n + failed_n
+        success_rate = None if finished == 0 else completed_n / finished
+        short_name = observed_short_by_mesh_id.get(mn.node_id) or mn.name
+        by_source.append(
+            {
+                "managed_node_id": str(mn.internal_id),
+                "node_id": mn.node_id,
+                "node_id_str": meshtastic_id_to_hex(mn.node_id),
+                "name": mn.name,
+                "short_name": short_name,
+                "total": row["total"],
+                "completed": completed_n,
+                "failed": failed_n,
+                "success_rate": success_rate,
+            }
+        )
+    by_source.sort(key=lambda x: (-x["total"], x["node_id_str"]))
+
     # Success over time: last 14 days, from StatsSnapshot or on-demand
     fourteen_days_ago = timezone.now() - timedelta(days=14)
     success_over_time = _get_success_over_time(fourteen_days_ago)
@@ -376,6 +417,7 @@ def traceroute_stats(request):
             "sources": sources,
             "success_failure": success_failure,
             "top_routers": top_routers,
+            "by_source": by_source,
             "success_over_time": success_over_time,
         }
     )

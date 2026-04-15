@@ -4181,7 +4181,8 @@ paths:
       summary: Get traceroute statistics
       description: >
         Returns traceroute stats for the given timeframe: sources (by trigger_type),
-        success/failure counts, top routers (intermediate nodes), and success over time (14d).
+        success/failure counts, top routers (intermediate nodes), per-source managed node
+        totals (with success rate among finished runs only), and success over time (14d).
         All authenticated users.
       tags: [Traceroutes]
       security:
@@ -4201,7 +4202,7 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [sources, success_failure, top_routers, success_over_time]
+                required: [sources, success_failure, top_routers, by_source, success_over_time]
                 properties:
                   sources:
                     type: array
@@ -4234,6 +4235,51 @@ paths:
                           type: string
                         count:
                           type: integer
+                  by_source:
+                    type: array
+                    description: >
+                      One row per source ManagedNode in the filtered period, ordered by total
+                      runs descending. success_rate is completed / (completed + failed) when
+                      that sum is positive; null if there are no finished runs (pending/sent
+                      count toward total only).
+                    items:
+                      type: object
+                      required:
+                        - managed_node_id
+                        - node_id
+                        - node_id_str
+                        - name
+                        - short_name
+                        - total
+                        - completed
+                        - failed
+                        - success_rate
+                      properties:
+                        managed_node_id:
+                          type: string
+                          format: uuid
+                        node_id:
+                          type: integer
+                        node_id_str:
+                          type: string
+                        name:
+                          type: string
+                        short_name:
+                          type: string
+                        total:
+                          type: integer
+                          description: All runs in the period (any status).
+                        completed:
+                          type: integer
+                        failed:
+                          type: integer
+                        success_rate:
+                          type: number
+                          format: float
+                          nullable: true
+                          description: >
+                            Fraction of finished runs that completed successfully.
+                            Denominator is completed + failed only.
                   success_over_time:
                     type: array
                     items:
