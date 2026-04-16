@@ -72,6 +72,16 @@ def upsert_node(
         )
 
 
+def _safe_latest_status(obs):
+    """Return obs.latest_status or None (reverse one-to-one raises RelatedObjectDoesNotExist otherwise)."""
+    if obs is None:
+        return None
+    try:
+        return obs.latest_status
+    except Exception:
+        return None
+
+
 def _get_node_coords(
     node_id: int,
     source_node: ManagedNode,
@@ -89,24 +99,22 @@ def _get_node_coords(
                 source_node.default_location_latitude,
                 source_node.default_location_longitude,
             )
-        obs = observed_by_id.get(node_id)
-        if obs and obs.latest_status and obs.latest_status.latitude is not None:
-            return obs.latest_status.latitude, obs.latest_status.longitude
+        status = _safe_latest_status(observed_by_id.get(node_id))
+        if status is not None and status.latitude is not None:
+            return status.latitude, status.longitude
         return None
 
     # Target node: ObservedNode.latest_status
     if node_id == target_node.node_id:
-        if target_node.latest_status and target_node.latest_status.latitude is not None:
-            return (
-                target_node.latest_status.latitude,
-                target_node.latest_status.longitude,
-            )
+        status = _safe_latest_status(target_node)
+        if status is not None and status.latitude is not None:
+            return status.latitude, status.longitude
         return None
 
     # Intermediate nodes: ObservedNode.latest_status
-    obs = observed_by_id.get(node_id)
-    if obs and obs.latest_status and obs.latest_status.latitude is not None:
-        return obs.latest_status.latitude, obs.latest_status.longitude
+    status = _safe_latest_status(observed_by_id.get(node_id))
+    if status is not None and status.latitude is not None:
+        return status.latitude, status.longitude
     return None
 
 
@@ -154,20 +162,32 @@ def add_traceroute_edges(auto_traceroute: AutoTraceRoute, driver=None, *, quiet:
     Extract edges from route/route_back, upsert nodes, create ROUTED_TO relationships.
     Only creates edges where both endpoints have coordinates.
     When quiet=True, suppresses success logging (for bulk export to avoid clashing with tqdm).
+
+    Route format (Meshtastic): ``route`` and ``route_back`` are relay-only lists of
+    ``{node_id, snr}`` dicts. The source is ``auto_tr.source_node`` (ManagedNode); the
+    target/responder is ``auto_tr.target_node`` (ObservedNode, = packet ``from_node``).
+    Neither endpoint is stored in ``route`` / ``route_back``. This function emits the
+    full chain of edges for both directions, including the synthetic bookends
+    (``source → route[0]``, ``route[-1] → target`` and mirror on the return path),
+    plus a ``source ↔ target`` pair for direct (zero-relay) traceroutes when both
+    endpoints have coordinates.
     """
     driver = driver or get_driver()
 
     auto_tr = (
         AutoTraceRoute.objects.filter(pk=auto_traceroute.pk)
-        .select_related("source_node", "target_node", "target_node__latest_status")
+        .select_related("source_node", "target_node", "target_node__latest_status", "raw_packet")
         .first()
     )
-    if not auto_tr or not auto_tr.route and not auto_tr.route_back:
+    if not auto_tr:
         return
 
-    # Collect all node_ids from route and route_back
+    route = auto_tr.route or []
+    route_back = auto_tr.route_back or []
+
+    # Collect all node_ids from route, route_back, source and target
     node_ids = set()
-    for item in (auto_tr.route or []) + (auto_tr.route_back or []):
+    for item in route + route_back:
         nid = item["node_id"]
         if nid != UNKNOWN_NODE_ID:
             node_ids.add(nid)
@@ -187,20 +207,37 @@ def add_traceroute_edges(auto_traceroute: AutoTraceRoute, driver=None, *, quiet:
             coords[nid] = pos
             names[nid] = _get_node_names(nid, auto_tr.source_node, auto_tr.target_node, observed_by_id)
 
-    # Extract edges (from_id, to_id, snr)
-    edges = []
-    if auto_tr.route:
-        edges.extend(_extract_edges(auto_tr.route))
-    if auto_tr.route_back:
-        edges.extend(_extract_edges(auto_tr.route_back))
+    # Trailing SNR values from the raw packet (firmware sometimes sends one extra
+    # value per direction: the SNR at the responding endpoint for the final hop).
+    # auto_tr.route only carries snr_towards[:len(route)], so pull the bookend
+    # SNR from raw_packet when available.
+    raw_packet = auto_tr.raw_packet
+    forward_target_snr = None
+    return_source_snr = None
+    if raw_packet is not None:
+        snr_towards = raw_packet.snr_towards or []
+        snr_back = raw_packet.snr_back or []
+        if len(snr_towards) > len(route):
+            forward_target_snr = snr_towards[len(route)]
+        if len(snr_back) > len(route_back):
+            return_source_snr = snr_back[len(route_back)]
 
-    # Prepend edge (source -> route[0]) — source is not in route per Meshtastic format
-    if auto_tr.route and len(auto_tr.route) > 0:
-        first_hop = auto_tr.route[0]
-        src_id = auto_tr.source_node.node_id
-        first_id = first_hop["node_id"]
-        if first_id != UNKNOWN_NODE_ID:
-            edges.insert(0, (src_id, first_id, first_hop.get("snr")))
+    source_id = auto_tr.source_node.node_id
+    target_id = auto_tr.target_node.node_id
+
+    # Build full chains (source/target are not in route); reuse _extract_edges which
+    # filters UNKNOWN_NODE_ID and picks SNR from the receiving end of each hop.
+    forward_chain = (
+        [{"node_id": source_id, "snr": None}] + list(route) + [{"node_id": target_id, "snr": forward_target_snr}]
+    )
+    return_chain = (
+        [{"node_id": target_id, "snr": None}] + list(route_back) + [{"node_id": source_id, "snr": return_source_snr}]
+    )
+
+    edges = _extract_edges(forward_chain) + _extract_edges(return_chain)
+
+    # Defensive: drop self-loops (pathological data where source/target collide with a relay).
+    edges = [(a, b, snr) for a, b, snr in edges if a != b]
 
     # Filter: both endpoints must have coords
     valid_edges = [(a, b, snr) for a, b, snr in edges if a in coords and b in coords]
@@ -219,6 +256,8 @@ def add_traceroute_edges(auto_traceroute: AutoTraceRoute, driver=None, *, quiet:
     else:
         triggered_at_str = datetime.utcnow().isoformat() + "Z"
 
+    auto_tr_id = auto_tr.id
+
     with driver.session() as session:
         for a_id, b_id, snr in valid_edges:
             a_str = meshtastic_id_to_hex(a_id)
@@ -228,8 +267,6 @@ def add_traceroute_edges(auto_traceroute: AutoTraceRoute, driver=None, *, quiet:
             a_short, a_long = names.get(a_id, (a_str, a_str))
             b_short, b_long = names.get(b_id, (b_str, b_str))
 
-            # Build relationship props: weight, triggered_at always; snr when present
-            rel_props = "weight: 1, triggered_at: datetime($triggered_at)"
             params = {
                 "a_id": a_id,
                 "a_str": a_str,
@@ -244,20 +281,31 @@ def add_traceroute_edges(auto_traceroute: AutoTraceRoute, driver=None, *, quiet:
                 "b_short_name": b_short,
                 "b_long_name": b_long,
                 "triggered_at": triggered_at_str,
+                "auto_tr_id": auto_tr_id,
+                "snr": float(snr) if snr is not None else None,
             }
-            if snr is not None:
-                rel_props += ", snr: $snr"
-                params["snr"] = float(snr)
 
+            # MERGE keyed on (auto_tr_id, a_id, b_id, triggered_at) so a re-export
+            # of the same AutoTraceRoute is idempotent: the existing relationship
+            # is updated in place rather than duplicated. weight stays at 1 per TR
+            # so bidirectional aggregation in run_heatmap_query continues to count
+            # one unit per distinct traceroute-hop.
             session.run(
-                f"""
-                MERGE (a:MeshNode {{node_id: $a_id}})
+                """
+                MERGE (a:MeshNode {node_id: $a_id})
                 SET a.node_id_str = $a_str, a.latitude = $a_lat, a.longitude = $a_lng,
                     a.short_name = $a_short_name, a.long_name = $a_long_name
-                MERGE (b:MeshNode {{node_id: $b_id}})
+                MERGE (b:MeshNode {node_id: $b_id})
                 SET b.node_id_str = $b_str, b.latitude = $b_lat, b.longitude = $b_lng,
                     b.short_name = $b_short_name, b.long_name = $b_long_name
-                CREATE (a)-[:ROUTED_TO {{{rel_props}}}]->(b)
+                MERGE (a)-[r:ROUTED_TO {
+                    auto_tr_id: $auto_tr_id,
+                    a_id: $a_id,
+                    b_id: $b_id,
+                    triggered_at: datetime($triggered_at)
+                }]->(b)
+                ON CREATE SET r.weight = 1, r.snr = $snr
+                ON MATCH SET r.weight = 1, r.snr = $snr
                 """,
                 **params,
             )
@@ -268,6 +316,29 @@ def add_traceroute_edges(auto_traceroute: AutoTraceRoute, driver=None, *, quiet:
             len(valid_edges),
             auto_tr.id,
         )
+
+
+def clear_all_routed_to_edges(driver=None) -> int:
+    """
+    Delete every ROUTED_TO relationship in Neo4j. Returns the number deleted.
+
+    Intended for bulk backfill workflows (``export_traceroutes_to_neo4j --clear``)
+    where an operator wants a clean slate before re-exporting the full history.
+    Nodes are left untouched - they'll be re-upserted by the subsequent export.
+    """
+    driver = driver or get_driver()
+    logger.warning("clear_all_routed_to_edges: deleting ALL ROUTED_TO relationships")
+    with driver.session() as session:
+        result = session.run("""
+            MATCH ()-[r:ROUTED_TO]->()
+            WITH r
+            DELETE r
+            RETURN count(r) AS deleted
+            """)
+        record = result.single()
+        deleted = record["deleted"] if record else 0
+    logger.info("clear_all_routed_to_edges: deleted %d ROUTED_TO relationships", deleted)
+    return int(deleted or 0)
 
 
 def export_all_traceroutes_to_neo4j(driver=None, batch_size: int = 100):
