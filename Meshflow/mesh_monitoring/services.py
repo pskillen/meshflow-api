@@ -30,10 +30,21 @@ def clear_presence_on_packet_from_node(observed_node: ObservedNode) -> None:
 
     updated = (
         NodePresence.objects.filter(observed_node=observed_node)
-        .filter(Q(verification_started_at__isnull=False) | Q(offline_confirmed_at__isnull=False))
+        .filter(
+            Q(verification_started_at__isnull=False)
+            | Q(offline_confirmed_at__isnull=False)
+            | Q(suspected_offline_at__isnull=False)
+            | Q(last_tr_sent__isnull=False)
+            | Q(last_zero_sources_at__isnull=False)
+            | Q(tr_sent_count__gt=0)
+        )
         .update(
             verification_started_at=None,
             offline_confirmed_at=None,
+            suspected_offline_at=None,
+            last_tr_sent=None,
+            last_zero_sources_at=None,
+            tr_sent_count=0,
         )
     )
     if updated:

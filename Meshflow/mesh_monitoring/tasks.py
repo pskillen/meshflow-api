@@ -3,7 +3,7 @@
 import logging
 from datetime import timedelta
 
-from django.db.models import Min
+from django.db.models import F, Min
 from django.utils import timezone
 
 from asgiref.sync import async_to_sync
@@ -45,6 +45,11 @@ def send_monitoring_traceroute_command(auto_traceroute_id: int) -> None:
     )
     auto_tr.status = AutoTraceRoute.STATUS_SENT
     auto_tr.save(update_fields=["status"])
+    sent_at = timezone.now()
+    NodePresence.objects.filter(pk=auto_tr.target_node_id).update(
+        last_tr_sent=sent_at,
+        tr_sent_count=F("tr_sent_count") + 1,
+    )
     logger.info(
         "mesh_monitoring: sent monitor TR id=%s %s -> %s",
         auto_tr.id,
@@ -56,6 +61,7 @@ def send_monitoring_traceroute_command(auto_traceroute_id: int) -> None:
 def _dispatch_monitoring_round(observed: ObservedNode) -> None:
     sources = select_monitoring_sources(observed, max_sources=3)
     if not sources:
+        NodePresence.objects.filter(pk=observed.pk).update(last_zero_sources_at=timezone.now())
         logger.warning(
             "mesh_monitoring: no monitoring sources for target %s",
             observed.node_id_str,
@@ -110,10 +116,30 @@ def _process_one_observed_node(obs: ObservedNode, now, window: timedelta) -> Non
     silent = last_heard is None or last_heard < now - effective_delta
 
     if not silent:
-        if presence.verification_started_at or presence.offline_confirmed_at:
+        if (
+            presence.verification_started_at
+            or presence.offline_confirmed_at
+            or presence.suspected_offline_at
+            or presence.last_tr_sent
+            or presence.last_zero_sources_at
+            or presence.tr_sent_count
+        ):
             presence.verification_started_at = None
             presence.offline_confirmed_at = None
-            presence.save(update_fields=["verification_started_at", "offline_confirmed_at"])
+            presence.suspected_offline_at = None
+            presence.last_tr_sent = None
+            presence.last_zero_sources_at = None
+            presence.tr_sent_count = 0
+            presence.save(
+                update_fields=[
+                    "verification_started_at",
+                    "offline_confirmed_at",
+                    "suspected_offline_at",
+                    "last_tr_sent",
+                    "last_zero_sources_at",
+                    "tr_sent_count",
+                ],
+            )
         return
 
     if presence.offline_confirmed_at:
@@ -140,5 +166,17 @@ def _process_one_observed_node(obs: ObservedNode, now, window: timedelta) -> Non
         return
 
     presence.verification_started_at = now
-    presence.save(update_fields=["verification_started_at"])
+    presence.suspected_offline_at = now
+    presence.tr_sent_count = 0
+    presence.last_tr_sent = None
+    presence.last_zero_sources_at = None
+    presence.save(
+        update_fields=[
+            "verification_started_at",
+            "suspected_offline_at",
+            "tr_sent_count",
+            "last_tr_sent",
+            "last_zero_sources_at",
+        ],
+    )
     _dispatch_monitoring_round(obs)

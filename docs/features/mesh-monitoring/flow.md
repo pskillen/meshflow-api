@@ -32,7 +32,7 @@ sequenceDiagram
 
   Celery->>DB: load ObservedNode watches NodePresence
   Note over Celery: last_heard older than min offline_after
-  Celery->>DB: set NodePresence.verification_started_at
+  Celery->>DB: set NodePresence.verification_started_at suspected_offline_at reset episode counters
   Celery->>DB: create AutoTraceRoute monitor rows
   loop Up to three sources staggered
     Celery->>Chan: group_send traceroute to source node
@@ -93,3 +93,14 @@ Only users who should receive an alert:
 - Have **verified** Discord notification binding (same rules as `POST .../discord/notifications/test/`).
 
 Implementation details and prefs API: [Discord notifications](../discord/notifications.md). Mesh monitoring does **not** embed Discord HTTP; it calls **`push_notifications.discord`**.
+
+## `NodePresence` observability (ops / debugging)
+
+| Field | When set | Reset |
+|-------|----------|--------|
+| `suspected_offline_at` | Same tick as starting a new verification episode (`verification_started_at`) | When the node is **not silent** (Celery clears), or `clear_presence_on_packet_from_node` runs after a packet advances `last_heard` |
+| `last_tr_sent` | Each time `send_monitoring_traceroute_command` successfully moves a monitoring `AutoTraceRoute` to `sent` | Same reset paths as above |
+| `tr_sent_count` | Incremented on each such send; set to **0** at episode start | Same reset paths; also cleared with presence |
+| `last_zero_sources_at` | When `_dispatch_monitoring_round` finds **no** eligible managed sources | Same reset paths |
+
+These fields are **not** used for suppression or routing logic; they exist for support and tuning (e.g. spotting zero-source offline confirms or TR spam).
