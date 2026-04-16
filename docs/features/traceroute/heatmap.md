@@ -5,16 +5,24 @@ The heatmap visualizes aggregated traceroute traffic between nodes as arcs on a 
 ## Neo4j Schema
 
 - **MeshNode**: Node label with `node_id` (unique), `node_id_str`, `latitude`, `longitude`, `short_name`, `long_name`.
-- **ROUTED_TO**: Relationship from one MeshNode to another. Properties: `weight` (integer, incremented per traceroute), `triggered_at` (datetime), `snr` (float, optional – SNR at receiving node for this hop).
+- **ROUTED_TO**: Relationship from one MeshNode to another. Properties:
+  - `weight` (integer, one per traceroute hop – summed bidirectionally for the heatmap)
+  - `triggered_at` (datetime)
+  - `auto_tr_id`, `a_id`, `b_id` – merge key used for idempotent re-export
+  - `snr` (float, optional – SNR at the receiving node for this hop)
 
 Edges are directional in Neo4j, but the heatmap query aggregates bidirectionally (A→B and B→A are summed). The `snr` property is used by the node-links API for per-node traceroute link visualization.
 
 ## Data Flow
 
-1. When an `AutoTraceRoute` completes, `push_traceroute_to_neo4j` extracts consecutive node pairs (with SNR) from `route` and `route_back`.
-2. **Meshtastic format:** `route` excludes the source (contains `[hop1, hop2, ..., target]`); `route_back` includes the source as the last element `[hop1', ..., source]`. SNR is 1:1 with route indices (SNR at receiving node per firmware PR #4485). A synthetic edge `(source, route[0])` is added in `add_traceroute_edges` so the originating node has outbound links.
-3. For each edge (from_id, to_id), both endpoints must have coordinates (from ManagedNode default_location or ObservedNode latest_status).
-4. Nodes are upserted; `ROUTED_TO` relationships are created with `weight: 1`, `triggered_at`, and `snr` (when present).
+1. When an `AutoTraceRoute` completes, `push_traceroute_to_neo4j` calls `add_traceroute_edges`, which builds two full chains of `{node_id, snr}` entries and emits consecutive pairs.
+2. **Meshtastic format:** `AutoTraceRoute.route` and `AutoTraceRoute.route_back` are **relay-only** lists. Neither the source (`AutoTraceRoute.source_node`, a `ManagedNode`) nor the target/responder (`AutoTraceRoute.target_node`, an `ObservedNode` matching the packet `from_node`) is stored in those lists. SNR is 1:1 with route indices (SNR at receiving node per firmware PR #4485). Firmware sometimes sends one extra trailing value in `snr_towards` / `snr_back`; that is the SNR at the responding endpoint for the final bookend hop and is pulled from the linked `raw_packet` when building the bookend edges.
+3. `add_traceroute_edges` constructs:
+   - Forward chain: `[source, *route, target]` → edges `source → route[0] → … → route[-1] → target`.
+   - Return chain: `[target, *route_back, source]` → edges `target → route_back[0] → … → route_back[-1] → source`.
+   - Direct traceroutes (both route lists empty) collapse to `(source, target)` and `(target, source)` when both endpoints have coordinates.
+4. For each edge, both endpoints must have coordinates (from `ManagedNode.default_location_*` or `ObservedNode.latest_status`).
+5. Nodes are upserted, and each edge is written with `MERGE (a)-[r:ROUTED_TO {auto_tr_id, a_id, b_id, triggered_at}]->(b)`. Re-exporting the same `AutoTraceRoute` therefore updates the existing relationship in place rather than duplicating it.
 
 ## Heatmap-Edges API
 
@@ -66,4 +74,6 @@ The query aggregates `ROUTED_TO` relationships bidirectionally (canonical direct
 
 - **Neo4j**: `NEO4J_URI`, `NEO4J_USER`, `NEO4J_PASSWORD` in settings.
 - **Schema**: `ensure_schema()` creates the `MeshNode.node_id` unique constraint. Run on first use or via migration.
-- **Bulk export**: Use `manage.py export_traceroutes_to_neo4j` to backfill Neo4j from existing completed traceroutes.
+- **Bulk export**: Use `manage.py export_traceroutes_to_neo4j` to backfill Neo4j from existing completed traceroutes. The export is idempotent thanks to the `MERGE` semantics above, so re-runs safely pick up new synthetic edges without double-counting.
+  - `--clear` first deletes every `ROUTED_TO` relationship (nodes are left untouched and re-upserted by the export). Useful when you want a guaranteed clean slate before a full re-export. Prompts for confirmation unless `--yes` is also given.
+  - `--clear` is sync-only; combining it with `--async` raises `CommandError`.
