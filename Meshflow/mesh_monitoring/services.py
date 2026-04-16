@@ -26,17 +26,47 @@ __all__ = [
 
 def clear_presence_on_packet_from_node(observed_node: ObservedNode) -> None:
     """Reset monitoring presence when any packet advances last_heard for this node."""
+    from django.utils import timezone
+
     from .models import NodePresence
 
-    updated = (
-        NodePresence.objects.filter(observed_node=observed_node)
-        .filter(Q(verification_started_at__isnull=False) | Q(offline_confirmed_at__isnull=False))
+    now = timezone.now()
+    base = NodePresence.objects.filter(observed_node=observed_node)
+
+    flag_q = (
+        Q(verification_started_at__isnull=False)
+        | Q(offline_confirmed_at__isnull=False)
+        | Q(suspected_offline_at__isnull=False)
+        | Q(last_tr_sent__isnull=False)
+        | Q(last_zero_sources_at__isnull=False)
+        | Q(tr_sent_count__gt=0)
+        | Q(is_offline=True)
+    )
+
+    cleared_offline = base.filter(offline_confirmed_at__isnull=False).update(
+        verification_started_at=None,
+        offline_confirmed_at=None,
+        suspected_offline_at=None,
+        last_tr_sent=None,
+        last_zero_sources_at=None,
+        tr_sent_count=0,
+        is_offline=False,
+        observed_online_at=now,
+    )
+    cleared_other = (
+        base.filter(flag_q)
+        .filter(offline_confirmed_at__isnull=True)
         .update(
             verification_started_at=None,
             offline_confirmed_at=None,
+            suspected_offline_at=None,
+            last_tr_sent=None,
+            last_zero_sources_at=None,
+            tr_sent_count=0,
+            is_offline=False,
         )
     )
-    if updated:
+    if cleared_offline or cleared_other:
         logger.debug("mesh_monitoring: cleared presence for observed_node %s", observed_node.node_id_str)
 
 
@@ -78,7 +108,19 @@ def on_monitoring_traceroute_completed(auto_tr: AutoTraceRoute) -> None:
         if auto_tr.triggered_at < presence.verification_started_at:
             return
         presence.verification_started_at = None
-        presence.save(update_fields=["verification_started_at"])
+        presence.suspected_offline_at = None
+        presence.last_tr_sent = None
+        presence.last_zero_sources_at = None
+        presence.tr_sent_count = 0
+        presence.save(
+            update_fields=[
+                "verification_started_at",
+                "suspected_offline_at",
+                "last_tr_sent",
+                "last_zero_sources_at",
+                "tr_sent_count",
+            ],
+        )
         logger.info(
             "mesh_monitoring: verification cleared by monitor TR id=%s target=%s",
             auto_tr.id,

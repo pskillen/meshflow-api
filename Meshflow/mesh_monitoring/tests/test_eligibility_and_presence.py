@@ -36,17 +36,43 @@ def test_user_cannot_watch_other_client(create_user, create_observed_node):
 
 
 @pytest.mark.django_db
+def test_clear_presence_on_packet_from_node_clears_observability_only(create_observed_node):
+    obs = create_observed_node()
+    NodePresence.objects.create(
+        observed_node=obs,
+        tr_sent_count=3,
+        suspected_offline_at=timezone.now(),
+        last_tr_sent=timezone.now(),
+        last_zero_sources_at=timezone.now(),
+    )
+    clear_presence_on_packet_from_node(obs)
+    p = NodePresence.objects.get(observed_node=obs)
+    assert p.tr_sent_count == 0
+    assert p.suspected_offline_at is None
+    assert p.last_tr_sent is None
+    assert p.last_zero_sources_at is None
+    assert p.is_offline is False
+
+
+@pytest.mark.django_db
 def test_clear_presence_on_packet_from_node(create_observed_node):
     obs = create_observed_node()
     NodePresence.objects.create(
         observed_node=obs,
         verification_started_at=timezone.now(),
         offline_confirmed_at=timezone.now(),
+        is_offline=True,
     )
     clear_presence_on_packet_from_node(obs)
     p = NodePresence.objects.get(observed_node=obs)
     assert p.verification_started_at is None
     assert p.offline_confirmed_at is None
+    assert p.suspected_offline_at is None
+    assert p.last_tr_sent is None
+    assert p.last_zero_sources_at is None
+    assert p.tr_sent_count == 0
+    assert p.is_offline is False
+    assert p.observed_online_at is not None
 
 
 @pytest.mark.django_db

@@ -12,5 +12,15 @@ class NodeWatchAdmin(admin.ModelAdmin):
 
 @admin.register(NodePresence)
 class NodePresenceAdmin(admin.ModelAdmin):
-    list_display = ("observed_node", "verification_started_at", "offline_confirmed_at")
+    list_display = (
+        "observed_node",
+        "is_offline",
+        "observed_online_at",
+        "verification_started_at",
+        "suspected_offline_at",
+        "offline_confirmed_at",
+        "last_tr_sent",
+        "tr_sent_count",
+        "last_zero_sources_at",
+    )
     raw_id_fields = ("observed_node",)
