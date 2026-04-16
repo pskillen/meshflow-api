@@ -92,6 +92,8 @@ Discord **login** uses the OAuth pair above. **DM notifications** (test message 
 | Variable                               | Default | Description                                                                 | Allowable Values         |
 |----------------------------------------|---------|-----------------------------------------------------------------------------|-------------------------|
 | `MESH_MONITORING_VERIFICATION_SECONDS` | `180`   | After silence triggers verification, max seconds to wait for `last_heard` or a successful monitoring traceroute before confirming offline. | Integer (string)        |
+| `MESH_MONITORING_NOTIFY_VERIFICATION_START` | (unset = **on**) | When unset, mesh monitoring sends a Discord DM when verification (monitor TR) **starts** for a watched node. Set to `0`, `false`, `no`, `off`, or empty to disable; `1` / `true` / `yes` / `on` to enable explicitly. | Boolean-ish string      |
+| `MESH_MONITORING_VERIFICATION_NOTIFY_COOLDOWN_SECONDS` | `3600` | Minimum seconds between verification-start DMs for the same node (repeat episode starts). | Integer (string)        |
 
 ---
 
@@ -145,6 +147,8 @@ Discord **login** uses the OAuth pair above. **DM notifications** (test message 
 ## 8. Mesh monitoring
 
 - **MESH_MONITORING_VERIFICATION_SECONDS**: Verification window (seconds) after `NodePresence.verification_started_at` before marking offline and notifying watchers.
+- **MESH_MONITORING_NOTIFY_VERIFICATION_START**: Discord when monitoring verification starts; unset means enabled, `false` / `0` / `off` / empty disables.
+- **MESH_MONITORING_VERIFICATION_NOTIFY_COOLDOWN_SECONDS**: Cooldown (seconds) between verification-start DMs for the same node (default one hour).
 
 ## 9. Monitoring / Prometheus
 

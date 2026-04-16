@@ -20,6 +20,7 @@ __all__ = [
     "clear_presence_on_packet_from_node",
     "on_monitoring_traceroute_completed",
     "notify_watchers_node_offline",
+    "notify_watchers_verification_started",
     "monitoring_traceroute_succeeded_since",
 ]
 
@@ -41,6 +42,7 @@ def clear_presence_on_packet_from_node(observed_node: ObservedNode) -> None:
         | Q(last_zero_sources_at__isnull=False)
         | Q(tr_sent_count__gt=0)
         | Q(is_offline=True)
+        | Q(last_verification_notify_at__isnull=False)
     )
 
     cleared_offline = base.filter(offline_confirmed_at__isnull=False).update(
@@ -52,6 +54,7 @@ def clear_presence_on_packet_from_node(observed_node: ObservedNode) -> None:
         tr_sent_count=0,
         is_offline=False,
         observed_online_at=now,
+        last_verification_notify_at=None,
     )
     cleared_other = (
         base.filter(flag_q)
@@ -64,6 +67,7 @@ def clear_presence_on_packet_from_node(observed_node: ObservedNode) -> None:
             last_zero_sources_at=None,
             tr_sent_count=0,
             is_offline=False,
+            last_verification_notify_at=None,
         )
     )
     if cleared_offline or cleared_other:
@@ -160,6 +164,50 @@ def notify_watchers_node_offline(observed_node: ObservedNode) -> int:
         except DiscordSendError as e:
             logger.warning(
                 "mesh_monitoring: Discord notify failed user=%s: %s",
+                user.pk,
+                e,
+            )
+    return attempted
+
+
+def notify_watchers_verification_started(observed_node: ObservedNode, silence_threshold_seconds: int) -> int:
+    """
+    DM each distinct watcher that mesh monitoring is starting RF verification (monitor TRs).
+
+    Returns number of send_dm attempts (same semantics as notify_watchers_node_offline).
+    """
+    from django.conf import settings
+    from django.contrib.auth import get_user_model
+
+    from .models import NodeWatch
+
+    User = get_user_model()
+    user_ids = (
+        NodeWatch.objects.filter(observed_node=observed_node, enabled=True).values_list("user_id", flat=True).distinct()
+    )
+    users = User.objects.filter(pk__in=user_ids)
+    text = (
+        f"Meshflow mesh monitoring: starting RF verification (monitoring traceroutes) for node "
+        f"{observed_node.node_id_str} ({observed_node.long_name}). "
+        f"Silence threshold for this watch is {silence_threshold_seconds} seconds."
+    )
+    base_url = (getattr(settings, "FRONTEND_URL", None) or "").strip().rstrip("/")
+    if base_url:
+        text += f"\n\n{base_url}/nodes/{observed_node.node_id}"
+    attempted = 0
+    for user in users:
+        if not user_has_verified_discord_dm_target(user):
+            logger.info(
+                "mesh_monitoring: skip verification-start notify user=%s (Discord not verified)",
+                user.pk,
+            )
+            continue
+        attempted += 1
+        try:
+            send_dm(user.discord_notify_user_id, text)
+        except DiscordSendError as e:
+            logger.warning(
+                "mesh_monitoring: Discord verification-start notify failed user=%s: %s",
                 user.pk,
                 e,
             )

@@ -76,6 +76,18 @@ def test_clear_presence_on_packet_from_node(create_observed_node):
 
 
 @pytest.mark.django_db
+def test_clear_presence_on_packet_from_node_clears_last_verification_notify_at(create_observed_node):
+    obs = create_observed_node()
+    NodePresence.objects.create(
+        observed_node=obs,
+        last_verification_notify_at=timezone.now(),
+    )
+    clear_presence_on_packet_from_node(obs)
+    p = NodePresence.objects.get(observed_node=obs)
+    assert p.last_verification_notify_at is None
+
+
+@pytest.mark.django_db
 def test_suppressed_observed_node_ids(create_observed_node):
     obs = create_observed_node()
     NodePresence.objects.create(observed_node=obs, verification_started_at=timezone.now())

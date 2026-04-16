@@ -22,5 +22,6 @@ class NodePresenceAdmin(admin.ModelAdmin):
         "last_tr_sent",
         "tr_sent_count",
         "last_zero_sources_at",
+        "last_verification_notify_at",
     )
     raw_id_fields = ("observed_node",)
