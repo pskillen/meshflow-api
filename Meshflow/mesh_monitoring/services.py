@@ -132,6 +132,25 @@ def on_monitoring_traceroute_completed(auto_tr: AutoTraceRoute) -> None:
         )
 
 
+def _node_details_url(observed_node: ObservedNode) -> str | None:
+    """Build a Meshflow UI deep link to the node details page, or None if unconfigured."""
+    from django.conf import settings
+
+    base_url = (getattr(settings, "FRONTEND_URL", None) or "").strip().rstrip("/")
+    if not base_url:
+        return None
+    return f"{base_url}/nodes/{observed_node.node_id}"
+
+
+def _format_node_label(observed_node: ObservedNode) -> str:
+    """Human-readable node label: '!aabbccdd SHRT (Long Name)'."""
+    short_name = (observed_node.short_name or "").strip()
+    long_name = observed_node.long_name or ""
+    if short_name:
+        return f"{observed_node.node_id_str} {short_name} ({long_name})"
+    return f"{observed_node.node_id_str} ({long_name})"
+
+
 def notify_watchers_node_offline(observed_node: ObservedNode) -> int:
     """
     DM each distinct watcher with verified Discord settings (deduped by user).
@@ -146,10 +165,10 @@ def notify_watchers_node_offline(observed_node: ObservedNode) -> int:
         NodeWatch.objects.filter(observed_node=observed_node, enabled=True).values_list("user_id", flat=True).distinct()
     )
     users = User.objects.filter(pk__in=user_ids)
-    text = (
-        f"Meshflow mesh monitoring: node {observed_node.node_id_str} "
-        f"({observed_node.long_name}) appears offline after verification."
-    )
+    text = f"Meshflow mesh monitoring: node {_format_node_label(observed_node)} appears offline after verification."
+    url = _node_details_url(observed_node)
+    if url:
+        text += f"\n\n{url}"
     attempted = 0
     for user in users:
         if not user_has_verified_discord_dm_target(user):
@@ -176,7 +195,6 @@ def notify_watchers_verification_started(observed_node: ObservedNode, silence_th
 
     Returns number of send_dm attempts (same semantics as notify_watchers_node_offline).
     """
-    from django.conf import settings
     from django.contrib.auth import get_user_model
 
     from .models import NodeWatch
@@ -188,12 +206,12 @@ def notify_watchers_verification_started(observed_node: ObservedNode, silence_th
     users = User.objects.filter(pk__in=user_ids)
     text = (
         f"Meshflow mesh monitoring: starting RF verification (monitoring traceroutes) for node "
-        f"{observed_node.node_id_str} ({observed_node.long_name}). "
+        f"{_format_node_label(observed_node)}. "
         f"Silence threshold for this watch is {silence_threshold_seconds} seconds."
     )
-    base_url = (getattr(settings, "FRONTEND_URL", None) or "").strip().rstrip("/")
-    if base_url:
-        text += f"\n\n{base_url}/nodes/{observed_node.node_id}"
+    url = _node_details_url(observed_node)
+    if url:
+        text += f"\n\n{url}"
     attempted = 0
     for user in users:
         if not user_has_verified_discord_dm_target(user):

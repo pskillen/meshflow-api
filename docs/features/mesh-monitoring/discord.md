@@ -7,6 +7,8 @@
 - **Who gets a DM:** Users with an **enabled** **`NodeWatch`** on that **`ObservedNode`**, who also have **verified** Discord notification settings (same anti-spam rules as the test endpoint).
 - **Deduping:** If one user has multiple watches on the same node, they should still receive at most **one** alert per offline event (per product design).
 - **Transport:** Server-side **`push_notifications.discord.send_dm`** — no duplicate Discord REST client inside **`mesh_monitoring`**.
+- **Node identity in DMs:** Both the verification-start and offline DMs include **`node_id_str`**, **`short_name`**, and **`long_name`** so watchers can disambiguate nodes with similar long names.
+- **Deep link in DMs:** Both the verification-start and offline DMs append **`{FRONTEND_URL}/nodes/{node_id}`** (decimal **`ObservedNode.node_id`**, consistent with the UI node route) when **`FRONTEND_URL`** is set. **`FRONTEND_URL`** must point at the correct UI for each deploy (pre-prod / prod) so the link lands on the matching stack.
 
 ## Verification-start DMs (#165)
 
