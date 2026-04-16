@@ -10,6 +10,7 @@ from traceroute.neo4j_service import (
     UNKNOWN_NODE_ID,
     _extract_edges,
     add_traceroute_edges,
+    clear_all_routed_to_edges,
     run_heatmap_query,
 )
 
@@ -288,6 +289,87 @@ class TestAddTracerouteEdges:
                 target_hop_snrs.append(kwargs.get("snr"))
         assert target_hop_snrs, "Expected (peer, target) edge to be written"
         assert target_hop_snrs[0] == -1.5
+
+    def test_add_traceroute_edges_uses_merge_with_auto_tr_id(
+        self, create_managed_node, create_observed_node, create_user
+    ):
+        """Edge writes are MERGE-based and include auto_tr_id in params (idempotent by design)."""
+        peer_id = 0xCCCCCCCC
+        _create_observed_with_coords(peer_id, 55.87, -4.25)
+        auto_tr = self._build_auto_tr(
+            create_managed_node,
+            create_observed_node,
+            create_user,
+            route=[{"node_id": peer_id, "snr": -5.0}],
+            route_back=[],
+        )
+
+        mock_driver, mock_session = _mock_driver()
+        with patch("traceroute.neo4j_service.get_driver", return_value=mock_driver):
+            add_traceroute_edges(auto_tr, driver=mock_driver)
+
+        edge_calls = [
+            call for call in mock_session.run.call_args_list if "a_id" in (call[1] or {}) and "b_id" in (call[1] or {})
+        ]
+        assert edge_calls, "Expected at least one edge write"
+        for call in edge_calls:
+            cypher = call[0][0] if call[0] else ""
+            params = call[1] or {}
+            assert "MERGE (a)-[r:ROUTED_TO" in cypher
+            assert "CREATE (a)-[:ROUTED_TO" not in cypher
+            assert "auto_tr_id: $auto_tr_id" in cypher
+            assert params.get("auto_tr_id") == auto_tr.id
+
+    def test_add_traceroute_edges_reexport_does_not_duplicate(
+        self, create_managed_node, create_observed_node, create_user
+    ):
+        """Re-invoking add_traceroute_edges with the same AutoTraceRoute keeps auto_tr_id stable."""
+        peer_id = 0xCCCCCCCC
+        _create_observed_with_coords(peer_id, 55.87, -4.25)
+        auto_tr = self._build_auto_tr(
+            create_managed_node,
+            create_observed_node,
+            create_user,
+            route=[{"node_id": peer_id, "snr": -5.0}],
+            route_back=[],
+        )
+
+        mock_driver, mock_session = _mock_driver()
+        with patch("traceroute.neo4j_service.get_driver", return_value=mock_driver):
+            add_traceroute_edges(auto_tr, driver=mock_driver)
+            add_traceroute_edges(auto_tr, driver=mock_driver)
+
+        edge_calls = [
+            call for call in mock_session.run.call_args_list if "a_id" in (call[1] or {}) and "b_id" in (call[1] or {})
+        ]
+        auto_tr_ids = {(call[1] or {}).get("auto_tr_id") for call in edge_calls}
+        assert auto_tr_ids == {auto_tr.id}, "Second export should reuse the same auto_tr_id"
+        for call in edge_calls:
+            assert "MERGE (a)-[r:ROUTED_TO" in call[0][0]
+
+
+class TestClearAllRoutedToEdges:
+    """Tests for clear_all_routed_to_edges."""
+
+    def test_clear_all_routed_to_edges_runs_delete(self):
+        mock_result = MagicMock()
+        mock_result.single.return_value = {"deleted": 42}
+        mock_session = MagicMock()
+        mock_session.run.return_value = mock_result
+        mock_driver = MagicMock()
+        mock_cm = MagicMock()
+        mock_cm.__enter__.return_value = mock_session
+        mock_cm.__exit__.return_value = False
+        mock_driver.session.return_value = mock_cm
+
+        with patch("traceroute.neo4j_service.get_driver", return_value=mock_driver):
+            deleted = clear_all_routed_to_edges(driver=mock_driver)
+
+        assert deleted == 42
+        assert mock_session.run.call_count == 1
+        cypher = mock_session.run.call_args[0][0]
+        assert "ROUTED_TO" in cypher
+        assert "DELETE r" in cypher
 
 
 @pytest.mark.django_db
