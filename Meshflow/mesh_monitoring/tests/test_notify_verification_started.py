@@ -15,8 +15,15 @@ from mesh_monitoring.models import NodePresence, NodeWatch
 from mesh_monitoring.tasks import process_node_watch_presence, send_monitoring_traceroute_command
 
 
-def test_notify_verification_start_enabled_default_false(monkeypatch):
+def test_notify_verification_start_enabled_default_true_when_unset(monkeypatch):
     monkeypatch.delenv("MESH_MONITORING_NOTIFY_VERIFICATION_START", raising=False)
+    assert notify_verification_start_enabled() is True
+
+
+def test_notify_verification_start_enabled_explicit_off(monkeypatch):
+    monkeypatch.setenv("MESH_MONITORING_NOTIFY_VERIFICATION_START", "false")
+    assert notify_verification_start_enabled() is False
+    monkeypatch.setenv("MESH_MONITORING_NOTIFY_VERIFICATION_START", "0")
     assert notify_verification_start_enabled() is False
 
 
@@ -29,7 +36,7 @@ def test_notify_verification_start_enabled_truthy(monkeypatch):
 
 def test_verification_notify_cooldown_seconds_default(monkeypatch):
     monkeypatch.delenv("MESH_MONITORING_VERIFICATION_NOTIFY_COOLDOWN_SECONDS", raising=False)
-    assert verification_notify_cooldown_seconds() == 21600
+    assert verification_notify_cooldown_seconds() == 3600
 
 
 @pytest.mark.django_db
@@ -94,7 +101,7 @@ def test_verification_start_notify_skipped_when_flag_off(
     create_packet_observation,
 ):
     monkeypatch.setenv("SCHEDULE_TRACEROUTE_SOURCE_RECENCY_SECONDS", "600")
-    monkeypatch.delenv("MESH_MONITORING_NOTIFY_VERIFICATION_START", raising=False)
+    monkeypatch.setenv("MESH_MONITORING_NOTIFY_VERIFICATION_START", "false")
 
     user = create_user()
     obs = create_observed_node(node_id=0xBBCCDDEE, claimed_by=user)
