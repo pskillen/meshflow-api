@@ -50,6 +50,7 @@ sequenceDiagram
 
 **Notes:**
 
+- **`NodePresence.is_offline`** is set together with **`offline_confirmed_at`** when the verification window expires without success; both clear on recovery. **`observed_online_at`** is set when the presence row is first created while the node is not silent, or when recovery clears a prior confirmed-offline state (periodic task sees fresh **`last_heard`**, or **`clear_presence_on_packet_from_node`** after a packet). Episode-only timestamps (**`suspected_offline_at`**, **`last_tr_sent`**, **`last_zero_sources_at`**, **`tr_sent_count`**) are nulled when verification succeeds (TR completion or periodic success) or when the node is heard again.
 - **Stagger:** Multiple sources may use Celery **`countdown`** (e.g. 0s / 30s / 60s) so radios respect spacing (`MONITORING_TRIGGER_MIN_INTERVAL_SEC` / firmware limits).
 - **Stale TR timeout:** Existing `mark_stale_traceroutes_failed` behavior still applies; monitoring logic treats completed/failed outcomes as part of the verification window (see epic design).
 

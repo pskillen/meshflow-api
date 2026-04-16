@@ -16,7 +16,7 @@ This document describes the **intended design** (models, Celery, APIs, and integ
 
 Env: **`MESH_MONITORING_VERIFICATION_SECONDS`** (default `180`) for the verification window after silence.
 
-**Ops:** Django Admin **`NodePresence`** lists **`suspected_offline_at`**, **`last_tr_sent`**, **`tr_sent_count`**, **`last_zero_sources_at`** so you can see verification episodes, TR sends, and “no monitoring sources” events without tailing logs alone. See [flow.md](flow.md) for reset rules.
+**Ops:** Django Admin **`NodePresence`** lists **`is_offline`**, **`observed_online_at`**, **`suspected_offline_at`**, **`last_tr_sent`**, **`tr_sent_count`**, **`last_zero_sources_at`** so you can see confirmed-offline vs verifying, last “happy” time, verification episodes, TR sends, and “no monitoring sources” events without tailing logs alone. See [flow.md](flow.md) for reset rules.
 
 ## Concepts
 

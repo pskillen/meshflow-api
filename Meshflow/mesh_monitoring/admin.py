@@ -14,6 +14,8 @@ class NodeWatchAdmin(admin.ModelAdmin):
 class NodePresenceAdmin(admin.ModelAdmin):
     list_display = (
         "observed_node",
+        "is_offline",
+        "observed_online_at",
         "verification_started_at",
         "suspected_offline_at",
         "offline_confirmed_at",

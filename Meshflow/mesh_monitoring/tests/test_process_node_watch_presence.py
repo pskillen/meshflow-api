@@ -74,6 +74,8 @@ def test_process_node_watch_presence_starts_verification_and_creates_monitor_tr(
     assert presence.tr_sent_count >= 1
     assert presence.last_tr_sent is not None
     assert presence.last_zero_sources_at is None
+    assert presence.is_offline is False
+    assert presence.observed_online_at is None
 
 
 @pytest.mark.django_db
@@ -123,6 +125,10 @@ def test_on_monitoring_traceroute_completed_clears_verification_when_routes_empt
     on_monitoring_traceroute_completed(auto_tr)
     presence = NodePresence.objects.get(observed_node=obs)
     assert presence.verification_started_at is None
+    assert presence.suspected_offline_at is None
+    assert presence.last_tr_sent is None
+    assert presence.last_zero_sources_at is None
+    assert presence.tr_sent_count == 0
 
 
 @pytest.mark.django_db
@@ -187,6 +193,91 @@ def test_process_node_watch_presence_clears_observability_when_node_not_silent(
     assert presence.last_tr_sent is None
     assert presence.last_zero_sources_at is None
     assert presence.tr_sent_count == 0
+    assert presence.is_offline is False
+
+
+@pytest.mark.django_db
+def test_process_node_watch_presence_sets_observed_online_at_when_created_heard(
+    create_user,
+    create_observed_node,
+):
+    """First presence row while last_heard is fresh records observed_online_at."""
+    user = create_user()
+    obs = create_observed_node(node_id=0x66778899, claimed_by=user)
+    obs.last_heard = timezone.now()
+    obs.save(update_fields=["last_heard"])
+    NodeWatch.objects.create(user=user, observed_node=obs, offline_after=3600, enabled=True)
+
+    process_node_watch_presence()
+
+    presence = NodePresence.objects.get(observed_node=obs)
+    assert presence.observed_online_at is not None
+    assert presence.is_offline is False
+    assert presence.verification_started_at is None
+
+
+@pytest.mark.django_db
+def test_process_node_watch_presence_recovery_from_offline_sets_observed_online_at(
+    create_user,
+    create_observed_node,
+):
+    user = create_user()
+    obs = create_observed_node(node_id=0x778899AA, claimed_by=user)
+    obs.last_heard = timezone.now()
+    obs.save(update_fields=["last_heard"])
+    NodeWatch.objects.create(user=user, observed_node=obs, offline_after=60, enabled=True)
+    NodePresence.objects.create(
+        observed_node=obs,
+        offline_confirmed_at=timezone.now() - timedelta(hours=1),
+        is_offline=True,
+    )
+
+    process_node_watch_presence()
+
+    presence = NodePresence.objects.get(observed_node=obs)
+    assert presence.is_offline is False
+    assert presence.offline_confirmed_at is None
+    assert presence.observed_online_at is not None
+
+
+@pytest.mark.django_db
+def test_process_node_watch_presence_offline_confirm_sets_is_offline(
+    monkeypatch,
+    create_user,
+    create_observed_node,
+    create_managed_node,
+    create_packet_observation,
+):
+    monkeypatch.setenv("SCHEDULE_TRACEROUTE_SOURCE_RECENCY_SECONDS", "600")
+
+    user = create_user()
+    obs = create_observed_node(node_id=0x88990011, claimed_by=user)
+    now = timezone.now()
+    obs.last_heard = now - timedelta(minutes=10)
+    obs.save(update_fields=["last_heard"])
+    NodeLatestStatus.objects.create(node=obs, latitude=48.0, longitude=2.0)
+    NodeWatch.objects.create(user=user, observed_node=obs, offline_after=60, enabled=True)
+    vs = now - timedelta(minutes=2)
+    NodePresence.objects.create(observed_node=obs, verification_started_at=vs)
+
+    mn = create_managed_node(
+        allow_auto_traceroute=True,
+        default_location_latitude=48.1,
+        default_location_longitude=2.1,
+    )
+    create_packet_observation(observer=mn)
+
+    monkeypatch.setattr(
+        "mesh_monitoring.tasks.verification_window_seconds",
+        lambda: 1,
+    )
+    with patch("mesh_monitoring.tasks.notify_watchers_node_offline", return_value=0):
+        process_node_watch_presence()
+
+    presence = NodePresence.objects.get(observed_node=obs)
+    assert presence.is_offline is True
+    assert presence.offline_confirmed_at is not None
+    assert presence.verification_started_at is None
 
 
 @pytest.mark.django_db

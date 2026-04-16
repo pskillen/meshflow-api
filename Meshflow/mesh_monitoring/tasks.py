@@ -109,13 +109,20 @@ def _process_one_observed_node(obs: ObservedNode, now, window: timedelta) -> Non
     if eff is None:
         return
 
-    presence, _ = NodePresence.objects.get_or_create(observed_node=obs)
     effective_delta = timedelta(seconds=int(eff))
-
     last_heard = obs.last_heard
     silent = last_heard is None or last_heard < now - effective_delta
 
+    presence, _ = NodePresence.objects.get_or_create(
+        observed_node=obs,
+        defaults={
+            "observed_online_at": now if not silent else None,
+            "is_offline": False,
+        },
+    )
+
     if not silent:
+        had_confirmed_offline = bool(presence.offline_confirmed_at) or presence.is_offline
         if (
             presence.verification_started_at
             or presence.offline_confirmed_at
@@ -123,6 +130,7 @@ def _process_one_observed_node(obs: ObservedNode, now, window: timedelta) -> Non
             or presence.last_tr_sent
             or presence.last_zero_sources_at
             or presence.tr_sent_count
+            or presence.is_offline
         ):
             presence.verification_started_at = None
             presence.offline_confirmed_at = None
@@ -130,16 +138,21 @@ def _process_one_observed_node(obs: ObservedNode, now, window: timedelta) -> Non
             presence.last_tr_sent = None
             presence.last_zero_sources_at = None
             presence.tr_sent_count = 0
-            presence.save(
-                update_fields=[
-                    "verification_started_at",
-                    "offline_confirmed_at",
-                    "suspected_offline_at",
-                    "last_tr_sent",
-                    "last_zero_sources_at",
-                    "tr_sent_count",
-                ],
-            )
+            presence.is_offline = False
+            if had_confirmed_offline:
+                presence.observed_online_at = now
+            update_fields = [
+                "verification_started_at",
+                "offline_confirmed_at",
+                "suspected_offline_at",
+                "last_tr_sent",
+                "last_zero_sources_at",
+                "tr_sent_count",
+                "is_offline",
+            ]
+            if had_confirmed_offline:
+                update_fields.append("observed_online_at")
+            presence.save(update_fields=update_fields)
         return
 
     if presence.offline_confirmed_at:
@@ -155,13 +168,28 @@ def _process_one_observed_node(obs: ObservedNode, now, window: timedelta) -> Non
 
         if success:
             presence.verification_started_at = None
-            presence.save(update_fields=["verification_started_at"])
+            presence.suspected_offline_at = None
+            presence.last_tr_sent = None
+            presence.last_zero_sources_at = None
+            presence.tr_sent_count = 0
+            presence.save(
+                update_fields=[
+                    "verification_started_at",
+                    "suspected_offline_at",
+                    "last_tr_sent",
+                    "last_zero_sources_at",
+                    "tr_sent_count",
+                ],
+            )
             return
 
         if now >= vs + window:
             presence.offline_confirmed_at = now
             presence.verification_started_at = None
-            presence.save(update_fields=["offline_confirmed_at", "verification_started_at"])
+            presence.is_offline = True
+            presence.save(
+                update_fields=["offline_confirmed_at", "verification_started_at", "is_offline"],
+            )
             notify_watchers_node_offline(obs)
         return
 

@@ -89,6 +89,21 @@ class NodePresence(models.Model):
         blank=True,
         help_text=_("When dispatch last found no eligible managed sources for monitoring TR."),
     )
+    is_offline = models.BooleanField(
+        default=False,
+        help_text=_(
+            "True after mesh monitoring confirms the node offline (verification window expired). "
+            "Cleared when the node is heard again."
+        ),
+    )
+    observed_online_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text=_(
+            "When mesh monitoring last treated the node as online: initial create while heard, "
+            "or recovery after confirmed offline."
+        ),
+    )
 
     class Meta:
         verbose_name = _("Node presence (mesh monitoring)")
