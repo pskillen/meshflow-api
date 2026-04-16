@@ -72,6 +72,16 @@ def upsert_node(
         )
 
 
+def _safe_latest_status(obs):
+    """Return obs.latest_status or None (reverse one-to-one raises RelatedObjectDoesNotExist otherwise)."""
+    if obs is None:
+        return None
+    try:
+        return obs.latest_status
+    except Exception:
+        return None
+
+
 def _get_node_coords(
     node_id: int,
     source_node: ManagedNode,
@@ -89,24 +99,22 @@ def _get_node_coords(
                 source_node.default_location_latitude,
                 source_node.default_location_longitude,
             )
-        obs = observed_by_id.get(node_id)
-        if obs and obs.latest_status and obs.latest_status.latitude is not None:
-            return obs.latest_status.latitude, obs.latest_status.longitude
+        status = _safe_latest_status(observed_by_id.get(node_id))
+        if status is not None and status.latitude is not None:
+            return status.latitude, status.longitude
         return None
 
     # Target node: ObservedNode.latest_status
     if node_id == target_node.node_id:
-        if target_node.latest_status and target_node.latest_status.latitude is not None:
-            return (
-                target_node.latest_status.latitude,
-                target_node.latest_status.longitude,
-            )
+        status = _safe_latest_status(target_node)
+        if status is not None and status.latitude is not None:
+            return status.latitude, status.longitude
         return None
 
     # Intermediate nodes: ObservedNode.latest_status
-    obs = observed_by_id.get(node_id)
-    if obs and obs.latest_status and obs.latest_status.latitude is not None:
-        return obs.latest_status.latitude, obs.latest_status.longitude
+    status = _safe_latest_status(observed_by_id.get(node_id))
+    if status is not None and status.latitude is not None:
+        return status.latitude, status.longitude
     return None
 
 
@@ -154,20 +162,32 @@ def add_traceroute_edges(auto_traceroute: AutoTraceRoute, driver=None, *, quiet:
     Extract edges from route/route_back, upsert nodes, create ROUTED_TO relationships.
     Only creates edges where both endpoints have coordinates.
     When quiet=True, suppresses success logging (for bulk export to avoid clashing with tqdm).
+
+    Route format (Meshtastic): ``route`` and ``route_back`` are relay-only lists of
+    ``{node_id, snr}`` dicts. The source is ``auto_tr.source_node`` (ManagedNode); the
+    target/responder is ``auto_tr.target_node`` (ObservedNode, = packet ``from_node``).
+    Neither endpoint is stored in ``route`` / ``route_back``. This function emits the
+    full chain of edges for both directions, including the synthetic bookends
+    (``source → route[0]``, ``route[-1] → target`` and mirror on the return path),
+    plus a ``source ↔ target`` pair for direct (zero-relay) traceroutes when both
+    endpoints have coordinates.
     """
     driver = driver or get_driver()
 
     auto_tr = (
         AutoTraceRoute.objects.filter(pk=auto_traceroute.pk)
-        .select_related("source_node", "target_node", "target_node__latest_status")
+        .select_related("source_node", "target_node", "target_node__latest_status", "raw_packet")
         .first()
     )
-    if not auto_tr or not auto_tr.route and not auto_tr.route_back:
+    if not auto_tr:
         return
 
-    # Collect all node_ids from route and route_back
+    route = auto_tr.route or []
+    route_back = auto_tr.route_back or []
+
+    # Collect all node_ids from route, route_back, source and target
     node_ids = set()
-    for item in (auto_tr.route or []) + (auto_tr.route_back or []):
+    for item in route + route_back:
         nid = item["node_id"]
         if nid != UNKNOWN_NODE_ID:
             node_ids.add(nid)
@@ -187,20 +207,37 @@ def add_traceroute_edges(auto_traceroute: AutoTraceRoute, driver=None, *, quiet:
             coords[nid] = pos
             names[nid] = _get_node_names(nid, auto_tr.source_node, auto_tr.target_node, observed_by_id)
 
-    # Extract edges (from_id, to_id, snr)
-    edges = []
-    if auto_tr.route:
-        edges.extend(_extract_edges(auto_tr.route))
-    if auto_tr.route_back:
-        edges.extend(_extract_edges(auto_tr.route_back))
+    # Trailing SNR values from the raw packet (firmware sometimes sends one extra
+    # value per direction: the SNR at the responding endpoint for the final hop).
+    # auto_tr.route only carries snr_towards[:len(route)], so pull the bookend
+    # SNR from raw_packet when available.
+    raw_packet = auto_tr.raw_packet
+    forward_target_snr = None
+    return_source_snr = None
+    if raw_packet is not None:
+        snr_towards = raw_packet.snr_towards or []
+        snr_back = raw_packet.snr_back or []
+        if len(snr_towards) > len(route):
+            forward_target_snr = snr_towards[len(route)]
+        if len(snr_back) > len(route_back):
+            return_source_snr = snr_back[len(route_back)]
 
-    # Prepend edge (source -> route[0]) — source is not in route per Meshtastic format
-    if auto_tr.route and len(auto_tr.route) > 0:
-        first_hop = auto_tr.route[0]
-        src_id = auto_tr.source_node.node_id
-        first_id = first_hop["node_id"]
-        if first_id != UNKNOWN_NODE_ID:
-            edges.insert(0, (src_id, first_id, first_hop.get("snr")))
+    source_id = auto_tr.source_node.node_id
+    target_id = auto_tr.target_node.node_id
+
+    # Build full chains (source/target are not in route); reuse _extract_edges which
+    # filters UNKNOWN_NODE_ID and picks SNR from the receiving end of each hop.
+    forward_chain = (
+        [{"node_id": source_id, "snr": None}] + list(route) + [{"node_id": target_id, "snr": forward_target_snr}]
+    )
+    return_chain = (
+        [{"node_id": target_id, "snr": None}] + list(route_back) + [{"node_id": source_id, "snr": return_source_snr}]
+    )
+
+    edges = _extract_edges(forward_chain) + _extract_edges(return_chain)
+
+    # Defensive: drop self-loops (pathological data where source/target collide with a relay).
+    edges = [(a, b, snr) for a, b, snr in edges if a != b]
 
     # Filter: both endpoints must have coords
     valid_edges = [(a, b, snr) for a, b, snr in edges if a in coords and b in coords]
