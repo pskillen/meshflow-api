@@ -13,10 +13,18 @@ from channels.layers import get_channel_layer
 from nodes.models import ObservedNode
 from traceroute.models import AutoTraceRoute
 
-from .constants import verification_window_seconds
+from .constants import (
+    notify_verification_start_enabled,
+    verification_notify_cooldown_seconds,
+    verification_window_seconds,
+)
 from .models import NodePresence, NodeWatch
 from .selection import select_monitoring_sources
-from .services import monitoring_traceroute_succeeded_since, notify_watchers_node_offline
+from .services import (
+    monitoring_traceroute_succeeded_since,
+    notify_watchers_node_offline,
+    notify_watchers_verification_started,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -131,6 +139,7 @@ def _process_one_observed_node(obs: ObservedNode, now, window: timedelta) -> Non
             or presence.last_zero_sources_at
             or presence.tr_sent_count
             or presence.is_offline
+            or presence.last_verification_notify_at
         ):
             presence.verification_started_at = None
             presence.offline_confirmed_at = None
@@ -139,6 +148,7 @@ def _process_one_observed_node(obs: ObservedNode, now, window: timedelta) -> Non
             presence.last_zero_sources_at = None
             presence.tr_sent_count = 0
             presence.is_offline = False
+            presence.last_verification_notify_at = None
             if had_confirmed_offline:
                 presence.observed_online_at = now
             update_fields = [
@@ -149,6 +159,7 @@ def _process_one_observed_node(obs: ObservedNode, now, window: timedelta) -> Non
                 "last_zero_sources_at",
                 "tr_sent_count",
                 "is_offline",
+                "last_verification_notify_at",
             ]
             if had_confirmed_offline:
                 update_fields.append("observed_online_at")
@@ -207,4 +218,12 @@ def _process_one_observed_node(obs: ObservedNode, now, window: timedelta) -> Non
             "last_zero_sources_at",
         ],
     )
+    if notify_verification_start_enabled():
+        cooldown_td = timedelta(seconds=verification_notify_cooldown_seconds())
+        last_nv = presence.last_verification_notify_at
+        if last_nv is None or (now - last_nv) >= cooldown_td:
+            attempted = notify_watchers_verification_started(obs, int(eff))
+            if attempted > 0:
+                presence.last_verification_notify_at = now
+                presence.save(update_fields=["last_verification_notify_at"])
     _dispatch_monitoring_round(obs)

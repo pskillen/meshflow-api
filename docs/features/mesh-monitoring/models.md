@@ -51,6 +51,7 @@ These fields describe the **active** silence → TR episode. They are cleared wh
 |-------|------|---------|
 | **`is_offline`** | bool | **`True`** when mesh monitoring has **confirmed** the node offline (set together with **`offline_confirmed_at`**). **`False`** when idle, verifying, or after recovery. Mirrors “are we in the offline_confirmed state?” for simple admin and queries. |
 | **`observed_online_at`** | datetime, null | Last time monitoring recorded the node as **online** for this purpose: **(1)** row **created** while the node was **not silent**, or **(2)** recovery after **confirmed** offline (periodic task sees fresh `last_heard`, or packet path clears presence after offline). Not updated on every successful verification alone if the node was never confirmed offline. |
+| **`last_verification_notify_at`** | datetime, null | When a **verification-start** Discord DM was last attempted (optional feature; see [discord.md](discord.md)). Used with env cooldown to limit repeat DMs. Cleared with other presence state when the node is heard again. |
 
 ---
 

@@ -104,6 +104,14 @@ class NodePresence(models.Model):
             "or recovery after confirmed offline."
         ),
     )
+    last_verification_notify_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text=_(
+            "When mesh monitoring last sent a Discord DM that verification (monitor TR) had started, "
+            "for cooldown against notify spam."
+        ),
+    )
 
     class Meta:
         verbose_name = _("Node presence (mesh monitoring)")
