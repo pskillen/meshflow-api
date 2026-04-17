@@ -4,8 +4,9 @@ from django.utils.translation import gettext_lazy as _
 
 from rest_framework import serializers
 
+from mesh_monitoring.constants import DEFAULT_OFFLINE_AFTER_SECONDS
 from mesh_monitoring.eligibility import user_can_watch
-from mesh_monitoring.models import NodeWatch
+from mesh_monitoring.models import NodePresence, NodeWatch
 from nodes.models import ObservedNode
 
 
@@ -14,6 +15,7 @@ class ObservedNodeWatchSummarySerializer(serializers.ModelSerializer):
 
     monitoring_verification_started_at = serializers.SerializerMethodField()
     monitoring_offline_confirmed_at = serializers.SerializerMethodField()
+    offline_after = serializers.SerializerMethodField()
 
     class Meta:
         model = ObservedNode
@@ -22,6 +24,7 @@ class ObservedNodeWatchSummarySerializer(serializers.ModelSerializer):
             "node_id_str",
             "long_name",
             "last_heard",
+            "offline_after",
             "monitoring_verification_started_at",
             "monitoring_offline_confirmed_at",
         ]
@@ -38,9 +41,29 @@ class ObservedNodeWatchSummarySerializer(serializers.ModelSerializer):
             return None
         return rel.offline_confirmed_at
 
+    def get_offline_after(self, obj):
+        rel = getattr(obj, "mesh_presence", None)
+        if rel is None:
+            return DEFAULT_OFFLINE_AFTER_SECONDS
+        return rel.offline_after
+
+
+class NodePresenceOfflineAfterSerializer(serializers.ModelSerializer):
+    """PATCH body for NodePresence.offline_after (node-level silence threshold)."""
+
+    class Meta:
+        model = NodePresence
+        fields = ["offline_after"]
+
+    def validate_offline_after(self, value):
+        if value is not None and value < 1:
+            raise serializers.ValidationError(_("offline_after must be at least 1 second."))
+        return value
+
 
 class NodeWatchSerializer(serializers.ModelSerializer):
     observed_node = ObservedNodeWatchSummarySerializer(read_only=True)
+    offline_after = serializers.SerializerMethodField()
     observed_node_id = serializers.PrimaryKeyRelatedField(
         queryset=ObservedNode.objects.all(),
         source="observed_node",
@@ -58,7 +81,7 @@ class NodeWatchSerializer(serializers.ModelSerializer):
             "enabled",
             "created_at",
         ]
-        read_only_fields = ["id", "observed_node", "created_at"]
+        read_only_fields = ["id", "observed_node", "offline_after", "created_at"]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -86,7 +109,8 @@ class NodeWatchSerializer(serializers.ModelSerializer):
                 )
         return attrs
 
-    def validate_offline_after(self, value):
-        if value is not None and value < 1:
-            raise serializers.ValidationError(_("offline_after must be at least 1 second."))
-        return value
+    def get_offline_after(self, obj):
+        rel = getattr(obj.observed_node, "mesh_presence", None)
+        if rel is None:
+            return DEFAULT_OFFLINE_AFTER_SECONDS
+        return rel.offline_after

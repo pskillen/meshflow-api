@@ -8,8 +8,8 @@ import pytest
 
 import nodes.tests.conftest  # noqa: F401
 from common.mesh_node_helpers import meshtastic_id_to_hex
-from mesh_monitoring.models import NodeWatch
 from mesh_monitoring.services import notify_watchers_node_offline, notify_watchers_verification_started
+from mesh_monitoring.tests.conftest import create_watch_with_offline_threshold
 
 
 @pytest.mark.django_db
@@ -23,7 +23,7 @@ def test_offline_dm_includes_short_name_and_deep_link(create_user, create_observ
         short_name="MLNN",
         claimed_by=user,
     )
-    NodeWatch.objects.create(user=user, observed_node=obs, offline_after=60, enabled=True)
+    create_watch_with_offline_threshold(user=user, observed_node=obs, offline_after=60)
 
     with override_settings(FRONTEND_URL="https://mesh.example/"):
         with patch("mesh_monitoring.services.user_has_verified_discord_dm_target", return_value=True):
@@ -51,7 +51,7 @@ def test_offline_dm_omits_url_when_frontend_unset(create_user, create_observed_n
         short_name="ANOD",
         claimed_by=user,
     )
-    NodeWatch.objects.create(user=user, observed_node=obs, offline_after=60, enabled=True)
+    create_watch_with_offline_threshold(user=user, observed_node=obs, offline_after=60)
 
     with override_settings(FRONTEND_URL=""):
         with patch("mesh_monitoring.services.user_has_verified_discord_dm_target", return_value=True):
@@ -74,7 +74,7 @@ def test_verification_start_dm_includes_short_name_and_deep_link(create_user, cr
         short_name="VFYM",
         claimed_by=user,
     )
-    NodeWatch.objects.create(user=user, observed_node=obs, offline_after=90, enabled=True)
+    create_watch_with_offline_threshold(user=user, observed_node=obs, offline_after=90)
 
     with override_settings(FRONTEND_URL="https://mesh.example"):
         with patch("mesh_monitoring.services.user_has_verified_discord_dm_target", return_value=True):

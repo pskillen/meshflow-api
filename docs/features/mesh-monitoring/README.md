@@ -12,6 +12,7 @@ This document describes the **intended design** (models, Celery, APIs, and integ
 | Verified Discord DMs (prefs, test, `push_notifications.discord`) | Shipped (`users` + `push_notifications`) |
 | Django app **`mesh_monitoring`** (`NodeWatch`, `NodePresence`), Celery **`process_node_watch_presence`**, `AutoTraceRoute.trigger_type=monitor`, hooks in **`packets`** + **`traceroute.target_selection`** | **Shipped** (phase 03b) |
 | Watch **REST** CRUD | **`GET/POST /api/monitoring/watches/`**, **`GET/PATCH/PUT/DELETE …/watches/{id}/`** — authenticated; see **`openapi.yaml`** (`Mesh Monitoring` tag) |
+| Node-level **`offline_after`** | **`GET/PATCH /api/monitoring/nodes/{internal_id}/offline-after/`** — staff or claim owner may PATCH |
 | **UI** (My Nodes watch toggles) | **meshtastic-bot-ui** My Nodes page + `meshtastic-api` client (phase 04) |
 
 Env: **`MESH_MONITORING_VERIFICATION_SECONDS`** (default `180`) for the verification window after silence.
@@ -26,7 +27,7 @@ A node is **watched** when there is at least one **`NodeWatch`** row: a user has
 
 - **Per-user:** Each watch is `(user, observed_node)` with a **unique** constraint.
 - **Eligibility** (who may create a watch): the user **claims** the node (`observed_node.claimed_by == user`) **or** the node’s **role** is in **`nodes.constants.INFRASTRUCTURE_ROLES`** (routers/repeaters/etc., shared with other product rules).
-- **Silence threshold:** Each watch has **`offline_after`** (e.g. default 2 hours). If several users watch the same node, the effective threshold is the **minimum** `offline_after` among **enabled** watches — one shared silence window per observed node.
+- **Silence threshold:** **`offline_after`** is stored once per observed node on **`NodePresence`** (seconds without **`last_heard`** before verification may start; default **6 hours** / 21600 s). Staff or the **claim owner** may edit it via **`GET/PATCH /api/monitoring/nodes/{internal_id}/offline-after/`**. **`NodeWatch`** responses still expose **`offline_after`** (read-only) for convenience.
 
 ### How watching works at runtime
 

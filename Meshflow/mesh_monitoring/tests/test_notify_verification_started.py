@@ -11,8 +11,9 @@ import pytest
 import nodes.tests.conftest  # noqa: F401
 import packets.tests.conftest  # noqa: F401
 from mesh_monitoring.constants import notify_verification_start_enabled, verification_notify_cooldown_seconds
-from mesh_monitoring.models import NodePresence, NodeWatch
+from mesh_monitoring.models import NodePresence
 from mesh_monitoring.tasks import process_node_watch_presence, send_monitoring_traceroute_command
+from mesh_monitoring.tests.conftest import create_watch_with_offline_threshold
 
 
 def test_notify_verification_start_enabled_default_true_when_unset(monkeypatch):
@@ -54,7 +55,7 @@ def test_verification_start_notify_happy_path(
     obs = create_observed_node(node_id=0xAABBCCDD, claimed_by=user)
     obs.last_heard = timezone.now() - timedelta(seconds=120)
     obs.save(update_fields=["last_heard"])
-    NodeWatch.objects.create(user=user, observed_node=obs, offline_after=60, enabled=True)
+    create_watch_with_offline_threshold(user=user, observed_node=obs, offline_after=60)
 
     mn = create_managed_node(
         allow_auto_traceroute=True,
@@ -107,7 +108,7 @@ def test_verification_start_notify_skipped_when_flag_off(
     obs = create_observed_node(node_id=0xBBCCDDEE, claimed_by=user)
     obs.last_heard = timezone.now() - timedelta(seconds=120)
     obs.save(update_fields=["last_heard"])
-    NodeWatch.objects.create(user=user, observed_node=obs, offline_after=60, enabled=True)
+    create_watch_with_offline_threshold(user=user, observed_node=obs, offline_after=60)
     mn = create_managed_node(
         allow_auto_traceroute=True,
         default_location_latitude=48.0,
@@ -153,9 +154,8 @@ def test_verification_start_notify_respects_cooldown(
     obs = create_observed_node(node_id=0xCCDDEEFF, claimed_by=user)
     obs.last_heard = timezone.now() - timedelta(seconds=120)
     obs.save(update_fields=["last_heard"])
-    NodeWatch.objects.create(user=user, observed_node=obs, offline_after=60, enabled=True)
-    NodePresence.objects.create(
-        observed_node=obs,
+    create_watch_with_offline_threshold(user=user, observed_node=obs, offline_after=60)
+    NodePresence.objects.filter(observed_node=obs).update(
         last_verification_notify_at=timezone.now() - timedelta(minutes=1),
     )
     mn = create_managed_node(
@@ -196,9 +196,8 @@ def test_not_silent_clears_last_verification_notify_at(
     obs = create_observed_node(node_id=0xDDEEFF00, claimed_by=user)
     obs.last_heard = timezone.now()
     obs.save(update_fields=["last_heard"])
-    NodeWatch.objects.create(user=user, observed_node=obs, offline_after=60, enabled=True)
-    NodePresence.objects.create(
-        observed_node=obs,
+    create_watch_with_offline_threshold(user=user, observed_node=obs, offline_after=60)
+    NodePresence.objects.filter(observed_node=obs).update(
         last_verification_notify_at=timezone.now() - timedelta(hours=1),
         verification_started_at=timezone.now() - timedelta(minutes=5),
     )

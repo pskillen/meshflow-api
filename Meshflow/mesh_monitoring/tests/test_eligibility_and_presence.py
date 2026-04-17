@@ -7,9 +7,10 @@ import pytest
 
 import nodes.tests.conftest  # noqa: F401
 from mesh_monitoring.eligibility import user_can_watch
-from mesh_monitoring.models import NodePresence, NodeWatch
+from mesh_monitoring.models import NodePresence
 from mesh_monitoring.services import clear_presence_on_packet_from_node
 from mesh_monitoring.suppression import suppressed_observed_node_ids
+from mesh_monitoring.tests.conftest import create_watch_with_offline_threshold
 from nodes.constants import INFRASTRUCTURE_ROLES
 from nodes.models import RoleSource
 
@@ -100,4 +101,4 @@ def test_nodewatch_save_validates_eligibility(create_user, create_observed_node)
     user = create_user()
     obs = create_observed_node(role=RoleSource.CLIENT, claimed_by=None)
     with pytest.raises(ValidationError):
-        NodeWatch.objects.create(user=user, observed_node=obs, offline_after=60, enabled=True)
+        create_watch_with_offline_threshold(user=user, observed_node=obs, offline_after=60)

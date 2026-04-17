@@ -2,6 +2,9 @@
 
 import os
 
+# Default silence threshold before verification may start (6 hours).
+DEFAULT_OFFLINE_AFTER_SECONDS = 21600
+
 # Align with STALE_TR_TIMEOUT_SECONDS / verification window in epic (~3 minutes).
 DEFAULT_VERIFICATION_WINDOW_SECONDS = 180
 

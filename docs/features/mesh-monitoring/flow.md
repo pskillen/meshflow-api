@@ -31,7 +31,7 @@ sequenceDiagram
   participant Disc as push_notifications_discord
 
   Celery->>DB: load ObservedNode watches NodePresence
-  Note over Celery: last_heard older than min offline_after
+  Note over Celery: last_heard older than NodePresence.offline_after
   Celery->>DB: set NodePresence.verification_started_at suspected_offline_at reset episode counters
   Celery->>DB: create AutoTraceRoute monitor rows
   loop Up to three sources staggered
@@ -61,7 +61,7 @@ flowchart TD
   start[Periodic_task_tick]
   start --> hasWatch{Any_enabled_NodeWatch_for_node}
   hasWatch -->|no| skip[Skip_node]
-  hasWatch -->|yes| effThreshold[Effective_threshold equals min offline_after]
+  hasWatch -->|yes| effThreshold[Threshold_is_NodePresence_offline_after]
   effThreshold --> stale{last_heard_null_or_before_now_minus_threshold}
   stale -->|no| online[State_online_or_idle]
   stale -->|yes| checkPresence{Already_offline_confirmed}

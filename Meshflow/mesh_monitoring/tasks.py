@@ -3,7 +3,7 @@
 import logging
 from datetime import timedelta
 
-from django.db.models import F, Min
+from django.db.models import F
 from django.utils import timezone
 
 from asgiref.sync import async_to_sync
@@ -14,6 +14,7 @@ from nodes.models import ObservedNode
 from traceroute.models import AutoTraceRoute
 
 from .constants import (
+    DEFAULT_OFFLINE_AFTER_SECONDS,
     notify_verification_start_enabled,
     verification_notify_cooldown_seconds,
     verification_window_seconds,
@@ -113,9 +114,11 @@ def process_node_watch_presence() -> dict:
 
 
 def _process_one_observed_node(obs: ObservedNode, now, window: timedelta) -> None:
-    eff = NodeWatch.objects.filter(observed_node=obs, enabled=True).aggregate(m=Min("offline_after"))["m"]
-    if eff is None:
+    if not NodeWatch.objects.filter(observed_node=obs, enabled=True).exists():
         return
+
+    presence_row = NodePresence.objects.filter(pk=obs.pk).first()
+    eff = presence_row.offline_after if presence_row else DEFAULT_OFFLINE_AFTER_SECONDS
 
     effective_delta = timedelta(seconds=int(eff))
     last_heard = obs.last_heard
@@ -128,6 +131,7 @@ def _process_one_observed_node(obs: ObservedNode, now, window: timedelta) -> Non
             "is_offline": False,
         },
     )
+    eff = presence.offline_after
 
     if not silent:
         had_confirmed_offline = bool(presence.offline_confirmed_at) or presence.is_offline
