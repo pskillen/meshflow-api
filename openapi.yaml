@@ -825,6 +825,10 @@ components:
           format: date-time
           nullable: true
           description: Present when mesh monitoring has confirmed offline after failed verification.
+        offline_after:
+          type: integer
+          description: >
+            Node-level silence threshold (seconds); stored on NodePresence. Duplicated here for convenience.
 
     NodeWatch:
       type: object
@@ -835,7 +839,10 @@ components:
           $ref: '#/components/schemas/ObservedNodeWatchSummary'
         offline_after:
           type: integer
-          description: Seconds without packets (last_heard) before verification may start.
+          readOnly: true
+          description: >
+            Node-level silence threshold (seconds without last_heard before verification may start);
+            same value as observed_node.offline_after. Edit via PATCH /monitoring/nodes/{id}/offline-after/.
         enabled:
           type: boolean
         created_at:
@@ -850,10 +857,6 @@ components:
           type: string
           format: uuid
           description: Target ObservedNode primary key (internal_id).
-        offline_after:
-          type: integer
-          minimum: 1
-          default: 7200
         enabled:
           type: boolean
           default: true
@@ -861,11 +864,26 @@ components:
     NodeWatchUpdate:
       type: object
       properties:
+        enabled:
+          type: boolean
+
+    NodeMonitoringOfflineAfter:
+      type: object
+      properties:
+        offline_after:
+          type: integer
+          description: Seconds without packets (last_heard) before verification may start.
+        editable:
+          type: boolean
+          description: Whether the current user may PATCH this value (staff or claim owner).
+
+    NodeMonitoringOfflineAfterPatch:
+      type: object
+      properties:
         offline_after:
           type: integer
           minimum: 1
-        enabled:
-          type: boolean
+      required: [offline_after]
 
     ObservedNodeEnvironmentSettingsPatch:
       type: object
@@ -4595,6 +4613,60 @@ paths:
                 $ref: '#/components/schemas/AutoTraceRoute'
         '404':
           description: Not found
+
+  /monitoring/nodes/{observed_node_id}/offline-after/:
+    parameters:
+      - name: observed_node_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+        description: ObservedNode primary key (internal_id)
+    get:
+      summary: Get node-level mesh monitoring silence threshold
+      tags: [Mesh Monitoring]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Current threshold and whether the user may edit it
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NodeMonitoringOfflineAfter'
+        '401':
+          description: Unauthorized
+        '404':
+          description: Observed node not found
+    patch:
+      summary: Update node-level silence threshold (NodePresence.offline_after)
+      description: >
+        Allowed for staff or the user who has claimed the observed node (claimed_by).
+      tags: [Mesh Monitoring]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NodeMonitoringOfflineAfterPatch'
+      responses:
+        '200':
+          description: Updated threshold
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NodeMonitoringOfflineAfter'
+        '400':
+          description: Validation error
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden (not claim owner or staff)
+        '404':
+          description: Observed node not found
 
   /monitoring/watches/:
     get:

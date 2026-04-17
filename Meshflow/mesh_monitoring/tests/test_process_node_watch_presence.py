@@ -12,6 +12,7 @@ import packets.tests.conftest  # noqa: F401
 from mesh_monitoring.models import NodePresence, NodeWatch
 from mesh_monitoring.services import monitoring_traceroute_succeeded_since, on_monitoring_traceroute_completed
 from mesh_monitoring.tasks import process_node_watch_presence, send_monitoring_traceroute_command
+from mesh_monitoring.tests.conftest import create_watch_with_offline_threshold
 from nodes.models import NodeLatestStatus
 from traceroute.models import AutoTraceRoute
 
@@ -32,7 +33,7 @@ def test_process_node_watch_presence_starts_verification_and_creates_monitor_tr(
     obs.save(update_fields=["last_heard"])
     NodeLatestStatus.objects.create(node=obs, latitude=48.0, longitude=2.0)
 
-    NodeWatch.objects.create(user=user, observed_node=obs, offline_after=60, enabled=True)
+    create_watch_with_offline_threshold(user=user, observed_node=obs, offline_after=60)
 
     mn = create_managed_node(
         allow_auto_traceroute=True,
@@ -146,7 +147,7 @@ def test_dispatch_zero_sources_sets_last_zero_sources_at(
     obs.last_heard = timezone.now() - timedelta(seconds=120)
     obs.save(update_fields=["last_heard"])
     NodeLatestStatus.objects.create(node=obs, latitude=48.0, longitude=2.0)
-    NodeWatch.objects.create(user=user, observed_node=obs, offline_after=60, enabled=True)
+    create_watch_with_offline_threshold(user=user, observed_node=obs, offline_after=60)
 
     mn = create_managed_node(
         allow_auto_traceroute=True,
@@ -173,9 +174,8 @@ def test_process_node_watch_presence_clears_observability_when_node_not_silent(
     obs = create_observed_node(node_id=0x44556677, claimed_by=user)
     obs.last_heard = timezone.now() - timedelta(seconds=120)
     obs.save(update_fields=["last_heard"])
-    NodeWatch.objects.create(user=user, observed_node=obs, offline_after=60, enabled=True)
-    NodePresence.objects.create(
-        observed_node=obs,
+    create_watch_with_offline_threshold(user=user, observed_node=obs, offline_after=60)
+    NodePresence.objects.filter(observed_node=obs).update(
         verification_started_at=timezone.now() - timedelta(minutes=5),
         suspected_offline_at=timezone.now() - timedelta(minutes=5),
         tr_sent_count=2,
@@ -206,7 +206,7 @@ def test_process_node_watch_presence_sets_observed_online_at_when_created_heard(
     obs = create_observed_node(node_id=0x66778899, claimed_by=user)
     obs.last_heard = timezone.now()
     obs.save(update_fields=["last_heard"])
-    NodeWatch.objects.create(user=user, observed_node=obs, offline_after=3600, enabled=True)
+    NodeWatch.objects.create(user=user, observed_node=obs, enabled=True)
 
     process_node_watch_presence()
 
@@ -225,9 +225,8 @@ def test_process_node_watch_presence_recovery_from_offline_sets_observed_online_
     obs = create_observed_node(node_id=0x778899AA, claimed_by=user)
     obs.last_heard = timezone.now()
     obs.save(update_fields=["last_heard"])
-    NodeWatch.objects.create(user=user, observed_node=obs, offline_after=60, enabled=True)
-    NodePresence.objects.create(
-        observed_node=obs,
+    create_watch_with_offline_threshold(user=user, observed_node=obs, offline_after=60)
+    NodePresence.objects.filter(observed_node=obs).update(
         offline_confirmed_at=timezone.now() - timedelta(hours=1),
         is_offline=True,
     )
@@ -256,9 +255,9 @@ def test_process_node_watch_presence_offline_confirm_sets_is_offline(
     obs.last_heard = now - timedelta(minutes=10)
     obs.save(update_fields=["last_heard"])
     NodeLatestStatus.objects.create(node=obs, latitude=48.0, longitude=2.0)
-    NodeWatch.objects.create(user=user, observed_node=obs, offline_after=60, enabled=True)
+    create_watch_with_offline_threshold(user=user, observed_node=obs, offline_after=60)
     vs = now - timedelta(minutes=2)
-    NodePresence.objects.create(observed_node=obs, verification_started_at=vs)
+    NodePresence.objects.filter(observed_node=obs).update(verification_started_at=vs)
 
     mn = create_managed_node(
         allow_auto_traceroute=True,

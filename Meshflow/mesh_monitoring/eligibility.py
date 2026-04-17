@@ -1,4 +1,7 @@
-"""Who may create a NodeWatch (same rules as future REST API)."""
+"""Who may create a NodeWatch (REST + model validation).
+
+See docs/features/mesh-monitoring/permissions.md for the full permission matrix.
+"""
 
 from nodes.constants import INFRASTRUCTURE_ROLES
 

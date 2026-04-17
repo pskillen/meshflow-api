@@ -21,10 +21,6 @@ class NodeWatch(models.Model):
         on_delete=models.CASCADE,
         related_name="watches",
     )
-    offline_after = models.PositiveIntegerField(
-        default=7200,
-        help_text=_("Seconds without packets (last_heard) before verification may start."),
-    )
     enabled = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -59,6 +55,10 @@ class NodePresence(models.Model):
         on_delete=models.CASCADE,
         primary_key=True,
         related_name="mesh_presence",
+    )
+    offline_after = models.PositiveIntegerField(
+        default=21600,
+        help_text=_("Seconds without packets (last_heard) before verification may start."),
     )
     verification_started_at = models.DateTimeField(
         null=True,

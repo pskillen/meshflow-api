@@ -5,7 +5,7 @@ from .models import NodePresence, NodeWatch
 
 @admin.register(NodeWatch)
 class NodeWatchAdmin(admin.ModelAdmin):
-    list_display = ("user", "observed_node", "offline_after", "enabled", "created_at")
+    list_display = ("user", "observed_node", "enabled", "created_at")
     list_filter = ("enabled",)
     raw_id_fields = ("user", "observed_node")
 
@@ -14,6 +14,7 @@ class NodeWatchAdmin(admin.ModelAdmin):
 class NodePresenceAdmin(admin.ModelAdmin):
     list_display = (
         "observed_node",
+        "offline_after",
         "is_offline",
         "observed_online_at",
         "verification_started_at",

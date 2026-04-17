@@ -6,14 +6,13 @@ Django app: **`meshflow.Meshflow.mesh_monitoring`**. These models support **sile
 
 ## `NodeWatch`
 
-A user opt-in to monitor one **`ObservedNode`**. Several watches can point at the same node; the periodic task uses the **minimum** `offline_after` among enabled watches as the effective silence threshold.
+A user opt-in to monitor one **`ObservedNode`**. Several watches can point at the same node; silence timing is **not** per watch — see **`NodePresence.offline_after`**.
 
 | Field | Type | Meaning |
 |-------|------|---------|
 | **`user`** | FK → `users.User` | Watcher who receives notifications when eligible. |
 | **`observed_node`** | FK → `nodes.ObservedNode` | Node being monitored. Unique per `(user, observed_node)`. |
-| **`offline_after`** | positive int (seconds) | How long **`ObservedNode.last_heard`** may be stale before verification may start. Default **7200** (2 hours). |
-| **`enabled`** | bool | When `False`, this watch does not contribute to thresholds or notifications. |
+| **`enabled`** | bool | When `False`, this watch does not contribute to notifications (and the node is not “watched” for monitoring ticks). |
 | **`created_at`** | datetime | Auto-set when the row is created. |
 
 **Validation:** On save, **`clean()`** ensures the user may watch that node (**claimed** node or **infrastructure** role); see `mesh_monitoring.eligibility.user_can_watch`.
@@ -22,15 +21,16 @@ A user opt-in to monitor one **`ObservedNode`**. Several watches can point at th
 
 ## `NodePresence`
 
-One row per observed node that participates in mesh monitoring (created lazily when a watched node is processed). Primary key is **`observed_node_id`** (same UUID as **`ObservedNode.internal_id`**); reverse relation from observed node: **`observed_node.mesh_presence`**.
+One row per observed node that participates in mesh monitoring (created lazily when a watched node is processed, or when the silence threshold API is used). Primary key is **`observed_node_id`** (same UUID as **`ObservedNode.internal_id`**); reverse relation from observed node: **`observed_node.mesh_presence`**.
 
-State is split into: **episode / observability** (current verification round), **confirmed offline** (deadline expired), and **summary flags** for operators.
+State is split into: **silence threshold**, **episode / observability** (current verification round), **confirmed offline** (deadline expired), and **summary flags** for operators.
 
 ### Core state
 
 | Field | Type | Meaning |
 |-------|------|---------|
 | **`observed_node`** | OneToOne → `ObservedNode` (PK) | The node this row describes. |
+| **`offline_after`** | positive int (seconds) | How long **`ObservedNode.last_heard`** may be stale before verification may start. Default **21600** (6 hours). |
 | **`verification_started_at`** | datetime, null | When the **current** verification window started (monitoring TR round). Null when not verifying. |
 | **`offline_confirmed_at`** | datetime, null | When the node was **confirmed offline** after the verification window passed without reachability proof. Cleared when the node is heard again. |
 
