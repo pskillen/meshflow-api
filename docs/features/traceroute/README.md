@@ -62,6 +62,7 @@ Auto-scheduler and permission checks share one notion of a **live** source node 
 
 ## Related Documentation
 
+- [Permissions](permissions.md) – Canonical rules for who may view and trigger traceroutes
 - [Flow](flow.md) – End-to-end lifecycle from trigger to completion
 - [Heatmap](heatmap.md) – Neo4j schema, heatmap-edges API, visualization
 - [Mesh monitoring](../mesh-monitoring/README.md) – watches, verification rounds, `pick_traceroute_target` exclusion for nodes under monitoring
