@@ -4507,7 +4507,7 @@ paths:
                 type: array
                 items:
                   type: object
-                  required: [node_id, node_id_str, short_name, long_name, allow_auto_traceroute, constellation]
+                  required: [node_id, node_id_str, short_name, long_name, allow_auto_traceroute, constellation, position]
                   properties:
                     node_id:
                       type: integer
@@ -4528,6 +4528,17 @@ paths:
                           type: string
                         map_color:
                           type: string
+                    position:
+                      type: object
+                      description: Latest known position of the node's ObservedNode counterpart, falling back to the ManagedNode's configured default location. Both fields may be null if no location is known.
+                      required: [latitude, longitude]
+                      properties:
+                        latitude:
+                          type: number
+                          nullable: true
+                        longitude:
+                          type: number
+                          nullable: true
 
   /traceroutes/trigger/:
     post:
