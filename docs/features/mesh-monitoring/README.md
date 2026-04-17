@@ -50,6 +50,7 @@ Any packet that advances **`last_heard`** should clear **`offline_confirmed_at`*
 
 | Doc | Contents |
 |-----|----------|
+| [permissions.md](permissions.md) | Who may **watch** a node vs who may change **`offline_after`** (staff / claim owner) |
 | [models.md](models.md) | **`NodeWatch`** and **`NodePresence`** fields and how they change at runtime |
 | [flow.md](flow.md) | Chronological sequence, state machine, component responsibilities |
 | [discord.md](discord.md) | How Discord alerts fit into monitoring (pointer to `docs/features/discord/`) |
