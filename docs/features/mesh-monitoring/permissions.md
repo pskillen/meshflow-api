@@ -9,6 +9,21 @@ Implementation lives in:
 
 ---
 
+## Why these rules (design rationale)
+
+### Watching
+
+- **Infrastructure nodes** are explicitly shared infrastructure (routers, repeaters, etc.). There is no individual “owner privacy” in the same sense as a personal handset; watching them does not single out a person’s private device choice beyond what the mesh already exposes.
+- **All other (non‑infra) nodes** could raise **privacy** concerns if we let arbitrary users stack monitoring tooling on top of public mesh data. The underlying observations are already public in nature—operators choose to broadcast presence, messages, location, and so on—but we **avoid adding extra product surface** that could make it easier to track or pressure someone **without their participation**. Limiting watches to **people who have claimed the node** keeps “your own nodes are your own nodes”: the person who has identified themselves with that node controls monitoring opt‑in for that class of target.
+- **Your own nodes:** if you have **claimed** an observed node, you may watch it—aligned with ownership and consent to deeper tooling for radios you treat as yours.
+
+### Changing silence / threshold settings
+
+- **`offline_after`** applies to **every** enabled watch and the **whole** monitoring episode for that observed node (one **`NodePresence`** row per node). Changing it is not a personal preference for one subscriber; it changes behaviour for **all** watchers and for verification / offline semantics.
+- That calls for a **stronger gate** than “anyone who can watch”: only the **claim owner** (who speaks for that non‑infra node in the product) or **staff** (platform operators / “system admin” via Django’s **`is_staff`**) may **PATCH** the value. Others may still **GET** the number for context, with **`editable: false`** when they cannot change it.
+
+---
+
 ## Who may create or keep a watch on an observed node?
 
 A user may create a **`NodeWatch`** only if **either**:
