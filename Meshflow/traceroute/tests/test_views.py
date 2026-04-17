@@ -293,6 +293,35 @@ class TestTracerouteTriggerableNodes:
         assert "long_name" in node
         assert "allow_auto_traceroute" in node
         assert "constellation" in node
+        assert "position" in node
+        assert set(node["position"].keys()) == {"latitude", "longitude"}
+
+    def test_triggerable_nodes_position_prefers_latest_observed_location(
+        self, api_client, editor_user, editor_managed_node
+    ):
+        """position is populated from NodeLatestStatus when the node has been heard."""
+        from nodes.models import NodeLatestStatus, ObservedNode
+
+        observed, _ = ObservedNode.objects.get_or_create(node_id=editor_managed_node.node_id)
+        NodeLatestStatus.objects.update_or_create(node=observed, defaults={"latitude": 55.86, "longitude": -4.25})
+        api_client.force_authenticate(user=editor_user)
+        resp = api_client.get("/api/traceroutes/triggerable-nodes/")
+        assert resp.status_code == 200
+        node = next(n for n in resp.json() if n["node_id"] == editor_managed_node.node_id)
+        assert node["position"] == {"latitude": 55.86, "longitude": -4.25}
+
+    def test_triggerable_nodes_position_falls_back_to_default_location(
+        self, api_client, editor_user, editor_managed_node
+    ):
+        """When no latest-observed position exists, fall back to ManagedNode default_location_*."""
+        editor_managed_node.default_location_latitude = 51.5
+        editor_managed_node.default_location_longitude = -0.12
+        editor_managed_node.save(update_fields=["default_location_latitude", "default_location_longitude"])
+        api_client.force_authenticate(user=editor_user)
+        resp = api_client.get("/api/traceroutes/triggerable-nodes/")
+        assert resp.status_code == 200
+        node = next(n for n in resp.json() if n["node_id"] == editor_managed_node.node_id)
+        assert node["position"] == {"latitude": 51.5, "longitude": -0.12}
 
     def test_triggerable_nodes_excludes_without_recent_ingestion(self, api_client, staff_user, create_managed_node):
         """Nodes with allow_auto_traceroute but no recent PacketObservation as observer are omitted."""

@@ -99,9 +99,13 @@ clients. The response is the intersection of:
 - **Eligible sources** (`allow_auto_traceroute=True` and recently heard), and
 - **Permission** (staff, owner, or constellation admin/editor).
 
-When this list is empty, the UI should hide all trigger affordances. The list
-has annotated `observed_short_name` / `observed_long_name` so the UI can label
-the source without a second round trip.
+When this list is empty, the UI should hide all trigger affordances. The
+payload includes `short_name` / `long_name` (from the node's `ObservedNode`
+counterpart) and a `position` object so the UI can label and place each source
+on a map without a second round trip. `position` uses the latest observed
+`NodeLatestStatus` if available, otherwise falls back to the `ManagedNode`'s
+configured `default_location_*`; either coordinate may be `null` if no
+location has ever been recorded.
 
 ## Client expectations
 

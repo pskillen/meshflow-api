@@ -242,10 +242,19 @@ class TriggerableNodeSerializer(serializers.ModelSerializer):
     short_name = serializers.SerializerMethodField()
     long_name = serializers.SerializerMethodField()
     constellation = TracerouteListConstellationSerializer(read_only=True)
+    position = serializers.SerializerMethodField()
 
     class Meta:
         model = ManagedNode
-        fields = ["node_id", "node_id_str", "short_name", "long_name", "allow_auto_traceroute", "constellation"]
+        fields = [
+            "node_id",
+            "node_id_str",
+            "short_name",
+            "long_name",
+            "allow_auto_traceroute",
+            "constellation",
+            "position",
+        ]
         read_only_fields = fields
 
     def get_node_id_str(self, obj):
@@ -256,6 +265,17 @@ class TriggerableNodeSerializer(serializers.ModelSerializer):
 
     def get_long_name(self, obj):
         return getattr(obj, "observed_long_name", None) or obj.name
+
+    def get_position(self, obj):
+        # Prefer the latest observed position (annotated from NodeLatestStatus);
+        # fall back to the ManagedNode's configured default location so the UI
+        # can still place nodes that have never been heard.
+        lat = getattr(obj, "observed_latitude", None)
+        lng = getattr(obj, "observed_longitude", None)
+        if lat is None and lng is None:
+            lat = obj.default_location_latitude
+            lng = obj.default_location_longitude
+        return {"latitude": lat, "longitude": lng}
 
 
 class TriggerTracerouteSerializer(serializers.Serializer):

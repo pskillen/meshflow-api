@@ -3,7 +3,7 @@
 from django.db.models import OuterRef, Q, Subquery
 
 from constellations.models import ConstellationUserMembership
-from nodes.models import ManagedNode, ObservedNode
+from nodes.models import ManagedNode, NodeLatestStatus, ObservedNode
 
 from .source_eligibility import eligible_auto_traceroute_sources_queryset
 
@@ -53,7 +53,13 @@ def get_triggerable_nodes_queryset(user):
         qs = eligible.filter(Q(owner=user) | Q(constellation_id__in=constellation_ids)).distinct()
     obs_short = ObservedNode.objects.filter(node_id=OuterRef("node_id")).values("short_name")[:1]
     obs_long = ObservedNode.objects.filter(node_id=OuterRef("node_id")).values("long_name")[:1]
+    # Latest known position of the node's ObservedNode counterpart. Used by the UI
+    # to render triggerable sources on a map alongside the traceroute target.
+    latest_lat = NodeLatestStatus.objects.filter(node__node_id=OuterRef("node_id")).values("latitude")[:1]
+    latest_lng = NodeLatestStatus.objects.filter(node__node_id=OuterRef("node_id")).values("longitude")[:1]
     return qs.annotate(
         observed_short_name=Subquery(obs_short),
         observed_long_name=Subquery(obs_long),
+        observed_latitude=Subquery(latest_lat),
+        observed_longitude=Subquery(latest_lng),
     ).order_by("node_id")
