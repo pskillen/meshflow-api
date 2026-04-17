@@ -799,36 +799,28 @@ components:
             Null when the user has no claim. Use accepted_at to distinguish pending vs accepted claims.
 
     ObservedNodeWatchSummary:
-      type: object
       description: >
-        Observed node fields included on NodeWatch responses for My Nodes / monitoring UI.
-      properties:
-        internal_id:
-          type: string
-          format: uuid
-        node_id_str:
-          type: string
-        long_name:
-          type: string
-          nullable: true
-        last_heard:
-          type: string
-          format: date-time
-          nullable: true
-        monitoring_verification_started_at:
-          type: string
-          format: date-time
-          nullable: true
-          description: Present when mesh monitoring is verifying reachability for this node.
-        monitoring_offline_confirmed_at:
-          type: string
-          format: date-time
-          nullable: true
-          description: Present when mesh monitoring has confirmed offline after failed verification.
-        offline_after:
-          type: integer
-          description: >
-            Node-level silence threshold (seconds); stored on NodePresence. Duplicated here for convenience.
+        Same fields as ObservedNode (aligned with GET /nodes/observed-nodes/) embedded on NodeWatch
+        responses, plus mesh monitoring hints so clients can render dashboards without N+1 node fetches.
+      allOf:
+        - $ref: '#/components/schemas/ObservedNode'
+        - type: object
+          properties:
+            monitoring_verification_started_at:
+              type: string
+              format: date-time
+              nullable: true
+              description: Present when mesh monitoring is verifying reachability for this node.
+            monitoring_offline_confirmed_at:
+              type: string
+              format: date-time
+              nullable: true
+              description: Present when mesh monitoring has confirmed offline after failed verification.
+            offline_after:
+              type: integer
+              description: >
+                Node-level silence threshold (seconds); stored on NodePresence. Duplicated here for
+                convenience; same value as top-level NodeWatch.offline_after.
 
     NodeWatch:
       type: object

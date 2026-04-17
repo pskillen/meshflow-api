@@ -69,7 +69,9 @@ class NodeWatchViewSet(viewsets.ModelViewSet):
         return (
             NodeWatch.objects.filter(user=self.request.user)
             .select_related("observed_node")
+            .select_related("observed_node__claimed_by")
             .select_related("observed_node__mesh_presence")
+            .select_related("observed_node__latest_status")
             .order_by("-created_at", "-id")
         )
 

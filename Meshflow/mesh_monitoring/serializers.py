@@ -8,25 +8,30 @@ from mesh_monitoring.constants import DEFAULT_OFFLINE_AFTER_SECONDS
 from mesh_monitoring.eligibility import user_can_watch
 from mesh_monitoring.models import NodePresence, NodeWatch
 from nodes.models import ObservedNode
+from nodes.serializers import ObservedNodeSerializer
 
 
-class ObservedNodeWatchSummarySerializer(serializers.ModelSerializer):
-    """Minimal observed node + monitoring presence hints for watch payloads."""
+class ObservedNodeWatchSummarySerializer(ObservedNodeSerializer):
+    """
+    Observed node fields aligned with GET /nodes/observed-nodes/ plus mesh monitoring hints.
+
+    Used only on NodeWatch responses so dashboards can render charts and controls without N+1 fetches.
+    """
 
     monitoring_verification_started_at = serializers.SerializerMethodField()
     monitoring_offline_confirmed_at = serializers.SerializerMethodField()
     offline_after = serializers.SerializerMethodField()
 
-    class Meta:
-        model = ObservedNode
-        fields = [
-            "internal_id",
-            "node_id_str",
-            "long_name",
-            "last_heard",
-            "offline_after",
+    class Meta(ObservedNodeSerializer.Meta):
+        fields = list(ObservedNodeSerializer.Meta.fields) + [
             "monitoring_verification_started_at",
             "monitoring_offline_confirmed_at",
+            "offline_after",
+        ]
+        read_only_fields = list(ObservedNodeSerializer.Meta.read_only_fields) + [
+            "monitoring_verification_started_at",
+            "monitoring_offline_confirmed_at",
+            "offline_after",
         ]
 
     def get_monitoring_verification_started_at(self, obj):
