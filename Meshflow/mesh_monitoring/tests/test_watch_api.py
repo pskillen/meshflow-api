@@ -189,3 +189,5 @@ def test_watch_presence_hints(api_client, create_user, create_observed_node):
     )
     assert r.status_code == status.HTTP_201_CREATED
     assert r.data["observed_node"]["monitoring_verification_started_at"] is not None
+    assert r.data["observed_node"]["node_id"] == obs.node_id
+    assert "short_name" in r.data["observed_node"]
