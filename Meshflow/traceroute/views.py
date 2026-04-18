@@ -408,6 +408,42 @@ def traceroute_stats(request):
         )
     by_source.sort(key=lambda x: (-x["total"], x["node_id_str"]))
 
+    # Per target observed node (same triggered_at window as qs)
+    by_target_rows = list(
+        qs.values("target_node_id").annotate(
+            total=Count("id"),
+            completed=Count("id", filter=Q(status=AutoTraceRoute.STATUS_COMPLETED)),
+            failed=Count("id", filter=Q(status=AutoTraceRoute.STATUS_FAILED)),
+        )
+    )
+    target_internal_ids = [r["target_node_id"] for r in by_target_rows]
+    observed_by_internal_id = {
+        o.internal_id: o for o in ObservedNode.objects.filter(internal_id__in=target_internal_ids)
+    }
+
+    by_target = []
+    for row in by_target_rows:
+        on = observed_by_internal_id.get(row["target_node_id"])
+        if on is None:
+            continue
+        completed_n = row["completed"]
+        failed_n = row["failed"]
+        finished = completed_n + failed_n
+        success_rate = None if finished == 0 else completed_n / finished
+        by_target.append(
+            {
+                "node_id": on.node_id,
+                "node_id_str": meshtastic_id_to_hex(on.node_id),
+                "short_name": on.short_name,
+                "long_name": on.long_name,
+                "total": row["total"],
+                "completed": completed_n,
+                "failed": failed_n,
+                "success_rate": success_rate,
+            }
+        )
+    by_target.sort(key=lambda x: (-x["total"], x["node_id_str"]))
+
     # Success over time: last 14 days, from StatsSnapshot or on-demand
     fourteen_days_ago = timezone.now() - timedelta(days=14)
     success_over_time = _get_success_over_time(fourteen_days_ago)
@@ -418,6 +454,7 @@ def traceroute_stats(request):
             "success_failure": success_failure,
             "top_routers": top_routers,
             "by_source": by_source,
+            "by_target": by_target,
             "success_over_time": success_over_time,
         }
     )

@@ -4263,8 +4263,8 @@ paths:
       description: >
         Returns traceroute stats for the given timeframe: sources (by trigger_type),
         success/failure counts, top routers (intermediate nodes), per-source managed node
-        totals (with success rate among finished runs only), and success over time (14d).
-        All authenticated users.
+        totals (with success rate among finished runs only), per-target observed node totals,
+        and success over time (14d). All authenticated users.
       tags: [Traceroutes]
       security:
         - BearerAuth: []
@@ -4283,7 +4283,7 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [sources, success_failure, top_routers, by_source, success_over_time]
+                required: [sources, success_failure, top_routers, by_source, by_target, success_over_time]
                 properties:
                   sources:
                     type: array
@@ -4347,6 +4347,49 @@ paths:
                           type: string
                         short_name:
                           type: string
+                        total:
+                          type: integer
+                          description: All runs in the period (any status).
+                        completed:
+                          type: integer
+                        failed:
+                          type: integer
+                        success_rate:
+                          type: number
+                          format: float
+                          nullable: true
+                          description: >
+                            Fraction of finished runs that completed successfully.
+                            Denominator is completed + failed only.
+                  by_target:
+                    type: array
+                    description: >
+                      One row per target ObservedNode in the filtered period, ordered by total
+                      runs descending. success_rate is completed / (completed + failed) when
+                      that sum is positive; null if there are no finished runs (pending/sent
+                      count toward total only).
+                    items:
+                      type: object
+                      required:
+                        - node_id
+                        - node_id_str
+                        - short_name
+                        - long_name
+                        - total
+                        - completed
+                        - failed
+                        - success_rate
+                      properties:
+                        node_id:
+                          type: integer
+                        node_id_str:
+                          type: string
+                        short_name:
+                          type: string
+                          nullable: true
+                        long_name:
+                          type: string
+                          nullable: true
                         total:
                           type: integer
                           description: All runs in the period (any status).
