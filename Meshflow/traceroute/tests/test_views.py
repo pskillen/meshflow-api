@@ -586,3 +586,108 @@ class TestTracerouteStats:
         assert resp_filtered.status_code == 200
         rows_f = {r["managed_node_id"]: r for r in resp_filtered.json()["by_source"]}
         assert rows_f[str(mn.internal_id)]["total"] == 1
+
+    def test_stats_by_target_empty_when_no_traceroutes(
+        self,
+        api_client,
+        create_user,
+    ):
+        user = create_user()
+        api_client.force_authenticate(user=user)
+
+        resp = api_client.get("/api/traceroutes/stats/")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "by_target" in data
+        assert data["by_target"] == []
+
+    def test_stats_includes_by_target_for_two_targets(
+        self,
+        api_client,
+        create_user,
+        create_managed_node,
+        create_observed_node,
+        create_auto_traceroute,
+    ):
+        user = create_user()
+        mn = create_managed_node(node_id=444_444_444)
+        on_a = create_observed_node(node_id=100_000_001, short_name="AAAA", long_name="Target A")
+        on_b = create_observed_node(node_id=100_000_002, short_name="BBBB", long_name="Target B")
+        api_client.force_authenticate(user=user)
+
+        # Target A: 2 completed, 1 failed -> success_rate 2/3
+        create_auto_traceroute(
+            source_node=mn, target_node=on_a, triggered_by=user, status=AutoTraceRoute.STATUS_COMPLETED
+        )
+        create_auto_traceroute(
+            source_node=mn, target_node=on_a, triggered_by=user, status=AutoTraceRoute.STATUS_COMPLETED
+        )
+        create_auto_traceroute(source_node=mn, target_node=on_a, triggered_by=user, status=AutoTraceRoute.STATUS_FAILED)
+        # Target B: 1 pending, 1 sent -> no finished runs, success_rate is null
+        create_auto_traceroute(
+            source_node=mn, target_node=on_b, triggered_by=user, status=AutoTraceRoute.STATUS_PENDING
+        )
+        create_auto_traceroute(source_node=mn, target_node=on_b, triggered_by=user, status=AutoTraceRoute.STATUS_SENT)
+
+        resp = api_client.get("/api/traceroutes/stats/")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "by_target" in data
+        by_node_id = {row["node_id"]: row for row in data["by_target"]}
+
+        row_a = by_node_id[on_a.node_id]
+        assert row_a["total"] == 3
+        assert row_a["completed"] == 2
+        assert row_a["failed"] == 1
+        assert row_a["success_rate"] == pytest.approx(2 / 3)
+        assert row_a["short_name"] == on_a.short_name
+        assert row_a["long_name"] == on_a.long_name
+        assert "node_id_str" in row_a
+
+        row_b = by_node_id[on_b.node_id]
+        assert row_b["total"] == 2
+        assert row_b["completed"] == 0
+        assert row_b["failed"] == 0
+        assert row_b["success_rate"] is None
+
+    def test_by_target_respects_triggered_at_after(
+        self,
+        api_client,
+        create_user,
+        create_managed_node,
+        create_observed_node,
+        create_auto_traceroute,
+    ):
+        user = create_user()
+        mn = create_managed_node(node_id=555_555_555)
+        on = create_observed_node(node_id=200_000_001)
+        api_client.force_authenticate(user=user)
+
+        old_time = timezone.now() - timedelta(days=30)
+        tr_old = create_auto_traceroute(
+            source_node=mn,
+            target_node=on,
+            triggered_by=user,
+            status=AutoTraceRoute.STATUS_COMPLETED,
+        )
+        AutoTraceRoute.objects.filter(pk=tr_old.pk).update(triggered_at=old_time)
+
+        create_auto_traceroute(
+            source_node=mn,
+            target_node=on,
+            triggered_by=user,
+            status=AutoTraceRoute.STATUS_FAILED,
+        )
+
+        resp_all = api_client.get("/api/traceroutes/stats/")
+        rows_all = {r["node_id"]: r for r in resp_all.json()["by_target"]}
+        assert rows_all[on.node_id]["total"] == 2
+        assert rows_all[on.node_id]["completed"] == 1
+        assert rows_all[on.node_id]["failed"] == 1
+
+        since = (timezone.now() - timedelta(days=7)).isoformat()
+        resp_filtered = api_client.get("/api/traceroutes/stats/", {"triggered_at_after": since})
+        rows_f = {r["node_id"]: r for r in resp_filtered.json()["by_target"]}
+        assert rows_f[on.node_id]["total"] == 1
+        assert rows_f[on.node_id]["completed"] == 0
+        assert rows_f[on.node_id]["failed"] == 1
