@@ -694,82 +694,46 @@ class TestTracerouteStats:
 
 
 @pytest.mark.django_db
-class TestFeederRanges:
+class TestFeederReach:
     def test_requires_auth(self, api_client):
-        resp = api_client.get("/api/traceroutes/feeder-ranges/")
+        resp = api_client.get("/api/traceroutes/feeder-reach/", {"feeder_id": "1"})
         assert resp.status_code == 401
 
-    def test_empty_response_shape(self, api_client, create_user):
+    def test_missing_feeder_id_returns_400(self, api_client, create_user):
         api_client.force_authenticate(user=create_user())
-        resp = api_client.get("/api/traceroutes/feeder-ranges/")
-        assert resp.status_code == 200
-        body = resp.json()
-        assert body["feeders"] == []
-        assert body["meta"]["min_samples"] == 10
-        assert body["meta"]["window"] == {"start": None, "end": None}
+        resp = api_client.get("/api/traceroutes/feeder-reach/")
+        assert resp.status_code == 400
 
-    def test_two_feeder_payload(
-        self,
-        api_client,
-        create_user,
-        create_managed_node,
-        create_observed_node,
-        create_auto_traceroute,
+    def test_non_int_feeder_id_returns_400(self, api_client, create_user):
+        api_client.force_authenticate(user=create_user())
+        resp = api_client.get("/api/traceroutes/feeder-reach/", {"feeder_id": "abc"})
+        assert resp.status_code == 400
+
+    def test_unknown_feeder_returns_404(self, api_client, create_user):
+        api_client.force_authenticate(user=create_user())
+        resp = api_client.get("/api/traceroutes/feeder-reach/", {"feeder_id": "999999"})
+        assert resp.status_code == 404
+
+    def test_empty_targets_when_no_traceroutes(
+        self, api_client, create_user, create_managed_node
     ):
-        from nodes.models import NodeLatestStatus
-
-        user = create_user()
-        api_client.force_authenticate(user=user)
-
-        feeder_a = create_managed_node(
-            node_id=0xAAAA_AAA1,
+        api_client.force_authenticate(user=create_user())
+        feeder = create_managed_node(
+            node_id=0xAAAA_AA01,
             default_location_latitude=55.86,
             default_location_longitude=-4.25,
         )
-        feeder_b = create_managed_node(
-            node_id=0xBBBB_BBB1,
-            default_location_latitude=55.95,
-            default_location_longitude=-3.20,
+        resp = api_client.get(
+            "/api/traceroutes/feeder-reach/", {"feeder_id": str(feeder.node_id)}
         )
-        target = create_observed_node(node_id=0xCCCC_CCC1)
-        NodeLatestStatus.objects.create(node=target, latitude=55.86, longitude=-4.20)
-
-        # 12 direct-only completed TRs from A; 1 multi-hop completed TR from B.
-        for _ in range(12):
-            create_auto_traceroute(
-                source_node=feeder_a,
-                target_node=target,
-                status=AutoTraceRoute.STATUS_COMPLETED,
-                route=[],
-                route_back=[],
-            )
-        create_auto_traceroute(
-            source_node=feeder_b,
-            target_node=target,
-            status=AutoTraceRoute.STATUS_COMPLETED,
-            route=[{"node_id": 0xDDDD_DDD1, "snr": 5.0}],
-            route_back=[{"node_id": 0xDDDD_DDD1, "snr": 4.5}],
-        )
-
-        resp = api_client.get("/api/traceroutes/feeder-ranges/")
         assert resp.status_code == 200
         body = resp.json()
-        feeders = {f["node_id"]: f for f in body["feeders"]}
-        assert set(feeders) == {feeder_a.node_id, feeder_b.node_id}
+        assert body["feeder"]["node_id"] == feeder.node_id
+        assert body["feeder"]["lat"] == pytest.approx(55.86)
+        assert body["targets"] == []
+        assert body["meta"]["window"] == {"start": None, "end": None}
 
-        a = feeders[feeder_a.node_id]
-        assert a["direct"]["sample_count"] == 12
-        assert a["any"]["sample_count"] == 12
-        assert a["direct"]["low_confidence"] is False
-        assert a["lat"] == pytest.approx(55.86)
-        assert a["lng"] == pytest.approx(-4.25)
-
-        b = feeders[feeder_b.node_id]
-        assert b["direct"]["sample_count"] == 0
-        assert b["any"]["sample_count"] == 1
-        assert b["any"]["low_confidence"] is True
-
-    def test_min_samples_query_param(
+    def test_payload_includes_attempts_and_successes(
         self,
         api_client,
         create_user,
@@ -781,23 +745,167 @@ class TestFeederRanges:
 
         api_client.force_authenticate(user=create_user())
         feeder = create_managed_node(
-            node_id=0xAAAA_AAA2,
+            node_id=0xAAAA_AA02,
             default_location_latitude=55.86,
             default_location_longitude=-4.25,
         )
-        target = create_observed_node(node_id=0xCCCC_CCC2)
+        target = create_observed_node(node_id=0xCCCC_CC02)
         NodeLatestStatus.objects.create(node=target, latitude=55.86, longitude=-4.20)
-        for _ in range(3):
+
+        for _ in range(7):
             create_auto_traceroute(
                 source_node=feeder,
                 target_node=target,
                 status=AutoTraceRoute.STATUS_COMPLETED,
-                route=[],
-                route_back=[],
+            )
+        for _ in range(3):
+            create_auto_traceroute(
+                source_node=feeder,
+                target_node=target,
+                status=AutoTraceRoute.STATUS_FAILED,
             )
 
-        resp = api_client.get("/api/traceroutes/feeder-ranges/", {"min_samples": "2"})
+        resp = api_client.get(
+            "/api/traceroutes/feeder-reach/", {"feeder_id": str(feeder.node_id)}
+        )
         assert resp.status_code == 200
         body = resp.json()
-        assert body["meta"]["min_samples"] == 2
-        assert body["feeders"][0]["any"]["low_confidence"] is False
+        assert len(body["targets"]) == 1
+        row = body["targets"][0]
+        assert row["node_id"] == target.node_id
+        assert row["attempts"] == 10
+        assert row["successes"] == 7
+
+
+@pytest.mark.django_db
+class TestConstellationCoverage:
+    def test_requires_auth(self, api_client):
+        resp = api_client.get(
+            "/api/traceroutes/constellation-coverage/", {"constellation_id": "1"}
+        )
+        assert resp.status_code == 401
+
+    def test_missing_constellation_id_returns_400(self, api_client, create_user):
+        api_client.force_authenticate(user=create_user())
+        resp = api_client.get("/api/traceroutes/constellation-coverage/")
+        assert resp.status_code == 400
+
+    def test_non_int_constellation_id_returns_400(self, api_client, create_user):
+        api_client.force_authenticate(user=create_user())
+        resp = api_client.get(
+            "/api/traceroutes/constellation-coverage/", {"constellation_id": "abc"}
+        )
+        assert resp.status_code == 400
+
+    def test_empty_response_shape(self, api_client, create_user, create_constellation):
+        api_client.force_authenticate(user=create_user())
+        constellation = create_constellation(created_by=create_user())
+        resp = api_client.get(
+            "/api/traceroutes/constellation-coverage/",
+            {"constellation_id": str(constellation.id)},
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["constellation_id"] == constellation.id
+        assert body["h3_resolution"] == 6
+        assert body["hexes"] == []
+
+    def test_hex_aggregation_end_to_end(
+        self,
+        api_client,
+        create_user,
+        create_managed_node,
+        create_observed_node,
+        create_auto_traceroute,
+        create_constellation,
+    ):
+        import h3
+
+        from nodes.models import NodeLatestStatus
+
+        owner = create_user()
+        api_client.force_authenticate(user=owner)
+        constellation = create_constellation(created_by=owner)
+
+        feeder = create_managed_node(
+            owner=owner,
+            constellation=constellation,
+            node_id=0xAAAA_AA03,
+            default_location_latitude=55.86,
+            default_location_longitude=-4.25,
+        )
+        target_a = create_observed_node(node_id=0xCCCC_CC03)
+        target_b = create_observed_node(node_id=0xCCCC_CC04)
+        NodeLatestStatus.objects.create(node=target_a, latitude=55.860, longitude=-4.200)
+        NodeLatestStatus.objects.create(
+            node=target_b, latitude=55.860010, longitude=-4.200010
+        )
+
+        for _ in range(3):
+            create_auto_traceroute(
+                source_node=feeder,
+                target_node=target_a,
+                status=AutoTraceRoute.STATUS_COMPLETED,
+            )
+        create_auto_traceroute(
+            source_node=feeder,
+            target_node=target_a,
+            status=AutoTraceRoute.STATUS_FAILED,
+        )
+        create_auto_traceroute(
+            source_node=feeder,
+            target_node=target_b,
+            status=AutoTraceRoute.STATUS_COMPLETED,
+        )
+
+        expected_hex = h3.latlng_to_cell(55.860, -4.200, 6)
+
+        resp = api_client.get(
+            "/api/traceroutes/constellation-coverage/",
+            {"constellation_id": str(constellation.id)},
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert len(body["hexes"]) == 1
+        hx = body["hexes"][0]
+        assert hx["h3_index"] == expected_hex
+        assert hx["attempts"] == 5
+        assert hx["successes"] == 4
+        assert hx["contributing_feeders"] == 1
+        assert hx["contributing_targets"] == 2
+
+    def test_h3_resolution_query_param(
+        self,
+        api_client,
+        create_user,
+        create_managed_node,
+        create_observed_node,
+        create_auto_traceroute,
+        create_constellation,
+    ):
+        from nodes.models import NodeLatestStatus
+
+        owner = create_user()
+        api_client.force_authenticate(user=owner)
+        constellation = create_constellation(created_by=owner)
+        feeder = create_managed_node(
+            owner=owner,
+            constellation=constellation,
+            node_id=0xAAAA_AA04,
+            default_location_latitude=55.86,
+            default_location_longitude=-4.25,
+        )
+        target = create_observed_node(node_id=0xCCCC_CC05)
+        NodeLatestStatus.objects.create(node=target, latitude=55.86, longitude=-4.20)
+        create_auto_traceroute(
+            source_node=feeder,
+            target_node=target,
+            status=AutoTraceRoute.STATUS_COMPLETED,
+        )
+
+        resp = api_client.get(
+            "/api/traceroutes/constellation-coverage/",
+            {"constellation_id": str(constellation.id), "h3_resolution": "8"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["h3_resolution"] == 8
