@@ -691,3 +691,113 @@ class TestTracerouteStats:
         assert rows_f[on.node_id]["total"] == 1
         assert rows_f[on.node_id]["completed"] == 0
         assert rows_f[on.node_id]["failed"] == 1
+
+
+@pytest.mark.django_db
+class TestFeederRanges:
+    def test_requires_auth(self, api_client):
+        resp = api_client.get("/api/traceroutes/feeder-ranges/")
+        assert resp.status_code == 401
+
+    def test_empty_response_shape(self, api_client, create_user):
+        api_client.force_authenticate(user=create_user())
+        resp = api_client.get("/api/traceroutes/feeder-ranges/")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["feeders"] == []
+        assert body["meta"]["min_samples"] == 10
+        assert body["meta"]["window"] == {"start": None, "end": None}
+
+    def test_two_feeder_payload(
+        self,
+        api_client,
+        create_user,
+        create_managed_node,
+        create_observed_node,
+        create_auto_traceroute,
+    ):
+        from nodes.models import NodeLatestStatus
+
+        user = create_user()
+        api_client.force_authenticate(user=user)
+
+        feeder_a = create_managed_node(
+            node_id=0xAAAA_AAA1,
+            default_location_latitude=55.86,
+            default_location_longitude=-4.25,
+        )
+        feeder_b = create_managed_node(
+            node_id=0xBBBB_BBB1,
+            default_location_latitude=55.95,
+            default_location_longitude=-3.20,
+        )
+        target = create_observed_node(node_id=0xCCCC_CCC1)
+        NodeLatestStatus.objects.create(node=target, latitude=55.86, longitude=-4.20)
+
+        # 12 direct-only completed TRs from A; 1 multi-hop completed TR from B.
+        for _ in range(12):
+            create_auto_traceroute(
+                source_node=feeder_a,
+                target_node=target,
+                status=AutoTraceRoute.STATUS_COMPLETED,
+                route=[],
+                route_back=[],
+            )
+        create_auto_traceroute(
+            source_node=feeder_b,
+            target_node=target,
+            status=AutoTraceRoute.STATUS_COMPLETED,
+            route=[{"node_id": 0xDDDD_DDD1, "snr": 5.0}],
+            route_back=[{"node_id": 0xDDDD_DDD1, "snr": 4.5}],
+        )
+
+        resp = api_client.get("/api/traceroutes/feeder-ranges/")
+        assert resp.status_code == 200
+        body = resp.json()
+        feeders = {f["node_id"]: f for f in body["feeders"]}
+        assert set(feeders) == {feeder_a.node_id, feeder_b.node_id}
+
+        a = feeders[feeder_a.node_id]
+        assert a["direct"]["sample_count"] == 12
+        assert a["any"]["sample_count"] == 12
+        assert a["direct"]["low_confidence"] is False
+        assert a["lat"] == pytest.approx(55.86)
+        assert a["lng"] == pytest.approx(-4.25)
+
+        b = feeders[feeder_b.node_id]
+        assert b["direct"]["sample_count"] == 0
+        assert b["any"]["sample_count"] == 1
+        assert b["any"]["low_confidence"] is True
+
+    def test_min_samples_query_param(
+        self,
+        api_client,
+        create_user,
+        create_managed_node,
+        create_observed_node,
+        create_auto_traceroute,
+    ):
+        from nodes.models import NodeLatestStatus
+
+        api_client.force_authenticate(user=create_user())
+        feeder = create_managed_node(
+            node_id=0xAAAA_AAA2,
+            default_location_latitude=55.86,
+            default_location_longitude=-4.25,
+        )
+        target = create_observed_node(node_id=0xCCCC_CCC2)
+        NodeLatestStatus.objects.create(node=target, latitude=55.86, longitude=-4.20)
+        for _ in range(3):
+            create_auto_traceroute(
+                source_node=feeder,
+                target_node=target,
+                status=AutoTraceRoute.STATUS_COMPLETED,
+                route=[],
+                route_back=[],
+            )
+
+        resp = api_client.get("/api/traceroutes/feeder-ranges/", {"min_samples": "2"})
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["meta"]["min_samples"] == 2
+        assert body["feeders"][0]["any"]["low_confidence"] is False

@@ -311,6 +311,55 @@ def heatmap_edges(request):
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
+def feeder_ranges(request):
+    """Per-feeder distance distributions for completed traceroutes.
+
+    Returns the geographic distance percentiles (p50/p90/p95/max) from each
+    ManagedNode to the target ObservedNodes of its successful traceroutes,
+    split into ``direct`` (no relays) and ``any`` (any successful path) blocks.
+    See ``docs/features/traceroute/feeder_ranges.md``.
+    """
+    from django.utils.dateparse import parse_datetime
+
+    from .feeder_ranges import DEFAULT_MIN_SAMPLES, compute_feeder_ranges
+
+    triggered_at_after = None
+    if request.query_params.get("triggered_at_after"):
+        dt = parse_datetime(request.query_params["triggered_at_after"])
+        if dt:
+            triggered_at_after = dt
+
+    triggered_at_before = None
+    if request.query_params.get("triggered_at_before"):
+        dt = parse_datetime(request.query_params["triggered_at_before"])
+        if dt:
+            triggered_at_before = dt
+
+    constellation_id = request.query_params.get("constellation_id")
+    if constellation_id is not None:
+        try:
+            constellation_id = int(constellation_id)
+        except ValueError:
+            constellation_id = None
+
+    min_samples = DEFAULT_MIN_SAMPLES
+    if request.query_params.get("min_samples"):
+        try:
+            min_samples = max(1, int(request.query_params["min_samples"]))
+        except ValueError:
+            pass
+
+    data = compute_feeder_ranges(
+        triggered_at_after=triggered_at_after,
+        triggered_at_before=triggered_at_before,
+        constellation_id=constellation_id,
+        min_samples=min_samples,
+    )
+    return Response(data)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
 def traceroute_stats(request):
     """Traceroute statistics: sources, success/failure, top routers, by source, success over time."""
     from django.utils.dateparse import parse_datetime

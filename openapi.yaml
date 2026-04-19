@@ -65,6 +65,32 @@ components:
       name: X-API-Key
 
   schemas:
+    FeederRangeBlock:
+      type: object
+      description: >
+        Distance distribution for one partition (`direct` or `any`) of a
+        feeder's successful traceroute targets. All distances in km. Percentile
+        fields are null when sample_count is 0.
+      required: [sample_count, low_confidence]
+      properties:
+        sample_count:
+          type: integer
+        p50_km:
+          type: number
+          nullable: true
+        p90_km:
+          type: number
+          nullable: true
+        p95_km:
+          type: number
+          nullable: true
+        max_km:
+          type: number
+          nullable: true
+        low_confidence:
+          type: boolean
+          description: True when sample_count is below the meta.min_samples floor.
+
     Error:
       type: object
       properties:
@@ -4515,6 +4541,102 @@ paths:
                         type: integer
         '503':
           description: Neo4j unavailable
+
+  /traceroutes/feeder-ranges/:
+    get:
+      summary: Get per-feeder success-range distance percentiles
+      description: >
+        For each ManagedNode (the "feeder"), returns the distance percentiles
+        (p50, p90, p95, max) and sample count of successful AutoTraceRoute
+        targets in a time window. Two partitions are returned per feeder:
+        `direct` (route and route_back both empty - RF reach) and `any` (every
+        successful TR including multi-hop). All authenticated users.
+      tags: [Traceroutes]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: triggered_at_after
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+            description: Window start (triggered_at >= value, ISO 8601)
+        - name: triggered_at_before
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+            description: Window end (triggered_at <= value, ISO 8601)
+        - name: constellation_id
+          in: query
+          required: false
+          schema:
+            type: integer
+            description: Restrict feeders to this constellation
+        - name: min_samples
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 10
+            description: >
+              Sample-size floor below which a partition is flagged as
+              `low_confidence: true`. Defaults to 10.
+      responses:
+        '200':
+          description: Per-feeder distance distributions
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [feeders, meta]
+                properties:
+                  feeders:
+                    type: array
+                    items:
+                      type: object
+                      required: [managed_node_id, node_id, node_id_str, lat, lng, direct, any]
+                      properties:
+                        managed_node_id:
+                          type: string
+                          description: ManagedNode internal_id (UUID)
+                        node_id:
+                          type: integer
+                        node_id_str:
+                          type: string
+                        short_name:
+                          type: string
+                          nullable: true
+                        long_name:
+                          type: string
+                          nullable: true
+                        lat:
+                          type: number
+                        lng:
+                          type: number
+                        direct:
+                          $ref: '#/components/schemas/FeederRangeBlock'
+                        any:
+                          $ref: '#/components/schemas/FeederRangeBlock'
+                  meta:
+                    type: object
+                    required: [min_samples, window]
+                    properties:
+                      min_samples:
+                        type: integer
+                      window:
+                        type: object
+                        properties:
+                          start:
+                            type: string
+                            format: date-time
+                            nullable: true
+                          end:
+                            type: string
+                            format: date-time
+                            nullable: true
 
   /traceroutes/can_trigger/:
     get:
