@@ -36,13 +36,18 @@ from nodes.models import (
     NodeAuth,
     NodeLatestStatus,
     NodeOwnerClaim,
+    NodeRfProfile,
+    NodeRfPropagationRender,
     ObservedNode,
     Position,
     PowerMetrics,
     RoleSource,
     WeatherUse,
 )
-from nodes.permission_helpers import user_can_edit_observed_node_environment_settings
+from nodes.permission_helpers import (
+    user_can_edit_observed_node_environment_settings,
+    user_can_edit_observed_node_rf_profile,
+)
 from nodes.serializers import (
     APIKeyCreateSerializer,
     APIKeyDetailSerializer,
@@ -53,6 +58,9 @@ from nodes.serializers import (
     EnvironmentMetricsSerializer,
     ManagedNodeSerializer,
     NodeOwnerClaimSerializer,
+    NodeRfProfileSerializer,
+    NodeRfProfileUpdateSerializer,
+    NodeRfPropagationRenderSerializer,
     ObservedNodeEnvironmentSettingsSerializer,
     ObservedNodeSearchSerializer,
     ObservedNodeSerializer,
@@ -612,6 +620,55 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
         node.save(update_fields=update_fields)
         out = ObservedNodeSerializer(node, context=self.get_serializer_context())
         return Response(out.data)
+
+    @action(detail=True, methods=["get", "patch"], url_path="rf-profile")
+    def rf_profile(self, request, node_id=None):
+        """Read or update RF propagation profile (coordinates owner/staff only in serializer)."""
+        node = self.get_object()
+        if request.method == "GET":
+            try:
+                profile = node.rf_profile
+            except NodeRfProfile.DoesNotExist:
+                return Response(status=status.HTTP_204_NO_CONTENT)
+            ser = NodeRfProfileSerializer(profile, context=self.get_serializer_context())
+            return Response(ser.data)
+        if not user_can_edit_observed_node_rf_profile(request.user, node):
+            raise PermissionDenied()
+        profile, _ = NodeRfProfile.objects.get_or_create(observed_node=node)
+        ser = NodeRfProfileUpdateSerializer(
+            data=request.data,
+            partial=True,
+            context={**self.get_serializer_context(), "profile": profile},
+        )
+        ser.is_valid(raise_exception=True)
+        for attr, value in ser.validated_data.items():
+            setattr(profile, attr, value)
+        profile.save()
+        return Response(NodeRfProfileSerializer(profile, context=self.get_serializer_context()).data)
+
+    @action(detail=True, methods=["get"], url_path="rf-propagation")
+    def rf_propagation(self, request, node_id=None):
+        """Return latest RF propagation render row, or ``status: none`` when none exist."""
+        node = self.get_object()
+        render = node.latest_rf_render()
+        if render is None:
+            return Response({"status": "none"})
+        ser = NodeRfPropagationRenderSerializer(render, context=self.get_serializer_context())
+        return Response(ser.data)
+
+    @action(detail=True, methods=["post"], url_path="rf-propagation/recompute")
+    def rf_propagation_recompute(self, request, node_id=None):
+        """Queue a new propagation render (worker wiring deferred to plan 2)."""
+        node = self.get_object()
+        if not user_can_edit_observed_node_rf_profile(request.user, node):
+            raise PermissionDenied()
+        row = NodeRfPropagationRender.objects.create(
+            observed_node=node,
+            status=NodeRfPropagationRender.Status.PENDING,
+        )
+        # TODO(plan-2): enqueue render task
+        ser = NodeRfPropagationRenderSerializer(row, context=self.get_serializer_context())
+        return Response(ser.data, status=status.HTTP_201_CREATED)
 
 
 class DeviceMetricsBulkView(APIView):
