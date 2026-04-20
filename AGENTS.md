@@ -95,6 +95,8 @@ python manage.py migrate && python manage.py run_deploy_tasks
 Always update openapi.yaml when modifying API contract. openapi.yaml is the contract shared between API and clients;
 where the code deviates from openapi.yaml, the OpenAPI spec is often correct. Check for what to do if this happens.
 
+- **Redis**: logical database usage (Channels, Celery, cache, planned RF engine) is documented in **[docs/REDIS.md](docs/REDIS.md)**. Update that file when introducing a new Redis consumer or changing DB indices.
+
 ## Source control
 
 When asked to create a pull request description, follow the template at
