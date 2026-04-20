@@ -32,3 +32,7 @@ LOGGING = {}
 # Disable CORS for tests
 CORS_ALLOWED_ORIGINS = []
 CORS_ALLOW_CREDENTIALS = False
+
+# Run Celery tasks synchronously in tests so `.delay()` invokes the task in-process.
+CELERY_TASK_ALWAYS_EAGER = True
+CELERY_TASK_EAGER_PROPAGATES = True
