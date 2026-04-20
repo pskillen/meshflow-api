@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from django.contrib.auth.models import AnonymousUser
 from django.db import IntegrityError
 from django.urls import reverse
@@ -9,6 +11,29 @@ from rest_framework.test import APIClient, APIRequestFactory
 from common.mesh_node_helpers import meshtastic_id_to_hex
 from nodes.models import AntennaPattern, NodeRfProfile, NodeRfPropagationRender
 from nodes.serializers import NodeRfProfileSerializer
+
+
+@pytest.fixture
+def stub_render_task():
+    """Replace ``render_rf_propagation.delay`` with a no-op so endpoint tests
+    don't trigger the real engine via Celery ``ALWAYS_EAGER``."""
+    with patch("rf_propagation.tasks.render_rf_propagation.delay") as mock_delay:
+        yield mock_delay
+
+
+def _rf_profile_fields(**overrides):
+    data = {
+        "rf_latitude": 55.861,
+        "rf_longitude": -4.251,
+        "rf_altitude_m": 80.0,
+        "antenna_height_m": 6.0,
+        "antenna_gain_dbi": 3.0,
+        "tx_power_dbm": 27.0,
+        "rf_frequency_mhz": 869.525,
+        "antenna_pattern": AntennaPattern.OMNI,
+    }
+    data.update(overrides)
+    return data
 
 
 @pytest.mark.django_db
@@ -200,13 +225,14 @@ def test_rf_profile_patch_owner_staff_stranger_unauth(create_observed_node, crea
 
 
 @pytest.mark.django_db
-def test_rf_propagation_get_none_then_pending(create_observed_node, create_user):
+def test_rf_propagation_get_none_then_pending(create_observed_node, create_user, stub_render_task):
     owner = create_user()
     node = create_observed_node(
         node_id=810_810_810,
         node_id_str=meshtastic_id_to_hex(810_810_810),
         claimed_by=owner,
     )
+    NodeRfProfile.objects.create(observed_node=node, **_rf_profile_fields())
     client = APIClient()
     client.force_authenticate(user=owner)
     url = reverse("observed-node-rf-propagation", kwargs={"node_id": node.node_id})
@@ -218,6 +244,7 @@ def test_rf_propagation_get_none_then_pending(create_observed_node, create_user)
     r1 = client.post(rec_url, {}, format="json")
     assert r1.status_code == status.HTTP_201_CREATED
     assert r1.data["status"] == "pending"
+    assert stub_render_task.call_count == 1
 
     r2 = client.get(url)
     assert r2.status_code == status.HTTP_200_OK
@@ -241,19 +268,104 @@ def test_rf_propagation_recompute_forbidden_stranger(create_observed_node, creat
 
 
 @pytest.mark.django_db
-def test_rf_propagation_recompute_creates_row(create_observed_node, create_user):
+def test_rf_propagation_recompute_creates_row(create_observed_node, create_user, stub_render_task):
     owner = create_user()
     node = create_observed_node(
         node_id=812_812_812,
         node_id_str=meshtastic_id_to_hex(812_812_812),
         claimed_by=owner,
     )
+    NodeRfProfile.objects.create(observed_node=node, **_rf_profile_fields())
     client = APIClient()
     client.force_authenticate(user=owner)
     url = reverse("observed-node-rf-propagation-recompute", kwargs={"node_id": node.node_id})
     response = client.post(url, {}, format="json")
     assert response.status_code == status.HTTP_201_CREATED
     assert NodeRfPropagationRender.objects.filter(observed_node=node).count() == 1
+    stub_render_task.assert_called_once()
+
+
+@pytest.mark.django_db
+def test_rf_propagation_recompute_400_when_no_profile(create_observed_node, create_user, stub_render_task):
+    owner = create_user()
+    node = create_observed_node(
+        node_id=812_812_813,
+        node_id_str=meshtastic_id_to_hex(812_812_813),
+        claimed_by=owner,
+    )
+    client = APIClient()
+    client.force_authenticate(user=owner)
+    url = reverse("observed-node-rf-propagation-recompute", kwargs={"node_id": node.node_id})
+    response = client.post(url, {}, format="json")
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    stub_render_task.assert_not_called()
+
+
+@pytest.mark.django_db
+def test_rf_propagation_recompute_dedup_returns_in_flight(create_observed_node, create_user, stub_render_task):
+    owner = create_user()
+    node = create_observed_node(
+        node_id=812_812_814,
+        node_id_str=meshtastic_id_to_hex(812_812_814),
+        claimed_by=owner,
+    )
+    NodeRfProfile.objects.create(observed_node=node, **_rf_profile_fields())
+    client = APIClient()
+    client.force_authenticate(user=owner)
+    url = reverse("observed-node-rf-propagation-recompute", kwargs={"node_id": node.node_id})
+
+    first = client.post(url, {}, format="json")
+    assert first.status_code == status.HTTP_201_CREATED
+    second = client.post(url, {}, format="json")
+    assert second.status_code == status.HTTP_200_OK
+    assert second.data["created_at"] == first.data["created_at"]
+    assert second.data["input_hash"] == first.data["input_hash"]
+    assert NodeRfPropagationRender.objects.filter(observed_node=node).count() == 1
+    assert stub_render_task.call_count == 1
+
+
+@pytest.mark.django_db
+def test_rf_propagation_recompute_cache_hit_reuses_asset(settings, create_observed_node, create_user, stub_render_task):
+    import tempfile
+    from pathlib import Path
+
+    from rf_propagation.hashing import compute_input_hash
+    from rf_propagation.payload import build_request
+
+    owner = create_user()
+    node = create_observed_node(
+        node_id=812_812_815,
+        node_id_str=meshtastic_id_to_hex(812_812_815),
+        claimed_by=owner,
+    )
+    profile = NodeRfProfile.objects.create(observed_node=node, **_rf_profile_fields())
+
+    with tempfile.TemporaryDirectory() as tmp:
+        settings.RF_PROPAGATION_ASSET_DIR = tmp
+        payload = build_request(profile)
+        input_hash = compute_input_hash(profile, extras={"radius_m": int(payload["radius"])})
+        Path(tmp, f"{input_hash}.png").write_bytes(b"\x89PNG\r\n\x1a\n")
+        NodeRfPropagationRender.objects.create(
+            observed_node=node,
+            status=NodeRfPropagationRender.Status.READY,
+            input_hash=input_hash,
+            asset_filename=f"{input_hash}.png",
+            bounds_west=-5.0,
+            bounds_south=55.0,
+            bounds_east=-3.5,
+            bounds_north=56.5,
+        )
+
+        client = APIClient()
+        client.force_authenticate(user=owner)
+        url = reverse("observed-node-rf-propagation-recompute", kwargs={"node_id": node.node_id})
+        response = client.post(url, {}, format="json")
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data["status"] == "ready"
+    assert response.data["input_hash"] == input_hash
+    assert response.data["asset_url"] is not None
+    stub_render_task.assert_not_called()
 
 
 @pytest.mark.django_db
