@@ -912,6 +912,17 @@ components:
           description: >
             True when the authenticated user may PATCH environment-settings for this node
             (staff or claim owner). Omitted or false for unauthenticated requests.
+        rf_profile_editable:
+          type: boolean
+          description: >
+            True when the authenticated user may PATCH rf-profile for this node
+            (staff or claim owner). False for unauthenticated requests.
+        has_rf_profile:
+          type: boolean
+          description: Whether an RF profile row exists for this node.
+        has_ready_rf_render:
+          type: boolean
+          description: Whether the latest RF propagation render for this node has status ready.
         latest_position:
           $ref: '#/components/schemas/Position'
         latest_device_metrics:
@@ -943,6 +954,128 @@ components:
           description: >
             The current user's claim for this node, if any. Only present for authenticated requests.
             Null when the user has no claim. Use accepted_at to distinguish pending vs accepted claims.
+
+    RfProfile:
+      type: object
+      description: >
+        RF propagation parameters. Public antenna fields are always present when a profile exists.
+        Private location fields (rf_latitude, rf_longitude, rf_altitude_m) are omitted unless the
+        authenticated user is staff or the node claim owner (claimed_by).
+      properties:
+        antenna_height_m:
+          type: number
+          nullable: true
+        antenna_gain_dbi:
+          type: number
+          nullable: true
+        tx_power_dbm:
+          type: number
+          nullable: true
+        rf_frequency_mhz:
+          type: number
+          nullable: true
+        antenna_pattern:
+          type: string
+          enum: [omni, directional]
+        antenna_azimuth_deg:
+          type: number
+          nullable: true
+        antenna_beamwidth_deg:
+          type: number
+          nullable: true
+        rf_latitude:
+          type: number
+          nullable: true
+          description: Omitted for anonymous users and non-owners (unless staff).
+        rf_longitude:
+          type: number
+          nullable: true
+          description: Omitted for anonymous users and non-owners (unless staff).
+        rf_altitude_m:
+          type: number
+          nullable: true
+          description: Omitted for anonymous users and non-owners (unless staff).
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    RfProfileUpdate:
+      type: object
+      description: Partial update body for PATCH rf-profile. Validated ranges apply server-side.
+      properties:
+        rf_latitude:
+          type: number
+          nullable: true
+        rf_longitude:
+          type: number
+          nullable: true
+        rf_altitude_m:
+          type: number
+          nullable: true
+        antenna_height_m:
+          type: number
+          nullable: true
+        antenna_gain_dbi:
+          type: number
+          nullable: true
+        tx_power_dbm:
+          type: number
+          nullable: true
+        rf_frequency_mhz:
+          type: number
+          nullable: true
+        antenna_pattern:
+          type: string
+          enum: [omni, directional]
+        antenna_azimuth_deg:
+          type: number
+          nullable: true
+        antenna_beamwidth_deg:
+          type: number
+          nullable: true
+
+    RfPropagationRender:
+      type: object
+      description: >
+        One propagation render job. asset_url is omitted unless status is ready and an asset file exists.
+      properties:
+        status:
+          type: string
+          enum: [pending, running, ready, failed]
+        input_hash:
+          type: string
+          nullable: true
+        asset_url:
+          type: string
+          format: uri
+          nullable: true
+        bounds:
+          type: object
+          nullable: true
+          properties:
+            west: { type: number }
+            south: { type: number }
+            east: { type: number }
+            north: { type: number }
+        error_message:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    RfPropagationStatusNone:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [none]
 
     ObservedNodeWatchSummary:
       description: >
@@ -3814,6 +3947,147 @@ paths:
           description: Invalid body (e.g. no fields provided)
         '403':
           description: Forbidden (not staff or claim owner)
+
+  /nodes/observed-nodes/{node_id}/rf-profile/:
+    get:
+      summary: Get RF propagation profile for an observed node
+      description: >
+        Returns the RF profile when one exists. Responds with 204 No Content when no profile has been
+        created yet. Private coordinates are only included for staff or the claim owner.
+      tags: [Nodes]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: node_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: RF profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RfProfile'
+        '204':
+          description: No RF profile exists for this node yet
+        '401':
+          description: Unauthenticated
+    patch:
+      summary: Create or update RF propagation profile
+      description: Staff or claim owner only. Uses get-or-create on first PATCH.
+      tags: [Nodes]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: node_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RfProfileUpdate'
+      responses:
+        '200':
+          description: Updated RF profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RfProfile'
+        '400':
+          description: Validation error
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden (not staff or claim owner)
+
+  /nodes/observed-nodes/{node_id}/rf-propagation/:
+    get:
+      summary: Get latest RF propagation render for an observed node
+      description: >
+        Returns the most recent render row, or `{"status":"none"}` when no renders exist yet.
+      tags: [Nodes]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: node_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Latest render or none sentinel
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/RfPropagationRender'
+                  - $ref: '#/components/schemas/RfPropagationStatusNone'
+
+  /nodes/observed-nodes/{node_id}/rf-propagation/recompute/:
+    post:
+      summary: Queue a new RF propagation render
+      description: >
+        Creates a render row in pending status. Worker dispatch is not implemented yet (plan 2).
+        Staff or claim owner only.
+      tags: [Nodes]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: node_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '201':
+          description: New pending render row
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RfPropagationRender'
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden (not staff or claim owner)
+
+  /nodes/observed-nodes/{node_id}/rf-propagation/asset/{filename}:
+    get:
+      summary: Download cached RF propagation map PNG
+      description: >
+        Public endpoint. Serves a PNG from RF_PROPAGATION_ASSET_DIR when the worker has written it;
+        returns 404 until then. Filenames must be a single path segment ending in .png (no traversal).
+      tags: [Nodes]
+      parameters:
+        - name: node_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: filename
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[A-Za-z0-9_-]+\.png$'
+      responses:
+        '200':
+          description: PNG image
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: Invalid filename
+        '404':
+          description: Asset not found on disk
 
   /nodes/managed-nodes/:
     get:
