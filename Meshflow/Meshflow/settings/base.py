@@ -143,6 +143,18 @@ CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", _celery_broker_url)
 CELERY_RESULT_BACKEND = CELERY_BROKER_URL
 CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
 
+# Django cache (Redis DB 2; channels use DB 0, Celery broker DB 1)
+_cache_url = f"redis://:{_redis_password}@{_redis_host}:{_redis_port}/2"
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": _cache_url,
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        },
+    },
+}
+
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 

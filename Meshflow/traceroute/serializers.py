@@ -183,6 +183,7 @@ class TracerouteListSerializer(serializers.ModelSerializer):
             "raw_packet",
             "completed_at",
             "error_message",
+            "target_strategy",
         ]
         read_only_fields = fields
 
@@ -223,6 +224,7 @@ class AutoTraceRouteSerializer(serializers.ModelSerializer):
             "raw_packet",
             "completed_at",
             "error_message",
+            "target_strategy",
         ]
         read_only_fields = fields
 
@@ -284,4 +286,17 @@ class TriggerTracerouteSerializer(serializers.Serializer):
     managed_node_id = serializers.IntegerField(help_text="Node ID of the ManagedNode (source/bot)")
     target_node_id = serializers.IntegerField(
         required=False, allow_null=True, help_text="Target ObservedNode node_id (optional for auto)"
+    )
+    target_strategy = serializers.ChoiceField(
+        choices=[
+            AutoTraceRoute.TARGET_STRATEGY_INTRA_ZONE,
+            AutoTraceRoute.TARGET_STRATEGY_DX_ACROSS,
+            AutoTraceRoute.TARGET_STRATEGY_DX_SAME_SIDE,
+        ],
+        required=False,
+        allow_null=True,
+        help_text=(
+            "Optional hypothesis selector when auto-picking target; recorded on the row "
+            "when triggering with an explicit target as well."
+        ),
     )

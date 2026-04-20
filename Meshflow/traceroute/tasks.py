@@ -2,7 +2,6 @@
 
 import logging
 import os
-import random
 from datetime import date, datetime, timedelta
 
 from django.db.models import Count
@@ -14,7 +13,8 @@ from channels.layers import get_channel_layer
 from tqdm import tqdm
 
 from .models import AutoTraceRoute
-from .source_eligibility import eligible_auto_traceroute_sources_queryset
+from .source_selection import select_traceroute_source
+from .strategy_rotation import pick_strategy_for_feeder, record_strategy_run
 from .target_selection import pick_traceroute_target
 from .ws_notify import notify_traceroute_status_changed
 
@@ -27,23 +27,32 @@ FAILED_TR_TIMEOUT_SECONDS = int(FAILED_TR_TIMEOUT_SECONDS)
 @shared_task
 def schedule_traceroutes():
     """
-    Run periodically (e.g. every 2h). Pick one random ManagedNode with recent packet
-    ingestion as observer, pick one target, create AutoTraceRoute (trigger_type=auto,
-    trigger_source=scheduler), send traceroute command via channel layer.
+    Run periodically (cadence may vary). Pick one eligible ManagedNode via
+    ``select_traceroute_source``, rotate target strategy via Redis LRU, pick target,
+    create AutoTraceRoute (trigger_type=auto, trigger_source=scheduler), send command.
     """
     channel_layer = get_channel_layer()
-    managed_nodes = list(eligible_auto_traceroute_sources_queryset())
-    if not managed_nodes:
+
+    source_node = select_traceroute_source()
+    if not source_node:
         logger.info(
             "schedule_traceroutes: no eligible sources (allow_auto_traceroute with "
             "ingestion within SCHEDULE_TRACEROUTE_SOURCE_RECENCY_SECONDS)"
         )
         return {"created": 0}
 
-    source_node = random.choice(managed_nodes)
-    target_node = pick_traceroute_target(source_node)
+    strategy = pick_strategy_for_feeder(source_node)
+    if not strategy:
+        logger.debug("schedule_traceroutes: no applicable strategy for node %s", source_node.node_id_str)
+        return {"created": 0}
+
+    target_node = pick_traceroute_target(source_node, strategy=strategy)
     if not target_node:
-        logger.debug("schedule_traceroutes: no target for node %s", source_node.node_id_str)
+        logger.debug(
+            "schedule_traceroutes: no target for node %s strategy=%s",
+            source_node.node_id_str,
+            strategy,
+        )
         return {"created": 0}
 
     auto_tr = AutoTraceRoute.objects.create(
@@ -52,8 +61,10 @@ def schedule_traceroutes():
         trigger_type=AutoTraceRoute.TRIGGER_TYPE_AUTO,
         triggered_by=None,
         trigger_source="scheduler",
+        target_strategy=strategy,
         status=AutoTraceRoute.STATUS_PENDING,
     )
+    record_strategy_run(source_node, strategy)
 
     async_to_sync(channel_layer.group_send)(
         f"node_{source_node.node_id}",

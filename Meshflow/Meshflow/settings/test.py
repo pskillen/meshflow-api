@@ -1,5 +1,13 @@
 from .base import *  # noqa
 
+# Tests use locmem cache so pytest does not require Redis for django.core.cache
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "meshflow-test-cache",
+    },
+}
+
 # Use in-memory channel layer for testing (no Redis required)
 CHANNEL_LAYERS = {
     "default": {
