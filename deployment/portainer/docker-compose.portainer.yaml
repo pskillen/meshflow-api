@@ -215,7 +215,7 @@ services:
     image: ghcr.io/pskillen/meshflow-rf-propagation:${RF_PROPAGATION_TAG:-latest-dev}
     restart: unless-stopped
     ports:
-      - "${RF_PROPAGATION_HTTP_PORT:-8020}:8080"
+      - "${RF_PROPAGATION_HTTP_PORT}:8080"
     environment:
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/3
       SDF_DIR: /data/sdf
