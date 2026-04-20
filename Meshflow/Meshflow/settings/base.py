@@ -144,6 +144,13 @@ CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", _celery_broker_url)
 CELERY_RESULT_BACKEND = CELERY_BROKER_URL
 CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
 
+# RF propagation cached PNGs (on-disk; Celery worker writes in plan 2)
+RF_PROPAGATION_ASSET_DIR = Path(
+    os.environ.get("RF_PROPAGATION_ASSET_DIR", "/var/meshflow/generated-assets/rf-propagation")
+)
+# Reserved for plan 2 (Site Planner HTTP client)
+RF_PROPAGATION_ENGINE_URL = os.environ.get("RF_PROPAGATION_ENGINE_URL", "")
+
 # Django cache (Redis DB 2; channels use DB 0, Celery broker DB 1)
 _cache_url = f"redis://:{_redis_password}@{_redis_host}:{_redis_port}/2"
 CACHES = {
