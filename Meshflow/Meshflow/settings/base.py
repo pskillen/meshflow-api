@@ -143,13 +143,27 @@ _celery_broker_url = f"redis://:{_redis_password}@{_redis_host}:{_redis_port}/1"
 CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", _celery_broker_url)
 CELERY_RESULT_BACKEND = CELERY_BROKER_URL
 CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
+# Route heavy RF propagation renders to a dedicated queue consumed by celery-rf-worker;
+# keep the default "celery" queue so the existing worker picks up everything else.
+CELERY_TASK_DEFAULT_QUEUE = "celery"
+CELERY_TASK_ROUTES = {
+    "nodes.tasks.render_rf_propagation": {"queue": "rf_renders"},
+}
 
-# RF propagation cached PNGs (on-disk; Celery worker writes in plan 2)
+# RF propagation cached PNGs (on-disk; written by the Celery worker).
 RF_PROPAGATION_ASSET_DIR = Path(
     os.environ.get("RF_PROPAGATION_ASSET_DIR", "/var/meshflow/generated-assets/rf-propagation")
 )
-# Reserved for plan 2 (Site Planner HTTP client)
+# Meshtastic Site Planner engine base URL (FastAPI service, see deployment/docker-compose.yaml).
 RF_PROPAGATION_ENGINE_URL = os.environ.get("RF_PROPAGATION_ENGINE_URL", "")
+# Bump this to invalidate every cached render (pipeline or post-processing change).
+RF_PROPAGATION_RENDER_VERSION = os.environ.get("RF_PROPAGATION_RENDER_VERSION", "1")
+# Default bbox radius around the tx (metres) when the profile does not specify one.
+RF_PROPAGATION_DEFAULT_RADIUS_M = int(os.environ.get("RF_PROPAGATION_DEFAULT_RADIUS_M", "20000"))
+# Upper bound (seconds) for polling engine job status inside the Celery task.
+RF_PROPAGATION_POLL_MAX_SECONDS = int(os.environ.get("RF_PROPAGATION_POLL_MAX_SECONDS", "300"))
+# Per-node retention: how many ``ready`` renders to keep on disk before GC.
+RF_PROPAGATION_READY_RETENTION = int(os.environ.get("RF_PROPAGATION_READY_RETENTION", "3"))
 
 # Django cache (Redis DB 2; channels use DB 0, Celery broker DB 1)
 _cache_url = f"redis://:{_redis_password}@{_redis_host}:{_redis_port}/2"

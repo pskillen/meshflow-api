@@ -51,6 +51,27 @@
             "env": {
                 "DJANGO_SETTINGS_MODULE": "Meshflow.settings.monolith"
             }
+        },
+        {
+            "name": "Celery RF worker (rf_renders queue)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "celery",
+            "args": [
+                "-A", "Meshflow",
+                "worker",
+                "-Q", "rf_renders",
+                "-l", "info",
+                "--concurrency=1",
+                "--pool=solo"
+            ],
+            "cwd": "${workspaceFolder}/Meshflow",
+            "python": "${workspaceFolder}/venv/bin/python",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "env": {
+                "DJANGO_SETTINGS_MODULE": "Meshflow.settings.monolith"
+            }
         }
     ]
 }

@@ -660,17 +660,140 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
         ser = NodeRfPropagationRenderSerializer(render, context=self.get_serializer_context())
         return Response(ser.data)
 
-    @action(detail=True, methods=["post"], url_path="rf-propagation/recompute")
-    def rf_propagation_recompute(self, request, node_id=None):
-        """Queue a new propagation render (worker wiring deferred to plan 2)."""
+    @action(detail=True, methods=["post"], url_path="rf-propagation/dismiss")
+    def rf_propagation_dismiss(self, request, node_id=None):
+        """Delete every non-``ready`` render row for this node.
+
+        Powers the UI "Cancel" (while ``pending``/``running``) and "Dismiss"
+        (while ``failed``) actions — the same discard semantics, one DELETE
+        endpoint. ``ready`` rows are preserved so the currently-served map
+        keeps working until the operator queues a fresh render.
+
+        The worker is resilient to the row vanishing mid-flight: it catches
+        ``DoesNotExist`` on pickup/status-check and returns without writing.
+        """
         node = self.get_object()
         if not user_can_edit_observed_node_rf_profile(request.user, node):
             raise PermissionDenied()
+
+        deleted, _ = (
+            NodeRfPropagationRender.objects.filter(observed_node=node)
+            .exclude(status=NodeRfPropagationRender.Status.READY)
+            .delete()
+        )
+        return Response({"deleted": deleted}, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post"], url_path="rf-propagation/cancel")
+    def rf_propagation_cancel(self, request, node_id=None):
+        """Mark any in-flight (``pending``/``running``) renders for this node as failed.
+
+        Lets the user abandon a stuck render so the next ``recompute`` starts
+        fresh. The worker picks up the status flip on its next DB read and
+        bails without writing an asset (see ``render_rf_propagation``).
+        """
+        node = self.get_object()
+        if not user_can_edit_observed_node_rf_profile(request.user, node):
+            raise PermissionDenied()
+
+        cancelled = NodeRfPropagationRender.objects.filter(
+            observed_node=node,
+            status__in=[
+                NodeRfPropagationRender.Status.PENDING,
+                NodeRfPropagationRender.Status.RUNNING,
+            ],
+        ).update(
+            status=NodeRfPropagationRender.Status.FAILED,
+            error_message="Cancelled by user",
+            completed_at=timezone.now(),
+        )
+        return Response({"cancelled": cancelled}, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post"], url_path="rf-propagation/recompute")
+    def rf_propagation_recompute(self, request, node_id=None):
+        """Queue a new propagation render.
+
+        Dedup strategy:
+
+        1. If a ``ready`` render with a matching content hash already exists
+           (and its PNG is still on disk), reuse it — no new row.
+        2. Else if a ``pending``/``running`` render exists for this node,
+           return that row without enqueueing another task.
+        3. Otherwise create a new ``pending`` row and dispatch the Celery
+           task.
+        """
+        node = self.get_object()
+        if not user_can_edit_observed_node_rf_profile(request.user, node):
+            raise PermissionDenied()
+
+        try:
+            profile = node.rf_profile
+        except NodeRfProfile.DoesNotExist:
+            return Response(
+                {"detail": "Set an RF profile before requesting a propagation render."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Compute hash + radius up front so cache lookup and eventual task agree.
+        from rf_propagation.hashing import compute_input_hash
+        from rf_propagation.payload import InvalidProfileError, build_request
+        from rf_propagation.tasks import render_rf_propagation
+
+        try:
+            payload = build_request(profile)
+        except InvalidProfileError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        input_hash = compute_input_hash(profile, extras={"radius_m": int(payload["radius"])})
+
+        asset_dir = Path(settings.RF_PROPAGATION_ASSET_DIR)
+        cache_hit = (
+            NodeRfPropagationRender.objects.filter(
+                status=NodeRfPropagationRender.Status.READY,
+                input_hash=input_hash,
+            )
+            .order_by("-created_at")
+            .first()
+        )
+        if cache_hit is not None and cache_hit.asset_filename:
+            if (asset_dir / cache_hit.asset_filename).is_file():
+                if cache_hit.observed_node_id == node.pk:
+                    ser = NodeRfPropagationRenderSerializer(cache_hit, context=self.get_serializer_context())
+                    return Response(ser.data, status=status.HTTP_200_OK)
+                row = NodeRfPropagationRender.objects.create(
+                    observed_node=node,
+                    status=NodeRfPropagationRender.Status.READY,
+                    input_hash=input_hash,
+                    asset_filename=cache_hit.asset_filename,
+                    bounds_west=cache_hit.bounds_west,
+                    bounds_south=cache_hit.bounds_south,
+                    bounds_east=cache_hit.bounds_east,
+                    bounds_north=cache_hit.bounds_north,
+                    completed_at=timezone.now(),
+                )
+                ser = NodeRfPropagationRenderSerializer(row, context=self.get_serializer_context())
+                return Response(ser.data, status=status.HTTP_201_CREATED)
+
+        in_flight = (
+            NodeRfPropagationRender.objects.filter(
+                observed_node=node,
+                status__in=[
+                    NodeRfPropagationRender.Status.PENDING,
+                    NodeRfPropagationRender.Status.RUNNING,
+                ],
+            )
+            .order_by("-created_at")
+            .first()
+        )
+        if in_flight is not None:
+            ser = NodeRfPropagationRenderSerializer(in_flight, context=self.get_serializer_context())
+            return Response(ser.data, status=status.HTTP_200_OK)
+
         row = NodeRfPropagationRender.objects.create(
             observed_node=node,
             status=NodeRfPropagationRender.Status.PENDING,
+            input_hash=input_hash,
         )
-        # TODO(plan-2): enqueue render task
+        render_rf_propagation.delay(row.pk)
         ser = NodeRfPropagationRenderSerializer(row, context=self.get_serializer_context())
         return Response(ser.data, status=status.HTTP_201_CREATED)
 

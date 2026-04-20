@@ -31,9 +31,9 @@ Configuration lives in [`Meshflow/Meshflow/settings/base.py`](../Meshflow/Meshfl
     - **`discord_connect_oauth:{nonce}`** — one-time Discord OAuth link nonces ([`Meshflow/users/discord_connect_oauth.py`](../Meshflow/users/discord_connect_oauth.py)); TTL **900 s** (`STATE_MAX_AGE`).
   - Prefer **feature prefixes** (`tr:`, `discord_connect_oauth:`) so keys are identifiable in `KEYS`/monitoring.
 
-- **DB 3 — Meshtastic Site Planner engine (planned)**  
-  - **Purpose:** Reserved for the **`meshflow-rf-propagation`** / Meshtastic Site Planner sibling container when added to Compose. The engine uses Redis for its **own** async prediction task state (task IDs, status); Meshflow API code does **not** read this DB directly — only HTTP calls to the engine.  
-  - **Important:** DB **2** must **not** be reused for Site Planner: it is already Django cache (see above). Configure the engine with e.g. `REDIS_URL=redis://redis:6379/3`.
+- **DB 3 — Meshtastic Site Planner engine**
+  - **Purpose:** Consumed by the **`rf-propagation`** (a.k.a. `site-planner` in Portainer) sibling container running the Meshtastic Site Planner image. The engine uses Redis for its **own** async prediction task state (task IDs, status); Meshflow API code does **not** read this DB directly — only HTTP calls to the engine (see [docs/features/rf_propagation/README.md](features/rf_propagation/README.md)).
+  - **Important:** DB **2** must **not** be reused for Site Planner: it is already Django cache (see above). Configure the engine with `REDIS_URL=redis://redis:6379/3` locally, or `redis://:${REDIS_PASSWORD}@redis:6379/3` in Portainer where Redis runs with `--requirepass`.
 
 ---
 
@@ -57,7 +57,7 @@ Redis-related variables used by Meshflow settings:
 | `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD` | Build URLs for Channels (DB 0), Celery (DB 1), cache (DB 2) in `settings/base.py`. |
 | `CELERY_BROKER_URL` | Optional override for Celery broker + result backend (defaults to `redis://…/1`). |
 
-RF propagation engine (when deployed): **`RF_PROPAGATION_ENGINE_URL`** is consumed by Meshflow task code (planned); the engine container uses **`REDIS_URL`** pointing at DB **3** so it does not collide with Django cache on DB 2.
+RF propagation engine: **`RF_PROPAGATION_ENGINE_URL`** is consumed by the Celery render task (`rf_propagation.tasks.render_rf_propagation`); the engine container uses **`REDIS_URL`** pointing at DB **3** so it does not collide with Django cache on DB 2.
 
 ---
 

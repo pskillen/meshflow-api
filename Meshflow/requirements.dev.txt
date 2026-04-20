@@ -7,10 +7,12 @@ pytest-mock~=3.12
 pytest-factoryboy~=2.5
 factory-boy~=3.3
 coverage~=7.4
+respx~=0.23
 
 # Development tools
 black~=26.1
 flake8~=7.3
+flake8-quotes~=3.4
 isort~=8.0
 
 # live reload
