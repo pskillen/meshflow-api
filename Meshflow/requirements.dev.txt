@@ -7,6 +7,7 @@ pytest-mock~=3.12
 pytest-factoryboy~=2.5
 factory-boy~=3.3
 coverage~=7.4
+respx~=0.23
 
 # Development tools
 black~=26.1
