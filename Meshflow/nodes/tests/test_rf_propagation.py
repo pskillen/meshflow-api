@@ -369,6 +369,133 @@ def test_rf_propagation_recompute_cache_hit_reuses_asset(settings, create_observ
 
 
 @pytest.mark.django_db
+def test_rf_propagation_cancel_marks_in_flight_as_failed(create_observed_node, create_user, stub_render_task):
+    owner = create_user()
+    node = create_observed_node(
+        node_id=812_812_816,
+        node_id_str=meshtastic_id_to_hex(812_812_816),
+        claimed_by=owner,
+    )
+    NodeRfProfile.objects.create(observed_node=node, **_rf_profile_fields())
+    client = APIClient()
+    client.force_authenticate(user=owner)
+
+    recompute_url = reverse("observed-node-rf-propagation-recompute", kwargs={"node_id": node.node_id})
+    cancel_url = reverse("observed-node-rf-propagation-cancel", kwargs={"node_id": node.node_id})
+
+    client.post(recompute_url, {}, format="json")
+    assert (
+        NodeRfPropagationRender.objects.filter(
+            observed_node=node,
+            status=NodeRfPropagationRender.Status.PENDING,
+        ).count()
+        == 1
+    )
+
+    response = client.post(cancel_url, {}, format="json")
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data["cancelled"] == 1
+
+    row = NodeRfPropagationRender.objects.get(observed_node=node)
+    assert row.status == NodeRfPropagationRender.Status.FAILED
+    assert row.error_message == "Cancelled by user"
+    assert row.completed_at is not None
+
+
+@pytest.mark.django_db
+def test_rf_propagation_cancel_is_noop_when_nothing_in_flight(create_observed_node, create_user):
+    owner = create_user()
+    node = create_observed_node(
+        node_id=812_812_817,
+        node_id_str=meshtastic_id_to_hex(812_812_817),
+        claimed_by=owner,
+    )
+    client = APIClient()
+    client.force_authenticate(user=owner)
+    cancel_url = reverse("observed-node-rf-propagation-cancel", kwargs={"node_id": node.node_id})
+
+    response = client.post(cancel_url, {}, format="json")
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data["cancelled"] == 0
+
+
+@pytest.mark.django_db
+def test_rf_propagation_cancel_allows_new_recompute(create_observed_node, create_user, stub_render_task):
+    owner = create_user()
+    node = create_observed_node(
+        node_id=812_812_818,
+        node_id_str=meshtastic_id_to_hex(812_812_818),
+        claimed_by=owner,
+    )
+    NodeRfProfile.objects.create(observed_node=node, **_rf_profile_fields())
+    client = APIClient()
+    client.force_authenticate(user=owner)
+    recompute_url = reverse("observed-node-rf-propagation-recompute", kwargs={"node_id": node.node_id})
+    cancel_url = reverse("observed-node-rf-propagation-cancel", kwargs={"node_id": node.node_id})
+
+    first = client.post(recompute_url, {}, format="json")
+    assert first.status_code == status.HTTP_201_CREATED
+    client.post(cancel_url, {}, format="json")
+    second = client.post(recompute_url, {}, format="json")
+
+    assert second.status_code == status.HTTP_201_CREATED
+    # First row cancelled, second row freshly dispatched → 2 rows + 2 .delay() calls.
+    assert NodeRfPropagationRender.objects.filter(observed_node=node).count() == 2
+    assert stub_render_task.call_count == 2
+
+
+@pytest.mark.django_db
+def test_rf_propagation_delete_removes_non_ready_rows(create_observed_node, create_user):
+    owner = create_user()
+    node = create_observed_node(
+        node_id=812_812_820,
+        node_id_str=meshtastic_id_to_hex(812_812_820),
+        claimed_by=owner,
+    )
+    NodeRfPropagationRender.objects.create(observed_node=node, status=NodeRfPropagationRender.Status.PENDING)
+    NodeRfPropagationRender.objects.create(
+        observed_node=node,
+        status=NodeRfPropagationRender.Status.FAILED,
+        error_message="boom",
+    )
+    ready = NodeRfPropagationRender.objects.create(
+        observed_node=node,
+        status=NodeRfPropagationRender.Status.READY,
+        asset_filename="h.png",
+    )
+
+    client = APIClient()
+    client.force_authenticate(user=owner)
+    url = reverse("observed-node-rf-propagation-dismiss", kwargs={"node_id": node.node_id})
+    response = client.post(url)
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data["deleted"] == 2
+    # Only the ready row survives.
+    remaining = list(NodeRfPropagationRender.objects.filter(observed_node=node))
+    assert remaining == [ready]
+
+
+@pytest.mark.django_db
+def test_rf_propagation_delete_requires_edit_permission(create_observed_node, create_user):
+    owner = create_user()
+    stranger = create_user(username="stranger", email="stranger@example.com")
+    node = create_observed_node(
+        node_id=812_812_821,
+        node_id_str=meshtastic_id_to_hex(812_812_821),
+        claimed_by=owner,
+    )
+    NodeRfPropagationRender.objects.create(observed_node=node, status=NodeRfPropagationRender.Status.PENDING)
+    client = APIClient()
+    client.force_authenticate(user=stranger)
+    url = reverse("observed-node-rf-propagation-dismiss", kwargs={"node_id": node.node_id})
+    response = client.post(url)
+
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+    assert NodeRfPropagationRender.objects.filter(observed_node=node).count() == 1
+
+
+@pytest.mark.django_db
 def test_observed_node_detail_rf_flags(create_observed_node, create_user):
     owner = create_user()
     node = create_observed_node(

@@ -156,6 +156,21 @@ def render_rf_propagation(self, render_id: int) -> dict:
         logger.warning("render_rf_propagation: render_id=%s vanished", render_id)
         return {"status": "missing"}
 
+    # If the row was already cancelled / completed (e.g. user hit cancel before
+    # the worker picked it up, or the task was re-dispatched after completion),
+    # don't do any of the expensive engine work.
+    terminal_statuses = {
+        NodeRfPropagationRender.Status.READY,
+        NodeRfPropagationRender.Status.FAILED,
+    }
+    if render.status in terminal_statuses:
+        logger.info(
+            "render_rf_propagation.skip_terminal render_id=%s status=%s",
+            render_id,
+            render.status,
+        )
+        return {"status": str(render.status), "render_id": render_id, "skipped": True}
+
     observed_node = render.observed_node
     logger.info("render_rf_propagation.render_start render_id=%s node_id=%s", render_id, observed_node.node_id)
 
@@ -180,6 +195,22 @@ def render_rf_propagation(self, render_id: int) -> dict:
             input_hash,
         )
         return _mirror_ready(render, cache_hit, input_hash)
+
+    # One final cancellation check before committing to the engine roundtrip.
+    # The row may have been cancelled (status flipped) or dismissed (deleted)
+    # by the operator; both mean "don't do the work".
+    try:
+        render.refresh_from_db(fields=["status"])
+    except NodeRfPropagationRender.DoesNotExist:
+        logger.info("render_rf_propagation.dismissed_before_engine render_id=%s", render_id)
+        return {"status": "missing", "render_id": render_id, "skipped": True}
+    if render.status in terminal_statuses:
+        logger.info(
+            "render_rf_propagation.cancelled_before_engine render_id=%s status=%s",
+            render_id,
+            render.status,
+        )
+        return {"status": str(render.status), "render_id": render_id, "skipped": True}
 
     # Engine roundtrip ----------------------------------------------------
     render.status = NodeRfPropagationRender.Status.RUNNING
@@ -229,6 +260,23 @@ def render_rf_propagation(self, render_id: int) -> dict:
         asset_path,
         len(png_bytes),
     )
+
+    # If the operator cancelled or dismissed while the engine was running, the
+    # row is now ``failed`` or gone — don't resurrect it. The PNG is content-
+    # addressed by hash, so it's safe to leave on disk; retention on a future
+    # render will reap it if it's orphaned.
+    try:
+        render.refresh_from_db(fields=["status"])
+    except NodeRfPropagationRender.DoesNotExist:
+        logger.info("render_rf_propagation.dismissed_after_engine render_id=%s", render_id)
+        return {"status": "missing", "render_id": render_id, "skipped": True}
+    if render.status in terminal_statuses:
+        logger.info(
+            "render_rf_propagation.cancelled_after_engine render_id=%s status=%s",
+            render_id,
+            render.status,
+        )
+        return {"status": str(render.status), "render_id": render_id, "skipped": True}
 
     render.status = NodeRfPropagationRender.Status.READY
     render.input_hash = input_hash

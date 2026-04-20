@@ -253,6 +253,94 @@ def test_task_missing_profile_fails_gracefully(asset_dir, create_observed_node):
 
 
 @pytest.mark.django_db
+def test_task_skips_when_row_already_cancelled(asset_dir, create_observed_node):
+    from rf_propagation import tasks as task_mod
+
+    node = create_observed_node(
+        node_id=820_820_827,
+        node_id_str=meshtastic_id_to_hex(820_820_827),
+    )
+    _make_profile(node)
+    render = NodeRfPropagationRender.objects.create(
+        observed_node=node,
+        status=NodeRfPropagationRender.Status.FAILED,
+        error_message="Cancelled by user",
+    )
+
+    with patch.object(task_mod, "SitePlannerClient") as fake_cls:
+        result = task_mod.render_rf_propagation.apply(args=[render.pk]).get()
+
+    assert result.get("skipped") is True
+    fake_cls.assert_not_called()
+    render.refresh_from_db()
+    # Cancellation message preserved; worker did not overwrite.
+    assert render.status == NodeRfPropagationRender.Status.FAILED
+    assert render.error_message == "Cancelled by user"
+
+
+@pytest.mark.django_db
+def test_task_respects_cancellation_during_engine_run(asset_dir, create_observed_node, settings):
+    """A cancel issued while the engine is running must not be overwritten."""
+    from rf_propagation import tasks as task_mod
+
+    settings.RF_PROPAGATION_ENGINE_URL = "http://fake-engine:8080"
+
+    node = create_observed_node(
+        node_id=820_820_828,
+        node_id_str=meshtastic_id_to_hex(820_820_828),
+    )
+    _make_profile(node)
+    render = NodeRfPropagationRender.objects.create(observed_node=node)
+
+    def _cancel_mid_flight(*args, **kwargs):
+        NodeRfPropagationRender.objects.filter(pk=render.pk).update(
+            status=NodeRfPropagationRender.Status.FAILED,
+            error_message="Cancelled by user",
+        )
+        return _tiff_bytes()
+
+    fake = _FakeClient(result=_tiff_bytes())
+    fake.result = _cancel_mid_flight
+
+    with patch.object(task_mod, "SitePlannerClient", return_value=fake):
+        result = task_mod.render_rf_propagation.apply(args=[render.pk]).get()
+
+    assert result.get("skipped") is True
+    render.refresh_from_db()
+    assert render.status == NodeRfPropagationRender.Status.FAILED
+    assert render.error_message == "Cancelled by user"
+
+
+@pytest.mark.django_db
+def test_task_handles_row_deleted_mid_flight(asset_dir, create_observed_node, settings):
+    """Dismiss (DELETE) mid-flight must not crash the worker or revive the row."""
+    from rf_propagation import tasks as task_mod
+
+    settings.RF_PROPAGATION_ENGINE_URL = "http://fake-engine:8080"
+
+    node = create_observed_node(
+        node_id=820_820_829,
+        node_id_str=meshtastic_id_to_hex(820_820_829),
+    )
+    _make_profile(node)
+    render = NodeRfPropagationRender.objects.create(observed_node=node)
+
+    def _dismiss_mid_flight(*args, **kwargs):
+        NodeRfPropagationRender.objects.filter(pk=render.pk).delete()
+        return _tiff_bytes()
+
+    fake = _FakeClient(result=_tiff_bytes())
+    fake.result = _dismiss_mid_flight
+
+    with patch.object(task_mod, "SitePlannerClient", return_value=fake):
+        result = task_mod.render_rf_propagation.apply(args=[render.pk]).get()
+
+    assert result.get("status") == "missing"
+    assert result.get("skipped") is True
+    assert not NodeRfPropagationRender.objects.filter(pk=render.pk).exists()
+
+
+@pytest.mark.django_db
 def test_task_missing_engine_url_fails(asset_dir, create_observed_node, settings):
     from rf_propagation import tasks as task_mod
 
