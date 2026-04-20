@@ -180,6 +180,12 @@ class ObservedNode(models.Model):
         """Return a string representation of the node, including user's short name if available."""
         return f"{self.short_name} ({self.node_id_str})"
 
+    def latest_rf_render(self):
+        """Return the most recent RF propagation render row, or None."""
+        if not self.pk:
+            return None
+        return NodeRfPropagationRender.objects.filter(observed_node=self).order_by("-created_at").first()
+
 
 class NodeLatestStatus(models.Model):
     """Denormalized cache of latest position and device metrics for a node."""
@@ -540,3 +546,80 @@ class NodeOwnerClaim(models.Model):
     claim_key = models.CharField(max_length=64, null=False, blank=False)
     created_at = models.DateTimeField(auto_now_add=True)
     accepted_at = models.DateTimeField(null=True, blank=True)
+
+
+class AntennaPattern(models.TextChoices):
+    """Antenna pattern for RF propagation profile."""
+
+    OMNI = "omni", _("Omni")
+    DIRECTIONAL = "directional", _("Directional")
+
+
+class NodeRfProfile(models.Model):
+    """Operator-set RF parameters for propagation rendering (1:1 with ObservedNode)."""
+
+    observed_node = models.OneToOneField(
+        ObservedNode,
+        on_delete=models.CASCADE,
+        related_name="rf_profile",
+    )
+    rf_latitude = models.FloatField(null=True, blank=True)
+    rf_longitude = models.FloatField(null=True, blank=True)
+    rf_altitude_m = models.FloatField(null=True, blank=True)
+
+    antenna_height_m = models.FloatField(null=True, blank=True)
+    antenna_gain_dbi = models.FloatField(null=True, blank=True)
+    tx_power_dbm = models.FloatField(null=True, blank=True)
+    rf_frequency_mhz = models.FloatField(null=True, blank=True)
+    antenna_pattern = models.CharField(
+        max_length=20,
+        choices=AntennaPattern.choices,
+        default=AntennaPattern.OMNI,
+    )
+    antenna_azimuth_deg = models.FloatField(null=True, blank=True)
+    antenna_beamwidth_deg = models.FloatField(null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = _("Node RF profile")
+        verbose_name_plural = _("Node RF profiles")
+
+
+class NodeRfPropagationRender(models.Model):
+    """One propagation render attempt for an observed node."""
+
+    class Status(models.TextChoices):
+        PENDING = "pending", _("Pending")
+        RUNNING = "running", _("Running")
+        READY = "ready", _("Ready")
+        FAILED = "failed", _("Failed")
+
+    observed_node = models.ForeignKey(
+        ObservedNode,
+        on_delete=models.CASCADE,
+        related_name="rf_renders",
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.PENDING,
+    )
+    input_hash = models.CharField(max_length=128, null=True, blank=True, db_index=True)
+    asset_filename = models.CharField(max_length=256, null=True, blank=True)
+    bounds_west = models.FloatField(null=True, blank=True)
+    bounds_south = models.FloatField(null=True, blank=True)
+    bounds_east = models.FloatField(null=True, blank=True)
+    bounds_north = models.FloatField(null=True, blank=True)
+    error_message = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = _("Node RF propagation render")
+        verbose_name_plural = _("Node RF propagation renders")
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["observed_node", "-created_at"], name="idx_rf_render_node_created"),
+        ]
