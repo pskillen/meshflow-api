@@ -6,19 +6,36 @@ pipeline fits together in production.
 
 ## Architecture
 
-```
-UI                 api (Django)            celery-rf-worker         rf-propagation (Site Planner)
- │                      │                         │                           │
- │ POST /rf-propagation/recompute ─────────────── │                           │
- │                      │── enqueue (rf_renders)─►│                           │
- │ 201 { status: pending, … }                    │ POST /predict ────────────►│
- │                      │                         │ GET /status (polling)◄────│
- │                      │                         │ GET /result (GeoTIFF)◄────│
- │                      │                         │ tiff → png → rf_assets    │
- │                      │                         │ update render row         │
- │ GET /rf-propagation/ (polling)                 │                           │
- │ 200 { status: ready, asset_url, bounds }       │                           │
- │ GET {asset_url} (public PNG) ─────────────────►│                           │
+```mermaid
+sequenceDiagram
+    participant UI
+    participant API as api (Django)
+    participant Q as Redis (DB 1)<br/>rf_renders queue
+    participant W as celery-rf-worker
+    participant E as rf-propagation<br/>(Site Planner)
+    participant FS as rf_assets volume
+
+    UI->>API: POST /rf-propagation/recompute/
+    API->>API: hash profile &amp; dedup (cache / in-flight)
+    API->>Q: enqueue render task (rf_renders)
+    API-->>UI: 201 { status: pending, input_hash }
+
+    W->>Q: BRPOP rf_renders
+    W->>E: POST /predict (lat, lon, frequency_mhz, …)
+    E-->>W: 200 { task_id }
+    loop poll until done
+        W->>E: GET /status/{task_id}
+        E-->>W: { status }
+    end
+    W->>E: GET /result/{task_id}
+    E-->>W: GeoTIFF bytes
+    W->>W: GeoTIFF → PNG
+    W->>FS: write {hash}.png
+    W->>API: UPDATE render row status=ready, bounds, asset_filename
+
+    UI->>API: GET /rf-propagation/ (polling, 5s)
+    API-->>UI: { status: ready, asset_url, bounds }
+    UI->>FS: GET {asset_url} (public PNG)
 ```
 
 Three containers collaborate on every render:
@@ -78,6 +95,48 @@ identical RF profiles therefore share a PNG.
 2. Otherwise return any `pending`/`running` row that already exists for
    the same node without enqueueing another task.
 3. Otherwise create a fresh `pending` row and `.delay()` the render task.
+
+### Cancelling / dismissing a render
+
+There are two flavours of "stop" for non-`ready` rows, both scoped to a
+single node and both requiring the same permission as `recompute`:
+
+- **`POST .../rf-propagation/cancel/`** — audit-preserving. Flips any
+  `pending`/`running` rows to `failed` with
+  `error_message="Cancelled by user"` and stamps `completed_at`. The
+  row stays in the database so operators can see _why_ a render was
+  aborted. `failed` rows are untouched (nothing to cancel).
+- **`POST .../rf-propagation/dismiss/`** — destructive. Deletes every
+  non-`ready` row for the node (`pending`, `running`, **and**
+  `failed`). Returns `{ "deleted": <count> }`. Use this from the UI
+  when the operator clicks "Cancel" (while in flight) or "Dismiss"
+  (on a failed row) — the end state is the same: the row is gone and
+  the next recompute starts from a clean slate.
+
+The worker is resilient to both: it performs three checks and treats
+"row gone" (`DoesNotExist`) and "row in terminal state" the same way
+— log and bail without writing:
+
+1. On task pickup — skip if the row is already terminal (cancel) or
+   missing (dismiss).
+2. Just before the engine call — avoids the expensive roundtrip.
+3. After the engine returns and the PNG is on disk — the worker
+   refuses to revive a cancelled/dismissed row. The PNG stays on disk
+   (it is content-addressed, so retention will reap it if nothing
+   else references the hash).
+
+There is no way to interrupt a running `/predict` call on the engine
+side, so a cancel/dismiss during engine polling will still let the
+current engine request finish; the worker just won't mark the row
+`ready`.
+
+Typical flows:
+
+- Render is stuck in `pending` (e.g. worker was down, engine URL was
+  misconfigured) → operator hits **dismiss** and then **recompute**.
+- Engine returns a permanent `422` for an unfixable profile → row
+  lands in `failed` → operator fixes the profile, clicks **dismiss**
+  on the error card, then **recompute**.
 
 ### Bumping `render_version`
 
