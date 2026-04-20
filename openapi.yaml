@@ -785,6 +785,13 @@ components:
         error_message:
           type: string
           nullable: true
+        target_strategy:
+          type: string
+          nullable: true
+          enum: [intra_zone, dx_across, dx_same_side, legacy]
+          description: >
+            Hypothesis-driven target picker for this run. Null or omitted in older rows means
+            legacy unspecified / pre-migration (UI may label as Legacy).
 
     IncomingPacket:
       oneOf:
@@ -1347,6 +1354,24 @@ components:
           type: boolean
           description: Included when include=status. True when allow_auto_traceroute and recent packet ingestion.
           readOnly: true
+        geo_classification:
+          type: object
+          nullable: true
+          description: Included when include=geo_classification. Per-feeder traceroute geography hints.
+          readOnly: true
+          properties:
+            tier:
+              type: string
+              enum: [perimeter, internal]
+            bearing_octant:
+              type: string
+              nullable: true
+              enum: [N, NE, E, SE, S, SW, W, NW]
+            applicable_strategies:
+              type: array
+              items:
+                type: string
+                enum: [intra_zone, dx_across, dx_same_side]
         position:
           type: object
           description: The latest known position of the node
@@ -3802,10 +3827,16 @@ paths:
         - name: include
           in: query
           required: false
-          description: Optional extras. Use include=status to add managed-node health fields.
+          description: >
+            Optional extras (repeat query param). include=status for health fields;
+            include=geo_classification for traceroute feeder classification.
           schema:
-            type: string
-            enum: [status]
+            type: array
+            items:
+              type: string
+              enum: [status, geo_classification]
+          style: form
+          explode: true
       responses:
         '200':
           description: List of managed nodes
@@ -3852,10 +3883,16 @@ paths:
         - name: include
           in: query
           required: false
-          description: Optional extras. Use include=status to add managed-node health fields.
+          description: >
+            Optional extras (repeat query param). include=status for health fields;
+            include=geo_classification for traceroute feeder classification.
           schema:
-            type: string
-            enum: [status]
+            type: array
+            items:
+              type: string
+              enum: [status, geo_classification]
+          style: form
+          explode: true
       responses:
         '200':
           description: List of managed nodes owned by the current user
@@ -3890,10 +3927,16 @@ paths:
         - name: include
           in: query
           required: false
-          description: Optional extras. Use include=status to add managed-node health fields.
+          description: >
+            Optional extras (repeat query param). include=status for health fields;
+            include=geo_classification for traceroute feeder classification.
           schema:
-            type: string
-            enum: [status]
+            type: array
+            items:
+              type: string
+              enum: [status, geo_classification]
+          style: form
+          explode: true
       responses:
         '200':
           description: Node details (OwnedManagedNode shape for owner/staff; else ManagedNodeRead)
@@ -4406,6 +4449,14 @@ paths:
           schema:
             type: string
             enum: [auto, user, external, monitor]
+        - name: target_strategy
+          in: query
+          required: false
+          schema:
+            type: string
+            description: >
+              Comma-separated target strategies. Use `legacy` to match null/unspecified rows.
+            example: intra_zone,dx_across,legacy
         - name: triggered_after
           in: query
           required: false
@@ -4448,7 +4499,7 @@ paths:
         Returns traceroute stats for the given timeframe: sources (by trigger_type),
         success/failure counts, top routers (intermediate nodes), per-source managed node
         totals (with success rate among finished runs only), per-target observed node totals,
-        and success over time (14d). All authenticated users.
+        success over time (14d), and counts by target_strategy (null mapped to legacy). All authenticated users.
       tags: [Traceroutes]
       security:
         - BearerAuth: []
@@ -4467,7 +4518,16 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [sources, success_failure, top_routers, by_source, by_target, success_over_time]
+                required:
+                  [
+                    sources,
+                    success_failure,
+                    top_routers,
+                    by_source,
+                    by_target,
+                    success_over_time,
+                    by_strategy,
+                  ]
                 properties:
                   sources:
                     type: array
@@ -4600,6 +4660,21 @@ paths:
                           type: integer
                         failed:
                           type: integer
+                  by_strategy:
+                    type: object
+                    description: >
+                      Counts per target_strategy (database null aggregated under key `legacy`).
+                    additionalProperties:
+                      type: object
+                      properties:
+                        completed:
+                          type: integer
+                        failed:
+                          type: integer
+                        pending:
+                          type: integer
+                        sent:
+                          type: integer
 
   /traceroutes/heatmap-edges/:
     get:
@@ -4640,6 +4715,19 @@ paths:
             description: >
               packets - edge color/width by packet count; snr - by average link quality (SNR).
               When snr, only edges with SNR data are returned.
+        - name: source_node_id
+          in: query
+          required: false
+          schema:
+            type: integer
+            description: Mesh node_id of the ManagedNode that sourced the traceroute (denormalized on Neo4j edges).
+        - name: target_strategy
+          in: query
+          required: false
+          schema:
+            type: string
+            description: Comma-separated strategies; use `legacy` for null strategy on historical edges.
+            example: intra_zone,legacy
       responses:
         '200':
           description: Heatmap edges and nodes
@@ -4883,6 +4971,13 @@ paths:
                   type: integer
                   description: Target ObservedNode node_id (optional for auto-selection)
                   nullable: true
+                target_strategy:
+                  type: string
+                  nullable: true
+                  enum: [intra_zone, dx_across, dx_same_side]
+                  description: >
+                    Optional hypothesis when auto-selecting the target; always stored on the row when provided,
+                    including when target_node_id is set explicitly.
       responses:
         '201':
           description: Traceroute triggered

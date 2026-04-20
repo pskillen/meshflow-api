@@ -766,6 +766,10 @@ class ManagedNodeViewSet(viewsets.ModelViewSet):
         include_values = _multi_query_strings(self.request, "include")
         return "status" in {value.lower() for value in include_values}
 
+    def _geo_classification_requested(self):
+        include_values = _multi_query_strings(self.request, "include")
+        return "geo_classification" in {value.lower() for value in include_values}
+
     def _annotate_common_fields(self, queryset):
         observed_node_qs = ObservedNode.objects.filter(node_id=OuterRef("node_id"))
         latest_status_qs = NodeLatestStatus.objects.filter(node__node_id=OuterRef("node_id"))
@@ -850,6 +854,7 @@ class ManagedNodeViewSet(viewsets.ModelViewSet):
     def get_serializer_context(self):
         context = super().get_serializer_context()
         context["include_status"] = self._status_requested()
+        context["include_geo_classification"] = self._geo_classification_requested()
         return context
 
     def get_serializer_class(self):

@@ -235,6 +235,7 @@ class ManagedNodeSerializer(serializers.ModelSerializer):
     packets_last_24h = serializers.IntegerField(read_only=True, required=False)
     radio_last_heard = serializers.DateTimeField(read_only=True, required=False, allow_null=True)
     is_eligible_traceroute_source = serializers.BooleanField(read_only=True, required=False)
+    geo_classification = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = ManagedNode
@@ -262,6 +263,7 @@ class ManagedNodeSerializer(serializers.ModelSerializer):
             "packets_last_24h",
             "radio_last_heard",
             "is_eligible_traceroute_source",
+            "geo_classification",
         ]
         read_only_fields = [
             "internal_id",
@@ -281,11 +283,21 @@ class ManagedNodeSerializer(serializers.ModelSerializer):
         "is_eligible_traceroute_source",
     )
 
+    GEO_FIELDS = ("geo_classification",)
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if not self.context.get("include_status", False):
             for field_name in self.STATUS_FIELDS:
                 self.fields.pop(field_name, None)
+        if not self.context.get("include_geo_classification", False):
+            for field_name in self.GEO_FIELDS:
+                self.fields.pop(field_name, None)
+
+    def get_geo_classification(self, obj):
+        from traceroute.geo_classification import build_geo_classification
+
+        return build_geo_classification(obj)
 
     def get_node_id_str(self, obj):
         if hasattr(obj, "node_id_str") and obj.node_id_str:

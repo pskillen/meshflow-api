@@ -283,6 +283,8 @@ def add_traceroute_edges(auto_traceroute: AutoTraceRoute, driver=None, *, quiet:
                 "triggered_at": triggered_at_str,
                 "auto_tr_id": auto_tr_id,
                 "snr": float(snr) if snr is not None else None,
+                "source_node_id": source_id,
+                "target_strategy": auto_tr.target_strategy,
             }
 
             # MERGE keyed on (auto_tr_id, a_id, b_id, triggered_at) so a re-export
@@ -304,8 +306,12 @@ def add_traceroute_edges(auto_traceroute: AutoTraceRoute, driver=None, *, quiet:
                     b_id: $b_id,
                     triggered_at: datetime($triggered_at)
                 }]->(b)
-                ON CREATE SET r.weight = 1, r.snr = $snr
-                ON MATCH SET r.weight = 1, r.snr = $snr
+                ON CREATE SET r.weight = 1, r.snr = $snr,
+                    r.source_node_id = $source_node_id,
+                    r.target_strategy = $target_strategy
+                ON MATCH SET r.weight = 1, r.snr = $snr,
+                    r.source_node_id = $source_node_id,
+                    r.target_strategy = $target_strategy
                 """,
                 **params,
             )
@@ -383,6 +389,8 @@ def run_heatmap_query(
     bbox=None,
     constellation_id=None,
     edge_metric="packets",
+    source_node_id=None,
+    target_strategy_tokens=None,
     driver=None,
 ):
     """
@@ -390,6 +398,8 @@ def run_heatmap_query(
     Returns dict with edges, nodes, and meta.
 
     edge_metric: "packets" (default) - edges colored by sum of packet count; "snr" - by avg link quality.
+
+    ``target_strategy_tokens``: optional list of strategy keys and/or ``legacy`` for null strategy rows.
     """
     driver = driver or get_driver()
 
@@ -404,6 +414,25 @@ def run_heatmap_query(
         params["triggered_at_after"] = (
             triggered_at_after.isoformat() if hasattr(triggered_at_after, "isoformat") else str(triggered_at_after)
         )
+
+    if source_node_id is not None:
+        where_clauses.append("r.source_node_id = $source_node_id")
+        params["source_node_id"] = int(source_node_id)
+
+    if target_strategy_tokens:
+        names = {t.strip() for t in target_strategy_tokens if t and str(t).strip()}
+        legacy_labels = {"legacy", AutoTraceRoute.TARGET_STRATEGY_LEGACY}
+        inc_legacy = bool(names & legacy_labels)
+        names -= legacy_labels
+        strat_parts = []
+        if inc_legacy:
+            strat_parts.append("(r.target_strategy IS NULL OR r.target_strategy = $legacy_marker)")
+            params["legacy_marker"] = AutoTraceRoute.TARGET_STRATEGY_LEGACY
+        if names:
+            strat_parts.append("r.target_strategy IN $heatmap_strategy_names")
+            params["heatmap_strategy_names"] = list(names)
+        if strat_parts:
+            where_clauses.append("(" + " OR ".join(strat_parts) + ")")
 
     if bbox and len(bbox) >= 4:
         min_lat, min_lon, max_lat, max_lon = bbox[:4]
@@ -512,14 +541,26 @@ def run_heatmap_query(
     nodes = list(nodes_by_id.values())
 
     # Meta: approximate counts (from Django for total TR, from Neo4j for nodes)
-    from .models import AutoTraceRoute
+    from django.db.models import Q
 
-    total_tr = AutoTraceRoute.objects.filter(status=AutoTraceRoute.STATUS_COMPLETED).count()
+    tr_q = AutoTraceRoute.objects.filter(status=AutoTraceRoute.STATUS_COMPLETED)
     if triggered_at_after:
-        total_tr = AutoTraceRoute.objects.filter(
-            status=AutoTraceRoute.STATUS_COMPLETED,
-            triggered_at__gte=triggered_at_after,
-        ).count()
+        tr_q = tr_q.filter(triggered_at__gte=triggered_at_after)
+    if source_node_id is not None:
+        tr_q = tr_q.filter(source_node__node_id=source_node_id)
+    if target_strategy_tokens:
+        tok = [t.strip() for t in target_strategy_tokens if t and str(t).strip()]
+        strat_q = Q()
+        legacy_labels = {"legacy", AutoTraceRoute.TARGET_STRATEGY_LEGACY}
+        any_legacy = bool(set(tok) & legacy_labels)
+        rest = [t for t in tok if t not in legacy_labels]
+        if any_legacy:
+            strat_q |= Q(target_strategy__isnull=True) | Q(target_strategy=AutoTraceRoute.TARGET_STRATEGY_LEGACY)
+        for s in rest:
+            strat_q |= Q(target_strategy=s)
+        tr_q = tr_q.filter(strat_q)
+
+    total_tr = tr_q.count()
 
     meta = {
         "active_nodes_count": len(nodes),

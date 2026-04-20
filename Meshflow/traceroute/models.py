@@ -33,6 +33,17 @@ class AutoTraceRoute(models.Model):
         (STATUS_FAILED, "Failed"),
     ]
 
+    TARGET_STRATEGY_INTRA_ZONE = "intra_zone"
+    TARGET_STRATEGY_DX_ACROSS = "dx_across"
+    TARGET_STRATEGY_DX_SAME_SIDE = "dx_same_side"
+    TARGET_STRATEGY_LEGACY = "legacy"
+    TARGET_STRATEGY_CHOICES = [
+        (TARGET_STRATEGY_INTRA_ZONE, _("Intra zone")),
+        (TARGET_STRATEGY_DX_ACROSS, _("DX across")),
+        (TARGET_STRATEGY_DX_SAME_SIDE, _("DX same side")),
+        (TARGET_STRATEGY_LEGACY, _("Legacy / unspecified")),
+    ]
+
     source_node = models.ForeignKey(
         ManagedNode,
         on_delete=models.CASCADE,
@@ -59,6 +70,14 @@ class AutoTraceRoute(models.Model):
         null=True,
         blank=True,
         help_text=_("e.g. scheduler"),
+    )
+    target_strategy = models.CharField(
+        max_length=24,
+        choices=TARGET_STRATEGY_CHOICES,
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text=_("Hypothesis-driven target selection strategy (scheduler or manual analytics)"),
     )
     triggered_at = models.DateTimeField(default=timezone.now)
     status = models.CharField(max_length=16, choices=STATUS_CHOICES, default=STATUS_PENDING, db_index=True)

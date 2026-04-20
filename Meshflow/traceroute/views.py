@@ -3,8 +3,8 @@
 from collections import Counter
 from datetime import timedelta
 
-from django.db.models import Count, Q
-from django.db.models.functions import TruncDate
+from django.db.models import CharField, Count, Q, Value
+from django.db.models.functions import Coalesce, TruncDate
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
@@ -82,6 +82,20 @@ def traceroute_list(request):
     trigger_type = request.query_params.get("trigger_type")
     if trigger_type:
         qs = qs.filter(trigger_type=trigger_type)
+
+    target_strategy_param = request.query_params.get("target_strategy")
+    if target_strategy_param:
+        tokens = [t.strip() for t in target_strategy_param.split(",") if t.strip()]
+        if tokens:
+            strat_q = Q()
+            for t in tokens:
+                if t in ("legacy", AutoTraceRoute.TARGET_STRATEGY_LEGACY):
+                    strat_q |= Q(target_strategy__isnull=True) | Q(
+                        target_strategy=AutoTraceRoute.TARGET_STRATEGY_LEGACY
+                    )
+                elif t in dict(AutoTraceRoute.TARGET_STRATEGY_CHOICES):
+                    strat_q |= Q(target_strategy=t)
+            qs = qs.filter(strat_q)
 
     triggered_after = request.query_params.get("triggered_after")
     if triggered_after:
@@ -166,6 +180,7 @@ def traceroute_trigger(request):
 
     managed_node_id = serializer.validated_data["managed_node_id"]
     target_node_id = serializer.validated_data.get("target_node_id")
+    target_strategy_req = serializer.validated_data.get("target_strategy")
 
     source_node = ManagedNode.objects.filter(node_id=managed_node_id).order_by("internal_id").first()
     if source_node is None:
@@ -225,7 +240,7 @@ def traceroute_trigger(request):
                 status=status.HTTP_404_NOT_FOUND,
             )
     else:
-        target_node = pick_traceroute_target(source_node)
+        target_node = pick_traceroute_target(source_node, strategy=target_strategy_req)
         if not target_node:
             return Response(
                 {"detail": "No ObservedNode available for auto-selection. " "Specify target_node_id."},
@@ -238,8 +253,14 @@ def traceroute_trigger(request):
         trigger_type=AutoTraceRoute.TRIGGER_TYPE_USER,
         triggered_by=request.user,
         trigger_source=None,
+        target_strategy=target_strategy_req,
         status=AutoTraceRoute.STATUS_PENDING,
     )
+
+    if target_strategy_req:
+        from .strategy_rotation import record_strategy_run
+
+        record_strategy_run(source_node, target_strategy_req)
 
     # Send command via channel layer
     channel_layer = get_channel_layer()
@@ -290,12 +311,26 @@ def heatmap_edges(request):
     if edge_metric not in ("packets", "snr"):
         edge_metric = "packets"
 
+    source_node_id = request.query_params.get("source_node_id")
+    if source_node_id is not None and str(source_node_id).strip() != "":
+        try:
+            source_node_id = int(source_node_id)
+        except ValueError:
+            source_node_id = None
+    else:
+        source_node_id = None
+
+    ts_param = request.query_params.get("target_strategy")
+    target_strategy_tokens = [s.strip() for s in ts_param.split(",") if s.strip()] if ts_param else None
+
     try:
         data = run_heatmap_query(
             triggered_at_after=triggered_at_after,
             bbox=bbox,
             constellation_id=constellation_id,
             edge_metric=edge_metric,
+            source_node_id=source_node_id,
+            target_strategy_tokens=target_strategy_tokens,
         )
     except Exception as e:
         import logging
@@ -540,6 +575,32 @@ def traceroute_stats(request):
         .order_by("-count")
     )
 
+    legacy_label = AutoTraceRoute.TARGET_STRATEGY_LEGACY
+    by_strategy_rows = (
+        qs.annotate(
+            strat=Coalesce(
+                "target_strategy",
+                Value(legacy_label, output_field=CharField(max_length=24)),
+            )
+        )
+        .values("strat")
+        .annotate(
+            completed=Count("id", filter=Q(status=AutoTraceRoute.STATUS_COMPLETED)),
+            failed=Count("id", filter=Q(status=AutoTraceRoute.STATUS_FAILED)),
+            pending=Count("id", filter=Q(status=AutoTraceRoute.STATUS_PENDING)),
+            sent=Count("id", filter=Q(status=AutoTraceRoute.STATUS_SENT)),
+        )
+    )
+    by_strategy = {
+        row["strat"]: {
+            "completed": row["completed"],
+            "failed": row["failed"],
+            "pending": row["pending"],
+            "sent": row["sent"],
+        }
+        for row in by_strategy_rows
+    }
+
     # Top routers: intermediate nodes from completed traceroutes
     UNKNOWN_NODE_ID = 0xFFFFFFFF
     router_counts = Counter()
@@ -658,6 +719,7 @@ def traceroute_stats(request):
             "by_source": by_source,
             "by_target": by_target,
             "success_over_time": success_over_time,
+            "by_strategy": by_strategy,
         }
     )
 
