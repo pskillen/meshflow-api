@@ -9,6 +9,7 @@ from nodes.views import (
     ManagedNodeViewSet,
     ObservedNodeClaimView,
     ObservedNodeViewSet,
+    RfPropagationAssetView,
     UserNodeClaimsView,
 )
 
@@ -32,5 +33,10 @@ urlpatterns = [
         name="environment-metrics-bulk",
     ),
     path("observed-nodes/<int:node_id>/claim/", ObservedNodeClaimView.as_view(), name="observed-node-claim"),
+    path(
+        "observed-nodes/<int:node_id>/rf-propagation/asset/<str:filename>",
+        RfPropagationAssetView.as_view(),
+        name="rf-propagation-asset",
+    ),
     path("claims/mine/", UserNodeClaimsView.as_view(), name="user-node-claims"),
 ]

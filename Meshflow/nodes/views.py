@@ -1,5 +1,8 @@
+import re
 from datetime import datetime, timedelta
+from pathlib import Path
 
+from django.conf import settings
 from django.db.models import (
     BooleanField,
     Case,
@@ -14,6 +17,7 @@ from django.db.models import (
     When,
 )
 from django.db.models.functions import Coalesce
+from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
@@ -669,6 +673,34 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
         # TODO(plan-2): enqueue render task
         ser = NodeRfPropagationRenderSerializer(row, context=self.get_serializer_context())
         return Response(ser.data, status=status.HTTP_201_CREATED)
+
+
+class RfPropagationAssetView(APIView):
+    """
+    Serve a cached propagation PNG from disk (public; hash in filename is the secret).
+
+    Returns 404 when the worker has not written the asset yet.
+    """
+
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request, node_id, filename):
+        _ = node_id  # reserved for future per-node asset validation
+        if ".." in filename or "/" in filename or "\\" in filename:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+        if not re.fullmatch(r"[A-Za-z0-9_-]+\.png\Z", filename):
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+        base = Path(settings.RF_PROPAGATION_ASSET_DIR).resolve()
+        target = (base / filename).resolve()
+        try:
+            target.relative_to(base)
+        except ValueError:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+        if not target.is_file():
+            raise Http404()
+        response = FileResponse(target.open("rb"), content_type="image/png")
+        response["Cache-Control"] = "public, max-age=31536000, immutable"
+        return response
 
 
 class DeviceMetricsBulkView(APIView):
