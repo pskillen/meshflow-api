@@ -230,6 +230,11 @@ class ManagedNodeSerializer(serializers.ModelSerializer):
     latest_air_quality_metrics = serializers.SerializerMethodField(read_only=True)
     latest_health_metrics = serializers.SerializerMethodField(read_only=True)
     latest_host_metrics = serializers.SerializerMethodField(read_only=True)
+    last_packet_ingested_at = serializers.DateTimeField(read_only=True, required=False, allow_null=True)
+    packets_last_hour = serializers.IntegerField(read_only=True, required=False)
+    packets_last_24h = serializers.IntegerField(read_only=True, required=False)
+    radio_last_heard = serializers.DateTimeField(read_only=True, required=False, allow_null=True)
+    is_eligible_traceroute_source = serializers.BooleanField(read_only=True, required=False)
 
     class Meta:
         model = ManagedNode
@@ -252,6 +257,11 @@ class ManagedNodeSerializer(serializers.ModelSerializer):
             "latest_air_quality_metrics",
             "latest_health_metrics",
             "latest_host_metrics",
+            "last_packet_ingested_at",
+            "packets_last_hour",
+            "packets_last_24h",
+            "radio_last_heard",
+            "is_eligible_traceroute_source",
         ]
         read_only_fields = [
             "internal_id",
@@ -262,6 +272,20 @@ class ManagedNodeSerializer(serializers.ModelSerializer):
             "owner",
             "constellation",
         ]
+
+    STATUS_FIELDS = (
+        "last_packet_ingested_at",
+        "packets_last_hour",
+        "packets_last_24h",
+        "radio_last_heard",
+        "is_eligible_traceroute_source",
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if not self.context.get("include_status", False):
+            for field_name in self.STATUS_FIELDS:
+                self.fields.pop(field_name, None)
 
     def get_node_id_str(self, obj):
         if hasattr(obj, "node_id_str") and obj.node_id_str:

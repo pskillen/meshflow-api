@@ -1323,6 +1323,30 @@ components:
           type: boolean
           description: If true, this node may be used for auto-scheduled traceroutes and manual triggers
           default: false
+        last_packet_ingested_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Included when include=status. Last packet ingestion timestamp where this node was observer.
+          readOnly: true
+        packets_last_hour:
+          type: integer
+          description: Included when include=status. Number of packet observations in the last hour.
+          readOnly: true
+        packets_last_24h:
+          type: integer
+          description: Included when include=status. Number of packet observations in the last 24 hours.
+          readOnly: true
+        radio_last_heard:
+          type: string
+          format: date-time
+          nullable: true
+          description: Included when include=status. ObservedNode last_heard matched by node_id.
+          readOnly: true
+        is_eligible_traceroute_source:
+          type: boolean
+          description: Included when include=status. True when allow_auto_traceroute and recent packet ingestion.
+          readOnly: true
         position:
           type: object
           description: The latest known position of the node
@@ -3775,6 +3799,13 @@ paths:
       parameters:
         - $ref: '#/components/parameters/PaginationPage'
         - $ref: '#/components/parameters/PaginationPageSize'
+        - name: include
+          in: query
+          required: false
+          description: Optional extras. Use include=status to add managed-node health fields.
+          schema:
+            type: string
+            enum: [status]
       responses:
         '200':
           description: List of managed nodes
@@ -3818,6 +3849,13 @@ paths:
       parameters:
         - $ref: '#/components/parameters/PaginationPage'
         - $ref: '#/components/parameters/PaginationPageSize'
+        - name: include
+          in: query
+          required: false
+          description: Optional extras. Use include=status to add managed-node health fields.
+          schema:
+            type: string
+            enum: [status]
       responses:
         '200':
           description: List of managed nodes owned by the current user
@@ -3849,6 +3887,13 @@ paths:
           required: true
           schema:
             type: integer
+        - name: include
+          in: query
+          required: false
+          description: Optional extras. Use include=status to add managed-node health fields.
+          schema:
+            type: string
+            enum: [status]
       responses:
         '200':
           description: Node details (OwnedManagedNode shape for owner/staff; else ManagedNodeRead)

@@ -1,6 +1,19 @@
 from datetime import datetime, timedelta
 
-from django.db.models import OuterRef, Q, Subquery
+from django.db.models import (
+    BooleanField,
+    Case,
+    Count,
+    DateTimeField,
+    Exists,
+    IntegerField,
+    OuterRef,
+    Q,
+    Subquery,
+    Value,
+    When,
+)
+from django.db.models.functions import Coalesce
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
@@ -13,6 +26,7 @@ from rest_framework.views import APIView
 from common.mesh_node_helpers import meshtastic_hex_to_int
 from constellations.models import ConstellationUserMembership
 from nodes.constants import INFRASTRUCTURE_ROLES
+from nodes.managed_node_liveness import schedule_traceroute_source_recency_seconds
 from nodes.models import (
     DeviceMetrics,
     EnvironmentExposure,
@@ -48,6 +62,7 @@ from nodes.serializers import (
 )
 from nodes.services.device_metrics import get_device_metrics_bulk
 from nodes.services.environment_metrics import get_environment_metrics_bulk
+from packets.models import PacketObservation
 
 from .utils import generate_claim_key
 
@@ -747,37 +762,95 @@ class ManagedNodeViewSet(viewsets.ModelViewSet):
     serializer_class = ManagedNodeSerializer
     lookup_field = "node_id"
 
-    def get_queryset(self):
-        """Filter nodes based on user ownership and annotate with observed node and NodeLatestStatus."""
+    def _status_requested(self):
+        include_values = _multi_query_strings(self.request, "include")
+        return "status" in {value.lower() for value in include_values}
+
+    def _annotate_common_fields(self, queryset):
         observed_node_qs = ObservedNode.objects.filter(node_id=OuterRef("node_id"))
         latest_status_qs = NodeLatestStatus.objects.filter(node__node_id=OuterRef("node_id"))
-
-        return (
-            ManagedNode.objects.all()
-            .order_by("node_id")
-            .annotate(
-                long_name=Subquery(observed_node_qs.values("long_name")[:1]),
-                short_name=Subquery(observed_node_qs.values("short_name")[:1]),
-                last_heard=Subquery(observed_node_qs.values("last_heard")[:1]),
-                last_latitude=Subquery(latest_status_qs.values("latitude")[:1]),
-                last_longitude=Subquery(latest_status_qs.values("longitude")[:1]),
-                last_altitude=Subquery(latest_status_qs.values("altitude")[:1]),
-                last_position_time=Subquery(latest_status_qs.values("position_reported_time")[:1]),
-                last_heading=Subquery(latest_status_qs.values("heading")[:1]),
-                last_location_source=Subquery(latest_status_qs.values("location_source")[:1]),
-                last_precision_bits=Subquery(latest_status_qs.values("precision_bits")[:1]),
-                last_ground_speed=Subquery(latest_status_qs.values("ground_speed")[:1]),
-                last_ground_track=Subquery(latest_status_qs.values("ground_track")[:1]),
-                last_sats_in_view=Subquery(latest_status_qs.values("sats_in_view")[:1]),
-                last_pdop=Subquery(latest_status_qs.values("pdop")[:1]),
-                last_battery_level=Subquery(latest_status_qs.values("battery_level")[:1]),
-                last_voltage=Subquery(latest_status_qs.values("voltage")[:1]),
-                last_metrics_time=Subquery(latest_status_qs.values("metrics_reported_time")[:1]),
-                last_channel_utilization=Subquery(latest_status_qs.values("channel_utilization")[:1]),
-                last_air_util_tx=Subquery(latest_status_qs.values("air_util_tx")[:1]),
-                last_uptime_seconds=Subquery(latest_status_qs.values("uptime_seconds")[:1]),
-            )
+        return queryset.annotate(
+            long_name=Subquery(observed_node_qs.values("long_name")[:1]),
+            short_name=Subquery(observed_node_qs.values("short_name")[:1]),
+            last_heard=Subquery(observed_node_qs.values("last_heard")[:1]),
+            last_latitude=Subquery(latest_status_qs.values("latitude")[:1]),
+            last_longitude=Subquery(latest_status_qs.values("longitude")[:1]),
+            last_altitude=Subquery(latest_status_qs.values("altitude")[:1]),
+            last_position_time=Subquery(latest_status_qs.values("position_reported_time")[:1]),
+            last_heading=Subquery(latest_status_qs.values("heading")[:1]),
+            last_location_source=Subquery(latest_status_qs.values("location_source")[:1]),
+            last_precision_bits=Subquery(latest_status_qs.values("precision_bits")[:1]),
+            last_ground_speed=Subquery(latest_status_qs.values("ground_speed")[:1]),
+            last_ground_track=Subquery(latest_status_qs.values("ground_track")[:1]),
+            last_sats_in_view=Subquery(latest_status_qs.values("sats_in_view")[:1]),
+            last_pdop=Subquery(latest_status_qs.values("pdop")[:1]),
+            last_battery_level=Subquery(latest_status_qs.values("battery_level")[:1]),
+            last_voltage=Subquery(latest_status_qs.values("voltage")[:1]),
+            last_metrics_time=Subquery(latest_status_qs.values("metrics_reported_time")[:1]),
+            last_channel_utilization=Subquery(latest_status_qs.values("channel_utilization")[:1]),
+            last_air_util_tx=Subquery(latest_status_qs.values("air_util_tx")[:1]),
+            last_uptime_seconds=Subquery(latest_status_qs.values("uptime_seconds")[:1]),
         )
+
+    def _annotate_status_fields(self, queryset):
+        now = timezone.now()
+        hour_cutoff = now - timedelta(hours=1)
+        day_cutoff = now - timedelta(hours=24)
+        recent_cutoff = now - timedelta(seconds=schedule_traceroute_source_recency_seconds())
+
+        packet_observation_qs = PacketObservation.objects.filter(observer_id=OuterRef("pk"))
+        observed_node_qs = ObservedNode.objects.filter(node_id=OuterRef("node_id"))
+
+        last_packet_subquery = packet_observation_qs.order_by("-upload_time").values("upload_time")[:1]
+        packets_last_hour_subquery = (
+            packet_observation_qs.filter(upload_time__gte=hour_cutoff)
+            .values("observer")
+            .annotate(c=Count("id"))
+            .values("c")[:1]
+        )
+        packets_last_24h_subquery = (
+            packet_observation_qs.filter(upload_time__gte=day_cutoff)
+            .values("observer")
+            .annotate(c=Count("id"))
+            .values("c")[:1]
+        )
+        eligible_observation_exists = Exists(packet_observation_qs.filter(upload_time__gte=recent_cutoff))
+
+        return queryset.annotate(
+            last_packet_ingested_at=Subquery(last_packet_subquery, output_field=DateTimeField()),
+            packets_last_hour=Coalesce(
+                Subquery(packets_last_hour_subquery, output_field=IntegerField()),
+                Value(0),
+            ),
+            packets_last_24h=Coalesce(
+                Subquery(packets_last_24h_subquery, output_field=IntegerField()),
+                Value(0),
+            ),
+            radio_last_heard=Subquery(observed_node_qs.values("last_heard")[:1], output_field=DateTimeField()),
+            is_eligible_traceroute_source=Case(
+                When(allow_auto_traceroute=True, then=eligible_observation_exists),
+                default=Value(False),
+                output_field=BooleanField(),
+            ),
+        )
+
+    def _managed_nodes_queryset(self, owner=None):
+        queryset = ManagedNode.objects.all().order_by("node_id")
+        if owner is not None:
+            queryset = queryset.filter(owner=owner)
+        queryset = self._annotate_common_fields(queryset)
+        if self._status_requested():
+            queryset = self._annotate_status_fields(queryset)
+        return queryset
+
+    def get_queryset(self):
+        """Filter nodes based on user ownership and annotate with observed node and NodeLatestStatus."""
+        return self._managed_nodes_queryset()
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context["include_status"] = self._status_requested()
+        return context
 
     def get_serializer_class(self):
         """Return different serializers based on the action."""
@@ -820,25 +893,7 @@ class ManagedNodeViewSet(viewsets.ModelViewSet):
         """
         Get all managed nodes owned by the current user.
         """
-        observed_node_qs = ObservedNode.objects.filter(node_id=OuterRef("node_id"))
-        latest_status_qs = NodeLatestStatus.objects.filter(node__node_id=OuterRef("node_id"))
-
-        nodes = (
-            ManagedNode.objects.filter(owner=request.user)
-            .order_by("node_id")
-            .annotate(
-                long_name=Subquery(observed_node_qs.values("long_name")[:1]),
-                short_name=Subquery(observed_node_qs.values("short_name")[:1]),
-                last_heard=Subquery(observed_node_qs.values("last_heard")[:1]),
-                last_latitude=Subquery(latest_status_qs.values("latitude")[:1]),
-                last_longitude=Subquery(latest_status_qs.values("longitude")[:1]),
-                last_altitude=Subquery(latest_status_qs.values("altitude")[:1]),
-                last_position_time=Subquery(latest_status_qs.values("position_reported_time")[:1]),
-                last_battery_level=Subquery(latest_status_qs.values("battery_level")[:1]),
-                last_voltage=Subquery(latest_status_qs.values("voltage")[:1]),
-                last_metrics_time=Subquery(latest_status_qs.values("metrics_reported_time")[:1]),
-            )
-        )
+        nodes = self._managed_nodes_queryset(owner=request.user)
 
         page = self.paginate_queryset(nodes)
         if page is not None:

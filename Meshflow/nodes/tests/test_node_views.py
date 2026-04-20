@@ -1,10 +1,12 @@
 from django.urls import reverse
+from django.utils import timezone
 
 import pytest
 from rest_framework import status
 from rest_framework.test import APIClient
 
 from common.mesh_node_helpers import meshtastic_id_to_hex
+from nodes.models import NodeLatestStatus
 
 
 @pytest.mark.django_db
@@ -38,6 +40,57 @@ def test_managed_node_detail_view(create_managed_node, create_user):
     response = client.get(reverse("managed-nodes-detail", kwargs={"node_id": node.node_id}))
     assert response.status_code == status.HTTP_200_OK
     assert response.data["node_id"] == node.node_id
+
+
+@pytest.mark.django_db
+def test_managed_nodes_status_fields_only_returned_with_include_status(
+    create_managed_node,
+    create_observed_node,
+    create_packet_observation,
+    create_user,
+):
+    client = APIClient()
+    user = create_user()
+    client.force_authenticate(user=user)
+
+    now = timezone.now()
+    managed = create_managed_node(owner=user, node_id=123450001, allow_auto_traceroute=True)
+    observed = create_observed_node(
+        node_id=managed.node_id, node_id_str=meshtastic_id_to_hex(managed.node_id), last_heard=now
+    )
+    NodeLatestStatus.objects.create(node=observed)
+    observation = create_packet_observation(observer=managed)
+    observation.upload_time = now
+    observation.save(update_fields=["upload_time"])
+
+    list_url = reverse("managed-nodes-list")
+    response_without_status = client.get(list_url)
+    assert response_without_status.status_code == status.HTTP_200_OK
+    first_without_status = response_without_status.data["results"][0]
+    assert "last_packet_ingested_at" not in first_without_status
+    assert "packets_last_hour" not in first_without_status
+    assert "packets_last_24h" not in first_without_status
+    assert "radio_last_heard" not in first_without_status
+    assert "is_eligible_traceroute_source" not in first_without_status
+
+    response_with_status = client.get(list_url, {"include": "status"})
+    assert response_with_status.status_code == status.HTTP_200_OK
+    first_with_status = response_with_status.data["results"][0]
+    assert first_with_status["last_packet_ingested_at"] is not None
+    assert first_with_status["packets_last_hour"] == 1
+    assert first_with_status["packets_last_24h"] == 1
+    assert first_with_status["radio_last_heard"] is not None
+    assert first_with_status["is_eligible_traceroute_source"] is True
+
+    detail_url = reverse("managed-nodes-detail", kwargs={"node_id": managed.node_id})
+    detail_response = client.get(detail_url, {"include": "status"})
+    assert detail_response.status_code == status.HTTP_200_OK
+    assert detail_response.data["packets_last_hour"] == 1
+
+    mine_url = reverse("managed-nodes-mine")
+    mine_response = client.get(mine_url, {"include": "status"})
+    assert mine_response.status_code == status.HTTP_200_OK
+    assert mine_response.data["results"][0]["packets_last_24h"] == 1
 
 
 @pytest.mark.django_db
