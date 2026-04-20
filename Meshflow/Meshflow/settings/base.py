@@ -117,6 +117,7 @@ TEMPLATES = [
 WSGI_APPLICATION = "Meshflow.wsgi.application"
 ASGI_APPLICATION = "Meshflow.asgi.application"
 
+# Logical DB allocation (single Redis server): Channels 0, Celery broker 1, Django cache 2 — see docs/REDIS.md
 _redis_password = os.environ.get("REDIS_PASSWORD", "")
 _redis_host = os.environ.get("REDIS_HOST", "localhost")
 _redis_port = os.environ.get("REDIS_PORT", "6379")
