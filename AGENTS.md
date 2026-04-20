@@ -95,7 +95,8 @@ python manage.py migrate && python manage.py run_deploy_tasks
 Always update openapi.yaml when modifying API contract. openapi.yaml is the contract shared between API and clients;
 where the code deviates from openapi.yaml, the OpenAPI spec is often correct. Check for what to do if this happens.
 
-- **Redis**: logical database usage (Channels, Celery, cache, planned RF engine) is documented in **[docs/REDIS.md](docs/REDIS.md)**. Update that file when introducing a new Redis consumer or changing DB indices.
+- **Redis**: logical database usage (Channels, Celery, cache, RF engine) is documented in **[docs/REDIS.md](docs/REDIS.md)**. Update that file when introducing a new Redis consumer or changing DB indices.
+- **RF propagation**: the render pipeline (Site Planner engine, dedicated Celery worker, hash-based cache) is documented in **[docs/features/rf_propagation/README.md](docs/features/rf_propagation/README.md)**. Key env vars: `RF_PROPAGATION_ENGINE_URL`, `RF_PROPAGATION_IMAGE_TAG`, `RF_PROPAGATION_RENDER_VERSION`. Smoke-test the engine independently with `docker compose exec api curl http://rf-propagation:8080/docs` (root compose) or `http://site-planner:8080/docs` (Portainer).
 
 ## Source control
 
