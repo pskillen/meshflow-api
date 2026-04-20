@@ -2,20 +2,18 @@
 
 from datetime import timedelta
 
-import pytest
 from django.utils import timezone
+
+import pytest
 
 from nodes.models import NodeLatestStatus
 from traceroute.models import AutoTraceRoute
 from traceroute.reach import compute_reach
 
-
 pytestmark = pytest.mark.django_db
 
 
-def test_attempts_count_completed_and_failed_only(
-    create_managed_node, create_observed_node, create_auto_traceroute
-):
+def test_attempts_count_completed_and_failed_only(create_managed_node, create_observed_node, create_auto_traceroute):
     feeder = create_managed_node(
         node_id=0xF11D_E001,
         default_location_latitude=55.86,
@@ -54,9 +52,7 @@ def test_attempts_count_completed_and_failed_only(
     assert row.successes == 4
 
 
-def test_drops_targets_without_position(
-    create_managed_node, create_observed_node, create_auto_traceroute
-):
+def test_drops_targets_without_position(create_managed_node, create_observed_node, create_auto_traceroute):
     feeder = create_managed_node(
         node_id=0xF11D_E002,
         default_location_latitude=55.86,
@@ -72,9 +68,7 @@ def test_drops_targets_without_position(
     assert compute_reach() == []
 
 
-def test_drops_feeders_without_position(
-    create_managed_node, create_observed_node, create_auto_traceroute
-):
+def test_drops_feeders_without_position(create_managed_node, create_observed_node, create_auto_traceroute):
     feeder = create_managed_node(node_id=0xF11D_E003)
     target = create_observed_node(node_id=0x7777_0003)
     NodeLatestStatus.objects.create(node=target, latitude=55.86, longitude=-4.20)
@@ -88,9 +82,7 @@ def test_drops_feeders_without_position(
     assert compute_reach() == []
 
 
-def test_groups_by_feeder_target_pair(
-    create_managed_node, create_observed_node, create_auto_traceroute
-):
+def test_groups_by_feeder_target_pair(create_managed_node, create_observed_node, create_auto_traceroute):
     feeder_a = create_managed_node(
         node_id=0xF11D_E004,
         default_location_latitude=55.86,
@@ -131,9 +123,7 @@ def test_groups_by_feeder_target_pair(
     }
 
 
-def test_feeder_id_filter(
-    create_managed_node, create_observed_node, create_auto_traceroute
-):
+def test_feeder_id_filter(create_managed_node, create_observed_node, create_auto_traceroute):
     feeder_keep = create_managed_node(
         node_id=0xF11D_E006,
         default_location_latitude=55.86,
@@ -197,9 +187,7 @@ def test_constellation_filter(
     assert {r.feeder_node_id for r in rows} == {feeder_keep.node_id}
 
 
-def test_window_filter(
-    create_managed_node, create_observed_node, create_auto_traceroute
-):
+def test_window_filter(create_managed_node, create_observed_node, create_auto_traceroute):
     feeder = create_managed_node(
         node_id=0xF11D_E00A,
         default_location_latitude=55.86,
@@ -231,9 +219,7 @@ def test_window_filter(
     assert rows[0].successes == 1
 
 
-def test_emits_display_metadata(
-    create_managed_node, create_observed_node, create_auto_traceroute
-):
+def test_emits_display_metadata(create_managed_node, create_observed_node, create_auto_traceroute):
     feeder = create_managed_node(
         node_id=0xF11D_E00B,
         name="Feeder MN",
@@ -241,9 +227,7 @@ def test_emits_display_metadata(
         default_location_longitude=-4.25,
     )
     create_observed_node(node_id=feeder.node_id, short_name="FEEDR", long_name="Feeder long")
-    target = create_observed_node(
-        node_id=0x7777_0009, short_name="TGT1", long_name="Target One"
-    )
+    target = create_observed_node(node_id=0x7777_0009, short_name="TGT1", long_name="Target One")
     NodeLatestStatus.objects.create(node=target, latitude=55.86, longitude=-4.20)
 
     create_auto_traceroute(

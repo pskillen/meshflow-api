@@ -167,9 +167,7 @@ def compute_reach(
     feeder_node_ids = {mn.node_id for mn in feeders}
     feeder_display = {
         row["node_id"]: row
-        for row in ObservedNode.objects.filter(node_id__in=feeder_node_ids).values(
-            "node_id", "short_name", "long_name"
-        )
+        for row in ObservedNode.objects.filter(node_id__in=feeder_node_ids).values("node_id", "short_name", "long_name")
     }
 
     feeder_meta_by_internal: dict = {}

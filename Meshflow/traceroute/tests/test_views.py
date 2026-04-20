@@ -714,18 +714,14 @@ class TestFeederReach:
         resp = api_client.get("/api/traceroutes/feeder-reach/", {"feeder_id": "999999"})
         assert resp.status_code == 404
 
-    def test_empty_targets_when_no_traceroutes(
-        self, api_client, create_user, create_managed_node
-    ):
+    def test_empty_targets_when_no_traceroutes(self, api_client, create_user, create_managed_node):
         api_client.force_authenticate(user=create_user())
         feeder = create_managed_node(
             node_id=0xAAAA_AA01,
             default_location_latitude=55.86,
             default_location_longitude=-4.25,
         )
-        resp = api_client.get(
-            "/api/traceroutes/feeder-reach/", {"feeder_id": str(feeder.node_id)}
-        )
+        resp = api_client.get("/api/traceroutes/feeder-reach/", {"feeder_id": str(feeder.node_id)})
         assert resp.status_code == 200
         body = resp.json()
         assert body["feeder"]["node_id"] == feeder.node_id
@@ -765,9 +761,7 @@ class TestFeederReach:
                 status=AutoTraceRoute.STATUS_FAILED,
             )
 
-        resp = api_client.get(
-            "/api/traceroutes/feeder-reach/", {"feeder_id": str(feeder.node_id)}
-        )
+        resp = api_client.get("/api/traceroutes/feeder-reach/", {"feeder_id": str(feeder.node_id)})
         assert resp.status_code == 200
         body = resp.json()
         assert len(body["targets"]) == 1
@@ -780,9 +774,7 @@ class TestFeederReach:
 @pytest.mark.django_db
 class TestConstellationCoverage:
     def test_requires_auth(self, api_client):
-        resp = api_client.get(
-            "/api/traceroutes/constellation-coverage/", {"constellation_id": "1"}
-        )
+        resp = api_client.get("/api/traceroutes/constellation-coverage/", {"constellation_id": "1"})
         assert resp.status_code == 401
 
     def test_missing_constellation_id_returns_400(self, api_client, create_user):
@@ -792,9 +784,7 @@ class TestConstellationCoverage:
 
     def test_non_int_constellation_id_returns_400(self, api_client, create_user):
         api_client.force_authenticate(user=create_user())
-        resp = api_client.get(
-            "/api/traceroutes/constellation-coverage/", {"constellation_id": "abc"}
-        )
+        resp = api_client.get("/api/traceroutes/constellation-coverage/", {"constellation_id": "abc"})
         assert resp.status_code == 400
 
     def test_empty_response_shape(self, api_client, create_user, create_constellation):
@@ -837,9 +827,7 @@ class TestConstellationCoverage:
         target_a = create_observed_node(node_id=0xCCCC_CC03)
         target_b = create_observed_node(node_id=0xCCCC_CC04)
         NodeLatestStatus.objects.create(node=target_a, latitude=55.860, longitude=-4.200)
-        NodeLatestStatus.objects.create(
-            node=target_b, latitude=55.860010, longitude=-4.200010
-        )
+        NodeLatestStatus.objects.create(node=target_b, latitude=55.860010, longitude=-4.200010)
 
         for _ in range(3):
             create_auto_traceroute(
