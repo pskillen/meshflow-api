@@ -35,15 +35,24 @@ def _profile(**overrides):
 
 def test_build_request_populates_required_fields():
     payload = build_request(_profile())
-    assert payload["tx_lat"] == pytest.approx(55.861)
-    assert payload["tx_lng"] == pytest.approx(-4.251)
+    assert payload["lat"] == pytest.approx(55.861)
+    assert payload["lon"] == pytest.approx(-4.251)
     assert payload["tx_height"] == pytest.approx(6.0)
     assert payload["tx_gain"] == pytest.approx(3.0)
     assert payload["tx_power"] == pytest.approx(27.0)
-    assert payload["frequency"] == pytest.approx(869.525)
+    assert payload["frequency_mhz"] == pytest.approx(869.525)
     assert payload["radius"] > 0
     assert payload["colormap"] == DEFAULT_COLORMAP
     assert payload["radio_climate"] == DEFAULT_RADIO_CLIMATE
+    # Site Planner's required fields must be present verbatim.
+    for required in ("lat", "lon", "tx_power"):
+        assert required in payload
+
+
+def test_build_request_clamps_tx_height_and_gain_below_engine_minimums():
+    payload = build_request(_profile(antenna_height_m=0.3, antenna_gain_dbi=-2.0))
+    assert payload["tx_height"] == pytest.approx(1.0)
+    assert payload["tx_gain"] == pytest.approx(0.0)
 
 
 def test_build_request_uses_settings_default_radius(settings):

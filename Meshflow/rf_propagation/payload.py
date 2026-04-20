@@ -55,12 +55,16 @@ def build_request(profile: "NodeRfProfile", *, radius_m: int | None = None) -> d
     freq = _require(profile.rf_frequency_mhz, "rf_frequency_mhz")
     tx_power = _require(profile.tx_power_dbm, "tx_power_dbm")
 
-    tx_height = (
+    tx_height_raw = (
         profile.antenna_height_m
         if profile.antenna_height_m is not None
         else (profile.rf_altitude_m if profile.rf_altitude_m is not None else 1.0)
     )
-    tx_gain = profile.antenna_gain_dbi if profile.antenna_gain_dbi is not None else 0.0
+    # Site Planner enforces tx_height >= 1 m and tx_gain >= 0 dBi; clamp defensively
+    # so realistic-but-low Meshtastic profiles still produce a render.
+    tx_height = max(1.0, float(tx_height_raw))
+    tx_gain_raw = profile.antenna_gain_dbi if profile.antenna_gain_dbi is not None else 0.0
+    tx_gain = max(0.0, float(tx_gain_raw))
 
     if profile.antenna_pattern == "directional":
         logger.warning(
@@ -70,12 +74,12 @@ def build_request(profile: "NodeRfProfile", *, radius_m: int | None = None) -> d
         )
 
     payload: dict[str, Any] = {
-        "tx_lat": float(lat),
-        "tx_lng": float(lng),
-        "tx_height": float(tx_height),
-        "tx_gain": float(tx_gain),
+        "lat": float(lat),
+        "lon": float(lng),
+        "tx_height": tx_height,
+        "tx_gain": tx_gain,
         "tx_power": float(tx_power),
-        "frequency": float(freq),
+        "frequency_mhz": float(freq),
         "rx_height": DEFAULT_RX_HEIGHT_M,
         "rx_gain": DEFAULT_RX_GAIN_DBI,
         "signal_threshold": DEFAULT_SIGNAL_THRESHOLD_DBM,
