@@ -309,6 +309,208 @@ def heatmap_edges(request):
     return Response(data)
 
 
+def _parse_window(request):
+    """Parse ``triggered_at_after`` / ``triggered_at_before`` from query params."""
+    from django.utils.dateparse import parse_datetime
+
+    triggered_at_after = None
+    if request.query_params.get("triggered_at_after"):
+        dt = parse_datetime(request.query_params["triggered_at_after"])
+        if dt:
+            triggered_at_after = dt
+
+    triggered_at_before = None
+    if request.query_params.get("triggered_at_before"):
+        dt = parse_datetime(request.query_params["triggered_at_before"])
+        if dt:
+            triggered_at_before = dt
+
+    return triggered_at_after, triggered_at_before
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def feeder_reach(request):
+    """Per-target attempt and success counts for one feeder.
+
+    Returns one row per ObservedNode that the requested ManagedNode has
+    attempted a traceroute to in the window, with attempt and success counts.
+    The frontend uses this single payload to render dots, client-side H3
+    hexagons, and a concave-hull polygon. See
+    ``docs/features/traceroute/coverage.md``.
+    """
+    from .reach import compute_reach
+
+    feeder_param = request.query_params.get("feeder_id")
+    if not feeder_param:
+        return Response(
+            {"detail": "feeder_id query param is required."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    try:
+        feeder_id = int(feeder_param)
+    except ValueError:
+        return Response(
+            {"detail": "feeder_id must be an integer."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    feeder = ManagedNode.objects.filter(node_id=feeder_id).first()
+    if feeder is None:
+        return Response({"detail": "Feeder not found."}, status=status.HTTP_404_NOT_FOUND)
+
+    triggered_at_after, triggered_at_before = _parse_window(request)
+
+    rows = compute_reach(
+        triggered_at_after=triggered_at_after,
+        triggered_at_before=triggered_at_before,
+        feeder_id=feeder_id,
+    )
+
+    if rows:
+        feeder_meta = {
+            "managed_node_id": rows[0].feeder_managed_node_id,
+            "node_id": rows[0].feeder_node_id,
+            "node_id_str": rows[0].feeder_node_id_str,
+            "short_name": rows[0].feeder_short_name,
+            "long_name": rows[0].feeder_long_name,
+            "lat": rows[0].feeder_lat,
+            "lng": rows[0].feeder_lng,
+        }
+    else:
+        from common.mesh_node_helpers import meshtastic_id_to_hex
+
+        observed = ObservedNode.objects.filter(node_id=feeder.node_id).first()
+        feeder_meta = {
+            "managed_node_id": str(feeder.internal_id),
+            "node_id": feeder.node_id,
+            "node_id_str": meshtastic_id_to_hex(feeder.node_id),
+            "short_name": (observed.short_name if observed else None) or feeder.name,
+            "long_name": observed.long_name if observed else None,
+            "lat": feeder.default_location_latitude,
+            "lng": feeder.default_location_longitude,
+        }
+
+    targets = [
+        {
+            "node_id": r.target_node_id,
+            "node_id_str": r.target_node_id_str,
+            "short_name": r.target_short_name,
+            "long_name": r.target_long_name,
+            "lat": r.target_lat,
+            "lng": r.target_lng,
+            "attempts": r.attempts,
+            "successes": r.successes,
+        }
+        for r in rows
+    ]
+
+    return Response(
+        {
+            "feeder": feeder_meta,
+            "targets": targets,
+            "meta": {
+                "window": {
+                    "start": triggered_at_after.isoformat() if triggered_at_after else None,
+                    "end": triggered_at_before.isoformat() if triggered_at_before else None,
+                },
+            },
+        }
+    )
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def constellation_coverage(request):
+    """Server-side H3-binned reach for an entire constellation.
+
+    Aggregates every (feeder, target) pair where the feeder is a ManagedNode
+    in the requested constellation, then bins the targets by H3 cell at the
+    requested resolution (default 6, ~3km edge). Each hex returns total
+    attempts/successes and the count of contributing feeders/targets.
+    """
+    import h3
+
+    from .reach import compute_reach
+
+    constellation_param = request.query_params.get("constellation_id")
+    if not constellation_param:
+        return Response(
+            {"detail": "constellation_id query param is required."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    try:
+        constellation_id = int(constellation_param)
+    except ValueError:
+        return Response(
+            {"detail": "constellation_id must be an integer."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    h3_resolution = 6
+    if request.query_params.get("h3_resolution"):
+        try:
+            h3_resolution = int(request.query_params["h3_resolution"])
+        except ValueError:
+            pass
+    h3_resolution = max(0, min(15, h3_resolution))
+
+    triggered_at_after, triggered_at_before = _parse_window(request)
+
+    rows = compute_reach(
+        triggered_at_after=triggered_at_after,
+        triggered_at_before=triggered_at_before,
+        constellation_id=constellation_id,
+    )
+
+    bins: dict = {}
+    for r in rows:
+        cell = h3.latlng_to_cell(r.target_lat, r.target_lng, h3_resolution)
+        existing = bins.get(cell)
+        if existing is None:
+            bins[cell] = {
+                "attempts": r.attempts,
+                "successes": r.successes,
+                "feeders": {r.feeder_node_id},
+                "targets": {r.target_node_id},
+            }
+        else:
+            existing["attempts"] += r.attempts
+            existing["successes"] += r.successes
+            existing["feeders"].add(r.feeder_node_id)
+            existing["targets"].add(r.target_node_id)
+
+    hexes = []
+    for cell, agg in bins.items():
+        centre_lat, centre_lng = h3.cell_to_latlng(cell)
+        hexes.append(
+            {
+                "h3_index": cell,
+                "centre_lat": centre_lat,
+                "centre_lng": centre_lng,
+                "attempts": agg["attempts"],
+                "successes": agg["successes"],
+                "contributing_feeders": len(agg["feeders"]),
+                "contributing_targets": len(agg["targets"]),
+            }
+        )
+    hexes.sort(key=lambda h: h["h3_index"])
+
+    return Response(
+        {
+            "constellation_id": constellation_id,
+            "h3_resolution": h3_resolution,
+            "hexes": hexes,
+            "meta": {
+                "window": {
+                    "start": triggered_at_after.isoformat() if triggered_at_after else None,
+                    "end": triggered_at_before.isoformat() if triggered_at_before else None,
+                },
+            },
+        }
+    )
+
+
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def traceroute_stats(request):

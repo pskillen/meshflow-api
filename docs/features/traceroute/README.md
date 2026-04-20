@@ -34,6 +34,8 @@ The traceroute feature tracks path discovery between Meshtastic nodes on the mes
 | `/api/traceroutes/can_trigger/` | GET | Whether current user has at least one triggerable node |
 | `/api/traceroutes/triggerable-nodes/` | GET | ManagedNodes the current user can trigger traceroutes from |
 | `/api/traceroutes/heatmap-edges/` | GET | Aggregated edges/nodes for heatmap (Neo4j) |
+| `/api/traceroutes/feeder-reach/` | GET | Per-target attempts/successes for one feeder (coverage map) |
+| `/api/traceroutes/constellation-coverage/` | GET | Server-side H3-binned reach for one constellation (coverage map) |
 
 ## Permissions
 
@@ -65,4 +67,5 @@ Auto-scheduler and permission checks share one notion of a **live** source node 
 - [Permissions](permissions.md) – Canonical rules for who may view and trigger traceroutes
 - [Flow](flow.md) – End-to-end lifecycle from trigger to completion
 - [Heatmap](heatmap.md) – Neo4j schema, heatmap-edges API, visualization
+- [Coverage](coverage.md) – Per-feeder and per-constellation reliability surface (dots, H3 hexes, concave-hull polygons)
 - [Mesh monitoring](../mesh-monitoring/README.md) – watches, verification rounds, `pick_traceroute_target` exclusion for nodes under monitoring
