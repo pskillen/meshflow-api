@@ -1,5 +1,8 @@
+import re
 from datetime import datetime, timedelta
+from pathlib import Path
 
+from django.conf import settings
 from django.db.models import (
     BooleanField,
     Case,
@@ -14,6 +17,7 @@ from django.db.models import (
     When,
 )
 from django.db.models.functions import Coalesce
+from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
@@ -36,13 +40,18 @@ from nodes.models import (
     NodeAuth,
     NodeLatestStatus,
     NodeOwnerClaim,
+    NodeRfProfile,
+    NodeRfPropagationRender,
     ObservedNode,
     Position,
     PowerMetrics,
     RoleSource,
     WeatherUse,
 )
-from nodes.permission_helpers import user_can_edit_observed_node_environment_settings
+from nodes.permission_helpers import (
+    user_can_edit_observed_node_environment_settings,
+    user_can_edit_observed_node_rf_profile,
+)
 from nodes.serializers import (
     APIKeyCreateSerializer,
     APIKeyDetailSerializer,
@@ -53,6 +62,9 @@ from nodes.serializers import (
     EnvironmentMetricsSerializer,
     ManagedNodeSerializer,
     NodeOwnerClaimSerializer,
+    NodeRfProfileSerializer,
+    NodeRfProfileUpdateSerializer,
+    NodeRfPropagationRenderSerializer,
     ObservedNodeEnvironmentSettingsSerializer,
     ObservedNodeSearchSerializer,
     ObservedNodeSerializer,
@@ -612,6 +624,83 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
         node.save(update_fields=update_fields)
         out = ObservedNodeSerializer(node, context=self.get_serializer_context())
         return Response(out.data)
+
+    @action(detail=True, methods=["get", "patch"], url_path="rf-profile")
+    def rf_profile(self, request, node_id=None):
+        """Read or update RF propagation profile (coordinates owner/staff only in serializer)."""
+        node = self.get_object()
+        if request.method == "GET":
+            try:
+                profile = node.rf_profile
+            except NodeRfProfile.DoesNotExist:
+                return Response(status=status.HTTP_204_NO_CONTENT)
+            ser = NodeRfProfileSerializer(profile, context=self.get_serializer_context())
+            return Response(ser.data)
+        if not user_can_edit_observed_node_rf_profile(request.user, node):
+            raise PermissionDenied()
+        profile, _ = NodeRfProfile.objects.get_or_create(observed_node=node)
+        ser = NodeRfProfileUpdateSerializer(
+            data=request.data,
+            partial=True,
+            context={**self.get_serializer_context(), "profile": profile},
+        )
+        ser.is_valid(raise_exception=True)
+        for attr, value in ser.validated_data.items():
+            setattr(profile, attr, value)
+        profile.save()
+        return Response(NodeRfProfileSerializer(profile, context=self.get_serializer_context()).data)
+
+    @action(detail=True, methods=["get"], url_path="rf-propagation")
+    def rf_propagation(self, request, node_id=None):
+        """Return latest RF propagation render row, or ``status: none`` when none exist."""
+        node = self.get_object()
+        render = node.latest_rf_render()
+        if render is None:
+            return Response({"status": "none"})
+        ser = NodeRfPropagationRenderSerializer(render, context=self.get_serializer_context())
+        return Response(ser.data)
+
+    @action(detail=True, methods=["post"], url_path="rf-propagation/recompute")
+    def rf_propagation_recompute(self, request, node_id=None):
+        """Queue a new propagation render (worker wiring deferred to plan 2)."""
+        node = self.get_object()
+        if not user_can_edit_observed_node_rf_profile(request.user, node):
+            raise PermissionDenied()
+        row = NodeRfPropagationRender.objects.create(
+            observed_node=node,
+            status=NodeRfPropagationRender.Status.PENDING,
+        )
+        # TODO(plan-2): enqueue render task
+        ser = NodeRfPropagationRenderSerializer(row, context=self.get_serializer_context())
+        return Response(ser.data, status=status.HTTP_201_CREATED)
+
+
+class RfPropagationAssetView(APIView):
+    """
+    Serve a cached propagation PNG from disk (public; hash in filename is the secret).
+
+    Returns 404 when the worker has not written the asset yet.
+    """
+
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request, node_id, filename):
+        _ = node_id  # reserved for future per-node asset validation
+        if ".." in filename or "/" in filename or "\\" in filename:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+        if not re.fullmatch(r"[A-Za-z0-9_-]+\.png\Z", filename):
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+        base = Path(settings.RF_PROPAGATION_ASSET_DIR).resolve()
+        target = (base / filename).resolve()
+        try:
+            target.relative_to(base)
+        except ValueError:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+        if not target.is_file():
+            raise Http404()
+        response = FileResponse(target.open("rb"), content_type="image/png")
+        response["Cache-Control"] = "public, max-age=31536000, immutable"
+        return response
 
 
 class DeviceMetricsBulkView(APIView):

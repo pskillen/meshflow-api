@@ -1,5 +1,7 @@
 import secrets
 
+from django.urls import reverse
+
 from rest_framework import serializers
 
 from common.mesh_node_helpers import meshtastic_id_to_hex
@@ -7,6 +9,7 @@ from constellations.models import Constellation, ConstellationUserMembership, Me
 from users.models import User
 
 from .models import (
+    AntennaPattern,
     DeviceMetrics,
     EnvironmentExposure,
     EnvironmentMetrics,
@@ -15,12 +18,17 @@ from .models import (
     NodeAPIKey,
     NodeAuth,
     NodeOwnerClaim,
+    NodeRfProfile,
+    NodeRfPropagationRender,
     ObservedNode,
     Position,
     PowerMetrics,
     WeatherUse,
 )
-from .permission_helpers import user_can_edit_observed_node_environment_settings
+from .permission_helpers import (
+    user_can_edit_observed_node_environment_settings,
+    user_can_edit_observed_node_rf_profile,
+)
 
 
 class ObservedNodeEnvironmentSettingsSerializer(serializers.Serializer):
@@ -39,6 +47,124 @@ class ObservedNodeEnvironmentSettingsSerializer(serializers.Serializer):
         if not attrs:
             raise serializers.ValidationError("At least one of environment_exposure, weather_use must be provided.")
         return attrs
+
+
+class NodeRfProfileSerializer(serializers.ModelSerializer):
+    """RF profile: public fields always; private coordinates only for owner/staff."""
+
+    class Meta:
+        model = NodeRfProfile
+        fields = [
+            "antenna_height_m",
+            "antenna_gain_dbi",
+            "tx_power_dbm",
+            "rf_frequency_mhz",
+            "antenna_pattern",
+            "antenna_azimuth_deg",
+            "antenna_beamwidth_deg",
+            "rf_latitude",
+            "rf_longitude",
+            "rf_altitude_m",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["created_at", "updated_at"]
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        request = self.context.get("request")
+        observed_node = instance.observed_node
+        if not user_can_edit_observed_node_rf_profile(getattr(request, "user", None), observed_node):
+            data.pop("rf_latitude", None)
+            data.pop("rf_longitude", None)
+            data.pop("rf_altitude_m", None)
+        return data
+
+
+class NodeRfProfileUpdateSerializer(serializers.Serializer):
+    """PATCH body for RF profile (validated ranges and directional rules)."""
+
+    rf_latitude = serializers.FloatField(required=False, allow_null=True)
+    rf_longitude = serializers.FloatField(required=False, allow_null=True)
+    rf_altitude_m = serializers.FloatField(required=False, allow_null=True)
+    antenna_height_m = serializers.FloatField(required=False, allow_null=True)
+    antenna_gain_dbi = serializers.FloatField(required=False, allow_null=True)
+    tx_power_dbm = serializers.FloatField(required=False, allow_null=True)
+    rf_frequency_mhz = serializers.FloatField(required=False, allow_null=True)
+    antenna_pattern = serializers.ChoiceField(choices=AntennaPattern.choices, required=False)
+    antenna_azimuth_deg = serializers.FloatField(required=False, allow_null=True)
+    antenna_beamwidth_deg = serializers.FloatField(required=False, allow_null=True)
+
+    def validate_rf_latitude(self, value):
+        if value is not None and not (-90.0 <= value <= 90.0):
+            raise serializers.ValidationError("Latitude must be between -90 and 90.")
+        return value
+
+    def validate_rf_longitude(self, value):
+        if value is not None and not (-180.0 <= value <= 180.0):
+            raise serializers.ValidationError("Longitude must be between -180 and 180.")
+        return value
+
+    def validate_tx_power_dbm(self, value):
+        if value is not None and not (-50.0 <= value <= 60.0):
+            raise serializers.ValidationError("tx_power_dbm must be between -50 and 60.")
+        return value
+
+    def validate(self, attrs):
+        profile = self.context.get("profile")
+        if profile is None:
+            return attrs
+        pattern = attrs.get("antenna_pattern", profile.antenna_pattern)
+        az = attrs.get("antenna_azimuth_deg", profile.antenna_azimuth_deg)
+        bw = attrs.get("antenna_beamwidth_deg", profile.antenna_beamwidth_deg)
+        if pattern == AntennaPattern.DIRECTIONAL:
+            if az is None or bw is None:
+                raise serializers.ValidationError(
+                    "antenna_azimuth_deg and antenna_beamwidth_deg are required when antenna_pattern is directional."
+                )
+        return attrs
+
+
+class NodeRfPropagationRenderSerializer(serializers.ModelSerializer):
+    """Latest propagation render row for API consumers."""
+
+    asset_url = serializers.SerializerMethodField()
+    bounds = serializers.SerializerMethodField()
+
+    class Meta:
+        model = NodeRfPropagationRender
+        fields = [
+            "status",
+            "input_hash",
+            "asset_url",
+            "bounds",
+            "error_message",
+            "created_at",
+            "completed_at",
+        ]
+        read_only_fields = fields
+
+    def get_asset_url(self, obj):
+        if obj.status != NodeRfPropagationRender.Status.READY or not obj.asset_filename:
+            return None
+        request = self.context.get("request")
+        path = reverse(
+            "rf-propagation-asset",
+            kwargs={"node_id": obj.observed_node.node_id, "filename": obj.asset_filename},
+        )
+        if request:
+            return request.build_absolute_uri(path)
+        return path
+
+    def get_bounds(self, obj):
+        if obj.bounds_west is None or obj.bounds_south is None or obj.bounds_east is None or obj.bounds_north is None:
+            return None
+        return {
+            "west": obj.bounds_west,
+            "south": obj.bounds_south,
+            "east": obj.bounds_east,
+            "north": obj.bounds_north,
+        }
 
 
 class NodeOwnerClaimSerializer(serializers.ModelSerializer):
@@ -914,6 +1040,9 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
     environment_exposure = serializers.SerializerMethodField()
     weather_use = serializers.SerializerMethodField()
     environment_settings_editable = serializers.SerializerMethodField()
+    rf_profile_editable = serializers.SerializerMethodField()
+    has_rf_profile = serializers.SerializerMethodField()
+    has_ready_rf_render = serializers.SerializerMethodField()
     owner = OwnerSerializer(source="claimed_by", read_only=True)
     claim = serializers.SerializerMethodField()
 
@@ -948,6 +1077,9 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
             "environment_exposure",
             "weather_use",
             "environment_settings_editable",
+            "rf_profile_editable",
+            "has_rf_profile",
+            "has_ready_rf_render",
             "owner",
             "claim",
         ]
@@ -967,6 +1099,9 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
             "environment_exposure",
             "weather_use",
             "environment_settings_editable",
+            "rf_profile_editable",
+            "has_rf_profile",
+            "has_ready_rf_render",
             "owner",
             "claim",
         ]
@@ -982,6 +1117,21 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
         if not request or not request.user.is_authenticated:
             return False
         return user_can_edit_observed_node_environment_settings(request.user, obj)
+
+    def get_rf_profile_editable(self, obj):
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated:
+            return False
+        return user_can_edit_observed_node_rf_profile(request.user, obj)
+
+    def get_has_rf_profile(self, obj):
+        return NodeRfProfile.objects.filter(observed_node=obj).exists()
+
+    def get_has_ready_rf_render(self, obj):
+        return NodeRfPropagationRender.objects.filter(
+            observed_node=obj,
+            status=NodeRfPropagationRender.Status.READY,
+        ).exists()
 
     def get_inferred_max_hops(self, obj):
         status = self._get_latest_status(obj)
