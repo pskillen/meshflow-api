@@ -157,7 +157,26 @@ RF_PROPAGATION_ASSET_DIR = Path(
 # Meshtastic Site Planner engine base URL (FastAPI service, see deployment/docker-compose.yaml).
 RF_PROPAGATION_ENGINE_URL = os.environ.get("RF_PROPAGATION_ENGINE_URL", "")
 # Bump this to invalidate every cached render (pipeline or post-processing change).
-RF_PROPAGATION_RENDER_VERSION = os.environ.get("RF_PROPAGATION_RENDER_VERSION", "1")
+RF_PROPAGATION_RENDER_VERSION = os.environ.get("RF_PROPAGATION_RENDER_VERSION", "2")
+
+
+def _rf_propagation_nodata_rgb() -> tuple[int, int, int]:
+    raw = os.environ.get("RF_PROPAGATION_NODATA_RGB", "0,0,0")
+    try:
+        parts = [int(x.strip()) for x in raw.split(",")]
+        if len(parts) == 3 and all(0 <= p <= 255 for p in parts):
+            return (parts[0], parts[1], parts[2])
+    except ValueError:
+        pass
+    return (0, 0, 0)
+
+
+# GeoTIFF coverage rasters use this colour for "no signal"; strip to transparent in PNG for map overlay.
+RF_PROPAGATION_NODATA_RGB = _rf_propagation_nodata_rgb()
+RF_PROPAGATION_NODATA_TOLERANCE = max(
+    0,
+    min(255, int(os.environ.get("RF_PROPAGATION_NODATA_TOLERANCE", "8"))),
+)
 # Default bbox radius around the tx (metres) when the profile does not specify one.
 RF_PROPAGATION_DEFAULT_RADIUS_M = int(os.environ.get("RF_PROPAGATION_DEFAULT_RADIUS_M", "20000"))
 # Upper bound (seconds) for polling engine job status inside the Celery task.
