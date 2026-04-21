@@ -54,11 +54,15 @@ def test_schedule_traceroutes_creates_when_recent_observation(
     with patch("traceroute.tasks.async_to_sync", side_effect=immediate_async_to_sync):
         with patch("traceroute.tasks.get_channel_layer", return_value=channel_layer):
             with patch(
-                "traceroute.tasks.pick_strategy_for_feeder",
-                return_value=AutoTraceRoute.TARGET_STRATEGY_DX_ACROSS,
+                "traceroute.tasks.eligible_traceroute_sources_ordered",
+                return_value=[mn],
             ):
-                with patch("traceroute.tasks.pick_traceroute_target", return_value=target):
-                    assert schedule_traceroutes() == {"created": 1}
+                with patch(
+                    "traceroute.tasks.ordered_strategies_for_feeder",
+                    return_value=[AutoTraceRoute.TARGET_STRATEGY_DX_ACROSS],
+                ):
+                    with patch("traceroute.tasks.pick_traceroute_target", return_value=target):
+                        assert schedule_traceroutes() == {"created": 1}
 
     assert AutoTraceRoute.objects.filter(
         source_node=mn,

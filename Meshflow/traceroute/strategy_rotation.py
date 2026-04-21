@@ -71,26 +71,30 @@ def _strategy_sort_tuple(strategy: str, last_iso: str | None) -> tuple:
     return (1, last_iso, ti)
 
 
-def pick_strategy_for_feeder(managed_node: ManagedNode) -> str | None:
+def ordered_strategies_for_feeder(managed_node: ManagedNode) -> list[str]:
+    """
+    Applicable strategies for *managed_node* ordered by Redis LRU (stalest first),
+    matching :func:`pick_strategy_for_feeder` tie-breaking.
+    """
     strategies = applicable_strategies(managed_node)
     if not strategies:
-        return None
+        return []
 
     keys = [KEY_FMT.format(feeder_pk=managed_node.pk, strategy=s) for s in strategies]
     lasts = cache.get_many(keys)
 
-    best: str | None = None
-    best_key_tuple: tuple | None = None
-
+    decorated: list[tuple[tuple, str]] = []
     for s in strategies:
         k = KEY_FMT.format(feeder_pk=managed_node.pk, strategy=s)
         iso = lasts.get(k)
-        t = _strategy_sort_tuple(s, iso)
-        if best_key_tuple is None or t < best_key_tuple:
-            best_key_tuple = t
-            best = s
+        decorated.append((_strategy_sort_tuple(s, iso), s))
+    decorated.sort(key=lambda x: x[0])
+    return [s for _, s in decorated]
 
-    return best
+
+def pick_strategy_for_feeder(managed_node: ManagedNode) -> str | None:
+    ordered = ordered_strategies_for_feeder(managed_node)
+    return ordered[0] if ordered else None
 
 
 def record_strategy_run(managed_node: ManagedNode, strategy: str | None) -> None:
