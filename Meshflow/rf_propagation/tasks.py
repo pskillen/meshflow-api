@@ -35,7 +35,7 @@ from .bounds import bbox_from_center
 from .client import EngineFatalError, EngineTransientError, SitePlannerClient
 from .hashing import compute_input_hash
 from .image import TiffDecodeError, geotiff_to_render_image
-from .payload import InvalidProfileError, build_request
+from .payload import InvalidProfileError, build_request, hash_extras_from_payload
 
 logger = logging.getLogger(__name__)
 
@@ -184,7 +184,7 @@ def render_rf_propagation(self, render_id: int) -> dict:
     except InvalidProfileError as exc:
         return _mark_failed(render, str(exc))
 
-    input_hash = compute_input_hash(profile, extras={"radius_m": int(payload["radius"])})
+    input_hash = compute_input_hash(profile, extras=hash_extras_from_payload(payload))
 
     cache_hit = _find_cache_hit(NodeRfPropagationRender, render_id, input_hash)
     if cache_hit is not None:

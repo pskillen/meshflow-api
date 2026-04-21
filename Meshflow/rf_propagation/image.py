@@ -18,6 +18,7 @@ the map correctly.
 from __future__ import annotations
 
 import logging
+import math
 from dataclasses import dataclass
 from io import BytesIO
 
@@ -97,6 +98,43 @@ def _png_bytes_from_rgba(img) -> bytes:
     return buf.getvalue()
 
 
+def _maybe_resample_pixel_aspect_for_web_mercator(img, bounds: Bbox | None, width: int, height: int):
+    """Resample raster pixels so width/height matches Mercator screen aspect at bbox centre.
+
+    SPLAT!/Site Planner tend to emit equal pixels-per-degree along lat/lng; Leaflet maps
+    the PNG onto EPSG:4326 bounds using Web Mercator where horizontal scale varies with
+    ``cos(latitude)``. Reconditioning pixel aspect avoids vertically squashed overlays.
+    """
+
+    from PIL import Image
+
+    if bounds is None:
+        return img
+    lat_span = bounds.north - bounds.south
+    lng_span = bounds.east - bounds.west
+    if lat_span <= 0 or lng_span <= 0:
+        return img
+    lat_c = (bounds.north + bounds.south) / 2.0
+    earth_aspect = (lng_span * math.cos(math.radians(lat_c))) / lat_span
+    current_aspect = width / height
+    rel_diff = abs(earth_aspect - current_aspect) / current_aspect if current_aspect else 0.0
+    if rel_diff <= 0.02:
+        return img
+
+    try:
+        resample = Image.Resampling.BILINEAR
+    except AttributeError:
+        resample = Image.BILINEAR
+
+    if earth_aspect > current_aspect:
+        new_w = max(1, int(round(height * earth_aspect)))
+        new_h = height
+    else:
+        new_w = width
+        new_h = max(1, int(round(width / earth_aspect)))
+    return img.resize((new_w, new_h), resample)
+
+
 def _pillow_convert(tiff_bytes: bytes) -> RenderImage:
     from PIL import Image  # local import so test runners without Pillow can skip
 
@@ -105,6 +143,7 @@ def _pillow_convert(tiff_bytes: bytes) -> RenderImage:
         width, height = img.size
         bounds = _bounds_from_pillow_tags(img, width, height)
         pil_img = img.convert("RGBA") if img.mode != "RGBA" else img.copy()
+        pil_img = _maybe_resample_pixel_aspect_for_web_mercator(pil_img, bounds, width, height)
 
     return RenderImage(png_bytes=_png_bytes_from_rgba(pil_img), bounds=bounds)
 
@@ -128,6 +167,8 @@ def _tifffile_convert(tiff_bytes: bytes) -> RenderImage:
         img = Image.fromarray(np.asarray(arr, dtype=arr.dtype), mode=mode).convert("RGBA")
     else:
         raise TiffDecodeError(f"unexpected TIFF shape: {arr.shape}")
+
+    img = _maybe_resample_pixel_aspect_for_web_mercator(img, bounds, width, height)
 
     return RenderImage(png_bytes=_png_bytes_from_rgba(img), bounds=bounds)
 

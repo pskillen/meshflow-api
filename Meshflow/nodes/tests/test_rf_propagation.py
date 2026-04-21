@@ -330,7 +330,7 @@ def test_rf_propagation_recompute_cache_hit_reuses_asset(settings, create_observ
     from pathlib import Path
 
     from rf_propagation.hashing import compute_input_hash
-    from rf_propagation.payload import build_request
+    from rf_propagation.payload import build_request, hash_extras_from_payload
 
     owner = create_user()
     node = create_observed_node(
@@ -343,7 +343,7 @@ def test_rf_propagation_recompute_cache_hit_reuses_asset(settings, create_observ
     with tempfile.TemporaryDirectory() as tmp:
         settings.RF_PROPAGATION_ASSET_DIR = tmp
         payload = build_request(profile)
-        input_hash = compute_input_hash(profile, extras={"radius_m": int(payload["radius"])})
+        input_hash = compute_input_hash(profile, extras=hash_extras_from_payload(payload))
         Path(tmp, f"{input_hash}.png").write_bytes(b"\x89PNG\r\n\x1a\n")
         NodeRfPropagationRender.objects.create(
             observed_node=node,

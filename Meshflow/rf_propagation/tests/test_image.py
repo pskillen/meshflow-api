@@ -153,3 +153,39 @@ def test_ignores_bounds_outside_valid_lat_lng_range():
     )
     result = geotiff_to_render_image(tiff)
     assert result.bounds is None
+
+
+def test_resamples_pixel_aspect_for_web_mercator():
+    """SPLAT-style equal pixels-per-degree yields a wide raster; rescale toward Mercator aspect."""
+    buf = BytesIO()
+    img = Image.new("RGBA", (240, 120), color=(128, 128, 128, 255))
+    img.save(
+        buf,
+        format="TIFF",
+        tiffinfo={
+            33922: (0.0, 0.0, 0.0, -5.0, 60.5, 0.0),
+            33550: (2.0 / 240.0, 1.0 / 120.0, 0.0),
+        },
+    )
+    result = geotiff_to_render_image(buf.getvalue())
+    assert result.bounds is not None
+    with Image.open(BytesIO(result.png_bytes)) as out:
+        assert out.size[0] == pytest.approx(240, abs=2)
+        assert out.size[1] == pytest.approx(240, abs=2)
+
+
+def test_aspect_correction_skips_near_square_equatorial_case():
+    buf = BytesIO()
+    img = Image.new("RGBA", (100, 100), color=(128, 128, 128, 255))
+    img.save(
+        buf,
+        format="TIFF",
+        tiffinfo={
+            33922: (0.0, 0.0, 0.0, -10.0, 0.5, 0.0),
+            33550: (1.0 / 100.0, 1.0 / 100.0, 0.0),
+        },
+    )
+    result = geotiff_to_render_image(buf.getvalue())
+    assert result.bounds is not None
+    with Image.open(BytesIO(result.png_bytes)) as out:
+        assert out.size == (100, 100)

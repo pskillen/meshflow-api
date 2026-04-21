@@ -735,7 +735,7 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
 
         # Compute hash + radius up front so cache lookup and eventual task agree.
         from rf_propagation.hashing import compute_input_hash
-        from rf_propagation.payload import InvalidProfileError, build_request
+        from rf_propagation.payload import InvalidProfileError, build_request, hash_extras_from_payload
         from rf_propagation.tasks import render_rf_propagation
 
         try:
@@ -743,7 +743,7 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
         except InvalidProfileError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
-        input_hash = compute_input_hash(profile, extras={"radius_m": int(payload["radius"])})
+        input_hash = compute_input_hash(profile, extras=hash_extras_from_payload(payload))
 
         asset_dir = Path(settings.RF_PROPAGATION_ASSET_DIR)
         cache_hit = (
