@@ -63,7 +63,7 @@ def compute_input_hash(
     :param render_version: Overrides :data:`settings.RF_PROPAGATION_RENDER_VERSION`.
         Exposed for tests.
     :param extras: Optional extra key/value pairs to fold into the hash
-        (typically from :func:`rf_propagation.payload.hash_extras_from_payload`:
+        (typically from ``rf_propagation.payload.hash_extras_from_payload``: keys like
         ``radius_m``, ``colormap``, ``high_resolution``, ``min_dbm``, ``max_dbm``,
         ``signal_threshold``). Keys must be JSON-serialisable.
     """
