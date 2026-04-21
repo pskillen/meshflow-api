@@ -35,7 +35,7 @@ def schedule_traceroutes():
 
     source_node = select_traceroute_source()
     if not source_node:
-        logger.info(
+        logger.warning(
             "schedule_traceroutes: no eligible sources (allow_auto_traceroute with "
             "ingestion within SCHEDULE_TRACEROUTE_SOURCE_RECENCY_SECONDS)"
         )
@@ -43,12 +43,12 @@ def schedule_traceroutes():
 
     strategy = pick_strategy_for_feeder(source_node)
     if not strategy:
-        logger.debug("schedule_traceroutes: no applicable strategy for node %s", source_node.node_id_str)
+        logger.warning("schedule_traceroutes: no applicable strategy for node %s", source_node.node_id_str)
         return {"created": 0}
 
     target_node = pick_traceroute_target(source_node, strategy=strategy)
     if not target_node:
-        logger.debug(
+        logger.warning(
             "schedule_traceroutes: no target for node %s strategy=%s",
             source_node.node_id_str,
             strategy,
