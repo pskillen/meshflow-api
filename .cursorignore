@@ -1,0 +1,74 @@
+# Dependencies & virtualenvs
+.venv/
+venv/
+venv-*/
+env/
+ENV/
+env.bak/
+venv.bak/
+__pypackages__/
+node_modules/
+
+# Installed / packaged Python artifacts
+*.egg-info/
+.eggs/
+*.egg
+develop-eggs/
+eggs/
+downloads/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+pip-wheel-metadata/
+
+# Bytecode & native extensions
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Build / distribution trees
+.Python
+build/
+dist/
+*.manifest
+*.spec
+
+# Tooling caches
+.pytest_cache/
+.mypy_cache/
+.hypothesis/
+.tox/
+.nox/
+.ruff_cache/
+.dmypy.json
+dmypy.json
+.pytype/
+.pyre/
+.coverage
+.coverage.*
+htmlcov/
+cover/
+.cache/
+
+# Django collectstatic & local media (often large binaries)
+staticfiles/
+media/
+
+# Local data, reports, generated state
+data/
+docker-data/
+reports/
+test-results/
+*.log
+*.sqlite
+*.sqlite3
+*.sqlite-journal
+*.sqlite3-journal
+*.db
+remote_db_dump.sql
+
+# Tailwind / CSS build artifact (if generated locally)
+tailwind.css

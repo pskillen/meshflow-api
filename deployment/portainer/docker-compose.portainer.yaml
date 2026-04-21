@@ -37,13 +37,13 @@ services:
     image: ghcr.io/pskillen/meshflow-api:${DJANGO_TAG}-docs
     restart: no
     ports:
-      - "${REDOC_EXT_PORT}:8080"
+      - "${ANCILLARY_PORTS_BIND_HOST}:${REDOC_EXT_PORT}:8080"
 
   redis:
     image: ${REDIS_IMAGE}
     restart: unless-stopped
     ports:
-      - "${REDIS_EXT_PORT}:6379"
+      - "${ANCILLARY_PORTS_BIND_HOST}:${REDIS_EXT_PORT}:6379"
     command: redis-server --requirepass ${REDIS_PASSWORD}
     environment:
       REDIS_PASSWORD: ${REDIS_PASSWORD}
@@ -56,8 +56,8 @@ services:
     image: neo4j:${NEO4J_IMAGE}
     restart: unless-stopped
     ports:
-      - "${NEO4J_HTTP_PORT}:7474"
-      - "${NEO4J_BOLT_PORT}:7687"
+      - "${ANCILLARY_PORTS_BIND_HOST}:${NEO4J_HTTP_PORT}:7474"
+      - "${ANCILLARY_PORTS_BIND_HOST}:${NEO4J_BOLT_PORT}:7687"
     environment:
       NEO4J_AUTH: neo4j/${NEO4J_PASSWORD}
     volumes:
@@ -227,7 +227,7 @@ services:
     image: ghcr.io/pskillen/meshflow-rf-propagation:${RF_PROPAGATION_TAG:-latest-dev}
     restart: unless-stopped
     ports:
-      - "${RF_PROPAGATION_HTTP_PORT}:8080"
+      - "${ANCILLARY_PORTS_BIND_HOST}:${RF_PROPAGATION_HTTP_PORT}:8080"
     environment:
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/3
       SDF_DIR: /data/sdf
