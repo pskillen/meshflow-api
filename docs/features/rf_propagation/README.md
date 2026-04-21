@@ -80,8 +80,10 @@ for its own task state.
 - `antenna_pattern`, azimuth, beamwidth (captured even though Site Planner
   currently ignores them — future engines may use them).
 - `render_version` from `settings.RF_PROPAGATION_RENDER_VERSION`.
-- The target radius (so changing `RF_PROPAGATION_DEFAULT_RADIUS_M`
-  invalidates existing renders).
+- Engine tunables from ``rf_propagation.payload.hash_extras_from_payload``
+  (`radius_m`, `colormap`, `high_resolution`, `min_dbm`, `max_dbm`,
+  `signal_threshold`) so changing any of the related environment variables
+  invalidates existing renders.
 
 The hash doubles as the on-disk filename (`{hash}.png`). Two nodes with
 identical RF profiles therefore share a PNG.
@@ -160,6 +162,21 @@ of **`RF_PROPAGATION_NODATA_RGB`** (comma-separated `R,G,B`, default
 `0,0,0`) are written with alpha 0 so the Leaflet basemap shows through
 outside the tinted coverage.
 
+After that, **pixel aspect correction** adjusts the raster width/height so
+each pixel matches the relative east–west vs north–south metres implied by the
+bbox centre latitude (Leaflet stretches the PNG onto Web Mercator). This avoids
+coverage patterns looking vertically squashed when SPLAT emits equal pixels per
+degree on both axes.
+
+### Tuning (radius, palette, resolution)
+
+- **`RF_PROPAGATION_DEFAULT_RADIUS_M`** — hint for how far SPLAT!/SRTM tries to extend the scene (actual bounds still come from the GeoTIFF tags). Larger values cost more compute and disk.
+- **`RF_PROPAGATION_COLORMAP`** — matplotlib colormap name forwarded to Site Planner (`plasma` default; invalid names fall back with a WARN log).
+- **`RF_PROPAGATION_HIGH_RESOLUTION`** — toggles SPLAT!'s finer SRTM sampling (`true` ⇒ ~9× more pixels vs standard). Keep `false` unless you explicitly need sharper terrain.
+- **`RF_PROPAGATION_MIN_DBM`**, **`RF_PROPAGATION_MAX_DBM`**, **`RF_PROPAGATION_SIGNAL_THRESHOLD_DBM`** — SPLAT palette span and contour threshold.
+
+All tunables participate in ``compute_input_hash`` (via ``hash_extras_from_payload``) so operators get a fresh cache row when ops change defaults.
+
 ## Environment variables
 
 | Variable | Default | Where used | Notes |
@@ -167,10 +184,15 @@ outside the tinted coverage.
 | `RF_PROPAGATION_ENGINE_URL` | _(empty)_ | worker | Internal URL of the engine, e.g. `http://rf-propagation:8080`. Required for real renders. |
 | `RF_PROPAGATION_ASSET_DIR` | `/var/meshflow/generated-assets/rf-propagation` | api + worker | Mounted from the `rf_assets` named volume; must be shared between `api` and `celery-rf-worker`. |
 | `RF_PROPAGATION_IMAGE_TAG` | `latest-dev` | compose | Tag for the engine image. |
-| `RF_PROPAGATION_RENDER_VERSION` | `3` | api + worker | Bump to invalidate all cached renders. |
+| `RF_PROPAGATION_RENDER_VERSION` | `4` | api + worker | Bump to invalidate all cached renders. |
 | `RF_PROPAGATION_NODATA_RGB` | `0,0,0` | api + worker | RGB colour treated as transparent background in the PNG overlay. |
 | `RF_PROPAGATION_NODATA_TOLERANCE` | `8` | api + worker | Per-channel distance from nodata RGB (0–255) to clear alpha. |
-| `RF_PROPAGATION_DEFAULT_RADIUS_M` | `20000` | api + worker | Hint passed to the engine; actual rendered bounds come from the GeoTIFF's georef tags. |
+| `RF_PROPAGATION_DEFAULT_RADIUS_M` | `50000` | api + worker | Hint passed to the engine; actual rendered bounds come from the GeoTIFF's georef tags. |
+| `RF_PROPAGATION_COLORMAP` | `plasma` | api + worker | Validated matplotlib name; forwarded to Site Planner. |
+| `RF_PROPAGATION_HIGH_RESOLUTION` | `false` | api + worker | Finer SRTM sampling (larger rasters). Boolean-ish (`1`/`true`/…). |
+| `RF_PROPAGATION_MIN_DBM` | `-130` | api + worker | Colour scale minimum (dBm). |
+| `RF_PROPAGATION_MAX_DBM` | `-50` | api + worker | Colour scale maximum (dBm). |
+| `RF_PROPAGATION_SIGNAL_THRESHOLD_DBM` | `-110` | api + worker | SPLAT signal threshold (dBm). |
 | `RF_PROPAGATION_POLL_MAX_SECONDS` | `300` | worker | Cap on cumulative polling before the render is marked failed. |
 | `RF_PROPAGATION_READY_RETENTION` | `3` | worker | Number of `ready` renders kept per node. |
 

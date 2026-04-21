@@ -234,7 +234,7 @@ def test_task_transient_error_retries(asset_dir, create_observed_node, settings)
 def test_task_cache_hit_reuses_existing_asset(asset_dir, create_observed_node):
     from rf_propagation import tasks as task_mod
     from rf_propagation.hashing import compute_input_hash
-    from rf_propagation.payload import build_request
+    from rf_propagation.payload import build_request, hash_extras_from_payload
 
     node = create_observed_node(
         node_id=820_820_823,
@@ -243,7 +243,7 @@ def test_task_cache_hit_reuses_existing_asset(asset_dir, create_observed_node):
     profile = _make_profile(node)
 
     payload = build_request(profile)
-    input_hash = compute_input_hash(profile, extras={"radius_m": int(payload["radius"])})
+    input_hash = compute_input_hash(profile, extras=hash_extras_from_payload(payload))
     asset_filename = f"{input_hash}.png"
     (asset_dir / asset_filename).write_bytes(b"\x89PNG\r\n\x1a\n")
 
@@ -431,3 +431,32 @@ def test_task_missing_engine_url_fails(asset_dir, create_observed_node, settings
     render.refresh_from_db()
     assert render.status == NodeRfPropagationRender.Status.FAILED
     assert "RF_PROPAGATION_ENGINE_URL" in render.error_message
+
+
+@pytest.mark.django_db
+def test_task_compute_hash_includes_engine_tuning_extras(asset_dir, create_observed_node, monkeypatch):
+    from rf_propagation import tasks as task_mod
+    from rf_propagation.hashing import compute_input_hash as real_compute_input_hash
+
+    extras_seen: list = []
+
+    def _tracing_compute(profile, *, render_version=None, extras=None):
+        extras_seen.append(extras)
+        return real_compute_input_hash(profile, render_version=render_version, extras=extras)
+
+    monkeypatch.setattr(task_mod, "compute_input_hash", _tracing_compute)
+
+    node = create_observed_node(
+        node_id=820_820_827,
+        node_id_str=meshtastic_id_to_hex(820_820_827),
+    )
+    _make_profile(node)
+    render = NodeRfPropagationRender.objects.create(observed_node=node)
+
+    fake = _FakeClient()
+    with patch.object(task_mod, "SitePlannerClient", return_value=fake):
+        task_mod.render_rf_propagation.apply(args=[render.pk]).get()
+
+    assert extras_seen and {"radius_m", "colormap", "high_resolution", "min_dbm", "max_dbm", "signal_threshold"} <= set(
+        extras_seen[0].keys()
+    )

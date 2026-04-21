@@ -157,7 +157,7 @@ RF_PROPAGATION_ASSET_DIR = Path(
 # Meshtastic Site Planner engine base URL (FastAPI service, see deployment/docker-compose.yaml).
 RF_PROPAGATION_ENGINE_URL = os.environ.get("RF_PROPAGATION_ENGINE_URL", "")
 # Bump this to invalidate every cached render (pipeline or post-processing change).
-RF_PROPAGATION_RENDER_VERSION = os.environ.get("RF_PROPAGATION_RENDER_VERSION", "3")
+RF_PROPAGATION_RENDER_VERSION = os.environ.get("RF_PROPAGATION_RENDER_VERSION", "4")
 
 
 def _rf_propagation_nodata_rgb() -> tuple[int, int, int]:
@@ -177,8 +177,36 @@ RF_PROPAGATION_NODATA_TOLERANCE = max(
     0,
     min(255, int(os.environ.get("RF_PROPAGATION_NODATA_TOLERANCE", "8"))),
 )
+
+
+def _rf_env_float(name: str, default: float) -> float:
+    raw = os.environ.get(name)
+    if raw is None or str(raw).strip() == "":
+        return default
+    return float(str(raw).strip())
+
+
+def _rf_env_bool(name: str, default: bool) -> bool:
+    raw = os.environ.get(name)
+    if raw is None or str(raw).strip() == "":
+        return default
+    return str(raw).strip().lower() in ("1", "true", "yes", "on")
+
+
 # Default bbox radius around the tx (metres) when the profile does not specify one.
-RF_PROPAGATION_DEFAULT_RADIUS_M = int(os.environ.get("RF_PROPAGATION_DEFAULT_RADIUS_M", "20000"))
+_rf_radius_raw = os.environ.get("RF_PROPAGATION_DEFAULT_RADIUS_M")
+RF_PROPAGATION_DEFAULT_RADIUS_M = (
+    int(str(_rf_radius_raw).strip()) if _rf_radius_raw and str(_rf_radius_raw).strip() else 50000
+)
+# Matplotlib colormap name passed to Site Planner (validated in rf_propagation.payload).
+RF_PROPAGATION_COLORMAP = (
+    os.environ.get("RF_PROPAGATION_COLORMAP").strip() if os.environ.get("RF_PROPAGATION_COLORMAP") else "plasma"
+)
+# SPLAT/site-planner: False = ~3 arc-sec SRTM, True = ~1 arc-sec (much larger rasters).
+RF_PROPAGATION_HIGH_RESOLUTION = _rf_env_bool("RF_PROPAGATION_HIGH_RESOLUTION", False)
+RF_PROPAGATION_MIN_DBM = _rf_env_float("RF_PROPAGATION_MIN_DBM", -130.0)
+RF_PROPAGATION_MAX_DBM = _rf_env_float("RF_PROPAGATION_MAX_DBM", -50.0)
+RF_PROPAGATION_SIGNAL_THRESHOLD_DBM = _rf_env_float("RF_PROPAGATION_SIGNAL_THRESHOLD_DBM", -110.0)
 # Upper bound (seconds) for polling engine job status inside the Celery task.
 RF_PROPAGATION_POLL_MAX_SECONDS = int(os.environ.get("RF_PROPAGATION_POLL_MAX_SECONDS", "300"))
 # Per-node retention: how many ``ready`` renders to keep on disk before GC.

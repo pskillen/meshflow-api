@@ -20,14 +20,63 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_RX_HEIGHT_M = 1.0
 DEFAULT_RX_GAIN_DBI = 1.0
+# Deprecated: use ``settings.RF_PROPAGATION_*`` for tunable defaults (see below).
 DEFAULT_SIGNAL_THRESHOLD_DBM = -110.0
 DEFAULT_RADIO_CLIMATE = "maritime_temperate_land"
-DEFAULT_COLORMAP = "viridis"
+DEFAULT_COLORMAP = "plasma"
 DEFAULT_MIN_DBM = -130.0
 DEFAULT_MAX_DBM = -50.0
 DEFAULT_HIGH_RESOLUTION = False
 
 _MISSING = object()
+
+# Names accepted by matplotlib / Site Planner colormap lookup (lowercase).
+_ALLOWED_MATPLOTLIB_COLORMAPS = frozenset(
+    {
+        "viridis",
+        "plasma",
+        "inferno",
+        "magma",
+        "cividis",
+        "turbo",
+        "jet",
+        "terrain",
+        "gist_earth",
+        "ocean",
+        "gist_ncar",
+        "coolwarm",
+        "rdylgn",
+        "spectral",
+        "rainbow",
+        "gist_rainbow",
+        "hot",
+        "afmhot",
+        "spring",
+        "summer",
+        "autumn",
+        "winter",
+        "bone",
+        "copper",
+        "pink",
+        "gray",
+        "grey",
+        "binary",
+        "cool",
+        "hsv",
+        "gnuplot",
+        "gnuplot2",
+        "cmrmap",
+        "brg",
+        "nipy_spectral",
+        "gist_stern",
+        "prism",
+        "tab10",
+        "tab20",
+        "set1",
+        "set2",
+        "set3",
+    }
+)
 
 
 class InvalidProfileError(ValueError):
@@ -38,6 +87,35 @@ def _require(value: Any, name: str) -> Any:
     if value is None:
         raise InvalidProfileError(f"RF profile is missing required field: {name}")
     return value
+
+
+def normalize_colormap(name: str) -> str:
+    """Return a matplotlib colormap name safe to send to Site Planner.
+
+    Unknown values log a warning and fall back to ``plasma``.
+    """
+
+    key = str(name).strip().lower()
+    if key in _ALLOWED_MATPLOTLIB_COLORMAPS:
+        return key
+    logger.warning(
+        "rf_propagation.payload: unknown RF_PROPAGATION_COLORMAP=%r; using plasma",
+        name,
+    )
+    return "plasma"
+
+
+def hash_extras_from_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    """Canonical keys folded into :func:`rf_propagation.hashing.compute_input_hash`."""
+
+    return {
+        "radius_m": int(payload["radius"]),
+        "colormap": str(payload["colormap"]),
+        "high_resolution": bool(payload["high_resolution"]),
+        "min_dbm": round(float(payload["min_dbm"]), 1),
+        "max_dbm": round(float(payload["max_dbm"]), 1),
+        "signal_threshold": round(float(payload["signal_threshold"]), 1),
+    }
 
 
 def build_request(profile: "NodeRfProfile", *, radius_m: int | None = None) -> dict[str, Any]:
@@ -73,6 +151,12 @@ def build_request(profile: "NodeRfProfile", *, radius_m: int | None = None) -> d
             getattr(profile.observed_node, "node_id", "?"),
         )
 
+    colormap = normalize_colormap(getattr(settings, "RF_PROPAGATION_COLORMAP", DEFAULT_COLORMAP))
+    high_res = bool(getattr(settings, "RF_PROPAGATION_HIGH_RESOLUTION", DEFAULT_HIGH_RESOLUTION))
+    min_dbm = float(getattr(settings, "RF_PROPAGATION_MIN_DBM", DEFAULT_MIN_DBM))
+    max_dbm = float(getattr(settings, "RF_PROPAGATION_MAX_DBM", DEFAULT_MAX_DBM))
+    signal_threshold = float(getattr(settings, "RF_PROPAGATION_SIGNAL_THRESHOLD_DBM", DEFAULT_SIGNAL_THRESHOLD_DBM))
+
     payload: dict[str, Any] = {
         "lat": float(lat),
         "lon": float(lng),
@@ -82,12 +166,12 @@ def build_request(profile: "NodeRfProfile", *, radius_m: int | None = None) -> d
         "frequency_mhz": float(freq),
         "rx_height": DEFAULT_RX_HEIGHT_M,
         "rx_gain": DEFAULT_RX_GAIN_DBI,
-        "signal_threshold": DEFAULT_SIGNAL_THRESHOLD_DBM,
+        "signal_threshold": signal_threshold,
         "radio_climate": DEFAULT_RADIO_CLIMATE,
-        "colormap": DEFAULT_COLORMAP,
+        "colormap": colormap,
         "radius": int(radius_m),
-        "min_dbm": DEFAULT_MIN_DBM,
-        "max_dbm": DEFAULT_MAX_DBM,
-        "high_resolution": DEFAULT_HIGH_RESOLUTION,
+        "min_dbm": min_dbm,
+        "max_dbm": max_dbm,
+        "high_resolution": high_res,
     }
     return payload

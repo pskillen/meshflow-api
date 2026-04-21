@@ -12,6 +12,8 @@ from rf_propagation.payload import (
     DEFAULT_RADIO_CLIMATE,
     InvalidProfileError,
     build_request,
+    hash_extras_from_payload,
+    normalize_colormap,
 )
 
 
@@ -86,3 +88,38 @@ def test_build_request_falls_back_to_altitude_for_height():
     profile = _profile(antenna_height_m=None, rf_altitude_m=50.0)
     payload = build_request(profile)
     assert payload["tx_height"] == pytest.approx(50.0)
+
+
+def test_build_request_uses_rf_engine_settings(settings):
+    settings.RF_PROPAGATION_COLORMAP = "viridis"
+    settings.RF_PROPAGATION_HIGH_RESOLUTION = True
+    settings.RF_PROPAGATION_MIN_DBM = -120.0
+    settings.RF_PROPAGATION_MAX_DBM = -60.0
+    settings.RF_PROPAGATION_SIGNAL_THRESHOLD_DBM = -100.0
+    payload = build_request(_profile())
+    assert payload["colormap"] == "viridis"
+    assert payload["high_resolution"] is True
+    assert payload["min_dbm"] == pytest.approx(-120.0)
+    assert payload["max_dbm"] == pytest.approx(-60.0)
+    assert payload["signal_threshold"] == pytest.approx(-100.0)
+
+
+def test_hash_extras_from_payload_keys():
+    payload = build_request(_profile())
+    ext = hash_extras_from_payload(payload)
+    assert set(ext) == {
+        "radius_m",
+        "colormap",
+        "high_resolution",
+        "min_dbm",
+        "max_dbm",
+        "signal_threshold",
+    }
+
+
+def test_normalize_colormap_unknown(caplog):
+    import logging
+
+    with caplog.at_level(logging.WARNING, logger="rf_propagation.payload"):
+        assert normalize_colormap("not-a-real-map-name-xyz") == "plasma"
+    assert any("unknown RF_PROPAGATION_COLORMAP" in rec.message for rec in caplog.records)

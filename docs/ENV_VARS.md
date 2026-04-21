@@ -105,6 +105,28 @@ Discord **login** uses the OAuth pair above. **DM notifications** (test message 
 
 ---
 
+## 10. RF propagation
+
+| Variable | Default | Description | Allowable Values |
+|----------|---------|-------------|------------------|
+| `RF_PROPAGATION_ENGINE_URL` | _(empty)_ | Base URL of the Meshtastic Site Planner engine (`POST /predict`). | HTTP(S) URL |
+| `RF_PROPAGATION_ASSET_DIR` | `/var/meshflow/generated-assets/rf-propagation` | On-disk PNG cache directory (shared by API + RF worker). | Absolute path |
+| `RF_PROPAGATION_RENDER_VERSION` | `4` | Bump to invalidate cached renders after pipeline changes. | Integer string |
+| `RF_PROPAGATION_DEFAULT_RADIUS_M` | `50000` | Coverage radius hint (metres) passed to the engine. | Positive integer |
+| `RF_PROPAGATION_COLORMAP` | `plasma` | Matplotlib colormap name for SPLAT output (validated in code). | Known cmap name |
+| `RF_PROPAGATION_HIGH_RESOLUTION` | `false` | Site Planner high-resolution SRTM (~1 arc-sec vs ~3 arc-sec). | Boolean-ish |
+| `RF_PROPAGATION_MIN_DBM` | `-130` | Lower bound of the rendered dBm colour scale. | Float |
+| `RF_PROPAGATION_MAX_DBM` | `-50` | Upper bound of the rendered dBm colour scale. | Float |
+| `RF_PROPAGATION_SIGNAL_THRESHOLD_DBM` | `-110` | SPLAT coverage threshold (dBm). | Float |
+| `RF_PROPAGATION_NODATA_RGB` | `0,0,0` | RGB treated as transparent in PNG overlay. | `R,G,B` |
+| `RF_PROPAGATION_NODATA_TOLERANCE` | `8` | Max per-channel distance from nodata RGB to clear alpha. | `0`–`255` |
+| `RF_PROPAGATION_POLL_MAX_SECONDS` | `300` | Worker poll budget for engine job completion. | Integer seconds |
+| `RF_PROPAGATION_READY_RETENTION` | `3` | Max `ready` renders kept per node. | Integer |
+
+See **[docs/features/rf_propagation/README.md](features/rf_propagation/README.md)** for architecture.
+
+---
+
 # Details
 
 ## 1. General Application
@@ -153,6 +175,13 @@ Discord **login** uses the OAuth pair above. **DM notifications** (test message 
 ## 9. Monitoring / Prometheus
 
 - **PROMETHEUS_PASSWORD**: If set, enables Prometheus metrics and adds authentication.
+
+## 10. RF propagation
+
+- **RF_PROPAGATION_ENGINE_URL**, **RF_PROPAGATION_ASSET_DIR**, **RF_PROPAGATION_RENDER_VERSION**: Core wiring for Site Planner renders and PNG caching (see feature README).
+- **RF_PROPAGATION_DEFAULT_RADIUS_M**, **RF_PROPAGATION_COLORMAP**, **RF_PROPAGATION_HIGH_RESOLUTION**, **RF_PROPAGATION_MIN_DBM**, **RF_PROPAGATION_MAX_DBM**, **RF_PROPAGATION_SIGNAL_THRESHOLD_DBM**: Tunables folded into `build_request` and the render input hash.
+- **RF_PROPAGATION_NODATA_RGB** / **RF_PROPAGATION_NODATA_TOLERANCE**: PNG post-processing for Leaflet overlays.
+- **RF_PROPAGATION_POLL_MAX_SECONDS**, **RF_PROPAGATION_READY_RETENTION**: Worker behaviour.
 
 ---
 

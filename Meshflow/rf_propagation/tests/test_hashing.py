@@ -77,3 +77,37 @@ def test_hash_extras_cannot_collide_with_profile_field():
 
     with pytest.raises(ValueError):
         compute_input_hash(_profile(), render_version="1", extras={"rf_latitude": 0.0})
+
+
+def _full_extras(**overrides):
+    base = {
+        "radius_m": 50000,
+        "colormap": "plasma",
+        "high_resolution": False,
+        "min_dbm": -130.0,
+        "max_dbm": -50.0,
+        "signal_threshold": -110.0,
+    }
+    base.update(overrides)
+    return base
+
+
+def test_hash_changes_when_extras_colormap_changes():
+    profile = _profile()
+    a = compute_input_hash(profile, render_version="1", extras=_full_extras(colormap="plasma"))
+    b = compute_input_hash(profile, render_version="1", extras=_full_extras(colormap="viridis"))
+    assert a != b
+
+
+def test_hash_changes_when_extras_high_resolution_changes():
+    profile = _profile()
+    a = compute_input_hash(profile, render_version="1", extras=_full_extras(high_resolution=False))
+    b = compute_input_hash(profile, render_version="1", extras=_full_extras(high_resolution=True))
+    assert a != b
+
+
+def test_hash_changes_when_extras_signal_threshold_changes():
+    profile = _profile()
+    a = compute_input_hash(profile, render_version="1", extras=_full_extras(signal_threshold=-110.0))
+    b = compute_input_hash(profile, render_version="1", extras=_full_extras(signal_threshold=-115.0))
+    assert a != b
