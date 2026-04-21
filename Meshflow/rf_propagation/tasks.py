@@ -34,7 +34,7 @@ from celery.exceptions import MaxRetriesExceededError, SoftTimeLimitExceeded
 from .bounds import bbox_from_center
 from .client import EngineFatalError, EngineTransientError, SitePlannerClient
 from .hashing import compute_input_hash
-from .image import TiffDecodeError, geotiff_bytes_to_png
+from .image import TiffDecodeError, geotiff_to_render_image
 from .payload import InvalidProfileError, build_request
 
 logger = logging.getLogger(__name__)
@@ -241,15 +241,27 @@ def render_rf_propagation(self, render_id: int) -> dict:
         return _mark_failed(render, f"max retries exceeded: {exc}")
 
     try:
-        png_bytes = geotiff_bytes_to_png(tiff_bytes)
+        render_image = geotiff_to_render_image(tiff_bytes)
     except TiffDecodeError as exc:
         return _mark_failed(render, f"could not decode engine GeoTIFF: {exc}")
 
-    bbox = bbox_from_center(
-        float(profile.rf_latitude),
-        float(profile.rf_longitude),
-        float(payload["radius"]),
-    )
+    png_bytes = render_image.png_bytes
+    # Prefer bounds recovered from the GeoTIFF's own georeferencing tags;
+    # SPLAT! emits an extent snapped to SRTM tile boundaries so our request
+    # ``radius`` is only a hint. Fall back to the request bbox if the engine
+    # somehow omits the tags so we still produce *some* overlay.
+    if render_image.bounds is not None:
+        bbox = render_image.bounds
+    else:
+        logger.warning(
+            "render_rf_propagation.bounds_fallback render_id=%s (GeoTIFF lacked georef tags)",
+            render_id,
+        )
+        bbox = bbox_from_center(
+            float(profile.rf_latitude),
+            float(profile.rf_longitude),
+            float(payload["radius"]),
+        )
 
     asset_filename = f"{input_hash}.png"
     asset_path = _asset_dir() / asset_filename
