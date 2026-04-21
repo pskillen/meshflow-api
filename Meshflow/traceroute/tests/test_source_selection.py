@@ -9,7 +9,11 @@ import pytest
 import nodes.tests.conftest  # noqa: F401
 import packets.tests.conftest  # noqa: F401
 from traceroute.models import AutoTraceRoute
-from traceroute.source_selection import SOURCE_SELECTORS, select_traceroute_source
+from traceroute.source_selection import (
+    SOURCE_SELECTORS,
+    eligible_traceroute_sources_ordered,
+    select_traceroute_source,
+)
 
 
 @pytest.mark.django_db
@@ -37,6 +41,9 @@ def test_select_lru_prefers_never_used_feeder(
 
     picked = select_traceroute_source()
     assert picked.node_id == b.node_id
+
+    ordered = eligible_traceroute_sources_ordered()
+    assert [n.node_id for n in ordered] == [b.node_id, a.node_id]
 
 
 @pytest.mark.django_db

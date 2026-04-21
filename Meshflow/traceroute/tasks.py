@@ -13,8 +13,8 @@ from channels.layers import get_channel_layer
 from tqdm import tqdm
 
 from .models import AutoTraceRoute
-from .source_selection import select_traceroute_source
-from .strategy_rotation import pick_strategy_for_feeder, record_strategy_run
+from .source_selection import eligible_traceroute_sources_ordered
+from .strategy_rotation import ordered_strategies_for_feeder, record_strategy_run
 from .target_selection import pick_traceroute_target
 from .ws_notify import notify_traceroute_status_changed
 
@@ -27,63 +27,81 @@ FAILED_TR_TIMEOUT_SECONDS = int(FAILED_TR_TIMEOUT_SECONDS)
 @shared_task
 def schedule_traceroutes():
     """
-    Run periodically (cadence may vary). Pick one eligible ManagedNode via
-    ``select_traceroute_source``, rotate target strategy via Redis LRU, pick target,
-    create AutoTraceRoute (trigger_type=auto, trigger_source=scheduler), send command.
+    Run periodically (cadence may vary). For each eligible source (LRU order), try
+    hypothesis strategies (Redis LRU order), then legacy; first hit creates an
+    AutoTraceRoute and sends the command. Avoids stalemate when one strategy never
+    finds a target (meshflow-api#196).
     """
     channel_layer = get_channel_layer()
 
-    source_node = select_traceroute_source()
-    if not source_node:
+    sources = eligible_traceroute_sources_ordered()
+    if not sources:
         logger.warning(
             "schedule_traceroutes: no eligible sources (allow_auto_traceroute with "
             "ingestion within SCHEDULE_TRACEROUTE_SOURCE_RECENCY_SECONDS)"
         )
         return {"created": 0}
 
-    strategy = pick_strategy_for_feeder(source_node)
-    if not strategy:
-        logger.warning("schedule_traceroutes: no applicable strategy for node %s", source_node.node_id_str)
-        return {"created": 0}
+    attempts: list[tuple[str, str, bool]] = []
 
-    target_node = pick_traceroute_target(source_node, strategy=strategy)
-    if not target_node:
-        logger.warning(
-            "schedule_traceroutes: no target for node %s strategy=%s",
-            source_node.node_id_str,
-            strategy,
+    for source_node in sources:
+        strategies = ordered_strategies_for_feeder(source_node)
+        chosen_strategy: str | None = None
+        target_node = None
+
+        for strategy in strategies:
+            target_node = pick_traceroute_target(source_node, strategy=strategy)
+            attempts.append((source_node.node_id_str, strategy, target_node is not None))
+            if target_node:
+                chosen_strategy = strategy
+                break
+
+        if not target_node:
+            target_node = pick_traceroute_target(
+                source_node,
+                strategy=AutoTraceRoute.TARGET_STRATEGY_LEGACY,
+            )
+            attempts.append((source_node.node_id_str, "legacy", target_node is not None))
+
+        if not target_node:
+            continue
+
+        row_strategy = chosen_strategy or AutoTraceRoute.TARGET_STRATEGY_LEGACY
+
+        auto_tr = AutoTraceRoute.objects.create(
+            source_node=source_node,
+            target_node=target_node,
+            trigger_type=AutoTraceRoute.TRIGGER_TYPE_AUTO,
+            triggered_by=None,
+            trigger_source="scheduler",
+            target_strategy=row_strategy,
+            status=AutoTraceRoute.STATUS_PENDING,
         )
-        return {"created": 0}
+        if chosen_strategy is not None:
+            record_strategy_run(source_node, chosen_strategy)
 
-    auto_tr = AutoTraceRoute.objects.create(
-        source_node=source_node,
-        target_node=target_node,
-        trigger_type=AutoTraceRoute.TRIGGER_TYPE_AUTO,
-        triggered_by=None,
-        trigger_source="scheduler",
-        target_strategy=strategy,
-        status=AutoTraceRoute.STATUS_PENDING,
-    )
-    record_strategy_run(source_node, strategy)
+        async_to_sync(channel_layer.group_send)(
+            f"node_{source_node.node_id}",
+            {
+                "type": "node_command",
+                "command": {"type": "traceroute", "target": target_node.node_id},
+            },
+        )
 
-    async_to_sync(channel_layer.group_send)(
-        f"node_{source_node.node_id}",
-        {
-            "type": "node_command",
-            "command": {"type": "traceroute", "target": target_node.node_id},
-        },
-    )
+        auto_tr.status = AutoTraceRoute.STATUS_SENT
+        auto_tr.save(update_fields=["status"])
+        logger.info(
+            "schedule_traceroutes: sent TR %s -> %s strategy=%s (id=%s)",
+            source_node.node_id_str,
+            target_node.node_id_str,
+            row_strategy,
+            auto_tr.id,
+        )
 
-    auto_tr.status = AutoTraceRoute.STATUS_SENT
-    auto_tr.save(update_fields=["status"])
-    logger.info(
-        "schedule_traceroutes: sent TR %s -> %s (id=%s)",
-        source_node.node_id_str,
-        target_node.node_id_str,
-        auto_tr.id,
-    )
+        return {"created": 1}
 
-    return {"created": 1}
+    logger.warning("schedule_traceroutes: cascade exhausted, no TR created: %s", attempts)
+    return {"created": 0}
 
 
 @shared_task
