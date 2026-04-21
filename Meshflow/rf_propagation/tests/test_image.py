@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from io import BytesIO
 
+from django.test import override_settings
+
 import pytest
 from PIL import Image
 
@@ -40,3 +42,49 @@ def test_rejects_empty_payload():
 def test_rejects_unreadable_bytes():
     with pytest.raises(TiffDecodeError):
         geotiff_bytes_to_png(b"not-a-real-tiff")
+
+
+def _rgb_tiff_mostly_black_with_one_red_pixel() -> bytes:
+    img = Image.new("RGB", (4, 4), (0, 0, 0))
+    px = img.load()
+    px[3, 3] = (255, 0, 0)
+    buf = BytesIO()
+    img.save(buf, format="TIFF")
+    return buf.getvalue()
+
+
+@override_settings(RF_PROPAGATION_NODATA_RGB=(0, 0, 0), RF_PROPAGATION_NODATA_TOLERANCE=0)
+def test_black_background_pixels_become_fully_transparent():
+    png_bytes = geotiff_bytes_to_png(_rgb_tiff_mostly_black_with_one_red_pixel())
+    with Image.open(BytesIO(png_bytes)) as img:
+        assert img.mode == "RGBA"
+        px = img.load()
+        assert px[0, 0][3] == 0
+        assert px[3, 3][3] == 255
+
+
+@override_settings(RF_PROPAGATION_NODATA_RGB=(0, 0, 0), RF_PROPAGATION_NODATA_TOLERANCE=8)
+def test_near_black_within_tolerance_becomes_transparent():
+    img = Image.new("RGB", (2, 2), (0, 0, 0))
+    px = img.load()
+    px[1, 1] = (7, 0, 0)
+    px[0, 1] = (20, 0, 0)
+    buf = BytesIO()
+    img.save(buf, format="TIFF")
+    png_bytes = geotiff_bytes_to_png(buf.getvalue())
+    with Image.open(BytesIO(png_bytes)) as out:
+        opx = out.load()
+        assert opx[1, 1][3] == 0
+        assert opx[0, 1][3] == 255
+
+
+@override_settings(RF_PROPAGATION_NODATA_RGB=(0, 0, 0), RF_PROPAGATION_NODATA_TOLERANCE=8)
+def test_far_from_nodata_stays_opaque():
+    img = Image.new("RGB", (2, 2), (0, 0, 0))
+    px = img.load()
+    px[0, 0] = (30, 0, 0)
+    buf = BytesIO()
+    img.save(buf, format="TIFF")
+    png_bytes = geotiff_bytes_to_png(buf.getvalue())
+    with Image.open(BytesIO(png_bytes)) as out:
+        assert out.getpixel((0, 0))[3] == 255

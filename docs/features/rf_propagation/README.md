@@ -153,6 +153,13 @@ renders per node (configurable via `RF_PROPAGATION_READY_RETENTION`) and
 deletes any older ready rows plus their PNG files. `failed` rows older
 than 7 days are also pruned per node.
 
+## PNG overlay transparency
+
+After GeoTIFF→PNG, pixels within **`RF_PROPAGATION_NODATA_TOLERANCE`**
+of **`RF_PROPAGATION_NODATA_RGB`** (comma-separated `R,G,B`, default
+`0,0,0`) are written with alpha 0 so the Leaflet basemap shows through
+outside the tinted coverage.
+
 ## Environment variables
 
 | Variable | Default | Where used | Notes |
@@ -160,7 +167,9 @@ than 7 days are also pruned per node.
 | `RF_PROPAGATION_ENGINE_URL` | _(empty)_ | worker | Internal URL of the engine, e.g. `http://rf-propagation:8080`. Required for real renders. |
 | `RF_PROPAGATION_ASSET_DIR` | `/var/meshflow/generated-assets/rf-propagation` | api + worker | Mounted from the `rf_assets` named volume; must be shared between `api` and `celery-rf-worker`. |
 | `RF_PROPAGATION_IMAGE_TAG` | `latest-dev` | compose | Tag for the engine image. |
-| `RF_PROPAGATION_RENDER_VERSION` | `1` | api + worker | Bump to invalidate all cached renders. |
+| `RF_PROPAGATION_RENDER_VERSION` | `2` | api + worker | Bump to invalidate all cached renders. |
+| `RF_PROPAGATION_NODATA_RGB` | `0,0,0` | api + worker | RGB colour treated as transparent background in the PNG overlay. |
+| `RF_PROPAGATION_NODATA_TOLERANCE` | `8` | api + worker | Per-channel distance from nodata RGB (0–255) to clear alpha. |
 | `RF_PROPAGATION_DEFAULT_RADIUS_M` | `20000` | api + worker | Radius of the predicted coverage bbox in metres. |
 | `RF_PROPAGATION_POLL_MAX_SECONDS` | `300` | worker | Cap on cumulative polling before the render is marked failed. |
 | `RF_PROPAGATION_READY_RETENTION` | `3` | worker | Number of `ready` renders kept per node. |

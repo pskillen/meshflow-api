@@ -36,16 +36,41 @@ def geotiff_bytes_to_png(tiff_bytes: bytes) -> bytes:
         raise TiffDecodeError(f"could not decode GeoTIFF: {exc}") from exc
 
 
+def _apply_nodata_alpha(img):
+    """Set alpha to 0 for pixels within tolerance of the configured nodata RGB."""
+    from django.conf import settings
+
+    import numpy as np
+    from PIL import Image
+
+    if img.mode != "RGBA":
+        img = img.convert("RGBA")
+    nodata = settings.RF_PROPAGATION_NODATA_RGB
+    tol = int(settings.RF_PROPAGATION_NODATA_TOLERANCE)
+    r0, g0, b0 = (int(nodata[0]), int(nodata[1]), int(nodata[2]))
+    arr = np.asarray(img, dtype=np.uint8)
+    r = arr[:, :, 0].astype(np.int16)
+    g = arr[:, :, 1].astype(np.int16)
+    b = arr[:, :, 2].astype(np.int16)
+    mask = (np.abs(r - r0) <= tol) & (np.abs(g - g0) <= tol) & (np.abs(b - b0) <= tol)
+    out = arr.copy()
+    out[mask, 3] = 0
+    return Image.fromarray(out, mode="RGBA")
+
+
+def _png_bytes_from_rgba(img) -> bytes:
+    buf = BytesIO()
+    _apply_nodata_alpha(img).save(buf, format="PNG", optimize=True)
+    return buf.getvalue()
+
+
 def _pillow_convert(tiff_bytes: bytes) -> bytes:
     from PIL import Image  # local import so test runners without Pillow can skip
 
     with Image.open(BytesIO(tiff_bytes)) as img:
         img.load()
-        if img.mode != "RGBA":
-            img = img.convert("RGBA")
-        buf = BytesIO()
-        img.save(buf, format="PNG", optimize=True)
-        return buf.getvalue()
+        pil_img = img.convert("RGBA") if img.mode != "RGBA" else img.copy()
+    return _png_bytes_from_rgba(pil_img)
 
 
 def _tifffile_convert(tiff_bytes: bytes) -> bytes:
@@ -62,6 +87,4 @@ def _tifffile_convert(tiff_bytes: bytes) -> bytes:
     else:
         raise TiffDecodeError(f"unexpected TIFF shape: {arr.shape}")
 
-    buf = BytesIO()
-    img.save(buf, format="PNG", optimize=True)
-    return buf.getvalue()
+    return _png_bytes_from_rgba(img)
