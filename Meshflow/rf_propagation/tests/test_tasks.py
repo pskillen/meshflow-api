@@ -22,6 +22,29 @@ def _tiff_bytes(size: tuple[int, int] = (8, 8)) -> bytes:
     return buf.getvalue()
 
 
+def _georef_tiff_bytes(
+    *,
+    size: tuple[int, int] = (20, 10),
+    tiepoint: tuple[float, float, float, float, float, float] = (
+        0.0,
+        0.0,
+        0.0,
+        -4.5,
+        55.9,
+        0.0,
+    ),
+    pixel_scale: tuple[float, float, float] = (0.02, 0.03, 0.0),
+) -> bytes:
+    img = Image.new("RGBA", size, color=(10, 20, 30, 255))
+    buf = BytesIO()
+    img.save(
+        buf,
+        format="TIFF",
+        tiffinfo={33922: tiepoint, 33550: pixel_scale},
+    )
+    return buf.getvalue()
+
+
 def _make_profile(node):
     return NodeRfProfile.objects.create(
         observed_node=node,
@@ -117,6 +140,56 @@ def test_task_happy_path_writes_png_and_marks_ready(asset_dir, create_observed_n
     assert render.bounds_north > render.bounds_south
     assert fake.submit_calls == 1
     assert fake.result_calls == 1
+
+
+@pytest.mark.django_db
+def test_task_uses_bounds_from_geotiff_when_present(asset_dir, create_observed_node):
+    """When the engine GeoTIFF carries georef tags, those drive the stored bbox."""
+    from rf_propagation import tasks as task_mod
+
+    node = create_observed_node(
+        node_id=820_820_830,
+        node_id_str=meshtastic_id_to_hex(820_820_830),
+    )
+    _make_profile(node)
+    render = NodeRfPropagationRender.objects.create(observed_node=node)
+
+    tiff = _georef_tiff_bytes()
+    fake = _FakeClient(result=tiff)
+    with patch.object(task_mod, "SitePlannerClient", return_value=fake):
+        task_mod.render_rf_propagation.apply(args=[render.pk]).get()
+
+    render.refresh_from_db()
+    # west = -4.5, east = -4.5 + 20*0.02 = -4.1
+    assert render.bounds_west == pytest.approx(-4.5)
+    assert render.bounds_east == pytest.approx(-4.1)
+    # north = 55.9, south = 55.9 - 10*0.03 = 55.6
+    assert render.bounds_north == pytest.approx(55.9)
+    assert render.bounds_south == pytest.approx(55.6)
+
+
+@pytest.mark.django_db
+def test_task_falls_back_to_center_bbox_when_geotiff_lacks_georef(asset_dir, create_observed_node):
+    """Legacy/plain TIFFs without georef tags must still produce a bbox."""
+    from rf_propagation import tasks as task_mod
+
+    node = create_observed_node(
+        node_id=820_820_831,
+        node_id_str=meshtastic_id_to_hex(820_820_831),
+    )
+    _make_profile(node)
+    render = NodeRfPropagationRender.objects.create(observed_node=node)
+
+    fake = _FakeClient(result=_tiff_bytes())
+    with patch.object(task_mod, "SitePlannerClient", return_value=fake):
+        task_mod.render_rf_propagation.apply(args=[render.pk]).get()
+
+    render.refresh_from_db()
+    assert render.status == NodeRfPropagationRender.Status.READY
+    # Fallback box is centred on the profile lat/lng.
+    profile_lat, profile_lng = 55.861, -4.251
+    assert render.bounds_south < profile_lat < render.bounds_north
+    assert render.bounds_west < profile_lng < render.bounds_east
 
 
 @pytest.mark.django_db

@@ -9,7 +9,7 @@ from django.test import override_settings
 import pytest
 from PIL import Image
 
-from rf_propagation.image import TiffDecodeError, geotiff_bytes_to_png
+from rf_propagation.image import TiffDecodeError, geotiff_bytes_to_png, geotiff_to_render_image
 
 
 def _synthetic_tiff_bytes(mode: str = "RGBA", size: tuple[int, int] = (8, 8)) -> bytes:
@@ -88,3 +88,68 @@ def test_far_from_nodata_stays_opaque():
     png_bytes = geotiff_bytes_to_png(buf.getvalue())
     with Image.open(BytesIO(png_bytes)) as out:
         assert out.getpixel((0, 0))[3] == 255
+
+
+def _georeferenced_tiff_bytes(
+    *,
+    size: tuple[int, int] = (10, 5),
+    tiepoint: tuple[float, float, float, float, float, float] = (
+        0.0,
+        0.0,
+        0.0,
+        -5.0,
+        56.0,
+        0.0,
+    ),
+    pixel_scale: tuple[float, float, float] = (0.1, 0.2, 0.0),
+) -> bytes:
+    img = Image.new("RGBA", size, color=(10, 20, 30, 255))
+    buf = BytesIO()
+    img.save(
+        buf,
+        format="TIFF",
+        tiffinfo={33922: tiepoint, 33550: pixel_scale},
+    )
+    return buf.getvalue()
+
+
+def test_extracts_bounds_from_pillow_geotiff_tags():
+    result = geotiff_to_render_image(_georeferenced_tiff_bytes())
+    assert result.bounds is not None
+    # west = tiepoint.X - I*scale_x = -5.0; east = west + width*scale_x
+    assert result.bounds.west == pytest.approx(-5.0)
+    assert result.bounds.east == pytest.approx(-4.0)
+    # north = tiepoint.Y = 56.0; south = north - height*scale_y
+    assert result.bounds.north == pytest.approx(56.0)
+    assert result.bounds.south == pytest.approx(55.0)
+
+
+def test_extracts_bounds_with_nonzero_tiepoint_pixel():
+    """SPLAT! uses (0,0) but the maths must still work for other tiepoints."""
+    result = geotiff_to_render_image(
+        _georeferenced_tiff_bytes(
+            size=(4, 3),
+            tiepoint=(1.0, 1.0, 0.0, -3.0, 52.0, 0.0),
+            pixel_scale=(0.5, 0.25, 0.0),
+        )
+    )
+    assert result.bounds is not None
+    assert result.bounds.west == pytest.approx(-3.5)
+    assert result.bounds.east == pytest.approx(-1.5)
+    assert result.bounds.north == pytest.approx(52.25)
+    assert result.bounds.south == pytest.approx(51.5)
+
+
+def test_returns_none_bounds_when_georef_tags_absent():
+    result = geotiff_to_render_image(_synthetic_tiff_bytes())
+    assert result.bounds is None
+    assert result.png_bytes.startswith(b"\x89PNG\r\n\x1a\n")
+
+
+def test_ignores_bounds_outside_valid_lat_lng_range():
+    tiff = _georeferenced_tiff_bytes(
+        tiepoint=(0.0, 0.0, 0.0, -200.0, 95.0, 0.0),
+        pixel_scale=(0.1, 0.2, 0.0),
+    )
+    result = geotiff_to_render_image(tiff)
+    assert result.bounds is None

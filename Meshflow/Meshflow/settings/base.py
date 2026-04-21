@@ -157,7 +157,7 @@ RF_PROPAGATION_ASSET_DIR = Path(
 # Meshtastic Site Planner engine base URL (FastAPI service, see deployment/docker-compose.yaml).
 RF_PROPAGATION_ENGINE_URL = os.environ.get("RF_PROPAGATION_ENGINE_URL", "")
 # Bump this to invalidate every cached render (pipeline or post-processing change).
-RF_PROPAGATION_RENDER_VERSION = os.environ.get("RF_PROPAGATION_RENDER_VERSION", "2")
+RF_PROPAGATION_RENDER_VERSION = os.environ.get("RF_PROPAGATION_RENDER_VERSION", "3")
 
 
 def _rf_propagation_nodata_rgb() -> tuple[int, int, int]:
