@@ -8,7 +8,7 @@ import pytest
 
 from nodes.models import NodeLatestStatus
 from traceroute.models import AutoTraceRoute
-from traceroute.reach import compute_reach
+from traceroute.reach import compute_reach, target_strategy_tokens_to_q
 
 pytestmark = pytest.mark.django_db
 
@@ -217,6 +217,76 @@ def test_window_filter(create_managed_node, create_observed_node, create_auto_tr
     assert len(rows) == 1
     assert rows[0].attempts == 1
     assert rows[0].successes == 1
+
+
+def test_target_strategy_tokens_filter(create_managed_node, create_observed_node, create_auto_traceroute):
+    feeder = create_managed_node(
+        node_id=0xF11D_E00C,
+        default_location_latitude=55.86,
+        default_location_longitude=-4.25,
+    )
+    target = create_observed_node(node_id=0x7777_000A)
+    NodeLatestStatus.objects.create(node=target, latitude=55.86, longitude=-4.20)
+
+    create_auto_traceroute(
+        source_node=feeder,
+        target_node=target,
+        status=AutoTraceRoute.STATUS_COMPLETED,
+        target_strategy=AutoTraceRoute.TARGET_STRATEGY_INTRA_ZONE,
+    )
+    create_auto_traceroute(
+        source_node=feeder,
+        target_node=target,
+        status=AutoTraceRoute.STATUS_COMPLETED,
+        target_strategy=AutoTraceRoute.TARGET_STRATEGY_DX_ACROSS,
+    )
+
+    rows_all = compute_reach(feeder_id=feeder.node_id)
+    assert rows_all[0].attempts == 2
+
+    rows_intra = compute_reach(
+        feeder_id=feeder.node_id,
+        target_strategy_tokens=["intra_zone"],
+    )
+    assert len(rows_intra) == 1
+    assert rows_intra[0].attempts == 1
+
+
+def test_target_strategy_legacy_matches_null(create_managed_node, create_observed_node, create_auto_traceroute):
+    feeder = create_managed_node(
+        node_id=0xF11D_E00D,
+        default_location_latitude=55.86,
+        default_location_longitude=-4.25,
+    )
+    target = create_observed_node(node_id=0x7777_000B)
+    NodeLatestStatus.objects.create(node=target, latitude=55.86, longitude=-4.20)
+
+    create_auto_traceroute(
+        source_node=feeder,
+        target_node=target,
+        status=AutoTraceRoute.STATUS_COMPLETED,
+        target_strategy=None,
+    )
+    create_auto_traceroute(
+        source_node=feeder,
+        target_node=target,
+        status=AutoTraceRoute.STATUS_COMPLETED,
+        target_strategy=AutoTraceRoute.TARGET_STRATEGY_LEGACY,
+    )
+    create_auto_traceroute(
+        source_node=feeder,
+        target_node=target,
+        status=AutoTraceRoute.STATUS_COMPLETED,
+        target_strategy=AutoTraceRoute.TARGET_STRATEGY_INTRA_ZONE,
+    )
+
+    rows = compute_reach(feeder_id=feeder.node_id, target_strategy_tokens=["legacy"])
+    assert len(rows) == 1
+    assert rows[0].attempts == 2
+
+
+def test_target_strategy_tokens_to_q_returns_none_for_invalid_only():
+    assert target_strategy_tokens_to_q(["not_a_real_strategy"]) is None
 
 
 def test_emits_display_metadata(create_managed_node, create_observed_node, create_auto_traceroute):

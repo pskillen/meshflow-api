@@ -32,6 +32,24 @@ from nodes.models import ManagedNode, NodeLatestStatus, ObservedNode
 from .models import AutoTraceRoute
 
 
+def target_strategy_tokens_to_q(tokens: Iterable[str]) -> Q | None:
+    """Build an OR filter over ``AutoTraceRoute.target_strategy`` for CSV tokens.
+
+    ``legacy`` matches null or explicit legacy strategy, matching traceroute list
+    behaviour.
+    """
+    strat_q = Q()
+    any_valid = False
+    for t in tokens:
+        if t in ("legacy", AutoTraceRoute.TARGET_STRATEGY_LEGACY):
+            strat_q |= Q(target_strategy__isnull=True) | Q(target_strategy=AutoTraceRoute.TARGET_STRATEGY_LEGACY)
+            any_valid = True
+        elif t in dict(AutoTraceRoute.TARGET_STRATEGY_CHOICES):
+            strat_q |= Q(target_strategy=t)
+            any_valid = True
+    return strat_q if any_valid else None
+
+
 @dataclass(frozen=True)
 class ReachRow:
     """One (feeder, target) pair with attempt and success counts in window."""
@@ -126,11 +144,16 @@ def compute_reach(
     triggered_at_before: datetime | None = None,
     constellation_id: int | None = None,
     feeder_id: int | None = None,
+    target_strategy_tokens: list[str] | None = None,
 ) -> list[ReachRow]:
     """Aggregate per-(feeder, target) attempt and success counts.
 
     ``feeder_id`` is the meshtastic node id of a ManagedNode (not the internal
     UUID) so callers can use the same id space as the rest of the API.
+
+    ``target_strategy_tokens`` optionally restricts to traceroutes whose
+    ``target_strategy`` matches one of the tokens (``legacy`` matches null or
+    explicit legacy).
 
     Rows where the target has no known position are dropped. Rows where the
     feeder has no known position are dropped. Pending and sent traceroutes are
@@ -148,6 +171,11 @@ def compute_reach(
     if feeder_id is not None:
         qs = qs.filter(source_node__node_id=feeder_id)
     qs = qs.filter(source_node__isnull=False, target_node__isnull=False)
+
+    if target_strategy_tokens:
+        fq = target_strategy_tokens_to_q(target_strategy_tokens)
+        if fq is not None:
+            qs = qs.filter(fq)
 
     grouped = list(
         qs.values("source_node_id", "target_node_id").annotate(
@@ -216,4 +244,68 @@ def compute_reach(
                 successes=g["successes"],
             )
         )
+    return out
+
+
+def aggregate_reach_rows_to_constellation_targets(rows: list[ReachRow]) -> list[dict]:
+    """Merge per-(feeder, target) rows into one dict per target for constellation maps."""
+    by_target: dict[int, dict] = {}
+    for r in rows:
+        tid = r.target_node_id
+        if tid not in by_target:
+            by_target[tid] = {
+                "node_id": tid,
+                "node_id_str": r.target_node_id_str,
+                "short_name": r.target_short_name,
+                "long_name": r.target_long_name,
+                "lat": r.target_lat,
+                "lng": r.target_lng,
+                "attempts": 0,
+                "successes": 0,
+                "feeder_node_ids": set(),
+            }
+        agg = by_target[tid]
+        agg["attempts"] += r.attempts
+        agg["successes"] += r.successes
+        agg["feeder_node_ids"].add(r.feeder_node_id)
+
+    targets = []
+    for agg in by_target.values():
+        feeder_ids = agg.pop("feeder_node_ids")
+        targets.append({**agg, "contributing_feeders": len(feeder_ids)})
+    targets.sort(key=lambda t: t["node_id"])
+    return targets
+
+
+def constellation_feeder_markers(constellation_id: int) -> list[dict]:
+    """All managed nodes in a constellation with a resolvable map position."""
+    feeders = list(ManagedNode.objects.filter(constellation_id=constellation_id))
+    if not feeders:
+        return []
+
+    positions = _bulk_feeder_positions(feeders)
+    node_ids = {mn.node_id for mn in feeders}
+    feeder_display = {
+        row["node_id"]: row
+        for row in ObservedNode.objects.filter(node_id__in=node_ids).values("node_id", "short_name", "long_name")
+    }
+
+    out: list[dict] = []
+    for mn in feeders:
+        pos = positions.get(mn.internal_id)
+        if pos is None:
+            continue
+        display = feeder_display.get(mn.node_id) or {}
+        out.append(
+            {
+                "managed_node_id": str(mn.internal_id),
+                "node_id": mn.node_id,
+                "node_id_str": meshtastic_id_to_hex(mn.node_id),
+                "short_name": display.get("short_name") or mn.name,
+                "long_name": display.get("long_name"),
+                "lat": pos[0],
+                "lng": pos[1],
+            }
+        )
+    out.sort(key=lambda x: x["node_id"])
     return out

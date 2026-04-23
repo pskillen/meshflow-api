@@ -106,6 +106,11 @@ Implementation:
 - `constellation_id` (filter to feeders in this constellation; targets are
   *not* filtered, by design — we want to see how far into other regions a
   constellation's feeders reach)
+- `target_strategy_tokens` (optional list of strings, e.g. ``intra_zone``,
+  ``dx_across``, ``legacy``): when provided, only traceroutes whose
+  ``AutoTraceRoute.target_strategy`` matches one of the tokens are counted.
+  ``legacy`` matches null or explicit legacy strategy (same semantics as the
+  traceroute list ``target_strategy`` query param).
 
 Both view functions are thin wrappers over this helper.
 
@@ -130,6 +135,7 @@ Implemented in **`Meshflow/traceroute/views.py::feeder_reach()`**.
 | `feeder_id` | yes | integer | Meshtastic node id of a `ManagedNode`. 400 if missing or non-integer; 404 if not found. |
 | `triggered_at_after` | no | ISO 8601 datetime | Start of window (inclusive). |
 | `triggered_at_before` | no | ISO 8601 datetime | End of window (inclusive). |
+| `target_strategy` | no | comma-separated strings | Same tokens as the traceroute list filter (`intra_zone`, `dx_across`, `dx_same_side`, `legacy`). When omitted, all strategies count. |
 
 **Response shape** (full schema: `FeederReach` in `openapi.yaml`)
 
@@ -181,6 +187,8 @@ Implemented in **`Meshflow/traceroute/views.py::constellation_coverage()`**.
 | `triggered_at_after` | no | ISO 8601 datetime | |
 | `triggered_at_before` | no | ISO 8601 datetime | |
 | `h3_resolution` | no | integer | Default 6. Clamped to `[0, 15]`. |
+| `target_strategy` | no | comma-separated strings | Restrict rows to these selection strategies before binning (same semantics as `feeder-reach`). |
+| `include_targets` | no | boolean-ish | When `1`, `true`, `yes`, or `on`, the response also includes `targets` (per-target aggregates across all feeders) and `feeders` (all managed nodes in the constellation with a map position). Omit or false for the original hex-only payload. |
 
 **Aggregation**
 
@@ -231,6 +239,16 @@ for full numbers.
 }
 ```
 
+When `include_targets=1`, two extra top-level arrays are present:
+
+- **`targets`**: one object per distinct target node reached in the window,
+  with summed `attempts` / `successes` across every feeder in the constellation
+  and `contributing_feeders` (distinct feeder count that attempted that target).
+- **`feeders`**: one object per `ManagedNode` in the constellation that has a
+  resolvable position (`default_location_*` or linked `ObservedNode.latest_status`),
+  regardless of whether it appears in the window's traceroute rows — so the map
+  can always show infrastructure.
+
 ---
 
 ## Frontend rendering
@@ -264,9 +282,10 @@ a metric question comes back. Source files live in
 ### Constellation page → `ConstellationCoveragePage`
 
 - `useConstellationCoverage(constellationId, window, h3Resolution)` fetches
-  one `ConstellationCoverage` payload.
+  one `ConstellationCoverage` payload (optionally with `include_targets=1` for
+  per-target dots and managed-node markers).
 - `ConstellationCoverageMap` renders a single `H3HexagonLayer` over the
-  server-binned hexes.
+  server-binned hexes, and when included, dots plus feeder icon markers.
 - Toolbar: constellation picker, time window, H3 resolution control,
   min-attempts input.
 - Hex-click popup shows `successes / attempts`, smoothed rate,

@@ -144,6 +144,8 @@ components:
       description: >
         Server-side H3-binned reliability for an entire constellation. Each hex
         aggregates every (feeder, target) row whose target falls inside the cell.
+        When `include_targets=1` is passed on the request, `targets` and `feeders`
+        are also returned for dot and marker layers on the constellation map.
       required: [constellation_id, h3_resolution, hexes, meta]
       properties:
         constellation_id:
@@ -155,12 +157,58 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ConstellationCoverageHex'
+        targets:
+          type: array
+          description: Present when `include_targets=1` on the request.
+          items:
+            $ref: '#/components/schemas/ConstellationCoverageTarget'
+        feeders:
+          type: array
+          description: Present when `include_targets=1` on the request.
+          items:
+            $ref: '#/components/schemas/FeederReachFeeder'
         meta:
           type: object
           required: [window]
           properties:
             window:
               $ref: '#/components/schemas/CoverageWindow'
+
+    ConstellationCoverageTarget:
+      type: object
+      description: >
+        Per-target aggregate across all feeders in the constellation for the
+        requested window (and optional strategy filter).
+      required:
+        - node_id
+        - node_id_str
+        - lat
+        - lng
+        - attempts
+        - successes
+        - contributing_feeders
+      properties:
+        node_id:
+          type: integer
+        node_id_str:
+          type: string
+        short_name:
+          type: string
+          nullable: true
+        long_name:
+          type: string
+          nullable: true
+        lat:
+          type: number
+        lng:
+          type: number
+        attempts:
+          type: integer
+        successes:
+          type: integer
+        contributing_feeders:
+          type: integer
+          description: Distinct feeder count that attempted this target.
 
     ConstellationCoverageHex:
       type: object
@@ -5095,6 +5143,14 @@ paths:
             type: string
             format: date-time
             description: Window end (triggered_at <= value, ISO 8601)
+        - name: target_strategy
+          in: query
+          required: false
+          schema:
+            type: string
+            description: >
+              Comma-separated strategy tokens (intra_zone, dx_across,
+              dx_same_side, legacy). legacy matches null or explicit legacy.
       responses:
         '200':
           description: Per-target attempt/success counts for the feeder
@@ -5145,6 +5201,22 @@ paths:
             minimum: 0
             maximum: 15
             description: H3 resolution (default 6, ~3km hex edge).
+        - name: target_strategy
+          in: query
+          required: false
+          schema:
+            type: string
+            description: >
+              Comma-separated strategy tokens; same semantics as feeder-reach.
+        - name: include_targets
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: ['1', 'true', 'yes', 'on']
+            description: >
+              When set, response includes `targets` and `feeders` arrays for
+              constellation map dots and managed-node markers.
       responses:
         '200':
           description: H3-binned reliability cells for the constellation
