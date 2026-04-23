@@ -14,7 +14,6 @@ from django.utils import timezone
 
 from constellations.geometry import (
     get_constellation_envelope,
-    is_perimeter_feeder,
     managed_node_position_lat_lon,
 )
 from nodes.models import ManagedNode
@@ -35,21 +34,24 @@ STRATEGY_TIE_ORDER = [
 
 def applicable_strategies(managed_node: ManagedNode) -> list[str]:
     """
-    Perimeter feeder with a defined envelope: intra_zone, dx_across, dx_same_side.
-    Internal feeder (or no envelope): dx_across, dx_same_side only.
+    When the constellation has a defined circular envelope (≥3 positioned managed nodes),
+    all three hypothesis strategies apply: intra_zone, dx_across, dx_same_side.
+
+    Intra-zone picks targets inside that envelope regardless of whether the feeder sits
+    on the geometric ``perimeter`` vs ``internal`` tier (see ``feeder_tier`` for display).
+
+    Without a constellation or envelope, only the two DX strategies are offered.
     """
     if not managed_node.constellation_id:
         return _dx_pair()
     env = get_constellation_envelope(managed_node.constellation)
     if env is None:
         return _dx_pair()
-    if is_perimeter_feeder(managed_node, env):
-        return [
-            AutoTraceRoute.TARGET_STRATEGY_INTRA_ZONE,
-            AutoTraceRoute.TARGET_STRATEGY_DX_ACROSS,
-            AutoTraceRoute.TARGET_STRATEGY_DX_SAME_SIDE,
-        ]
-    return _dx_pair()
+    return [
+        AutoTraceRoute.TARGET_STRATEGY_INTRA_ZONE,
+        AutoTraceRoute.TARGET_STRATEGY_DX_ACROSS,
+        AutoTraceRoute.TARGET_STRATEGY_DX_SAME_SIDE,
+    ]
 
 
 def _dx_pair() -> list[str]:
