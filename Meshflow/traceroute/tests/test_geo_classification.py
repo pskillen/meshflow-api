@@ -58,6 +58,10 @@ def test_geo_classification_envelope_and_selector_params_perimeter_feeder(create
     assert geo["envelope"] is not None
     assert set(geo["envelope"]) == {"centroid_lat", "centroid_lon", "radius_km"}
     assert geo["envelope"]["radius_km"] > 0
+    assert geo["selection_centroid"] == {
+        "lat": geo["envelope"]["centroid_lat"],
+        "lon": geo["envelope"]["centroid_lon"],
+    }
     assert geo["source_bearing_deg"] is not None
     assert 0 <= geo["source_bearing_deg"] < 360
 
@@ -125,5 +129,7 @@ def test_geo_classification_no_envelope_two_nodes_source_bearing_from_centroid(c
 
     geo = build_geo_classification(feeder)
     assert geo["envelope"] is None
+    assert geo["selection_centroid"] is not None
+    assert {"lat", "lon"} == set(geo["selection_centroid"])
     assert geo["source_bearing_deg"] is not None
     assert 0 <= geo["source_bearing_deg"] < 360

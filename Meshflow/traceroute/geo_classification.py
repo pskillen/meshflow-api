@@ -54,6 +54,12 @@ def build_geo_classification(managed_node: ManagedNode) -> dict:
             "radius_km": env["radius_km"],
         }
 
+    selection_centroid: tuple[float, float] | None = None
+    if env is not None:
+        selection_centroid = (env["centroid_lat"], env["centroid_lon"])
+    elif constellation is not None:
+        selection_centroid = constellation_centroid(constellation)
+
     source_bearing_deg: float | None = None
     if pos:
         if env is not None:
@@ -74,11 +80,19 @@ def build_geo_classification(managed_node: ManagedNode) -> dict:
         "perimeter_distance_fraction": PERIMETER_DISTANCE_FRACTION,
     }
 
+    centroid_payload = None
+    if selection_centroid is not None:
+        centroid_payload = {
+            "lat": selection_centroid[0],
+            "lon": selection_centroid[1],
+        }
+
     return {
         "tier": tier,
         "bearing_octant": octant,
         "applicable_strategies": applicable_strategies(managed_node),
         "envelope": envelope_payload,
+        "selection_centroid": centroid_payload,
         "source_bearing_deg": source_bearing_deg,
         "selector_params": selector_params,
     }
