@@ -37,11 +37,13 @@ class AutoTraceRoute(models.Model):
     TARGET_STRATEGY_DX_ACROSS = "dx_across"
     TARGET_STRATEGY_DX_SAME_SIDE = "dx_same_side"
     TARGET_STRATEGY_LEGACY = "legacy"
+    TARGET_STRATEGY_MANUAL = "manual"
     TARGET_STRATEGY_CHOICES = [
         (TARGET_STRATEGY_INTRA_ZONE, _("Intra zone")),
         (TARGET_STRATEGY_DX_ACROSS, _("DX across")),
         (TARGET_STRATEGY_DX_SAME_SIDE, _("DX same side")),
         (TARGET_STRATEGY_LEGACY, _("Legacy / unspecified")),
+        (TARGET_STRATEGY_MANUAL, _("Manual target")),
     ]
 
     source_node = models.ForeignKey(

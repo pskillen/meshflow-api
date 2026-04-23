@@ -296,7 +296,7 @@ class TriggerTracerouteSerializer(serializers.Serializer):
         required=False,
         allow_null=True,
         help_text=(
-            "Optional hypothesis selector when auto-picking target; recorded on the row "
-            "when triggering with an explicit target as well."
+            "Optional hypothesis selector when auto-picking target. Omit to let the server pick via LRU. "
+            "When target_node_id is set, this field is ignored and the row is stored as strategy=manual."
         ),
     )

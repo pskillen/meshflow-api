@@ -836,10 +836,10 @@ components:
         target_strategy:
           type: string
           nullable: true
-          enum: [intra_zone, dx_across, dx_same_side, legacy]
+          enum: [intra_zone, dx_across, dx_same_side, legacy, manual]
           description: >
-            Hypothesis-driven target picker for this run. Null or omitted in older rows means
-            legacy unspecified / pre-migration (UI may label as Legacy).
+            Hypothesis-driven target picker for this run, or manual when the user picked an explicit target.
+            Null or omitted in older rows means legacy unspecified / pre-migration.
 
     IncomingPacket:
       oneOf:
@@ -5322,8 +5322,8 @@ paths:
                   nullable: true
                   enum: [intra_zone, dx_across, dx_same_side]
                   description: >
-                    Optional hypothesis when auto-selecting the target; always stored on the row when provided,
-                    including when target_node_id is set explicitly.
+                    Optional hypothesis when auto-selecting the target (omit for server-chosen strategy).
+                    Ignored when target_node_id is set; the API stores strategy as manual for explicit targets.
       responses:
         '201':
           description: Traceroute triggered
