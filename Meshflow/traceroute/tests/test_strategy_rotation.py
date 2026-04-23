@@ -6,6 +6,7 @@ import pytest
 
 import nodes.tests.conftest  # noqa: F401
 from constellations.models import Constellation
+from traceroute.models import AutoTraceRoute
 from traceroute.strategy_rotation import (
     applicable_strategies,
     ordered_strategies_for_feeder,
@@ -38,6 +39,45 @@ def test_pick_strategy_rotates_cold_cache(create_user, create_managed_node):
     second = pick_strategy_for_feeder(mn)
     assert second in applicable_strategies(mn)
     assert second != first
+
+
+@pytest.mark.django_db
+def test_applicable_strategies_includes_intra_for_internal_feeder_when_envelope_exists(
+    create_user, create_managed_node
+):
+    """Internal (near-centroid) feeders still get intra_zone if the constellation envelope is defined."""
+    user = create_user()
+    c1 = create_managed_node(
+        owner=user,
+        node_id=0xC0000001,
+        default_location_latitude=55.0,
+        default_location_longitude=-4.25,
+    ).constellation
+    create_managed_node(
+        owner=user,
+        constellation=c1,
+        node_id=0xC0000002,
+        default_location_latitude=55.03,
+        default_location_longitude=-4.25,
+    )
+    create_managed_node(
+        owner=user,
+        constellation=c1,
+        node_id=0xC0000003,
+        default_location_latitude=55.015,
+        default_location_longitude=-4.22,
+    )
+    internal_feeder = create_managed_node(
+        owner=user,
+        constellation=c1,
+        node_id=0xC0000004,
+        default_location_latitude=55.015,
+        default_location_longitude=-4.24,
+    )
+    strat = applicable_strategies(internal_feeder)
+    assert AutoTraceRoute.TARGET_STRATEGY_INTRA_ZONE in strat
+    assert AutoTraceRoute.TARGET_STRATEGY_DX_ACROSS in strat
+    assert AutoTraceRoute.TARGET_STRATEGY_DX_SAME_SIDE in strat
 
 
 @pytest.mark.django_db
