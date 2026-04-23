@@ -83,19 +83,15 @@ def traceroute_list(request):
     if trigger_type:
         qs = qs.filter(trigger_type=trigger_type)
 
+    from .reach import target_strategy_tokens_to_q
+
     target_strategy_param = request.query_params.get("target_strategy")
     if target_strategy_param:
         tokens = [t.strip() for t in target_strategy_param.split(",") if t.strip()]
         if tokens:
-            strat_q = Q()
-            for t in tokens:
-                if t in ("legacy", AutoTraceRoute.TARGET_STRATEGY_LEGACY):
-                    strat_q |= Q(target_strategy__isnull=True) | Q(
-                        target_strategy=AutoTraceRoute.TARGET_STRATEGY_LEGACY
-                    )
-                elif t in dict(AutoTraceRoute.TARGET_STRATEGY_CHOICES):
-                    strat_q |= Q(target_strategy=t)
-            qs = qs.filter(strat_q)
+            fq = target_strategy_tokens_to_q(tokens)
+            if fq is not None:
+                qs = qs.filter(fq)
 
     triggered_after = request.query_params.get("triggered_after")
     if triggered_after:
@@ -363,6 +359,22 @@ def _parse_window(request):
     return triggered_at_after, triggered_at_before
 
 
+def _parse_target_strategy_tokens(request) -> list[str] | None:
+    """Comma-separated ``target_strategy`` query values, or None if absent/empty."""
+    param = request.query_params.get("target_strategy")
+    if not param:
+        return None
+    tokens = [t.strip() for t in param.split(",") if t.strip()]
+    return tokens or None
+
+
+def _include_targets_from_request(request) -> bool:
+    val = request.query_params.get("include_targets")
+    if val is None:
+        return False
+    return val.strip().lower() in ("1", "true", "yes", "on")
+
+
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def feeder_reach(request):
@@ -395,11 +407,13 @@ def feeder_reach(request):
         return Response({"detail": "Feeder not found."}, status=status.HTTP_404_NOT_FOUND)
 
     triggered_at_after, triggered_at_before = _parse_window(request)
+    strategy_tokens = _parse_target_strategy_tokens(request)
 
     rows = compute_reach(
         triggered_at_after=triggered_at_after,
         triggered_at_before=triggered_at_before,
         feeder_id=feeder_id,
+        target_strategy_tokens=strategy_tokens,
     )
 
     if rows:
@@ -466,8 +480,6 @@ def constellation_coverage(request):
     """
     import h3
 
-    from .reach import compute_reach
-
     constellation_param = request.query_params.get("constellation_id")
     if not constellation_param:
         return Response(
@@ -491,11 +503,16 @@ def constellation_coverage(request):
     h3_resolution = max(0, min(15, h3_resolution))
 
     triggered_at_after, triggered_at_before = _parse_window(request)
+    strategy_tokens = _parse_target_strategy_tokens(request)
+    include_targets = _include_targets_from_request(request)
+
+    from .reach import aggregate_reach_rows_to_constellation_targets, compute_reach, constellation_feeder_markers
 
     rows = compute_reach(
         triggered_at_after=triggered_at_after,
         triggered_at_before=triggered_at_before,
         constellation_id=constellation_id,
+        target_strategy_tokens=strategy_tokens,
     )
 
     bins: dict = {}
@@ -531,19 +548,22 @@ def constellation_coverage(request):
         )
     hexes.sort(key=lambda h: h["h3_index"])
 
-    return Response(
-        {
-            "constellation_id": constellation_id,
-            "h3_resolution": h3_resolution,
-            "hexes": hexes,
-            "meta": {
-                "window": {
-                    "start": triggered_at_after.isoformat() if triggered_at_after else None,
-                    "end": triggered_at_before.isoformat() if triggered_at_before else None,
-                },
+    payload: dict = {
+        "constellation_id": constellation_id,
+        "h3_resolution": h3_resolution,
+        "hexes": hexes,
+        "meta": {
+            "window": {
+                "start": triggered_at_after.isoformat() if triggered_at_after else None,
+                "end": triggered_at_before.isoformat() if triggered_at_before else None,
             },
-        }
-    )
+        },
+    }
+    if include_targets:
+        payload["targets"] = aggregate_reach_rows_to_constellation_targets(rows)
+        payload["feeders"] = constellation_feeder_markers(constellation_id)
+
+    return Response(payload)
 
 
 @api_view(["GET"])

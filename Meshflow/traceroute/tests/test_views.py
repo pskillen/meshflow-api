@@ -770,6 +770,47 @@ class TestFeederReach:
         assert row["attempts"] == 10
         assert row["successes"] == 7
 
+    def test_feeder_reach_target_strategy_filter(
+        self,
+        api_client,
+        create_user,
+        create_managed_node,
+        create_observed_node,
+        create_auto_traceroute,
+    ):
+        from nodes.models import NodeLatestStatus
+
+        api_client.force_authenticate(user=create_user())
+        feeder = create_managed_node(
+            node_id=0xAAAA_AA20,
+            default_location_latitude=55.86,
+            default_location_longitude=-4.25,
+        )
+        target = create_observed_node(node_id=0xCCCC_CC20)
+        NodeLatestStatus.objects.create(node=target, latitude=55.86, longitude=-4.20)
+
+        create_auto_traceroute(
+            source_node=feeder,
+            target_node=target,
+            status=AutoTraceRoute.STATUS_COMPLETED,
+            target_strategy=AutoTraceRoute.TARGET_STRATEGY_INTRA_ZONE,
+        )
+        create_auto_traceroute(
+            source_node=feeder,
+            target_node=target,
+            status=AutoTraceRoute.STATUS_COMPLETED,
+            target_strategy=AutoTraceRoute.TARGET_STRATEGY_DX_ACROSS,
+        )
+
+        resp = api_client.get(
+            "/api/traceroutes/feeder-reach/",
+            {"feeder_id": str(feeder.node_id), "target_strategy": "intra_zone"},
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert len(body["targets"]) == 1
+        assert body["targets"][0]["attempts"] == 1
+
 
 @pytest.mark.django_db
 class TestConstellationCoverage:
@@ -897,3 +938,137 @@ class TestConstellationCoverage:
         )
         assert resp.status_code == 200
         assert resp.json()["h3_resolution"] == 8
+
+    def test_include_targets_returns_targets_and_feeders(
+        self,
+        api_client,
+        create_user,
+        create_managed_node,
+        create_observed_node,
+        create_auto_traceroute,
+        create_constellation,
+    ):
+        from nodes.models import NodeLatestStatus
+
+        owner = create_user()
+        api_client.force_authenticate(user=owner)
+        constellation = create_constellation(created_by=owner)
+
+        feeder_a = create_managed_node(
+            owner=owner,
+            constellation=constellation,
+            node_id=0xAAAA_AA10,
+            default_location_latitude=55.86,
+            default_location_longitude=-4.25,
+        )
+        feeder_b = create_managed_node(
+            owner=owner,
+            constellation=constellation,
+            node_id=0xAAAA_AA11,
+            default_location_latitude=55.90,
+            default_location_longitude=-4.30,
+        )
+        target = create_observed_node(node_id=0xCCCC_CC10)
+        NodeLatestStatus.objects.create(node=target, latitude=55.87, longitude=-4.22)
+
+        create_auto_traceroute(
+            source_node=feeder_a,
+            target_node=target,
+            status=AutoTraceRoute.STATUS_COMPLETED,
+        )
+        create_auto_traceroute(
+            source_node=feeder_b,
+            target_node=target,
+            status=AutoTraceRoute.STATUS_FAILED,
+        )
+
+        resp = api_client.get(
+            "/api/traceroutes/constellation-coverage/",
+            {
+                "constellation_id": str(constellation.id),
+                "include_targets": "1",
+            },
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert "targets" in body
+        assert "feeders" in body
+        assert len(body["targets"]) == 1
+        assert body["targets"][0]["attempts"] == 2
+        assert body["targets"][0]["successes"] == 1
+        assert body["targets"][0]["contributing_feeders"] == 2
+        feeder_ids = {f["node_id"] for f in body["feeders"]}
+        assert feeder_a.node_id in feeder_ids
+        assert feeder_b.node_id in feeder_ids
+
+    def test_omit_include_targets_has_no_targets_key(
+        self,
+        api_client,
+        create_user,
+        create_constellation,
+    ):
+        owner = create_user()
+        api_client.force_authenticate(user=owner)
+        constellation = create_constellation(created_by=owner)
+        resp = api_client.get(
+            "/api/traceroutes/constellation-coverage/",
+            {"constellation_id": str(constellation.id)},
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert "targets" not in body
+        assert "feeders" not in body
+
+    def test_constellation_target_strategy_filters_hexes(
+        self,
+        api_client,
+        create_user,
+        create_managed_node,
+        create_observed_node,
+        create_auto_traceroute,
+        create_constellation,
+    ):
+        from nodes.models import NodeLatestStatus
+
+        owner = create_user()
+        api_client.force_authenticate(user=owner)
+        constellation = create_constellation(created_by=owner)
+        feeder = create_managed_node(
+            owner=owner,
+            constellation=constellation,
+            node_id=0xAAAA_AA12,
+            default_location_latitude=55.86,
+            default_location_longitude=-4.25,
+        )
+        target = create_observed_node(node_id=0xCCCC_CC11)
+        NodeLatestStatus.objects.create(node=target, latitude=55.86, longitude=-4.20)
+
+        create_auto_traceroute(
+            source_node=feeder,
+            target_node=target,
+            status=AutoTraceRoute.STATUS_COMPLETED,
+            target_strategy=AutoTraceRoute.TARGET_STRATEGY_INTRA_ZONE,
+        )
+        create_auto_traceroute(
+            source_node=feeder,
+            target_node=target,
+            status=AutoTraceRoute.STATUS_COMPLETED,
+            target_strategy=AutoTraceRoute.TARGET_STRATEGY_DX_ACROSS,
+        )
+
+        resp_all = api_client.get(
+            "/api/traceroutes/constellation-coverage/",
+            {"constellation_id": str(constellation.id)},
+        )
+        assert resp_all.status_code == 200
+        assert resp_all.json()["hexes"][0]["attempts"] == 2
+
+        resp_f = api_client.get(
+            "/api/traceroutes/constellation-coverage/",
+            {
+                "constellation_id": str(constellation.id),
+                "target_strategy": "intra_zone",
+            },
+        )
+        assert resp_f.status_code == 200
+        assert resp_f.json()["hexes"][0]["attempts"] == 1
