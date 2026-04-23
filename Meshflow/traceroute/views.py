@@ -81,7 +81,9 @@ def traceroute_list(request):
 
     trigger_type = request.query_params.get("trigger_type")
     if trigger_type:
-        qs = qs.filter(trigger_type=trigger_type)
+        trigger_types = [t.strip() for t in trigger_type.split(",") if t.strip()]
+        if trigger_types:
+            qs = qs.filter(trigger_type__in=trigger_types)
 
     from .reach import target_strategy_tokens_to_q
 
@@ -235,8 +237,20 @@ def traceroute_trigger(request):
                 {"target_node_id": ["ObservedNode with this node_id not found."]},
                 status=status.HTTP_404_NOT_FOUND,
             )
+        # Manual target: strategy is always recorded as manual (client target_strategy ignored).
+        persisted_strategy = AutoTraceRoute.TARGET_STRATEGY_MANUAL
+        pick_strategy = None
     else:
-        target_node = pick_traceroute_target(source_node, strategy=target_strategy_req)
+        if target_strategy_req is not None:
+            persisted_strategy = target_strategy_req
+            pick_strategy = target_strategy_req
+        else:
+            from .strategy_rotation import pick_strategy_for_feeder
+
+            persisted_strategy = pick_strategy_for_feeder(source_node)
+            pick_strategy = persisted_strategy
+
+        target_node = pick_traceroute_target(source_node, strategy=pick_strategy)
         if not target_node:
             return Response(
                 {"detail": "No ObservedNode available for auto-selection. " "Specify target_node_id."},
@@ -249,14 +263,14 @@ def traceroute_trigger(request):
         trigger_type=AutoTraceRoute.TRIGGER_TYPE_USER,
         triggered_by=request.user,
         trigger_source=None,
-        target_strategy=target_strategy_req,
+        target_strategy=persisted_strategy,
         status=AutoTraceRoute.STATUS_PENDING,
     )
 
-    if target_strategy_req:
+    if persisted_strategy and persisted_strategy != AutoTraceRoute.TARGET_STRATEGY_MANUAL:
         from .strategy_rotation import record_strategy_run
 
-        record_strategy_run(source_node, target_strategy_req)
+        record_strategy_run(source_node, persisted_strategy)
 
     # Send command via channel layer
     channel_layer = get_channel_layer()

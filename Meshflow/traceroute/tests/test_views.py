@@ -1,6 +1,7 @@
 """Tests for traceroute views."""
 
 from datetime import timedelta
+from unittest.mock import patch
 
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
@@ -113,6 +114,52 @@ class TestTracerouteList:
         resp = api_client.get("/api/traceroutes/?status=completed,pending,sent")
         assert resp.status_code == 200
         assert "results" in resp.json()
+
+    def test_list_trigger_type_comma_separated_union(
+        self, api_client, create_user, create_managed_node, create_observed_node, create_auto_traceroute
+    ):
+        """trigger_type param accepts comma-separated values (OR semantics)."""
+        user = create_user()
+        mn = create_managed_node()
+        on = create_observed_node()
+        api_client.force_authenticate(user=user)
+        create_auto_traceroute(
+            triggered_by=user,
+            trigger_type=AutoTraceRoute.TRIGGER_TYPE_AUTO,
+            source_node=mn,
+            target_node=on,
+        )
+        create_auto_traceroute(
+            triggered_by=user,
+            trigger_type=AutoTraceRoute.TRIGGER_TYPE_USER,
+            source_node=mn,
+            target_node=on,
+        )
+        resp = api_client.get(f"/api/traceroutes/?trigger_type=auto,user&source_node={mn.node_id}")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["count"] >= 2
+        types = {r["trigger_type"] for r in data["results"]}
+        assert "auto" in types
+        assert "user" in types
+
+    def test_list_trigger_type_single_value(
+        self, api_client, create_user, create_managed_node, create_observed_node, create_auto_traceroute
+    ):
+        user = create_user()
+        mn = create_managed_node()
+        on = create_observed_node()
+        api_client.force_authenticate(user=user)
+        create_auto_traceroute(
+            triggered_by=user, trigger_type=AutoTraceRoute.TRIGGER_TYPE_AUTO, source_node=mn, target_node=on
+        )
+        create_auto_traceroute(
+            triggered_by=user, trigger_type=AutoTraceRoute.TRIGGER_TYPE_USER, source_node=mn, target_node=on
+        )
+        resp = api_client.get(f"/api/traceroutes/?trigger_type=user&source_node={mn.node_id}")
+        assert resp.status_code == 200
+        for row in resp.json()["results"]:
+            assert row["trigger_type"] == "user"
 
     def test_list_response_shape(self, api_client, create_user, create_auto_traceroute):
         """List response has expected structure for source_node and target_node."""
@@ -371,7 +418,87 @@ class TestTracerouteTrigger:
         assert data["target_node"]["node_id"] == on.node_id
         assert data["trigger_type"] == "user"
         assert data["status"] == "sent"
+        assert data["target_strategy"] == AutoTraceRoute.TARGET_STRATEGY_MANUAL
         assert AutoTraceRoute.objects.filter(id=data["id"]).exists()
+
+    def test_trigger_manual_target_ignores_client_target_strategy(
+        self, api_client, editor_user, editor_managed_node, create_observed_node
+    ):
+        """Explicit target always persists strategy=manual even if client sends a hypothesis."""
+        mn = editor_managed_node
+        on = create_observed_node()
+        api_client.force_authenticate(user=editor_user)
+        resp = api_client.post(
+            "/api/traceroutes/trigger/",
+            {
+                "managed_node_id": mn.node_id,
+                "target_node_id": on.node_id,
+                "target_strategy": AutoTraceRoute.TARGET_STRATEGY_DX_ACROSS,
+            },
+            format="json",
+        )
+        assert resp.status_code == 201
+        assert resp.json()["target_strategy"] == AutoTraceRoute.TARGET_STRATEGY_MANUAL
+
+    def test_trigger_auto_persists_resolved_strategy_when_none_requested(
+        self, api_client, editor_user, editor_managed_node, create_observed_node
+    ):
+        """Auto target without target_strategy uses pick_strategy_for_feeder and persists it."""
+        mn = editor_managed_node
+        on = create_observed_node()
+        api_client.force_authenticate(user=editor_user)
+        with patch(
+            "traceroute.strategy_rotation.pick_strategy_for_feeder",
+            return_value=AutoTraceRoute.TARGET_STRATEGY_DX_ACROSS,
+        ):
+            with patch("traceroute.views.pick_traceroute_target", return_value=on) as mock_pick:
+                resp = api_client.post(
+                    "/api/traceroutes/trigger/",
+                    {"managed_node_id": mn.node_id},
+                    format="json",
+                )
+        assert resp.status_code == 201
+        assert resp.json()["target_strategy"] == AutoTraceRoute.TARGET_STRATEGY_DX_ACROSS
+        mock_pick.assert_called_once()
+        assert mock_pick.call_args.kwargs.get("strategy") == AutoTraceRoute.TARGET_STRATEGY_DX_ACROSS
+
+    def test_trigger_auto_explicit_strategy_persisted(
+        self, api_client, editor_user, editor_managed_node, create_observed_node
+    ):
+        """Auto target with explicit target_strategy keeps that value on the row."""
+        mn = editor_managed_node
+        on = create_observed_node()
+        api_client.force_authenticate(user=editor_user)
+        with patch("traceroute.views.pick_traceroute_target", return_value=on) as mock_pick:
+            resp = api_client.post(
+                "/api/traceroutes/trigger/",
+                {
+                    "managed_node_id": mn.node_id,
+                    "target_strategy": AutoTraceRoute.TARGET_STRATEGY_INTRA_ZONE,
+                },
+                format="json",
+            )
+        assert resp.status_code == 201
+        assert resp.json()["target_strategy"] == AutoTraceRoute.TARGET_STRATEGY_INTRA_ZONE
+        mock_pick.assert_called_once()
+        assert mock_pick.call_args.kwargs.get("strategy") == AutoTraceRoute.TARGET_STRATEGY_INTRA_ZONE
+
+    def test_trigger_auto_when_pick_strategy_returns_none_persists_null(
+        self, api_client, editor_user, editor_managed_node, create_observed_node
+    ):
+        """If no feeder strategy applies, auto path may still pick a legacy target with null strategy."""
+        mn = editor_managed_node
+        on = create_observed_node()
+        api_client.force_authenticate(user=editor_user)
+        with patch("traceroute.strategy_rotation.pick_strategy_for_feeder", return_value=None):
+            with patch("traceroute.views.pick_traceroute_target", return_value=on):
+                resp = api_client.post(
+                    "/api/traceroutes/trigger/",
+                    {"managed_node_id": mn.node_id},
+                    format="json",
+                )
+        assert resp.status_code == 201
+        assert resp.json()["target_strategy"] is None
 
     def test_trigger_rejects_when_allow_auto_traceroute_disabled(
         self,
