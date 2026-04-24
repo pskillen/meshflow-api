@@ -112,6 +112,36 @@ class ManagedNode(models.Model):
         return getattr(self, f"channel_{channel_idx}")
 
 
+class ManagedNodeStatus(models.Model):
+    """Denormalized feeder/API ingestion status for a managed node (not RF mesh liveness)."""
+
+    node = models.OneToOneField(
+        ManagedNode,
+        on_delete=models.CASCADE,
+        related_name="status",
+        primary_key=True,
+    )
+    last_packet_ingested_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text=_("Latest PacketObservation.upload_time for this observer (API ingest time)."),
+    )
+    is_sending_data = models.BooleanField(
+        default=False,
+        db_index=True,
+        help_text=_("True when last_packet_ingested_at is within the configured feeder recency window."),
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = _("Managed node status")
+        verbose_name_plural = _("Managed node statuses")
+
+    def __str__(self):
+        return f"status:{self.node_id}"
+
+
 class EnvironmentExposure(models.IntegerChoices):
     """Where environment / weather sensors are placed (operator-set)."""
 

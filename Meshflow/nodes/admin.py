@@ -1,11 +1,12 @@
 from django import forms
 from django.contrib import admin
 from django.contrib.admin.widgets import FilteredSelectMultiple
+from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 
-from .models import ManagedNode, NodeAPIKey, NodeAuth, NodeLatestStatus, ObservedNode
+from .models import ManagedNode, ManagedNodeStatus, NodeAPIKey, NodeAuth, NodeLatestStatus, ObservedNode
 
 
 class CopyToClipboardWidget(forms.Widget):
@@ -280,6 +281,8 @@ class ManagedNodeAdmin(admin.ModelAdmin):
         "owner",
         "constellation",
         "allow_auto_traceroute",
+        "status_is_sending_data",
+        "status_last_packet_ingested_at",
     )
     list_filter = (
         "owner",
@@ -293,6 +296,26 @@ class ManagedNodeAdmin(admin.ModelAdmin):
         "owner__username",
         "owner__email",
     )
+
+    @admin.display(description=_("Feeding (API)"), boolean=True)
+    def status_is_sending_data(self, obj):
+        try:
+            return obj.status.is_sending_data
+        except ObjectDoesNotExist:
+            return None
+
+    @admin.display(description=_("Last packet ingested (status)"))
+    def status_last_packet_ingested_at(self, obj):
+        try:
+            status = obj.status
+        except ObjectDoesNotExist:
+            return "—"
+        if status.last_packet_ingested_at is None:
+            return "—"
+        return status.last_packet_ingested_at
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related("status")
 
     def get_fields(self, request, obj=None):
         fields = [
@@ -312,6 +335,34 @@ class ManagedNodeAdmin(admin.ModelAdmin):
             "channel_7",
         ]
         return fields
+
+
+@admin.register(ManagedNodeStatus)
+class ManagedNodeStatusAdmin(admin.ModelAdmin):
+    list_display = (
+        "node",
+        "last_packet_ingested_at",
+        "is_sending_data",
+        "updated_at",
+    )
+    list_select_related = ("node", "node__owner")
+    list_filter = ("is_sending_data",)
+    search_fields = ("node__name", "node__node_id")
+    readonly_fields = (
+        "node",
+        "last_packet_ingested_at",
+        "is_sending_data",
+        "updated_at",
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(NodeAPIKey)
