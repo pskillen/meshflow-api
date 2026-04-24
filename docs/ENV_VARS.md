@@ -127,6 +127,20 @@ See **[docs/features/rf_propagation/README.md](features/rf_propagation/README.md
 
 ---
 
+## 11. Traceroute target reliability (auto selection)
+
+Tunables for [automatic target selection reliability](../features/traceroute/algorithms.md#automatic-reliability). Only `trigger_type=auto` completed/failed `AutoTraceRoute` rows in the lookback window are used.
+
+| Variable | Default | Description | Allowable Values |
+|----------|---------|-------------|------------------|
+| `TR_RELIABILITY_ENABLED` | `true` (on) | When false, disables soft penalty and hard cooldown. | `1`, `0`, `true`, `false`, `yes`, `no`, `on`, `off` (empty = default) |
+| `TR_RELIABILITY_WINDOW_DAYS` | `14` | Lookback for reliability evidence and ordering of attempts. | Integer (string) |
+| `TR_RELIABILITY_CONSECUTIVE_FAILS` | `4` | Minimum **consecutive** recent automatic failures (newest first) to hard-cooldown a (source, target) pair. Set to `0` to disable hard cooldown. | Integer (string) |
+| `TR_RELIABILITY_SOFT_MAX` | `100` | Maximum soft penalty (same scale as distance/recency demerit) applied as this times `(failed/attempts)` when enough attempts exist. Set to `0` to disable soft penalty. | Float (string) |
+| `TR_RELIABILITY_MIN_ATTEMPTS_SOFT` | `3` | Minimum completed or failed auto attempts in the window before applying the soft ratio penalty. | Integer (string) |
+
+---
+
 # Details
 
 ## 1. General Application
@@ -182,6 +196,13 @@ See **[docs/features/rf_propagation/README.md](features/rf_propagation/README.md
 - **RF_PROPAGATION_DEFAULT_RADIUS_M**, **RF_PROPAGATION_COLORMAP**, **RF_PROPAGATION_HIGH_RESOLUTION**, **RF_PROPAGATION_MIN_DBM**, **RF_PROPAGATION_MAX_DBM**, **RF_PROPAGATION_SIGNAL_THRESHOLD_DBM**: Tunables folded into `build_request` and the render input hash.
 - **RF_PROPAGATION_NODATA_RGB** / **RF_PROPAGATION_NODATA_TOLERANCE**: PNG post-processing for Leaflet overlays.
 - **RF_PROPAGATION_POLL_MAX_SECONDS**, **RF_PROPAGATION_READY_RETENTION**: Worker behaviour.
+
+## 11. Traceroute target reliability
+
+- **TR_RELIABILITY_ENABLED**: Master switch for automatic target reliability in `traceroute.target_selection`.
+- **TR_RELIABILITY_WINDOW_DAYS**: How far back to read `AutoTraceRoute` rows for a given managed source.
+- **TR_RELIABILITY_CONSECUTIVE_FAILS**: Streak of automatic failures (after the most recent attempt) required to exclude the target for that source. `0` disables exclusion.
+- **TR_RELIABILITY_SOFT_MAX** / **TR_RELIABILITY_MIN_ATTEMPTS_SOFT**: Soft deprioritisation of targets with a poor success ratio without excluding them.
 
 ---
 
