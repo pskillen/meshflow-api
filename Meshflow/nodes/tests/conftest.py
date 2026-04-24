@@ -1,5 +1,6 @@
-import pytest
 from django.utils import timezone
+
+import pytest
 
 from common.mesh_node_helpers import meshtastic_id_to_hex
 from constellations.models import MessageChannel

@@ -22,13 +22,10 @@ def eligible_auto_traceroute_sources_queryset():
     ManagedNodeStatus.is_sending_data (refreshed periodically; same recency window as
     schedule_traceroute_source_recency_seconds in nodes.tasks.update_managed_node_statuses).
     """
-    return (
-        ManagedNode.objects.filter(
-            allow_auto_traceroute=True,
-            status__is_sending_data=True,
-        )
-        .select_related("constellation", "status")
-    )
+    return ManagedNode.objects.filter(
+        allow_auto_traceroute=True,
+        status__is_sending_data=True,
+    ).select_related("constellation", "status")
 
 
 def is_managed_node_eligible_traceroute_source(managed_node: ManagedNode) -> bool:

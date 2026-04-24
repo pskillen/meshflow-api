@@ -6,7 +6,7 @@ import pytest
 
 import nodes.tests.conftest  # noqa: F401
 from common.mesh_node_helpers import meshtastic_id_to_hex
-from nodes.models import NodeLatestStatus, ObservedNode
+from nodes.models import NodeLatestStatus
 from traceroute.target_selection import pick_traceroute_target
 
 
