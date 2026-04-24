@@ -1,13 +1,8 @@
 """Managed-node eligibility based on recent packet ingestion (traceroute sources, monitoring)."""
 
 import os
-from datetime import timedelta
-
-from django.db.models import Exists, OuterRef
-from django.utils import timezone
 
 from nodes.models import ManagedNode
-from packets.models import PacketObservation
 
 DEFAULT_SCHEDULE_TRACEROUTE_SOURCE_RECENCY_SECONDS = 600
 
@@ -23,20 +18,14 @@ def schedule_traceroute_source_recency_seconds() -> int:
 
 def eligible_auto_traceroute_sources_queryset():
     """
-    ManagedNodes that may run auto traceroutes: allow_auto_traceroute and at least one
-    PacketObservation as observer with upload_time within the recency window.
+    ManagedNodes that may run auto traceroutes: allow_auto_traceroute and denormalized
+    ManagedNodeStatus.is_sending_data (refreshed periodically; same recency window as
+    schedule_traceroute_source_recency_seconds in nodes.tasks.update_managed_node_statuses).
     """
-    cutoff = timezone.now() - timedelta(seconds=schedule_traceroute_source_recency_seconds())
-    recent_observation = PacketObservation.objects.filter(
-        observer_id=OuterRef("pk"),
-        upload_time__gte=cutoff,
-    )
-    return (
-        ManagedNode.objects.filter(allow_auto_traceroute=True)
-        .annotate(_has_recent_ingestion=Exists(recent_observation))
-        .filter(_has_recent_ingestion=True)
-        .select_related("constellation")
-    )
+    return ManagedNode.objects.filter(
+        allow_auto_traceroute=True,
+        status__is_sending_data=True,
+    ).select_related("constellation", "status")
 
 
 def is_managed_node_eligible_traceroute_source(managed_node: ManagedNode) -> bool:

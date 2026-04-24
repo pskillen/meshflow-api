@@ -11,7 +11,7 @@ from django.core.cache import cache
 from common.geo import haversine_km
 from nodes.models import ManagedNode, ObservedNode
 
-ENVELOPE_CACHE_PREFIX = "tr:envelope:v1"
+ENVELOPE_CACHE_PREFIX = "tr:envelope:v2"
 ENVELOPE_TTL_SECONDS = 600
 
 # Source farther than this fraction of envelope radius counts as "perimeter" feeder
@@ -57,9 +57,9 @@ def managed_node_position_lat_lon(managed_node: ManagedNode) -> tuple[float, flo
 
 
 def constellation_centroid(constellation) -> tuple[float, float] | None:
-    """Mean of ManagedNode positions (with coordinates) in this constellation."""
+    """Mean of positions for managed nodes that are actively feeding (ManagedNodeStatus)."""
     positions: list[tuple[float, float]] = []
-    for mn in ManagedNode.objects.filter(constellation=constellation).iterator():
+    for mn in ManagedNode.objects.filter(constellation=constellation, status__is_sending_data=True).iterator():
         p = managed_node_position_lat_lon(mn)
         if p:
             positions.append(p)
@@ -73,12 +73,13 @@ def constellation_centroid(constellation) -> tuple[float, float] | None:
 
 def _compute_envelope_circle(constellation) -> dict[str, Any] | None:
     """
-    Circular envelope: centroid + p90 distance from centroid to managed-node positions.
+    Circular envelope: centroid + p90 distance from centroid to managed-node positions
+    for nodes that are actively feeding (ManagedNodeStatus.is_sending_data).
 
     Returns ``None`` when fewer than three managed nodes have coordinates (undefined).
     """
     positions: list[tuple[float, float]] = []
-    for mn in ManagedNode.objects.filter(constellation=constellation).iterator():
+    for mn in ManagedNode.objects.filter(constellation=constellation, status__is_sending_data=True).iterator():
         p = managed_node_position_lat_lon(mn)
         if p:
             positions.append(p)

@@ -25,7 +25,9 @@ When you change any threshold in code, **update this file in the same PR**.
   in `packets/services/base.py` at ingest. It is the canonical "mesh heard"
   time.
 - `PacketObservation.upload_time` (feeder upload) is the canonical
-  "feeder heard" time for managed nodes and traceroute source eligibility.
+  "feeder heard" time for managed nodes. Traceroute **source eligibility** and
+  constellation **coverage geometry** read the denormalized snapshot
+  `ManagedNodeStatus` (refreshed periodically from packet observations).
 
 ---
 
@@ -37,7 +39,7 @@ source of truth for defaults.
 | Env var | Default | Purpose |
 | --- | --- | --- |
 | `PACKET_DEDUP_WINDOW_MINUTES` | `10` (min) | Packet dedup window vs `first_reported_time` |
-| `SCHEDULE_TRACEROUTE_SOURCE_RECENCY_SECONDS` | `600` (s) | Managed feeder liveness + TR source eligibility |
+| `SCHEDULE_TRACEROUTE_SOURCE_RECENCY_SECONDS` | `600` (s) | Managed feeder snapshot (`ManagedNodeStatus`) + TR source eligibility window |
 | `FAILED_TR_TIMEOUT_SECONDS` | `180` (s) | Mark stuck `AutoTraceRoute` as `failed` |
 | `STALE_TR_TIMEOUT_SECONDS` | `180` (s) | Match inbound TR response packet to an `AutoTraceRoute` |
 | `ONLINE_NODE_WINDOW_HOURS` | `2` (h) | `online_nodes` stats snapshot window |
@@ -61,12 +63,14 @@ Implemented in
 
 | Signal | Field | Fresh if | Controlled by |
 | --- | --- | --- | --- |
-| Feeder | `PacketObservation.upload_time` | within **`SCHEDULE_TRACEROUTE_SOURCE_RECENCY_SECONDS`** (default **600 s / 10 min**) | env |
+| Feeder (TR sources / monitoring) | `ManagedNodeStatus.is_sending_data` | `True` when `last_packet_ingested_at` is within **`SCHEDULE_TRACEROUTE_SOURCE_RECENCY_SECONDS`** (default **600 s / 10 min**) | env + periodic `nodes.tasks.update_managed_node_statuses` |
 | Radio / mesh | `ObservedNode.last_heard` (or `ManagedNode.radio_last_heard` proxy) | within **2 h** (aligned with `online_nodes` window) | code |
 
-`eligible_auto_traceroute_sources_queryset()` uses the same feeder cutoff;
-this is the **one place** that decides whether a managed node is eligible to
-originate a traceroute.
+`eligible_auto_traceroute_sources_queryset()` requires `allow_auto_traceroute`
+and `status.is_sending_data`; the status row is derived from recent
+`PacketObservation.upload_time` by the refresh task (same cutoff as the env
+var above). This is the **canonical** rule for whether a managed node may
+originate an auto or monitoring traceroute.
 
 ### Managed-node API annotations
 
@@ -76,8 +80,8 @@ In `ManagedNodeViewSet` (see `Meshflow/nodes/views.py`):
 | --- | --- | --- |
 | `packets_last_hour` | **1 h** | `PacketObservation.upload_time` |
 | `packets_last_24h` | **24 h** | `PacketObservation.upload_time` |
-| `last_packet_ingested_at` | latest `upload_time` | `PacketObservation` |
-| `is_eligible_traceroute_source` | feeder window above | `managed_node_liveness` |
+| `last_packet_ingested_at` | snapshot | `ManagedNodeStatus.last_packet_ingested_at` |
+| `is_eligible_traceroute_source` | `allow_auto_traceroute` and `status.is_sending_data` | `ManagedNodeStatus` |
 
 ### Managed-node status denormalization (`ManagedNodeStatus`)
 
@@ -93,8 +97,9 @@ liveness; that remains `ObservedNode.last_heard`.
 
 The Celery task `nodes.tasks.update_managed_node_statuses` runs on a **5-minute**
 `django_celery_beat` interval (see `nodes` migration `0032_add_update_managed_node_statuses_periodic_task`).
-API list/detail annotations may still compute status on the fly until follow-up work
-switches consumers to this table.
+Managed-node `include=status` responses use this snapshot for ingest time and
+traceroute-source eligibility; packet-count fields remain live aggregates over
+`PacketObservation`.
 
 ### `ObservedNodeViewSet.recent_counts`
 

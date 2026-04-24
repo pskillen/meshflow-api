@@ -14,6 +14,7 @@ import nodes.tests.conftest  # noqa: F401 - load fixtures
 import packets.tests.conftest  # noqa: F401 - load fixtures
 import users.tests.conftest  # noqa: F401 - load fixtures
 from constellations.models import ConstellationUserMembership, MessageChannel
+from nodes.tasks import update_managed_node_statuses
 from packets.models import PacketObservation
 from traceroute.models import AutoTraceRoute
 
@@ -28,7 +29,7 @@ def add_traceroute_source_ingestion(create_raw_packet):
             name=f"tr-ingest-{observer.internal_id}",
             constellation=observer.constellation,
         )
-        return PacketObservation.objects.create(
+        obs = PacketObservation.objects.create(
             packet=packet,
             observer=observer,
             channel=channel,
@@ -40,6 +41,8 @@ def add_traceroute_source_ingestion(create_raw_packet):
             upload_time=timezone.now(),
             relay_node=None,
         )
+        update_managed_node_statuses()
+        return obs
 
     return _add
 
@@ -371,7 +374,7 @@ class TestTracerouteTriggerableNodes:
         assert node["position"] == {"latitude": 51.5, "longitude": -0.12}
 
     def test_triggerable_nodes_excludes_without_recent_ingestion(self, api_client, staff_user, create_managed_node):
-        """Nodes with allow_auto_traceroute but no recent PacketObservation as observer are omitted."""
+        """Nodes with allow_auto_traceroute but no active ManagedNodeStatus feeding snapshot are omitted."""
         mn = create_managed_node(allow_auto_traceroute=True)
         api_client.force_authenticate(user=staff_user)
         resp = api_client.get("/api/traceroutes/triggerable-nodes/")
@@ -601,7 +604,7 @@ class TestTracerouteTrigger:
         create_managed_node,
         create_observed_node,
     ):
-        """Trigger returns 400 when source has permission but no recent ingestion as observer."""
+        """Trigger returns 400 when source has permission but ManagedNodeStatus is not actively feeding."""
         membership = ConstellationUserMembership.objects.filter(user=editor_user, role="editor").first()
         constellation = membership.constellation
         creator = constellation.created_by

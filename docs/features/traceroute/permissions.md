@@ -39,7 +39,7 @@ contract; update the code (or this document) until they agree.
 "Eligibility" for a source node means:
 
 - `allow_auto_traceroute=True`, and
-- The node has reported packets recently enough to be considered live — see
+- `ManagedNodeStatus.is_sending_data` is true (feeder snapshot; refreshed from packet observations) — see
   `eligible_auto_traceroute_sources_queryset` in
   [`Meshflow/traceroute/source_eligibility.py`](../../../Meshflow/traceroute/source_eligibility.py)
   and its canonical definition in `nodes.managed_node_liveness`.

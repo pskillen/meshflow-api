@@ -56,7 +56,7 @@ Late responses: if a TR was marked `failed` (timeout) but the response arrives l
 
 ## Code map (shared helpers)
 
-Auto-scheduler and permission checks share one notion of a **live** source node (recent packet ingestion as observer). Canonical implementation: **`nodes.managed_node_liveness`** (`eligible_auto_traceroute_sources_queryset`, etc.). **`traceroute.source_eligibility`** re-exports the same API for existing imports.
+Auto-scheduler and permission checks share one notion of a **live** source node (`ManagedNodeStatus.is_sending_data`, refreshed from `PacketObservation.upload_time` on a beat schedule). Canonical implementation: **`nodes.managed_node_liveness`** (`eligible_auto_traceroute_sources_queryset`, etc.). **`traceroute.source_eligibility`** re-exports the same API for existing imports.
 
 **Target selection** for auto TR: `traceroute.target_selection.pick_traceroute_target` uses **`common.geo.haversine_km`** and **`nodes.positioning.managed_node_lat_lon`**.
 

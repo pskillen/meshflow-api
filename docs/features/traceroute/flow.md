@@ -8,18 +8,18 @@ Who can trigger traceroutes and from which nodes:
 
 | Role | Can trigger from |
 |------|------------------|
-| System admin (`is_staff`) | ManagedNodes with `allow_auto_traceroute=True` and recent ingestion as `PacketObservation.observer` |
+| System admin (`is_staff`) | ManagedNodes with `allow_auto_traceroute=True` and `ManagedNodeStatus.is_sending_data` (feeder snapshot) |
 | Constellation admin/editor | Same eligibility, in constellations where user has admin/editor role |
 | ManagedNode owner | Same eligibility for nodes they own |
 | All authenticated | View traceroute list, detail, heatmap |
 
-The UI fetches `GET /api/traceroutes/triggerable-nodes/` to list sources that are both permitted and recently ingesting (same rule as the Celery scheduler: **`nodes.managed_node_liveness`**, exposed via **`traceroute.source_eligibility`** for traceroute code). The trigger view validates eligibility, `user_can_trigger_from_node(user, source_node)`, and rate limits before sending the command.
+The UI fetches `GET /api/traceroutes/triggerable-nodes/` to list sources that are both permitted and actively feeding per **`ManagedNodeStatus`** (same rule as the Celery scheduler: **`nodes.managed_node_liveness`**, exposed via **`traceroute.source_eligibility`** for traceroute code). The trigger view validates eligibility, `user_can_trigger_from_node(user, source_node)`, and rate limits before sending the command.
 
 ## 1. Trigger
 
-**Manual**: User calls `POST /api/traceroutes/trigger/` with `managed_node_id` and optional `target_node_id`. Source must match the same eligibility as auto-schedule (recent ingestion window `SCHEDULE_TRACEROUTE_SOURCE_RECENCY_SECONDS`). Requires permission as above. Rate limit: **`traceroute.trigger_intervals.MANUAL_TRIGGER_MIN_INTERVAL_SEC`** (default 60s) per source node.
+**Manual**: User calls `POST /api/traceroutes/trigger/` with `managed_node_id` and optional `target_node_id`. Source must match the same eligibility as auto-schedule (`ManagedNodeStatus` / `SCHEDULE_TRACEROUTE_SOURCE_RECENCY_SECONDS` window). Requires permission as above. Rate limit: **`traceroute.trigger_intervals.MANUAL_TRIGGER_MIN_INTERVAL_SEC`** (default 60s) per source node.
 
-**Automatic**: Celery task `schedule_traceroutes` runs periodically. Picks one random ManagedNode with `allow_auto_traceroute=True` **and** recent packet ingestion as `PacketObservation.observer` (within `SCHEDULE_TRACEROUTE_SOURCE_RECENCY_SECONDS`, default 600s; see **`nodes.managed_node_liveness`**), uses **`pick_traceroute_target()`** to select a target (geography via **`common.geo.haversine_km`** and **`nodes.positioning.managed_node_lat_lon`**, prioritises periphery and less-recently-traced nodes), creates `AutoTraceRoute` with `trigger_type=auto`. **`pick_traceroute_target()`** excludes observed nodes that have **`mesh_monitoring.NodePresence`** with active verification or offline confirmed.
+**Automatic**: Celery task `schedule_traceroutes` runs periodically. Picks one eligible ManagedNode with `allow_auto_traceroute=True` **and** `ManagedNodeStatus.is_sending_data` (same recency window as `SCHEDULE_TRACEROUTE_SOURCE_RECENCY_SECONDS`, default 600s; see **`nodes.managed_node_liveness`**), uses **`pick_traceroute_target()`** to select a target (geography via **`common.geo.haversine_km`** and **`nodes.positioning.managed_node_lat_lon`**, prioritises periphery and less-recently-traced nodes), creates `AutoTraceRoute` with `trigger_type=auto`. **`pick_traceroute_target()`** excludes observed nodes that have **`mesh_monitoring.NodePresence`** with active verification or offline confirmed.
 
 **Mesh monitoring**: Celery task **`mesh_monitoring.tasks.process_node_watch_presence`** (beat, default every 60s) creates `AutoTraceRoute` rows with `trigger_type=monitor` and `trigger_source=mesh_monitoring` for watched nodes that are silent past their effective threshold; commands use the same WebSocket path as above. See [mesh monitoring](../mesh-monitoring/README.md).
 

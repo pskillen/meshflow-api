@@ -22,7 +22,9 @@ def _clear_constellation_envelope_cache():
 
 
 @pytest.mark.django_db
-def test_geo_classification_envelope_and_selector_params_perimeter_feeder(create_user, create_managed_node):
+def test_geo_classification_envelope_and_selector_params_perimeter_feeder(
+    create_user, create_managed_node, mark_constellation_managed_nodes_feeding
+):
     user = create_user()
     c1 = create_managed_node(
         owner=user,
@@ -52,6 +54,7 @@ def test_geo_classification_envelope_and_selector_params_perimeter_feeder(create
         default_location_longitude=-4.25,
     )
 
+    mark_constellation_managed_nodes_feeding(c1)
     geo = build_geo_classification(feeder)
 
     assert geo["tier"] == "perimeter"
@@ -72,7 +75,9 @@ def test_geo_classification_envelope_and_selector_params_perimeter_feeder(create
 
 
 @pytest.mark.django_db
-def test_geo_classification_internal_feeder_still_has_envelope(create_user, create_managed_node):
+def test_geo_classification_internal_feeder_still_has_envelope(
+    create_user, create_managed_node, mark_constellation_managed_nodes_feeding
+):
     user = create_user()
     c1 = create_managed_node(
         owner=user,
@@ -103,6 +108,7 @@ def test_geo_classification_internal_feeder_still_has_envelope(create_user, crea
         default_location_longitude=-4.24,
     )
 
+    mark_constellation_managed_nodes_feeding(c1)
     geo = build_geo_classification(feeder)
     assert geo["tier"] == "internal"
     assert geo["envelope"] is not None
@@ -110,7 +116,9 @@ def test_geo_classification_internal_feeder_still_has_envelope(create_user, crea
 
 
 @pytest.mark.django_db
-def test_geo_classification_no_envelope_two_nodes_source_bearing_from_centroid(create_user, create_managed_node):
+def test_geo_classification_no_envelope_two_nodes_source_bearing_from_centroid(
+    create_user, create_managed_node, mark_constellation_managed_nodes_feeding
+):
     """Envelope needs ≥3 positioned managed nodes; centroid still exists for two."""
     user = create_user()
     c1 = create_managed_node(
@@ -127,6 +135,7 @@ def test_geo_classification_no_envelope_two_nodes_source_bearing_from_centroid(c
         default_location_longitude=-4.25,
     )
 
+    mark_constellation_managed_nodes_feeding(c1)
     geo = build_geo_classification(feeder)
     assert geo["envelope"] is None
     assert geo["selection_centroid"] is not None

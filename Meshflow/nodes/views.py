@@ -8,7 +8,6 @@ from django.db.models import (
     Case,
     Count,
     DateTimeField,
-    Exists,
     IntegerField,
     OuterRef,
     Q,
@@ -30,12 +29,12 @@ from rest_framework.views import APIView
 from common.mesh_node_helpers import meshtastic_hex_to_int
 from constellations.models import ConstellationUserMembership
 from nodes.constants import INFRASTRUCTURE_ROLES
-from nodes.managed_node_liveness import schedule_traceroute_source_recency_seconds
 from nodes.models import (
     DeviceMetrics,
     EnvironmentExposure,
     EnvironmentMetrics,
     ManagedNode,
+    ManagedNodeStatus,
     NodeAPIKey,
     NodeAuth,
     NodeLatestStatus,
@@ -1012,12 +1011,16 @@ class ManagedNodeViewSet(viewsets.ModelViewSet):
         now = timezone.now()
         hour_cutoff = now - timedelta(hours=1)
         day_cutoff = now - timedelta(hours=24)
-        recent_cutoff = now - timedelta(seconds=schedule_traceroute_source_recency_seconds())
 
         packet_observation_qs = PacketObservation.objects.filter(observer_id=OuterRef("pk"))
         observed_node_qs = ObservedNode.objects.filter(node_id=OuterRef("node_id"))
 
-        last_packet_subquery = packet_observation_qs.order_by("-upload_time").values("upload_time")[:1]
+        status_qs = ManagedNodeStatus.objects.filter(node_id=OuterRef("pk"))
+        last_packet_subquery = status_qs.values("last_packet_ingested_at")[:1]
+        is_sending_subquery = Subquery(
+            status_qs.values("is_sending_data")[:1],
+            output_field=BooleanField(),
+        )
         packets_last_hour_subquery = (
             packet_observation_qs.filter(upload_time__gte=hour_cutoff)
             .values("observer")
@@ -1030,7 +1033,6 @@ class ManagedNodeViewSet(viewsets.ModelViewSet):
             .annotate(c=Count("id"))
             .values("c")[:1]
         )
-        eligible_observation_exists = Exists(packet_observation_qs.filter(upload_time__gte=recent_cutoff))
 
         return queryset.annotate(
             last_packet_ingested_at=Subquery(last_packet_subquery, output_field=DateTimeField()),
@@ -1044,7 +1046,7 @@ class ManagedNodeViewSet(viewsets.ModelViewSet):
             ),
             radio_last_heard=Subquery(observed_node_qs.values("last_heard")[:1], output_field=DateTimeField()),
             is_eligible_traceroute_source=Case(
-                When(allow_auto_traceroute=True, then=eligible_observation_exists),
+                When(allow_auto_traceroute=True, then=Coalesce(is_sending_subquery, Value(False))),
                 default=Value(False),
                 output_field=BooleanField(),
             ),

@@ -14,6 +14,7 @@ from mesh_monitoring.services import monitoring_traceroute_succeeded_since, on_m
 from mesh_monitoring.tasks import process_node_watch_presence, send_monitoring_traceroute_command
 from mesh_monitoring.tests.conftest import create_watch_with_offline_threshold
 from nodes.models import NodeLatestStatus
+from nodes.tasks import update_managed_node_statuses
 from traceroute.models import AutoTraceRoute
 
 
@@ -41,6 +42,7 @@ def test_process_node_watch_presence_starts_verification_and_creates_monitor_tr(
         default_location_longitude=2.1,
     )
     create_packet_observation(observer=mn)
+    update_managed_node_statuses()
 
     channel_layer = MagicMock()
 
@@ -155,6 +157,7 @@ def test_dispatch_zero_sources_sets_last_zero_sources_at(
         default_location_longitude=2.1,
     )
     create_packet_observation(observer=mn)
+    update_managed_node_statuses()
 
     with patch("mesh_monitoring.tasks.select_monitoring_sources", return_value=[]):
         process_node_watch_presence()
@@ -265,6 +268,7 @@ def test_process_node_watch_presence_offline_confirm_sets_is_offline(
         default_location_longitude=2.1,
     )
     create_packet_observation(observer=mn)
+    update_managed_node_statuses()
 
     monkeypatch.setattr(
         "mesh_monitoring.tasks.verification_window_seconds",

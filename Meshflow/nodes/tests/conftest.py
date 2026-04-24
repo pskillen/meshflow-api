@@ -1,9 +1,11 @@
+from django.utils import timezone
+
 import pytest
 
 from common.mesh_node_helpers import meshtastic_id_to_hex
 from constellations.models import MessageChannel
 from constellations.tests.conftest import create_constellation  # noqa: F401
-from nodes.models import ManagedNode, NodeAPIKey, NodeAuth, ObservedNode
+from nodes.models import ManagedNode, ManagedNodeStatus, NodeAPIKey, NodeAuth, ObservedNode
 from users.tests.conftest import create_user  # noqa: F401
 
 
@@ -96,3 +98,31 @@ def create_node_auth(create_node_api_key, create_managed_node):
         return NodeAuth.objects.create(**kwargs)
 
     return make_node_auth
+
+
+@pytest.fixture
+def mark_managed_node_feeding():
+    """Set denormalized feeder snapshot without going through packet ingestion."""
+
+    def _mark(managed_node: ManagedNode, *, sending: bool = True, last_at=None):
+        ts = last_at if last_at is not None else (timezone.now() if sending else None)
+        ManagedNodeStatus.objects.update_or_create(
+            node=managed_node,
+            defaults={
+                "last_packet_ingested_at": ts,
+                "is_sending_data": sending,
+            },
+        )
+
+    return _mark
+
+
+@pytest.fixture
+def mark_constellation_managed_nodes_feeding(mark_managed_node_feeding):
+    """Mark every managed node in a constellation as actively feeding."""
+
+    def _mark(constellation):
+        for mn in ManagedNode.objects.filter(constellation=constellation):
+            mark_managed_node_feeding(mn, sending=True)
+
+    return _mark
