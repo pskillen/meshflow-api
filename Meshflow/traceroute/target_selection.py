@@ -21,6 +21,7 @@ from nodes.models import ManagedNode, ObservedNode
 from nodes.positioning import managed_node_lat_lon
 
 from .models import AutoTraceRoute
+from .reliability import load_source_target_reliability
 
 
 def _get_last_traced_by_source(managed_node: ManagedNode) -> dict[int, float]:
@@ -56,8 +57,13 @@ def _iter_scored_candidates(
     last_traced_hours: dict[int, float],
     managed_node_ids: set[int],
     suppressed: list[int],
+    *,
+    hard_cooldown: set[int] | None = None,
+    soft_penalty: dict[int, float] | None = None,
 ):
     """Yield (score, ObservedNode) where higher score is better (legacy-style)."""
+    hard = hard_cooldown or set()
+    soft = soft_penalty or {}
     source_pos = managed_node_lat_lon(managed_node)
     if not source_pos:
         return
@@ -76,12 +82,15 @@ def _iter_scored_candidates(
     )
 
     for obs in candidates:
+        if obs.node_id in hard:
+            continue
         lat = obs.latest_status.latitude
         lon = obs.latest_status.longitude
         dist = haversine_km(source_pos[0], source_pos[1], lat, lon)
         hours_since = last_traced_hours.get(obs.node_id)
         demerit = _demerit_hours(hours_since)
-        score = dist - demerit
+        sp = soft.get(obs.node_id, 0.0)
+        score = dist - demerit - sp
         yield score, obs
 
 
@@ -109,7 +118,9 @@ def pick_traceroute_target(
     Pick one target ObservedNode for a ManagedNode.
 
     ``strategy``:
-        ``None`` / ``legacy`` — original periphery-first + recency demerit (existing behaviour).
+        ``None`` / ``legacy`` — periphery-first, recency demerit, and automatic
+        reliability soft penalty / hard cooldown from recent auto traceroutes
+        (meshflow-api#211).
         ``intra_zone`` / ``dx_across`` / ``dx_same_side`` — hypothesis-driven selectors (#176).
     """
     strat = strategy
@@ -119,6 +130,7 @@ def pick_traceroute_target(
     last_traced_hours = _get_last_traced_by_source(managed_node)
     managed_node_ids = set(ManagedNode.objects.values_list("node_id", flat=True))
     suppressed = list(suppressed_observed_node_ids())
+    hard_cooldown, soft_penalty = load_source_target_reliability(managed_node)
 
     if strat is None:
         return _pick_legacy(
@@ -128,6 +140,8 @@ def pick_traceroute_target(
             managed_node_ids,
             suppressed,
             slot,
+            hard_cooldown=hard_cooldown,
+            soft_penalty=soft_penalty,
         )
 
     if strat == AutoTraceRoute.TARGET_STRATEGY_INTRA_ZONE:
@@ -138,6 +152,8 @@ def pick_traceroute_target(
             managed_node_ids,
             suppressed,
             slot,
+            hard_cooldown=hard_cooldown,
+            soft_penalty=soft_penalty,
         )
     if strat == AutoTraceRoute.TARGET_STRATEGY_DX_ACROSS:
         return _pick_dx(
@@ -148,6 +164,8 @@ def pick_traceroute_target(
             suppressed,
             slot,
             across=True,
+            hard_cooldown=hard_cooldown,
+            soft_penalty=soft_penalty,
         )
     if strat == AutoTraceRoute.TARGET_STRATEGY_DX_SAME_SIDE:
         return _pick_dx(
@@ -158,6 +176,8 @@ def pick_traceroute_target(
             suppressed,
             slot,
             across=False,
+            hard_cooldown=hard_cooldown,
+            soft_penalty=soft_penalty,
         )
 
     return _pick_legacy(
@@ -167,6 +187,8 @@ def pick_traceroute_target(
         managed_node_ids,
         suppressed,
         slot,
+        hard_cooldown=hard_cooldown,
+        soft_penalty=soft_penalty,
     )
 
 
@@ -177,6 +199,9 @@ def _pick_legacy(
     managed_node_ids,
     suppressed,
     slot,
+    *,
+    hard_cooldown: set[int] | None = None,
+    soft_penalty: dict[int, float] | None = None,
 ):
     scored = list(
         _iter_scored_candidates(
@@ -185,6 +210,8 @@ def _pick_legacy(
             last_traced_hours,
             managed_node_ids,
             suppressed,
+            hard_cooldown=hard_cooldown,
+            soft_penalty=soft_penalty,
         )
     )
     scored.sort(key=lambda x: -x[0])
@@ -206,6 +233,9 @@ def _pick_intra_zone(
     managed_node_ids,
     suppressed,
     slot,
+    *,
+    hard_cooldown: set[int] | None = None,
+    soft_penalty: dict[int, float] | None = None,
 ):
     constellation = managed_node.constellation
     env = get_constellation_envelope(constellation) if constellation else None
@@ -220,12 +250,14 @@ def _pick_intra_zone(
     r_km = env["radius_km"]
 
     inside: list[tuple[float, ObservedNode]] = []
-    for score, obs in _iter_scored_candidates(
+    for _score, obs in _iter_scored_candidates(
         managed_node,
         last_heard_within_hours,
         last_traced_hours,
         managed_node_ids,
         suppressed,
+        hard_cooldown=hard_cooldown,
+        soft_penalty=soft_penalty,
     ):
         lat = obs.latest_status.latitude
         lon = obs.latest_status.longitude
@@ -240,11 +272,13 @@ def _pick_intra_zone(
     dists = [d for d, _ in inside]
     med = float(median(dists))
     scored = []
+    soft = soft_penalty or {}
     for d_src, obs in inside:
         hours_since = last_traced_hours.get(obs.node_id)
         demerit = _demerit_hours(hours_since)
         base = -abs(d_src - med)
-        total = base - demerit
+        sp = soft.get(obs.node_id, 0.0)
+        total = base - demerit - sp
         scored.append((total, obs))
     scored.sort(key=lambda x: -x[0])
     top20 = [obs for _, obs in scored[:20]]
@@ -260,6 +294,8 @@ def _pick_dx(
     slot,
     *,
     across: bool,
+    hard_cooldown: set[int] | None = None,
+    soft_penalty: dict[int, float] | None = None,
 ):
     constellation = managed_node.constellation
     source_pos = managed_node_lat_lon(managed_node)
@@ -293,6 +329,8 @@ def _pick_dx(
             br_src,
             half_w,
             across=across,
+            hard_cooldown=hard_cooldown,
+            soft_penalty=soft_penalty,
         )
         if ranked:
             return _deterministic_pick(managed_node, ranked[:20], slot or strategy_key)
@@ -311,6 +349,8 @@ def _dx_candidate_rank(
     half_window,
     *,
     across,
+    hard_cooldown: set[int] | None = None,
+    soft_penalty: dict[int, float] | None = None,
 ) -> list[ObservedNode]:
     """Return ObservedNodes sorted best-first for current half_window (periphery + bearing)."""
     source_pos = managed_node_lat_lon(managed_node)
@@ -323,6 +363,8 @@ def _dx_candidate_rank(
                 last_traced_hours,
                 managed_node_ids,
                 suppressed,
+                hard_cooldown=hard_cooldown,
+                soft_penalty=soft_penalty,
             )
         )
         scored.sort(key=lambda x: -x[0])
@@ -338,6 +380,8 @@ def _dx_candidate_rank(
         last_traced_hours,
         managed_node_ids,
         suppressed,
+        hard_cooldown=hard_cooldown,
+        soft_penalty=soft_penalty,
     ):
         lat = obs.latest_status.latitude
         lon = obs.latest_status.longitude

@@ -58,12 +58,13 @@ Late responses: if a TR was marked `failed` (timeout) but the response arrives l
 
 Auto-scheduler and permission checks share one notion of a **live** source node (`ManagedNodeStatus.is_sending_data`, refreshed from `PacketObservation.upload_time` on a beat schedule). Canonical implementation: **`nodes.managed_node_liveness`** (`eligible_auto_traceroute_sources_queryset`, etc.). **`traceroute.source_eligibility`** re-exports the same API for existing imports.
 
-**Target selection** for auto TR: `traceroute.target_selection.pick_traceroute_target` uses **`common.geo.haversine_km`** and **`nodes.positioning.managed_node_lat_lon`**.
+**Target selection** for auto TR: `traceroute.target_selection.pick_traceroute_target` uses **`common.geo.haversine_km`**, **`nodes.positioning.managed_node_lat_lon`**, and optional automatic reliability (soft penalty and hard cooldown from recent `AutoTraceRoute` rows with `trigger_type=auto`; see [Algorithms](algorithms.md) and [ENV_VARS.md](../../ENV_VARS.md) §11).
 
 **Manual trigger rate limit**: **`traceroute.trigger_intervals.MANUAL_TRIGGER_MIN_INTERVAL_SEC`**. Mesh monitoring (future Celery) can use **`MONITORING_TRIGGER_MIN_INTERVAL_SEC`** for a shorter default.
 
 ## Related Documentation
 
+- [Algorithms](algorithms.md) – Source, strategy, and target selection (including auto reliability)
 - [Permissions](permissions.md) – Canonical rules for who may view and trigger traceroutes
 - [Flow](flow.md) – End-to-end lifecycle from trigger to completion
 - [Heatmap](heatmap.md) – Neo4j schema, heatmap-edges API, visualization
