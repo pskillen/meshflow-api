@@ -7,6 +7,7 @@ from rest_framework.test import APIClient
 
 from common.mesh_node_helpers import meshtastic_id_to_hex
 from nodes.models import NodeLatestStatus
+from nodes.tasks import update_managed_node_statuses
 
 
 @pytest.mark.django_db
@@ -62,6 +63,7 @@ def test_managed_nodes_status_fields_only_returned_with_include_status(
     observation = create_packet_observation(observer=managed)
     observation.upload_time = now
     observation.save(update_fields=["upload_time"])
+    update_managed_node_statuses()
 
     list_url = reverse("managed-nodes-list")
     response_without_status = client.get(list_url)

@@ -8,6 +8,7 @@ import pytest
 
 import nodes.tests.conftest  # noqa: F401
 import packets.tests.conftest  # noqa: F401
+from nodes.tasks import update_managed_node_statuses
 from traceroute.models import AutoTraceRoute
 from traceroute.source_selection import (
     SOURCE_SELECTORS,
@@ -30,6 +31,7 @@ def test_select_lru_prefers_never_used_feeder(
     b = create_managed_node(allow_auto_traceroute=True, node_id=0xA0000002)
     create_packet_observation(observer=a)
     create_packet_observation(observer=b)
+    update_managed_node_statuses()
     tgt = create_observed_node(node_id=501)
     AutoTraceRoute.objects.create(
         source_node=a,
@@ -52,6 +54,7 @@ def test_unknown_algo_falls_back_to_default(monkeypatch, create_managed_node, cr
     monkeypatch.setenv("SCHEDULE_TRACEROUTE_SOURCE_RECENCY_SECONDS", "600")
     mn = create_managed_node(allow_auto_traceroute=True)
     create_packet_observation(observer=mn)
+    update_managed_node_statuses()
 
     assert SOURCE_SELECTORS["least_recently_used"] is not None
     picked = select_traceroute_source()

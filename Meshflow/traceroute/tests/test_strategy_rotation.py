@@ -43,7 +43,7 @@ def test_pick_strategy_rotates_cold_cache(create_user, create_managed_node):
 
 @pytest.mark.django_db
 def test_applicable_strategies_includes_intra_for_internal_feeder_when_envelope_exists(
-    create_user, create_managed_node
+    create_user, create_managed_node, mark_constellation_managed_nodes_feeding
 ):
     """Internal (near-centroid) feeders still get intra_zone if the constellation envelope is defined."""
     user = create_user()
@@ -74,6 +74,7 @@ def test_applicable_strategies_includes_intra_for_internal_feeder_when_envelope_
         default_location_latitude=55.015,
         default_location_longitude=-4.24,
     )
+    mark_constellation_managed_nodes_feeding(c1)
     strat = applicable_strategies(internal_feeder)
     assert AutoTraceRoute.TARGET_STRATEGY_INTRA_ZONE in strat
     assert AutoTraceRoute.TARGET_STRATEGY_DX_ACROSS in strat

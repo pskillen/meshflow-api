@@ -9,6 +9,7 @@ import pytest
 
 import nodes.tests.conftest  # noqa: F401
 import packets.tests.conftest  # noqa: F401
+from nodes.tasks import update_managed_node_statuses
 from traceroute.models import AutoTraceRoute
 from traceroute.tasks import schedule_traceroutes
 
@@ -29,6 +30,7 @@ def test_schedule_traceroutes_excludes_stale_observation(monkeypatch, create_man
     obs = create_packet_observation(observer=mn)
     obs.upload_time = timezone.now() - timedelta(seconds=700)
     obs.save(update_fields=["upload_time"])
+    update_managed_node_statuses()
 
     assert schedule_traceroutes() == {"created": 0}
     assert AutoTraceRoute.objects.count() == 0
@@ -44,6 +46,7 @@ def test_schedule_traceroutes_creates_when_recent_observation(
     monkeypatch.setenv("SCHEDULE_TRACEROUTE_SOURCE_RECENCY_SECONDS", "600")
     mn = create_managed_node(allow_auto_traceroute=True)
     create_packet_observation(observer=mn)
+    update_managed_node_statuses()
     target = create_observed_node(node_id=111222333)
 
     channel_layer = MagicMock()

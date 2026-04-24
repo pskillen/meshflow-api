@@ -14,6 +14,7 @@ from mesh_monitoring.constants import notify_verification_start_enabled, verific
 from mesh_monitoring.models import NodePresence
 from mesh_monitoring.tasks import process_node_watch_presence, send_monitoring_traceroute_command
 from mesh_monitoring.tests.conftest import create_watch_with_offline_threshold
+from nodes.tasks import update_managed_node_statuses
 
 
 def test_notify_verification_start_enabled_default_true_when_unset(monkeypatch):
@@ -63,6 +64,7 @@ def test_verification_start_notify_happy_path(
         default_location_longitude=2.0,
     )
     create_packet_observation(observer=mn)
+    update_managed_node_statuses()
 
     channel_layer = MagicMock()
 
@@ -115,6 +117,7 @@ def test_verification_start_notify_skipped_when_flag_off(
         default_location_longitude=2.0,
     )
     create_packet_observation(observer=mn)
+    update_managed_node_statuses()
 
     channel_layer = MagicMock()
 
@@ -164,6 +167,7 @@ def test_verification_start_notify_respects_cooldown(
         default_location_longitude=2.0,
     )
     create_packet_observation(observer=mn)
+    update_managed_node_statuses()
 
     channel_layer = MagicMock()
 
