@@ -79,6 +79,23 @@ In `ManagedNodeViewSet` (see `Meshflow/nodes/views.py`):
 | `last_packet_ingested_at` | latest `upload_time` | `PacketObservation` |
 | `is_eligible_traceroute_source` | feeder window above | `managed_node_liveness` |
 
+### Managed-node status denormalization (`ManagedNodeStatus`)
+
+The `ManagedNodeStatus` model (`Meshflow/nodes/models.py`) stores a **snapshot** of
+feeder/API ingestion state per `ManagedNode` (one-to-one). It is **not** mesh RF
+liveness; that remains `ObservedNode.last_heard`.
+
+| Field | Meaning | Source |
+| --- | --- | --- |
+| `last_packet_ingested_at` | Latest ingest time for this observer | `Max(PacketObservation.upload_time)` for `observer_id = ManagedNode.pk` |
+| `is_sending_data` | Whether the observer is “currently feeding” per the same window as traceroute sources | `last_packet_ingested_at >= now - SCHEDULE_TRACEROUTE_SOURCE_RECENCY_SECONDS` (default **600 s**) |
+| `updated_at` | When the snapshot row was last written | set when the periodic task runs |
+
+The Celery task `nodes.tasks.update_managed_node_statuses` runs on a **5-minute**
+`django_celery_beat` interval (see `nodes` migration `0032_add_update_managed_node_statuses_periodic_task`).
+API list/detail annotations may still compute status on the fly until follow-up work
+switches consumers to this table.
+
 ### `ObservedNodeViewSet.recent_counts`
 
 Windows used by `/api/nodes/observed-nodes/recent_counts/` and the dashboard:
