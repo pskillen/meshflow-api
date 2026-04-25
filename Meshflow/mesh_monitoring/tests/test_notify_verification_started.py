@@ -75,11 +75,12 @@ def test_verification_start_notify_happy_path(
     with override_settings(FRONTEND_URL="https://mesh.example"):
         with patch("mesh_monitoring.services.user_has_verified_discord_dm_target", return_value=True):
             with patch("mesh_monitoring.services.send_dm") as send_dm:
-                with patch("traceroute.dispatch.notify_traceroute_status_changed"):
-                    with patch("traceroute.dispatch.async_to_sync", side_effect=immediate_async_to_sync):
-                        with patch("traceroute.dispatch.get_channel_layer", return_value=channel_layer):
-                            process_node_watch_presence()
-                            dispatch_pending_traceroutes()
+                with patch("mesh_monitoring.tasks.notify_traceroute_status_changed"):
+                    with patch("traceroute.dispatch.notify_traceroute_status_changed"):
+                        with patch("traceroute.dispatch.async_to_sync", side_effect=immediate_async_to_sync):
+                            with patch("traceroute.dispatch.get_channel_layer", return_value=channel_layer):
+                                process_node_watch_presence()
+                                dispatch_pending_traceroutes()
 
     send_dm.assert_called_once()
     body = send_dm.call_args[0][1]
@@ -121,11 +122,12 @@ def test_verification_start_notify_skipped_when_flag_off(
 
     with patch("mesh_monitoring.services.user_has_verified_discord_dm_target", return_value=True):
         with patch("mesh_monitoring.services.send_dm") as send_dm:
-            with patch("traceroute.dispatch.notify_traceroute_status_changed"):
-                with patch("traceroute.dispatch.async_to_sync", side_effect=immediate_async_to_sync):
-                    with patch("traceroute.dispatch.get_channel_layer", return_value=channel_layer):
-                        process_node_watch_presence()
-                        dispatch_pending_traceroutes()
+            with patch("mesh_monitoring.tasks.notify_traceroute_status_changed"):
+                with patch("traceroute.dispatch.notify_traceroute_status_changed"):
+                    with patch("traceroute.dispatch.async_to_sync", side_effect=immediate_async_to_sync):
+                        with patch("traceroute.dispatch.get_channel_layer", return_value=channel_layer):
+                            process_node_watch_presence()
+                            dispatch_pending_traceroutes()
 
     send_dm.assert_not_called()
 
@@ -165,11 +167,12 @@ def test_verification_start_notify_respects_cooldown(
 
     with patch("mesh_monitoring.services.user_has_verified_discord_dm_target", return_value=True):
         with patch("mesh_monitoring.services.send_dm") as send_dm:
-            with patch("traceroute.dispatch.notify_traceroute_status_changed"):
-                with patch("traceroute.dispatch.async_to_sync", side_effect=immediate_async_to_sync):
-                    with patch("traceroute.dispatch.get_channel_layer", return_value=channel_layer):
-                        process_node_watch_presence()
-                        dispatch_pending_traceroutes()
+            with patch("mesh_monitoring.tasks.notify_traceroute_status_changed"):
+                with patch("traceroute.dispatch.notify_traceroute_status_changed"):
+                    with patch("traceroute.dispatch.async_to_sync", side_effect=immediate_async_to_sync):
+                        with patch("traceroute.dispatch.get_channel_layer", return_value=channel_layer):
+                            process_node_watch_presence()
+                            dispatch_pending_traceroutes()
 
     send_dm.assert_not_called()
 

@@ -27,8 +27,8 @@ FAILED_TR_TIMEOUT_SECONDS = int(FAILED_TR_TIMEOUT_SECONDS)
 def schedule_traceroutes():
     """
     Run periodically (cadence may vary). For each eligible source (LRU order), try
-    hypothesis strategies (Redis LRU order), then legacy; first hit creates an
-    AutoTraceRoute and sends the command. Avoids stalemate when one strategy never
+    hypothesis strategies (Redis LRU order), then legacy; first hit creates a queued
+    ``AutoTraceRoute`` (``pending``) for the shared dispatcher. Avoids stalemate when one strategy never
     finds a target (meshflow-api#196).
     """
     sources = eligible_traceroute_sources_ordered()
@@ -92,6 +92,7 @@ def schedule_traceroutes():
             row_strategy,
             auto_tr.id,
         )
+        notify_traceroute_status_changed(auto_tr.id, AutoTraceRoute.STATUS_PENDING)
         return {"created": 1}
 
     logger.warning("schedule_traceroutes: cascade exhausted, no TR created: %s", attempts)
