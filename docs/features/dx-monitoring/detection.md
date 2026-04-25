@@ -12,7 +12,7 @@ DX detection identifies packet observations that look unusual enough to review o
 investigate. The MVP creates internal event records for nodes that appear outside
 the normal range of an observing cluster:
 
-- A brand-new observed node that is suitably distant from the observing
+- A newly positioned observed node that is suitably distant from the observing
 constellation's normal cluster.
 - A previously DX-classified node that returns after a long quiet period.
 - A direct or near-direct observation between a managed observer and a suitably
@@ -22,10 +22,12 @@ New nodes and returning nodes are common on an active mesh and are not DX events
 by themselves. The defining signal is that the node is outside the normal
 distance envelope for the observer's cluster, or that the node has already been
 seen as DX before and has now reappeared after a long dark period. The detector
-does not classify the propagation cause. A candidate can be caused by
-tropospheric lift, aircraft, balloons, temporary node placement, data errors, or
-ordinary mesh changes. The event record explains why the candidate exists and
-preserves the evidence needed to tune the rules.
+only starts caring about a node once the node has a usable position, because
+distance from the local cluster is the core signal. The detector does not
+classify the propagation cause. A candidate can be caused by tropospheric lift,
+aircraft, balloons, temporary node placement, data errors, or ordinary mesh
+changes. The event record explains why the candidate exists and preserves the
+evidence needed to tune the rules.
 
 ## Runtime Position
 
@@ -39,13 +41,31 @@ flowchart LR
   detection --> lastHeard["Update ObservedNode.last_heard"]
 ```
 
-
-
 The detector evaluates the packet after packet-specific processing updates
 derived state, such as `NodeLatestStatus`, and before
 `ObservedNode.last_heard` is overwritten for the current packet. This lets the
 rules compare the current observation with the node's previous `last_heard`
 value.
+
+## Position Availability
+
+An `ObservedNode` can be created by any first-heard packet type. In Meshtastic,
+the first packet may be node-info, text, telemetry, position, or something else,
+and packets can arrive in any order. Most first sightings do not include a
+position.
+
+Creating an `ObservedNode` is therefore not enough to open a DX event. The
+distance-based rules wait until packet processing has a usable destination
+position in `NodeLatestStatus`. If a node is first created by a `NodeInfoPacket`
+or `MessagePacket`, detection records no candidate at that point. When a later
+`PositionPacket` or other status update supplies coordinates, the detector can
+evaluate whether that now-positioned node is outside the observing
+constellation's normal range.
+
+The implementation tracks enough per-node DX metadata to distinguish "first time
+we can evaluate this node's position" from ordinary repeated packets. A local
+node that receives its first position inside the cluster range remains a
+non-event.
 
 ## Inputs
 
@@ -57,6 +77,7 @@ Each detection pass receives:
 - The observed `ObservedNode` identified by `RawPacket.from_int`.
 - Whether the observed node was created by this packet.
 - The observed node's previous `last_heard` value.
+- Whether the observed node has already had a usable position evaluated for DX.
 - The observer's `Constellation`, used as the current model for the local mesh
 cluster.
 - Usable observer and destination positions when distance-based rules need them.
@@ -86,15 +107,24 @@ observer, observed timestamp, reason metadata, and optional distance.
 
 ### `new_distant_node`
 
-The detector emits `new_distant_node` when packet processing creates the
-`ObservedNode` for `RawPacket.from_int` and the observation is suitably distant
-from the observing constellation's normal cluster.
+The detector emits `new_distant_node` when a node receives its first usable
+position for DX evaluation and that position is suitably distant from the
+observing constellation's normal cluster.
 
 This rule does not fire for ordinary new nodes inside the usual range. New nodes
 appear multiple times per day and are background mesh activity. A new node only
 becomes interesting when its location or observation geometry places it outside
 the expected cluster envelope, such as a Central Belt Scotland observer suddenly
 hearing a node in Aberdeen, the Midlands, or Northern Ireland.
+
+The first packet that created the `ObservedNode` may not be the packet that opens
+the DX event. A node can be created by node-info, text, or telemetry with no
+coordinates, then become eligible later when a position arrives. That later
+positioned observation is the first meaningful point for this rule.
+
+While the node stays beyond the cluster-distance threshold, later packets still
+match this reason code and extend the same deduplicated `DxEvent` until the
+active window expires.
 
 The MVP distance decision is deliberately explicit and tunable. The observer's
 constellation represents the local cluster, and the initial implementation uses
@@ -178,12 +208,14 @@ For each packet processed by `BasePacketService`:
   `ObservedNode.last_heard`.
 2. Run packet-specific processing so latest node status is current.
 3. Stop if detection is disabled or the packet is not eligible.
-4. Evaluate each MVP rule independently.
-5. For each matched rule, find or create the active event for observing
+4. Load destination position state after packet-specific processing.
+5. Skip distance-based rules when the destination position is still unknown.
+6. Evaluate each MVP rule independently.
+7. For each matched rule, find or create the active event for observing
   constellation, destination node, and reason code.
-6. Persist a `DxEventObservation` for the packet evidence.
-7. Return without sending traceroutes, notifications, or user-facing API events.
-8. Continue normal packet processing and update `ObservedNode.last_heard`.
+8. Persist a `DxEventObservation` for the packet evidence.
+9. Return without sending traceroutes, notifications, or user-facing API events.
+10. Continue normal packet processing and update `ObservedNode.last_heard`.
 
 ## False-Positive Controls
 
@@ -192,6 +224,8 @@ The MVP suppresses noisy candidates by:
 - Ignoring packets that cannot be tied to an observed node and observation.
 - Ignoring self-observations from the managed observer.
 - Treating ordinary new nodes inside the cluster range as non-events.
+- Waiting for usable destination coordinates before evaluating a node as
+  distant.
 - Requiring previous DX event history for returned-DX detection.
 - Requiring coordinates on both nodes, or a usable cluster footprint, for
 distance detection.

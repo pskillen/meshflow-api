@@ -1,0 +1,49 @@
+from django.contrib import admin
+
+from dx_monitoring.models import DxEvent, DxEventObservation, DxNodeMetadata
+
+
+class DxEventObservationInline(admin.TabularInline):
+    model = DxEventObservation
+    extra = 0
+    readonly_fields = ("id", "raw_packet", "packet_observation", "observer", "observed_at", "distance_km", "metadata")
+    can_delete = False
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(DxEvent)
+class DxEventAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "constellation",
+        "destination",
+        "reason_code",
+        "state",
+        "first_observed_at",
+        "last_observed_at",
+        "active_until",
+        "observation_count",
+        "last_observer",
+        "best_distance_km",
+    )
+    list_filter = ("reason_code", "state", "constellation")
+    search_fields = ("destination__node_id_str", "destination__long_name")
+    readonly_fields = ("id", "metadata")
+    inlines = [DxEventObservationInline]
+
+
+@admin.register(DxEventObservation)
+class DxEventObservationAdmin(admin.ModelAdmin):
+    list_display = ("id", "event", "observer", "observed_at", "distance_km")
+    list_filter = ("observer__constellation",)
+    search_fields = ("event__destination__node_id_str",)
+    readonly_fields = ("id", "metadata")
+
+
+@admin.register(DxNodeMetadata)
+class DxNodeMetadataAdmin(admin.ModelAdmin):
+    list_display = ("observed_node", "exclude_from_detection", "cluster_position_evaluated_for_dx", "updated_at")
+    list_filter = ("exclude_from_detection", "cluster_position_evaluated_for_dx")
+    search_fields = ("observed_node__node_id_str", "exclude_notes")
