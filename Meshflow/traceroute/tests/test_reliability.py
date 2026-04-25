@@ -48,7 +48,7 @@ def test_load_reliability_hard_cooldown_consecutive_auto_fails(
         AutoTraceRoute.objects.create(
             source_node=source,
             target_node=bad,
-            trigger_type=AutoTraceRoute.TRIGGER_TYPE_AUTO,
+            trigger_type=AutoTraceRoute.TRIGGER_TYPE_MONITORING,
             status=AutoTraceRoute.STATUS_FAILED,
             triggered_at=now - timedelta(minutes=i),
             completed_at=now - timedelta(minutes=i),
@@ -129,7 +129,7 @@ def test_load_reliability_streak_broken_by_recent_success(
     AutoTraceRoute.objects.create(
         source_node=source,
         target_node=t,
-        trigger_type=AutoTraceRoute.TRIGGER_TYPE_AUTO,
+        trigger_type=AutoTraceRoute.TRIGGER_TYPE_MONITORING,
         status=AutoTraceRoute.STATUS_FAILED,
         triggered_at=now - timedelta(hours=3),
         completed_at=now - timedelta(hours=3),
@@ -137,7 +137,7 @@ def test_load_reliability_streak_broken_by_recent_success(
     AutoTraceRoute.objects.create(
         source_node=source,
         target_node=t,
-        trigger_type=AutoTraceRoute.TRIGGER_TYPE_AUTO,
+        trigger_type=AutoTraceRoute.TRIGGER_TYPE_MONITORING,
         status=AutoTraceRoute.STATUS_COMPLETED,
         triggered_at=now - timedelta(hours=2),
         completed_at=now - timedelta(hours=2),
@@ -145,7 +145,7 @@ def test_load_reliability_streak_broken_by_recent_success(
     AutoTraceRoute.objects.create(
         source_node=source,
         target_node=t,
-        trigger_type=AutoTraceRoute.TRIGGER_TYPE_AUTO,
+        trigger_type=AutoTraceRoute.TRIGGER_TYPE_MONITORING,
         status=AutoTraceRoute.STATUS_FAILED,
         triggered_at=now - timedelta(hours=1),
         completed_at=now - timedelta(hours=1),

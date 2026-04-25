@@ -129,7 +129,7 @@ See **[docs/features/rf_propagation/README.md](features/rf_propagation/README.md
 
 ## 11. Traceroute target reliability (auto selection)
 
-Tunables for [automatic target selection reliability](../features/traceroute/algorithms.md#automatic-reliability). Only `trigger_type=auto` completed/failed `AutoTraceRoute` rows in the lookback window are used.
+Tunables for [automatic target selection reliability](../features/traceroute/algorithms.md#automatic-reliability). Only `trigger_type=3` (Monitoring) completed/failed `AutoTraceRoute` rows in the lookback window are used.
 
 | Variable | Default | Description | Allowable Values |
 |----------|---------|-------------|------------------|

@@ -7,9 +7,16 @@ from constellations.models import Constellation
 from nodes.models import ManagedNode, ObservedNode
 from nodes.serializers import ManagedNodeSerializer, ObservedNodeSerializer, PositionSerializer
 
-from .models import AutoTraceRoute
+from .models import AutoTraceRoute, TriggerType
 
 UNKNOWN_NODE_ID = 0xFFFFFFFF
+
+
+def trigger_type_label_for(value: int) -> str:
+    try:
+        return str(TriggerType(value).label)
+    except ValueError:
+        return str(value)
 
 
 class TracerouteListConstellationSerializer(serializers.ModelSerializer):
@@ -161,6 +168,7 @@ class TracerouteListSerializer(serializers.ModelSerializer):
     source_node = TracerouteListSourceNodeSerializer(read_only=True)
     target_node = TracerouteTargetNodeSerializer(read_only=True)
     triggered_by_username = serializers.CharField(source="triggered_by.username", read_only=True)
+    trigger_type_label = serializers.SerializerMethodField()
     route_nodes = serializers.SerializerMethodField()
     route_back_nodes = serializers.SerializerMethodField()
 
@@ -171,6 +179,7 @@ class TracerouteListSerializer(serializers.ModelSerializer):
             "source_node",
             "target_node",
             "trigger_type",
+            "trigger_type_label",
             "triggered_by",
             "triggered_by_username",
             "trigger_source",
@@ -186,6 +195,9 @@ class TracerouteListSerializer(serializers.ModelSerializer):
             "target_strategy",
         ]
         read_only_fields = fields
+
+    def get_trigger_type_label(self, obj):
+        return trigger_type_label_for(obj.trigger_type)
 
     def get_route_nodes(self, obj):
         observed = self.context.get("observed_by_id") if self.context else None
@@ -202,6 +214,7 @@ class AutoTraceRouteSerializer(serializers.ModelSerializer):
     source_node = TracerouteSourceNodeSerializer(read_only=True)
     target_node = ObservedNodeSerializer(read_only=True)
     triggered_by_username = serializers.CharField(source="triggered_by.username", read_only=True)
+    trigger_type_label = serializers.SerializerMethodField()
     route_nodes = serializers.SerializerMethodField()
     route_back_nodes = serializers.SerializerMethodField()
 
@@ -212,6 +225,7 @@ class AutoTraceRouteSerializer(serializers.ModelSerializer):
             "source_node",
             "target_node",
             "trigger_type",
+            "trigger_type_label",
             "triggered_by",
             "triggered_by_username",
             "trigger_source",
@@ -227,6 +241,9 @@ class AutoTraceRouteSerializer(serializers.ModelSerializer):
             "target_strategy",
         ]
         read_only_fields = fields
+
+    def get_trigger_type_label(self, obj):
+        return trigger_type_label_for(obj.trigger_type)
 
     def get_route_nodes(self, obj):
         observed = self.context.get("observed_by_id") if self.context else None

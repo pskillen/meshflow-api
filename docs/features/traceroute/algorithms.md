@@ -15,7 +15,7 @@ On each automatic scheduling tick the system:
 3. For the first strategy that yields a target, creates an `AutoTraceRoute` and sends the command.
 4. If no hypothesis strategy finds a target, falls back to **legacy** target selection.
 
-Manual and **monitor** traceroutes are out of scope for automatic reliability: only `trigger_type=auto` terminal rows inform cooldowns and soft penalties.
+Manual, **node watch**, external, and **DX watch** traceroutes are out of scope for automatic reliability: only `trigger_type=3` (**Monitoring**) terminal rows inform cooldowns and soft penalties.
 
 ---
 
@@ -73,7 +73,7 @@ Environment: `AUTO_TR_SOURCE_SELECTION_ALGO` (`least_recently_used`, `random`, `
 
 ### Automatic reliability
 
-**Evidence:** `AutoTraceRoute` rows with `trigger_type=auto` and `status` in `completed` or `failed` within a configurable lookback window. User, monitor, and external triggers are ignored for suppression.
+**Evidence:** `AutoTraceRoute` rows with `trigger_type=3` (Monitoring) and `status` in `completed` or `failed` within a configurable lookback window. User, node watch, external, and DX watch triggers are ignored for suppression.
 
 **Per source–target pair:**
 
