@@ -3,14 +3,12 @@
 import logging
 from datetime import timedelta
 
-from django.db.models import F
 from django.utils import timezone
 
-from asgiref.sync import async_to_sync
 from celery import shared_task
-from channels.layers import get_channel_layer
 
 from nodes.models import ObservedNode
+from traceroute.dispatch import TRACEROUTE_MAX_PENDING_PER_SOURCE, pending_count_for_source
 from traceroute.models import AutoTraceRoute
 
 from .constants import (
@@ -29,42 +27,16 @@ from .services import (
 
 logger = logging.getLogger(__name__)
 
-# Stagger monitoring TR commands to distinct sources (seconds).
-MONITORING_TR_STAGGER_SECONDS = 30
-
 
 @shared_task
-def send_monitoring_traceroute_command(auto_traceroute_id: int) -> None:
-    """Send WebSocket traceroute command for a pending monitoring AutoTraceRoute."""
-    channel_layer = get_channel_layer()
-    auto_tr = AutoTraceRoute.objects.select_related("source_node", "target_node").filter(pk=auto_traceroute_id).first()
-    if not auto_tr or auto_tr.trigger_type != AutoTraceRoute.TRIGGER_TYPE_NODE_WATCH:
-        return
-    if auto_tr.status == AutoTraceRoute.STATUS_SENT:
-        return
-    if auto_tr.status != AutoTraceRoute.STATUS_PENDING:
-        return
+def send_monitoring_traceroute_command(_auto_traceroute_id: int) -> None:
+    """
+    Legacy hook: monitoring TR delivery is handled by :func:`traceroute.tasks.dispatch_pending_traceroutes`.
+    Kept so any old Celery messages or references do not break.
+    """
+    from traceroute.tasks import dispatch_pending_traceroutes
 
-    async_to_sync(channel_layer.group_send)(
-        f"node_{auto_tr.source_node.node_id}",
-        {
-            "type": "node_command",
-            "command": {"type": "traceroute", "target": auto_tr.target_node.node_id},
-        },
-    )
-    auto_tr.status = AutoTraceRoute.STATUS_SENT
-    auto_tr.save(update_fields=["status"])
-    sent_at = timezone.now()
-    NodePresence.objects.filter(pk=auto_tr.target_node_id).update(
-        last_tr_sent=sent_at,
-        tr_sent_count=F("tr_sent_count") + 1,
-    )
-    logger.info(
-        "mesh_monitoring: sent monitor TR id=%s %s -> %s",
-        auto_tr.id,
-        auto_tr.source_node.node_id_str,
-        auto_tr.target_node.node_id_str,
-    )
+    dispatch_pending_traceroutes()
 
 
 def _dispatch_monitoring_round(observed: ObservedNode) -> None:
@@ -76,18 +48,23 @@ def _dispatch_monitoring_round(observed: ObservedNode) -> None:
             observed.node_id_str,
         )
         return
-    for i, source in enumerate(sources):
-        auto_tr = AutoTraceRoute.objects.create(
+    at = timezone.now()
+    for source in sources:
+        if pending_count_for_source(source.pk) >= TRACEROUTE_MAX_PENDING_PER_SOURCE:
+            logger.warning(
+                "mesh_monitoring: skip create monitor TR for %s, pending cap (%d) for this source",
+                source.node_id_str,
+                TRACEROUTE_MAX_PENDING_PER_SOURCE,
+            )
+            continue
+        AutoTraceRoute.objects.create(
             source_node=source,
             target_node=observed,
             trigger_type=AutoTraceRoute.TRIGGER_TYPE_NODE_WATCH,
             triggered_by=None,
             trigger_source="mesh_monitoring",
             status=AutoTraceRoute.STATUS_PENDING,
-        )
-        send_monitoring_traceroute_command.apply_async(
-            args=[auto_tr.id],
-            countdown=i * MONITORING_TR_STAGGER_SECONDS,
+            earliest_send_at=at,
         )
 
 

@@ -146,9 +146,12 @@ depend on this.
 
 | Item | Default | Env | Purpose |
 | --- | --- | --- | --- |
-| `FAILED_TR_TIMEOUT_SECONDS` | **180 s** | yes | `mark_stale_traceroutes_failed` moves `pending`/`sent` with `triggered_at` older than cutoff to `failed` |
-| Manual TR min interval (`MANUAL_TRIGGER_MIN_INTERVAL_SEC`) | **60 s** | no | Per-source rate limit on manual triggers |
-| Monitoring TR min interval (`MONITORING_TRIGGER_MIN_INTERVAL_SEC`) | **30 s** | no | Per-source spacing for monitoring-triggered TRs |
+| `FAILED_TR_TIMEOUT_SECONDS` | **180 s** | yes | Stale `AutoTraceRoute`: for `pending`, the clock is `earliest_send_at`; for `sent` with `dispatched_at` set, the clock is `dispatched_at`; for legacy `sent` rows without `dispatched_at`, `triggered_at` is used. Rows older than the window move to `failed` |
+| Manual TR min interval (`MANUAL_TRIGGER_MIN_INTERVAL_SEC`) | **60 s** | no | Per-source rate limit on manual triggers (HTTP) |
+| Monitoring TR min interval (`MONITORING_TRIGGER_MIN_INTERVAL_SEC`) | **30 s** | no | Default for `TRACEROUTE_DISPATCH_INTERVAL_SEC` (WebSocket send pacing per `ManagedNode`) |
+| `TRACEROUTE_DISPATCH_INTERVAL_SEC` | same as `MONITORING_TRIGGER_MIN_INTERVAL_SEC` | yes | Min seconds between successful WebSocket sends for a given source (`traceroute.dispatch`) |
+| `TRACEROUTE_MAX_PENDING_PER_SOURCE` | **20** | yes | New scheduler and mesh-monitoring rows are not created for a source with at least this many pending `AutoTraceRoute` rows |
+| `TRACEROUTE_DISPATCH_CANDIDATE_BATCH` / `TRACEROUTE_DISPATCH_MAX_SCAN` | **200** / **10 000** | yes | Dispatcher paging when scanning due pending rows |
 
 ### Target selection
 
@@ -188,6 +191,7 @@ Seeded in migrations (operators can edit in admin):
 | Task | Cadence |
 | --- | --- |
 | `schedule_traceroutes` | Every 2 h, minute `:00` UTC |
+| `dispatch_pending_traceroutes` | Every 15 s | WebSocket send queue for `AutoTraceRoute` rows in `pending` (per-source pacing) |
 | `mark_stale_traceroutes_failed` | Every minute |
 | `collect_traceroute_success_daily` | Daily at `01:05` UTC |
 
@@ -283,6 +287,7 @@ deploy; the table below lists the **seeded defaults**:
 | Task | Cadence | Seed migration |
 | --- | --- | --- |
 | `schedule_traceroutes` | Every 2 h, `:00` UTC | `traceroute/migrations/0002_add_schedule_traceroutes_periodic_task.py` |
+| `dispatch_pending_traceroutes` | Every 15 s | `traceroute/migrations/0011_traceroute_dispatch_queue.py` |
 | `mark_stale_traceroutes_failed` | Every minute | `traceroute/migrations/0003_add_stale_tr_task_and_index.py` |
 | `collect_traceroute_success_daily` | Daily `01:05` UTC | `traceroute/migrations/0006_add_collect_traceroute_success_daily_task.py` |
 | `collect_stats_snapshots` | Hourly `:05` UTC | `stats/migrations/0002_add_collect_stats_snapshots_periodic_task.py` |

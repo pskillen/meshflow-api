@@ -11,11 +11,12 @@ import nodes.tests.conftest  # noqa: F401
 import packets.tests.conftest  # noqa: F401
 from mesh_monitoring.models import NodePresence, NodeWatch
 from mesh_monitoring.services import monitoring_traceroute_succeeded_since, on_monitoring_traceroute_completed
-from mesh_monitoring.tasks import process_node_watch_presence, send_monitoring_traceroute_command
+from mesh_monitoring.tasks import process_node_watch_presence
 from mesh_monitoring.tests.conftest import create_watch_with_offline_threshold
 from nodes.models import NodeLatestStatus
 from nodes.tasks import update_managed_node_statuses
 from traceroute.models import AutoTraceRoute
+from traceroute.tasks import dispatch_pending_traceroutes
 
 
 @pytest.mark.django_db
@@ -49,17 +50,11 @@ def test_process_node_watch_presence_starts_verification_and_creates_monitor_tr(
     def immediate_async_to_sync(async_func):
         return async_func
 
-    def sync_apply_async(*, args=(), **kwargs):
-        send_monitoring_traceroute_command(*args)
-
-    with patch("mesh_monitoring.tasks.async_to_sync", side_effect=immediate_async_to_sync):
-        with patch("mesh_monitoring.tasks.get_channel_layer", return_value=channel_layer):
-            with patch.object(
-                send_monitoring_traceroute_command,
-                "apply_async",
-                side_effect=sync_apply_async,
-            ):
+    with patch("traceroute.dispatch.notify_traceroute_status_changed"):
+        with patch("traceroute.dispatch.async_to_sync", side_effect=immediate_async_to_sync):
+            with patch("traceroute.dispatch.get_channel_layer", return_value=channel_layer):
                 result = process_node_watch_presence()
+                dispatch_pending_traceroutes()
 
     assert result["watched"] >= 1
     assert NodePresence.objects.filter(observed_node=obs, verification_started_at__isnull=False).exists()
@@ -293,6 +288,7 @@ def test_send_monitoring_traceroute_command_updates_presence_tr_fields(
     obs = create_observed_node(node_id=0x55667788, claimed_by=user)
     NodePresence.objects.get_or_create(observed_node=obs)
     source = create_managed_node(allow_auto_traceroute=True)
+    at = timezone.now()
     auto_tr = AutoTraceRoute.objects.create(
         source_node=source,
         target_node=obs,
@@ -300,15 +296,17 @@ def test_send_monitoring_traceroute_command_updates_presence_tr_fields(
         triggered_by=None,
         trigger_source="mesh_monitoring",
         status=AutoTraceRoute.STATUS_PENDING,
+        earliest_send_at=at,
     )
     channel_layer = MagicMock()
 
     def immediate_async_to_sync(async_func):
         return async_func
 
-    with patch("mesh_monitoring.tasks.async_to_sync", side_effect=immediate_async_to_sync):
-        with patch("mesh_monitoring.tasks.get_channel_layer", return_value=channel_layer):
-            send_monitoring_traceroute_command(auto_tr.id)
+    with patch("traceroute.dispatch.notify_traceroute_status_changed"):
+        with patch("traceroute.dispatch.async_to_sync", side_effect=immediate_async_to_sync):
+            with patch("traceroute.dispatch.get_channel_layer", return_value=channel_layer):
+                assert dispatch_pending_traceroutes()["dispatched"] == 1
 
     presence = NodePresence.objects.get(observed_node=obs)
     assert presence.tr_sent_count == 1

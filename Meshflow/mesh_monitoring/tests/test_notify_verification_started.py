@@ -12,9 +12,10 @@ import nodes.tests.conftest  # noqa: F401
 import packets.tests.conftest  # noqa: F401
 from mesh_monitoring.constants import notify_verification_start_enabled, verification_notify_cooldown_seconds
 from mesh_monitoring.models import NodePresence
-from mesh_monitoring.tasks import process_node_watch_presence, send_monitoring_traceroute_command
+from mesh_monitoring.tasks import process_node_watch_presence
 from mesh_monitoring.tests.conftest import create_watch_with_offline_threshold
 from nodes.tasks import update_managed_node_statuses
+from traceroute.tasks import dispatch_pending_traceroutes
 
 
 def test_notify_verification_start_enabled_default_true_when_unset(monkeypatch):
@@ -71,20 +72,14 @@ def test_verification_start_notify_happy_path(
     def immediate_async_to_sync(async_func):
         return async_func
 
-    def sync_apply_async(*, args=(), **kwargs):
-        send_monitoring_traceroute_command(*args)
-
     with override_settings(FRONTEND_URL="https://mesh.example"):
         with patch("mesh_monitoring.services.user_has_verified_discord_dm_target", return_value=True):
             with patch("mesh_monitoring.services.send_dm") as send_dm:
-                with patch("mesh_monitoring.tasks.async_to_sync", side_effect=immediate_async_to_sync):
-                    with patch("mesh_monitoring.tasks.get_channel_layer", return_value=channel_layer):
-                        with patch.object(
-                            send_monitoring_traceroute_command,
-                            "apply_async",
-                            side_effect=sync_apply_async,
-                        ):
+                with patch("traceroute.dispatch.notify_traceroute_status_changed"):
+                    with patch("traceroute.dispatch.async_to_sync", side_effect=immediate_async_to_sync):
+                        with patch("traceroute.dispatch.get_channel_layer", return_value=channel_layer):
                             process_node_watch_presence()
+                            dispatch_pending_traceroutes()
 
     send_dm.assert_called_once()
     body = send_dm.call_args[0][1]
@@ -124,19 +119,13 @@ def test_verification_start_notify_skipped_when_flag_off(
     def immediate_async_to_sync(async_func):
         return async_func
 
-    def sync_apply_async(*, args=(), **kwargs):
-        send_monitoring_traceroute_command(*args)
-
     with patch("mesh_monitoring.services.user_has_verified_discord_dm_target", return_value=True):
         with patch("mesh_monitoring.services.send_dm") as send_dm:
-            with patch("mesh_monitoring.tasks.async_to_sync", side_effect=immediate_async_to_sync):
-                with patch("mesh_monitoring.tasks.get_channel_layer", return_value=channel_layer):
-                    with patch.object(
-                        send_monitoring_traceroute_command,
-                        "apply_async",
-                        side_effect=sync_apply_async,
-                    ):
+            with patch("traceroute.dispatch.notify_traceroute_status_changed"):
+                with patch("traceroute.dispatch.async_to_sync", side_effect=immediate_async_to_sync):
+                    with patch("traceroute.dispatch.get_channel_layer", return_value=channel_layer):
                         process_node_watch_presence()
+                        dispatch_pending_traceroutes()
 
     send_dm.assert_not_called()
 
@@ -174,19 +163,13 @@ def test_verification_start_notify_respects_cooldown(
     def immediate_async_to_sync(async_func):
         return async_func
 
-    def sync_apply_async(*, args=(), **kwargs):
-        send_monitoring_traceroute_command(*args)
-
     with patch("mesh_monitoring.services.user_has_verified_discord_dm_target", return_value=True):
         with patch("mesh_monitoring.services.send_dm") as send_dm:
-            with patch("mesh_monitoring.tasks.async_to_sync", side_effect=immediate_async_to_sync):
-                with patch("mesh_monitoring.tasks.get_channel_layer", return_value=channel_layer):
-                    with patch.object(
-                        send_monitoring_traceroute_command,
-                        "apply_async",
-                        side_effect=sync_apply_async,
-                    ):
+            with patch("traceroute.dispatch.notify_traceroute_status_changed"):
+                with patch("traceroute.dispatch.async_to_sync", side_effect=immediate_async_to_sync):
+                    with patch("traceroute.dispatch.get_channel_layer", return_value=channel_layer):
                         process_node_watch_presence()
+                        dispatch_pending_traceroutes()
 
     send_dm.assert_not_called()
 

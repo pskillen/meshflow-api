@@ -4,14 +4,13 @@ import logging
 import os
 from datetime import date, datetime, timedelta
 
-from django.db.models import Count
+from django.db.models import Count, Q
 from django.utils import timezone
 
-from asgiref.sync import async_to_sync
 from celery import shared_task
-from channels.layers import get_channel_layer
 from tqdm import tqdm
 
+from .dispatch import TRACEROUTE_MAX_PENDING_PER_SOURCE, pending_count_for_source, try_dispatch_one
 from .models import AutoTraceRoute
 from .source_selection import eligible_traceroute_sources_ordered
 from .strategy_rotation import ordered_strategies_for_feeder, record_strategy_run
@@ -32,8 +31,6 @@ def schedule_traceroutes():
     AutoTraceRoute and sends the command. Avoids stalemate when one strategy never
     finds a target (meshflow-api#196).
     """
-    channel_layer = get_channel_layer()
-
     sources = eligible_traceroute_sources_ordered()
     if not sources:
         logger.warning(
@@ -45,6 +42,13 @@ def schedule_traceroutes():
     attempts: list[tuple[str, str, bool]] = []
 
     for source_node in sources:
+        if pending_count_for_source(source_node.pk) >= TRACEROUTE_MAX_PENDING_PER_SOURCE:
+            logger.info(
+                "schedule_traceroutes: skip %s, pending cap (%d)",
+                source_node.node_id_str,
+                TRACEROUTE_MAX_PENDING_PER_SOURCE,
+            )
+            continue
         strategies = ordered_strategies_for_feeder(source_node)
         chosen_strategy: str | None = None
         target_node = None
@@ -68,6 +72,7 @@ def schedule_traceroutes():
 
         row_strategy = chosen_strategy or AutoTraceRoute.TARGET_STRATEGY_LEGACY
 
+        at_now = timezone.now()
         auto_tr = AutoTraceRoute.objects.create(
             source_node=source_node,
             target_node=target_node,
@@ -76,32 +81,40 @@ def schedule_traceroutes():
             trigger_source="scheduler",
             target_strategy=row_strategy,
             status=AutoTraceRoute.STATUS_PENDING,
+            earliest_send_at=at_now,
         )
         if chosen_strategy is not None:
             record_strategy_run(source_node, chosen_strategy)
-
-        async_to_sync(channel_layer.group_send)(
-            f"node_{source_node.node_id}",
-            {
-                "type": "node_command",
-                "command": {"type": "traceroute", "target": target_node.node_id},
-            },
-        )
-
-        auto_tr.status = AutoTraceRoute.STATUS_SENT
-        auto_tr.save(update_fields=["status"])
         logger.info(
-            "schedule_traceroutes: sent TR %s -> %s strategy=%s (id=%s)",
+            "schedule_traceroutes: queued TR %s -> %s strategy=%s (id=%s) for WebSocket dispatch",
             source_node.node_id_str,
             target_node.node_id_str,
             row_strategy,
             auto_tr.id,
         )
-
         return {"created": 1}
 
     logger.warning("schedule_traceroutes: cascade exhausted, no TR created: %s", attempts)
     return {"created": 0}
+
+
+@shared_task
+def dispatch_pending_traceroutes():
+    """
+    Run frequently (e.g. every 15s). Send due ``AutoTraceRoute`` rows to managed nodes over Channels,
+    at most one per source per :data:`traceroute.dispatch.DISPATCH_PER_SOURCE_INTERVAL_SEC` by default.
+    """
+    summary = {"dispatched": 0, "errors": 0}
+    for _ in range(2000):
+        r = try_dispatch_one()
+        o = r.get("outcome")
+        if o == "dispatched":
+            summary["dispatched"] += 1
+        elif o == "error":
+            summary["errors"] += 1
+        elif o in ("no_row", "all_cooldown"):
+            return summary
+    return summary
 
 
 @shared_task
@@ -147,14 +160,32 @@ def push_traceroute_to_neo4j(auto_traceroute_id: int):
 @shared_task
 def mark_stale_traceroutes_failed():
     """
-    Run every 60 seconds. Mark traceroutes still pending/sent after 180s as failed.
-    Broadcast each update to WebSocket clients.
+    Run every 60 seconds. Mark pending/sent auto-traceroutes as failed after
+    :envvar:`FAILED_TR_TIMEOUT_SECONDS` without completion.
+
+    Pending: clock starts at ``earliest_send_at`` (when the row is due in the queue), not ``triggered_at``,
+    so work can wait for per-feeder pacing without time-outing first.
+
+    Sent: clock starts at ``dispatched_at`` when set, else ``triggered_at`` for legacy rows.
     """
-    cutoff = timezone.now() - timedelta(seconds=FAILED_TR_TIMEOUT_SECONDS)
-    stale = AutoTraceRoute.objects.filter(
-        status__in=[AutoTraceRoute.STATUS_PENDING, AutoTraceRoute.STATUS_SENT],
+    now = timezone.now()
+    td = timedelta(seconds=FAILED_TR_TIMEOUT_SECONDS)
+    cutoff = now - td
+    too_old_pending = Q(
+        status=AutoTraceRoute.STATUS_PENDING,
+        earliest_send_at__lt=now - td,
+    )
+    too_old_sent_dispatched = Q(
+        status=AutoTraceRoute.STATUS_SENT,
+        dispatched_at__isnull=False,
+        dispatched_at__lt=now - td,
+    )
+    too_old_sent_legacy = Q(
+        status=AutoTraceRoute.STATUS_SENT,
+        dispatched_at__isnull=True,
         triggered_at__lt=cutoff,
     )
+    stale = AutoTraceRoute.objects.filter(too_old_pending | too_old_sent_dispatched | too_old_sent_legacy)
     updated = 0
     for auto_tr in stale:
         auto_tr.status = AutoTraceRoute.STATUS_FAILED
