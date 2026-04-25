@@ -128,7 +128,7 @@ class TestTracerouteList:
         api_client.force_authenticate(user=user)
         create_auto_traceroute(
             triggered_by=user,
-            trigger_type=AutoTraceRoute.TRIGGER_TYPE_AUTO,
+            trigger_type=AutoTraceRoute.TRIGGER_TYPE_MONITORING,
             source_node=mn,
             target_node=on,
         )
@@ -143,8 +143,8 @@ class TestTracerouteList:
         data = resp.json()
         assert data["count"] >= 2
         types = {r["trigger_type"] for r in data["results"]}
-        assert "auto" in types
-        assert "user" in types
+        assert AutoTraceRoute.TRIGGER_TYPE_MONITORING in types
+        assert AutoTraceRoute.TRIGGER_TYPE_USER in types
 
     def test_list_trigger_type_single_value(
         self, api_client, create_user, create_managed_node, create_observed_node, create_auto_traceroute
@@ -154,7 +154,10 @@ class TestTracerouteList:
         on = create_observed_node()
         api_client.force_authenticate(user=user)
         create_auto_traceroute(
-            triggered_by=user, trigger_type=AutoTraceRoute.TRIGGER_TYPE_AUTO, source_node=mn, target_node=on
+            triggered_by=user,
+            trigger_type=AutoTraceRoute.TRIGGER_TYPE_MONITORING,
+            source_node=mn,
+            target_node=on,
         )
         create_auto_traceroute(
             triggered_by=user, trigger_type=AutoTraceRoute.TRIGGER_TYPE_USER, source_node=mn, target_node=on
@@ -162,7 +165,33 @@ class TestTracerouteList:
         resp = api_client.get(f"/api/traceroutes/?trigger_type=user&source_node={mn.node_id}")
         assert resp.status_code == 200
         for row in resp.json()["results"]:
-            assert row["trigger_type"] == "user"
+            assert row["trigger_type"] == AutoTraceRoute.TRIGGER_TYPE_USER
+            assert row["trigger_type_label"] == "User"
+
+    def test_list_trigger_type_numeric_filter(
+        self, api_client, create_user, create_managed_node, create_observed_node, create_auto_traceroute
+    ):
+        user = create_user()
+        mn = create_managed_node()
+        on = create_observed_node()
+        api_client.force_authenticate(user=user)
+        create_auto_traceroute(
+            triggered_by=user,
+            trigger_type=AutoTraceRoute.TRIGGER_TYPE_NODE_WATCH,
+            source_node=mn,
+            target_node=on,
+        )
+        create_auto_traceroute(
+            triggered_by=user,
+            trigger_type=AutoTraceRoute.TRIGGER_TYPE_USER,
+            source_node=mn,
+            target_node=on,
+        )
+        resp = api_client.get(f"/api/traceroutes/?trigger_type=4,1&source_node={mn.node_id}")
+        assert resp.status_code == 200
+        types = {r["trigger_type"] for r in resp.json()["results"]}
+        assert AutoTraceRoute.TRIGGER_TYPE_NODE_WATCH in types
+        assert AutoTraceRoute.TRIGGER_TYPE_USER in types
 
     def test_list_response_shape(self, api_client, create_user, create_auto_traceroute):
         """List response has expected structure for source_node and target_node."""
@@ -192,6 +221,9 @@ class TestTracerouteList:
         assert "last_heard" in tn
         assert "latest_position" in tn
         assert "claim" in tn
+        assert "trigger_type" in tr
+        assert isinstance(tr["trigger_type"], int)
+        assert "trigger_type_label" in tr
 
     def test_list_query_count_bounded(self, api_client, create_user, create_auto_traceroute):
         """List endpoint uses bounded queries (no N+1)."""
@@ -419,7 +451,8 @@ class TestTracerouteTrigger:
         data = resp.json()
         assert data["source_node"]["node_id"] == mn.node_id
         assert data["target_node"]["node_id"] == on.node_id
-        assert data["trigger_type"] == "user"
+        assert data["trigger_type"] == AutoTraceRoute.TRIGGER_TYPE_USER
+        assert data["trigger_type_label"] == "User"
         assert data["status"] == "sent"
         assert data["target_strategy"] == AutoTraceRoute.TARGET_STRATEGY_MANUAL
         assert AutoTraceRoute.objects.filter(id=data["id"]).exists()

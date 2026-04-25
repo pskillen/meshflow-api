@@ -8,19 +8,24 @@ from nodes.models import ManagedNode, ObservedNode
 from packets.models import TraceroutePacket
 
 
+class TriggerType(models.IntegerChoices):
+    """How an ``AutoTraceRoute`` was created (stable integer storage)."""
+
+    USER = 1, _("User")
+    EXTERNAL = 2, _("External")
+    MONITORING = 3, _("Monitoring")
+    NODE_WATCH = 4, _("Node Watch")
+    DX_WATCH = 5, _("DX Watch")
+
+
 class AutoTraceRoute(models.Model):
     """Records each traceroute request (manual or auto) and its result."""
 
-    TRIGGER_TYPE_AUTO = "auto"
-    TRIGGER_TYPE_USER = "user"
-    TRIGGER_TYPE_EXTERNAL = "external"
-    TRIGGER_TYPE_MONITOR = "monitor"
-    TRIGGER_TYPE_CHOICES = [
-        (TRIGGER_TYPE_AUTO, "Auto"),
-        (TRIGGER_TYPE_USER, "User"),
-        (TRIGGER_TYPE_EXTERNAL, "External"),
-        (TRIGGER_TYPE_MONITOR, "Monitor"),
-    ]
+    TRIGGER_TYPE_USER = TriggerType.USER
+    TRIGGER_TYPE_EXTERNAL = TriggerType.EXTERNAL
+    TRIGGER_TYPE_MONITORING = TriggerType.MONITORING
+    TRIGGER_TYPE_NODE_WATCH = TriggerType.NODE_WATCH
+    TRIGGER_TYPE_DX_WATCH = TriggerType.DX_WATCH
 
     STATUS_PENDING = "pending"
     STATUS_SENT = "sent"
@@ -58,7 +63,7 @@ class AutoTraceRoute(models.Model):
         related_name="traceroutes_received",
         help_text=_("Destination node"),
     )
-    trigger_type = models.CharField(max_length=16, choices=TRIGGER_TYPE_CHOICES)
+    trigger_type = models.PositiveSmallIntegerField(choices=TriggerType.choices)
     triggered_by = models.ForeignKey(
         "users.User",
         on_delete=models.SET_NULL,

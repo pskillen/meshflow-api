@@ -78,7 +78,7 @@ def monitoring_traceroute_succeeded_since(observed_node: ObservedNode, since) ->
     """True if a monitoring TR completed since `since` (including direct path with empty route/route_back)."""
     return AutoTraceRoute.objects.filter(
         target_node=observed_node,
-        trigger_type=AutoTraceRoute.TRIGGER_TYPE_MONITOR,
+        trigger_type=AutoTraceRoute.TRIGGER_TYPE_NODE_WATCH,
         status=AutoTraceRoute.STATUS_COMPLETED,
         triggered_at__gte=since,
     ).exists()
@@ -89,7 +89,7 @@ def on_monitoring_traceroute_completed(auto_tr: AutoTraceRoute) -> None:
     When a monitoring TR completes, end verification early (including direct path with empty hops).
     Called from packets receiver after route fields are saved.
     """
-    if auto_tr.trigger_type != AutoTraceRoute.TRIGGER_TYPE_MONITOR:
+    if auto_tr.trigger_type != AutoTraceRoute.TRIGGER_TYPE_NODE_WATCH:
         return
     if auto_tr.status != AutoTraceRoute.STATUS_COMPLETED:
         return

@@ -71,7 +71,7 @@ def schedule_traceroutes():
         auto_tr = AutoTraceRoute.objects.create(
             source_node=source_node,
             target_node=target_node,
-            trigger_type=AutoTraceRoute.TRIGGER_TYPE_AUTO,
+            trigger_type=AutoTraceRoute.TRIGGER_TYPE_MONITORING,
             triggered_by=None,
             trigger_source="scheduler",
             target_strategy=row_strategy,

@@ -65,7 +65,7 @@ def test_process_node_watch_presence_starts_verification_and_creates_monitor_tr(
     assert NodePresence.objects.filter(observed_node=obs, verification_started_at__isnull=False).exists()
     assert AutoTraceRoute.objects.filter(
         target_node=obs,
-        trigger_type=AutoTraceRoute.TRIGGER_TYPE_MONITOR,
+        trigger_type=AutoTraceRoute.TRIGGER_TYPE_NODE_WATCH,
         trigger_source="mesh_monitoring",
     ).exists()
     channel_layer.group_send.assert_called()
@@ -93,7 +93,7 @@ def test_monitoring_traceroute_succeeded_since_true_when_route_empty(
     AutoTraceRoute.objects.create(
         source_node=source,
         target_node=obs,
-        trigger_type=AutoTraceRoute.TRIGGER_TYPE_MONITOR,
+        trigger_type=AutoTraceRoute.TRIGGER_TYPE_NODE_WATCH,
         triggered_by=None,
         trigger_source="mesh_monitoring",
         status=AutoTraceRoute.STATUS_COMPLETED,
@@ -117,7 +117,7 @@ def test_on_monitoring_traceroute_completed_clears_verification_when_routes_empt
     auto_tr = AutoTraceRoute.objects.create(
         source_node=source,
         target_node=obs,
-        trigger_type=AutoTraceRoute.TRIGGER_TYPE_MONITOR,
+        trigger_type=AutoTraceRoute.TRIGGER_TYPE_NODE_WATCH,
         triggered_by=None,
         trigger_source="mesh_monitoring",
         status=AutoTraceRoute.STATUS_COMPLETED,
@@ -296,7 +296,7 @@ def test_send_monitoring_traceroute_command_updates_presence_tr_fields(
     auto_tr = AutoTraceRoute.objects.create(
         source_node=source,
         target_node=obs,
-        trigger_type=AutoTraceRoute.TRIGGER_TYPE_MONITOR,
+        trigger_type=AutoTraceRoute.TRIGGER_TYPE_NODE_WATCH,
         triggered_by=None,
         trigger_source="mesh_monitoring",
         status=AutoTraceRoute.STATUS_PENDING,

@@ -118,7 +118,7 @@ def test_select_monitoring_sources_respects_spacing_cooldown(
     AutoTraceRoute.objects.create(
         source_node=mn,
         target_node=target,
-        trigger_type=AutoTraceRoute.TRIGGER_TYPE_AUTO,
+        trigger_type=AutoTraceRoute.TRIGGER_TYPE_MONITORING,
         status=AutoTraceRoute.STATUS_SENT,
         triggered_at=timezone.now(),
     )

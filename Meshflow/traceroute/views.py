@@ -30,6 +30,7 @@ from .serializers import (
 from .source_eligibility import is_managed_node_eligible_traceroute_source
 from .target_selection import pick_traceroute_target
 from .trigger_intervals import MANUAL_TRIGGER_MIN_INTERVAL_SEC
+from .trigger_type_query import parse_trigger_type_filter_tokens
 
 
 class TraceroutePagination(PageNumberPagination):
@@ -82,8 +83,9 @@ def traceroute_list(request):
     trigger_type = request.query_params.get("trigger_type")
     if trigger_type:
         trigger_types = [t.strip() for t in trigger_type.split(",") if t.strip()]
-        if trigger_types:
-            qs = qs.filter(trigger_type__in=trigger_types)
+        parsed = parse_trigger_type_filter_tokens(trigger_types)
+        if parsed:
+            qs = qs.filter(trigger_type__in=parsed)
 
     from .reach import target_strategy_tokens_to_q
 

@@ -38,7 +38,7 @@ def send_monitoring_traceroute_command(auto_traceroute_id: int) -> None:
     """Send WebSocket traceroute command for a pending monitoring AutoTraceRoute."""
     channel_layer = get_channel_layer()
     auto_tr = AutoTraceRoute.objects.select_related("source_node", "target_node").filter(pk=auto_traceroute_id).first()
-    if not auto_tr or auto_tr.trigger_type != AutoTraceRoute.TRIGGER_TYPE_MONITOR:
+    if not auto_tr or auto_tr.trigger_type != AutoTraceRoute.TRIGGER_TYPE_NODE_WATCH:
         return
     if auto_tr.status == AutoTraceRoute.STATUS_SENT:
         return
@@ -80,7 +80,7 @@ def _dispatch_monitoring_round(observed: ObservedNode) -> None:
         auto_tr = AutoTraceRoute.objects.create(
             source_node=source,
             target_node=observed,
-            trigger_type=AutoTraceRoute.TRIGGER_TYPE_MONITOR,
+            trigger_type=AutoTraceRoute.TRIGGER_TYPE_NODE_WATCH,
             triggered_by=None,
             trigger_source="mesh_monitoring",
             status=AutoTraceRoute.STATUS_PENDING,

@@ -70,7 +70,7 @@ def test_schedule_traceroutes_creates_when_recent_observation(
     assert AutoTraceRoute.objects.filter(
         source_node=mn,
         target_node=target,
-        trigger_type=AutoTraceRoute.TRIGGER_TYPE_AUTO,
+        trigger_type=AutoTraceRoute.TRIGGER_TYPE_MONITORING,
         trigger_source="scheduler",
         target_strategy=AutoTraceRoute.TARGET_STRATEGY_DX_ACROSS,
     ).exists()

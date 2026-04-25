@@ -5,10 +5,24 @@ The traceroute feature tracks path discovery between Meshtastic nodes on the mes
 ## Overview
 
 - **AutoTraceRoute**: Django model recording each traceroute request (manual or scheduled) and its result.
-- **Triggering**: Manual (user) or automatic (Celery scheduler every 2h). **Mesh monitoring** (when enabled) adds verification traceroutes with `trigger_type=monitor`; see [Mesh monitoring](../mesh-monitoring/README.md).
+- **Triggering**: Manual (**User**), scheduled mesh exploration (**Monitoring**), **External** (cross-environment / orphaned responses), **Node Watch** (mesh monitoring verification), and **DX Watch** (reserved integer for future DX Monitoring exploration). See [Mesh monitoring](../mesh-monitoring/README.md) for node-watch flows.
 - **Command delivery**: WebSocket (`NodeConsumer`) sends traceroute commands to connected bots (meshtastic-bot).
-- **Completion**: Packet receiver matches incoming `TraceroutePacket` to `AutoTraceRoute` (same source/target within configurable window). If no match exists (e.g. cross-env: prod triggered, pre-prod received), creates an `AutoTraceRoute` with `trigger_type="external"`. Updates status and pushes to Neo4j.
+- **Completion**: Packet receiver matches incoming `TraceroutePacket` to `AutoTraceRoute` (same source/target within configurable window). If no match exists (e.g. cross-env: prod triggered, pre-prod received), creates an `AutoTraceRoute` with `trigger_type=2` (External). Updates status and pushes to Neo4j.
 - **Heatmap**: Neo4j stores edges; `heatmap-edges` API returns aggregated edges/nodes for map visualization.
+
+## Trigger type (canonical)
+
+`AutoTraceRoute.trigger_type` is stored as a **stable integer**. The REST API returns `trigger_type` (int) and `trigger_type_label` (human-readable). List filters accept comma-separated **integers** and **legacy slugs** (`auto` → Monitoring, `monitor` → Node Watch) for backwards-compatible URLs.
+
+| Value | Name | Meaning |
+|------:|------|---------|
+| 1 | User | Manual trigger from the UI/API (`triggered_by` set). |
+| 2 | External | Response matched no local row (e.g. cross-environment ingest). |
+| 3 | Monitoring | Periodic scheduler (`trigger_source` e.g. `scheduler`); replaces historical string `auto`. |
+| 4 | Node Watch | Mesh monitoring verification round (`trigger_source` e.g. `mesh_monitoring`); replaces historical string `monitor`. |
+| 5 | DX Watch | Reserved for future DX Monitoring exploration (no scheduler behaviour yet). |
+
+**Not the same thing:** `target_strategy` values `dx_across` and `dx_same_side` are **hypothesis-driven target selection** labels used by the scheduler when choosing an `ObservedNode` to trace. They are unrelated to trigger type **5 (DX Watch)**.
 
 ## Data Model
 
@@ -16,8 +30,8 @@ The traceroute feature tracks path discovery between Meshtastic nodes on the mes
 |-------|-------------|
 | `source_node` | ManagedNode that sends the traceroute |
 | `target_node` | ObservedNode (destination) |
-| `trigger_type` | `auto`, `user`, or `external`; **`monitor`** when mesh-monitoring verification is implemented |
-| `triggered_by` | User (manual only) |
+| `trigger_type` | Integer; see table above |
+| `triggered_by` | User (manual / trigger type 1 only) |
 | `trigger_source` | e.g. `scheduler` (null for external) |
 | `status` | `pending` → `sent` → `completed` or `failed` |
 | `route` | JSON list of `{node_id, snr}` (forward path) |
@@ -48,17 +62,17 @@ The traceroute feature tracks path discovery between Meshtastic nodes on the mes
 
 ## Cross-Environment and Late Responses
 
-When a node feeds data to multiple API instances (e.g. prod and pre-prod), a TR initiated by prod may have its response ingested by pre-prod. Pre-prod has no prior `AutoTraceRoute`, so the receiver creates one with `trigger_type="external"`. The only missing data is `triggered_at` (approximated as receive time).
+When a node feeds data to multiple API instances (e.g. prod and pre-prod), a TR initiated by prod may have its response ingested by pre-prod. Pre-prod has no prior `AutoTraceRoute`, so the receiver creates one with `trigger_type=2` (External). The only missing data is `triggered_at` (approximated as receive time).
 
 Late responses: if a TR was marked `failed` (timeout) but the response arrives later, the receiver finds the failed record within the window and updates it to `completed`.
 
-**Direct path:** `route` and `route_back` may both be empty when the source and target are in direct RF range (no repeaters on the path). Inferred `external` completions can therefore have empty hop lists; that is still a successful traceroute, not a timeout.
+**Direct path:** `route` and `route_back` may both be empty when the source and target are in direct RF range (no repeaters on the path). Inferred external completions can therefore have empty hop lists; that is still a successful traceroute, not a timeout.
 
 ## Code map (shared helpers)
 
 Auto-scheduler and permission checks share one notion of a **live** source node (`ManagedNodeStatus.is_sending_data`, refreshed from `PacketObservation.upload_time` on a beat schedule). Canonical implementation: **`nodes.managed_node_liveness`** (`eligible_auto_traceroute_sources_queryset`, etc.). **`traceroute.source_eligibility`** re-exports the same API for existing imports.
 
-**Target selection** for auto TR: `traceroute.target_selection.pick_traceroute_target` uses **`common.geo.haversine_km`**, **`nodes.positioning.managed_node_lat_lon`**, and optional automatic reliability (soft penalty and hard cooldown from recent `AutoTraceRoute` rows with `trigger_type=auto`; see [Algorithms](algorithms.md) and [ENV_VARS.md](../../ENV_VARS.md) §11).
+**Target selection** for auto TR: `traceroute.target_selection.pick_traceroute_target` uses **`common.geo.haversine_km`**, **`nodes.positioning.managed_node_lat_lon`**, and optional automatic reliability (soft penalty and hard cooldown from recent `AutoTraceRoute` rows with `trigger_type=3` (Monitoring); see [Algorithms](algorithms.md) and [ENV_VARS.md](../../ENV_VARS.md) §11).
 
 **Manual trigger rate limit**: **`traceroute.trigger_intervals.MANUAL_TRIGGER_MIN_INTERVAL_SEC`**. Mesh monitoring (future Celery) can use **`MONITORING_TRIGGER_MIN_INTERVAL_SEC`** for a shorter default.
 

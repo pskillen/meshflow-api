@@ -733,8 +733,14 @@ components:
         target_node:
           $ref: '#/components/schemas/ObservedNode'
         trigger_type:
+          type: integer
+          enum: [1, 2, 3, 4, 5]
+          description: >
+            Trigger taxonomy: 1=User, 2=External, 3=Monitoring (scheduled mesh exploration),
+            4=Node Watch (mesh monitoring verification), 5=DX Watch (reserved).
+        trigger_type_label:
           type: string
-          enum: [auto, user, external, monitor]
+          description: Human-readable label for trigger_type (matches Django IntegerChoices label).
         triggered_by:
           type: integer
           nullable: true
@@ -4770,7 +4776,10 @@ paths:
           required: false
           schema:
             type: string
-            enum: [auto, user, external, monitor]
+            description: >
+              Comma-separated filter. Each token may be a decimal integer 1–5 or a legacy slug:
+              user, external, auto (maps to Monitoring=3), monitor (maps to Node Watch=4).
+              Example: `3,4` or `auto,monitor`.
         - name: target_strategy
           in: query
           required: false
@@ -4857,7 +4866,8 @@ paths:
                       type: object
                       properties:
                         trigger_type:
-                          type: string
+                          type: integer
+                          enum: [1, 2, 3, 4, 5]
                         count:
                           type: integer
                   success_failure:

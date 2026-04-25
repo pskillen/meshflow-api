@@ -1,8 +1,8 @@
 """
 Per-source target reliability for automatic traceroute selection.
 
-Only ``trigger_type=auto`` and terminal statuses (completed, failed) are used.
-Manual, monitor, and external triggers do not affect exclusion or soft penalties.
+Only ``trigger_type=monitoring`` (integer ``3``) and terminal statuses (completed, failed) are used.
+User, node watch, external, and DX watch triggers do not affect exclusion or soft penalties.
 """
 
 from __future__ import annotations
@@ -83,7 +83,7 @@ def load_source_target_reliability(
     rows = list(
         AutoTraceRoute.objects.filter(
             source_node=managed_node,
-            trigger_type=AutoTraceRoute.TRIGGER_TYPE_AUTO,
+            trigger_type=AutoTraceRoute.TRIGGER_TYPE_MONITORING,
             triggered_at__gte=cutoff,
             status__in=(AutoTraceRoute.STATUS_COMPLETED, AutoTraceRoute.STATUS_FAILED),
         )

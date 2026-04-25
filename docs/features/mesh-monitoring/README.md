@@ -10,7 +10,7 @@ This document describes the **intended design** (models, Celery, APIs, and integ
 |------|-------------------|
 | Shared helpers (`nodes.managed_node_liveness`, `common.geo`, `nodes.positioning`, `traceroute.trigger_intervals`, random auto TR) | Shipped in API (refactor / traceroute) |
 | Verified Discord DMs (prefs, test, `push_notifications.discord`) | Shipped (`users` + `push_notifications`) |
-| Django app **`mesh_monitoring`** (`NodeWatch`, `NodePresence`), Celery **`process_node_watch_presence`**, `AutoTraceRoute.trigger_type=monitor`, hooks in **`packets`** + **`traceroute.target_selection`** | **Shipped** (phase 03b) |
+| Django app **`mesh_monitoring`** (`NodeWatch`, `NodePresence`), Celery **`process_node_watch_presence`**, `AutoTraceRoute.trigger_type=4` (Node Watch), hooks in **`packets`** + **`traceroute.target_selection`** | **Shipped** (phase 03b) |
 | Watch **REST** CRUD | **`GET/POST /api/monitoring/watches/`**, **`GET/PATCH/PUT/DELETE …/watches/{id}/`** — authenticated; see **`openapi.yaml`** (`Mesh Monitoring` tag) |
 | Node-level **`offline_after`** | **`GET/PATCH /api/monitoring/nodes/{internal_id}/offline-after/`** — staff or claim owner may PATCH |
 | **UI** (My Nodes watch toggles) | **meshtastic-bot-ui** My Nodes page + `meshtastic-api` client (phase 04) |
@@ -33,7 +33,7 @@ A node is **watched** when there is at least one **`NodeWatch`** row: a user has
 
 1. **Packet path:** Whenever any packet is processed for a node, **`last_heard`** on **`ObservedNode`** is updated (see `packets` services). That is the primary signal that the node is still seen on the mesh.
 2. **Periodic job:** A Celery task (e.g. every minute), **`process_node_watch_presence`**, considers every **`ObservedNode`** that has at least one enabled watch. It compares `last_heard` to the effective threshold and maintains **`NodePresence`** (one row per observed node used for monitoring state).
-3. **Verification:** If the node is “too quiet” but not yet confirmed offline, the system enters a **verifying** state and schedules **monitoring traceroutes** — same **WebSocket** command path as manual/auto TR (`meshtastic-bot`), but `AutoTraceRoute.trigger_type=monitor` and `trigger_source` identifies mesh monitoring.
+3. **Verification:** If the node is “too quiet” but not yet confirmed offline, the system enters a **verifying** state and schedules **monitoring traceroutes** — same **WebSocket** command path as manual/auto TR (`meshtastic-bot`), but `AutoTraceRoute.trigger_type=4` (Node Watch) and `trigger_source` identifies mesh monitoring.
 4. **Random auto TR:** The existing **`schedule_traceroutes`** job continues to pick random targets; **`pick_traceroute_target`** **excludes** nodes that are in verification or already **offline_confirmed** so monitoring and random scheduling do not fight over the same targets.
 
 ### When a node is treated as offline

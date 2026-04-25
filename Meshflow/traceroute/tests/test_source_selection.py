@@ -36,7 +36,7 @@ def test_select_lru_prefers_never_used_feeder(
     AutoTraceRoute.objects.create(
         source_node=a,
         target_node=tgt,
-        trigger_type=AutoTraceRoute.TRIGGER_TYPE_AUTO,
+        trigger_type=AutoTraceRoute.TRIGGER_TYPE_MONITORING,
         status=AutoTraceRoute.STATUS_SENT,
         triggered_at=timezone.now() - timedelta(hours=1),
     )
