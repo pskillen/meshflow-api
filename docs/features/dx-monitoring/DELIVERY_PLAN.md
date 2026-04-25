@@ -196,13 +196,22 @@ API work should expose read-oriented event data after the event model stabilizes
   packet IDs.
 - Keep `openapi.yaml` in sync with any public contract changes.
 
-UI work should follow the existing `meshtastic-bot-ui` API hook and dashboard
-patterns:
+UI work should be split into two delivery slices:
 
-- Start with a DX Monitoring dashboard or route.
-- Reuse map, table, and traceroute modal patterns from the mesh-watch dashboard.
-- Poll first unless a later event stream is justified.
-- Add node-detail integration only after the event list is useful.
+- **6a: early read-only visibility.** After the detection MVP and models are
+  merged, add just enough API and UI to inspect what detection is doing while it
+  runs for a few days. This should focus on active/recent events, reason codes,
+  destination nodes, observer/source nodes, distances, counters, timestamps, and
+  raw evidence links. It should not include subscriptions, notifications,
+  exploration controls, or rich traceroute visualisation.
+- **6b: full DX Monitoring UI.** After exploration and notification contracts
+  stabilize, add the remaining user-facing experience: subscriptions,
+  notification preferences, traceroute/evidence visualisation, node-detail
+  integration, and richer historical review.
+
+Both UI slices should follow the existing `meshtastic-bot-ui` API hook and
+dashboard patterns, reuse map/table/modal components where practical, and poll
+first unless a later event stream is justified.
 
 The UI ticket is tracked in
 [meshtastic-bot-ui #219](https://github.com/pskillen/meshtastic-bot-ui/issues/219).
@@ -239,13 +248,21 @@ Implementation should happen in these child tickets:
    detect initial DX Monitoring candidates.
 5. [meshflow-api #221](https://github.com/pskillen/meshflow-api/issues/221):
    explore DX candidates with traceroutes.
-6. [meshflow-api #223](https://github.com/pskillen/meshflow-api/issues/223):
+6a. Early read-only DX visibility dashboard:
+   expose the detection MVP enough to inspect live/recent candidates after
+   Phase 3. This may need a small `meshflow-api` read-only endpoint plus a
+   `meshtastic-bot-ui` dashboard slice.
+6b. Full DX Monitoring UI:
+   subscriptions, notification preferences, traceroute/evidence visualisation,
+   node-detail integration, and richer historical review after exploration and
+   notification contracts stabilize.
+7. [meshflow-api #223](https://github.com/pskillen/meshflow-api/issues/223):
    notify subscribers about DX events.
-7. [meshflow-api #222](https://github.com/pskillen/meshflow-api/issues/222):
+8. [meshflow-api #222](https://github.com/pskillen/meshflow-api/issues/222):
    expose DX Monitoring events via API.
-8. [meshtastic-bot-ui #219](https://github.com/pskillen/meshtastic-bot-ui/issues/219):
-   add a DX Monitoring dashboard.
-9. [meshflow-api #224](https://github.com/pskillen/meshflow-api/issues/224):
+9. [meshtastic-bot-ui #219](https://github.com/pskillen/meshtastic-bot-ui/issues/219):
+   add the full DX Monitoring dashboard experience.
+10. [meshflow-api #224](https://github.com/pskillen/meshflow-api/issues/224):
    harden and operate the rollout.
 
 ## Open Questions
@@ -264,9 +281,12 @@ Implementation should happen in these child tickets:
 2. Ship bot-side traceroute queueing before any API fan-out.
 3. Clarify traceroute trigger metadata.
 4. Ship detection without notifications.
-5. Add bounded traceroute exploration.
-6. Expose read-only event APIs and operational views.
-7. Add notifications behind conservative opt-in settings.
-8. Add the UI dashboard once the API contract stabilizes.
-9. Harden defaults, logs, metrics, retention, and runbooks after real event data
+5. Add early read-only API/UI visibility for detection results so operators can
+   inspect real candidate data before exploration or notifications are enabled.
+6. Add bounded traceroute exploration.
+7. Expose the fuller read-only event API and operational views.
+8. Add notifications behind conservative opt-in settings.
+9. Add the full UI dashboard once exploration and notification contracts
+   stabilize.
+10. Harden defaults, logs, metrics, retention, and runbooks after real event data
    exists.
