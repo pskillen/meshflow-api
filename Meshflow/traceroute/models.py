@@ -87,6 +87,27 @@ class AutoTraceRoute(models.Model):
         help_text=_("Hypothesis-driven target selection strategy (scheduler or manual analytics)"),
     )
     triggered_at = models.DateTimeField(default=timezone.now)
+    # Queue: earliest time the API may send the WebSocket command to the bot (durable schedule).
+    earliest_send_at = models.DateTimeField(
+        default=timezone.now,
+        db_index=True,
+        help_text=_("Not before this time: dispatch to source node (per-feeder spacing in the dispatcher)"),
+    )
+    # When the command was actually delivered to Channels (set only after a successful group_send).
+    dispatched_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text=_("Set when the traceroute command is sent to the source node's WebSocket group"),
+    )
+    dispatch_attempts = models.PositiveIntegerField(
+        default=0,
+        help_text=_("Failed delivery attempts to Channels (keeps status pending)"),
+    )
+    dispatch_error = models.TextField(
+        null=True,
+        blank=True,
+        help_text=_("Last error from the channel layer or dispatch logic"),
+    )
     status = models.CharField(max_length=16, choices=STATUS_CHOICES, default=STATUS_PENDING, db_index=True)
     route = models.JSONField(
         null=True,
@@ -117,6 +138,7 @@ class AutoTraceRoute(models.Model):
             models.Index(fields=["triggered_at"]),
             models.Index(fields=["status"]),
             models.Index(fields=["status", "triggered_at"]),
+            models.Index(fields=["status", "earliest_send_at"]),
         ]
         permissions = [
             ("trigger_traceroute", "Can trigger traceroute commands"),

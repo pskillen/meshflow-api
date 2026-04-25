@@ -170,7 +170,7 @@ class TracerouteConsumer(AsyncWebsocketConsumer):
 
     Authenticated users connect with JWT via query param: ws/traceroutes/?token=<jwt>
     On connect, join group "traceroutes". Receive traceroute_update events when
-    any traceroute's status changes (completed or failed).
+    a traceroute is enqueued (pending) or its status changes (e.g. sent, completed, failed).
     """
 
     async def connect(self):

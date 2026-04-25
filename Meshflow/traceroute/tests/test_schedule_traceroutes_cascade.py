@@ -8,7 +8,7 @@ import pytest
 import nodes.tests.conftest  # noqa: F401
 import packets.tests.conftest  # noqa: F401
 from traceroute.models import AutoTraceRoute
-from traceroute.tasks import schedule_traceroutes
+from traceroute.tasks import dispatch_pending_traceroutes, schedule_traceroutes
 
 
 @pytest.mark.django_db
@@ -28,16 +28,19 @@ def test_first_strategy_wins_records_strategy(
     def immediate_async_to_sync(async_func):
         return async_func
 
-    with patch("traceroute.tasks.async_to_sync", side_effect=immediate_async_to_sync):
-        with patch("traceroute.tasks.get_channel_layer", return_value=channel_layer):
-            with patch("traceroute.tasks.eligible_traceroute_sources_ordered", return_value=[mn]):
-                with patch(
-                    "traceroute.tasks.ordered_strategies_for_feeder",
-                    return_value=[AutoTraceRoute.TARGET_STRATEGY_DX_ACROSS],
-                ):
-                    with patch("traceroute.tasks.pick_traceroute_target", return_value=target):
-                        with patch("traceroute.tasks.record_strategy_run") as rec:
-                            assert schedule_traceroutes() == {"created": 1}
+    with patch("traceroute.tasks.notify_traceroute_status_changed"):
+        with patch("traceroute.dispatch.notify_traceroute_status_changed"):
+            with patch("traceroute.dispatch.async_to_sync", side_effect=immediate_async_to_sync):
+                with patch("traceroute.dispatch.get_channel_layer", return_value=channel_layer):
+                    with patch("traceroute.tasks.eligible_traceroute_sources_ordered", return_value=[mn]):
+                        with patch(
+                            "traceroute.tasks.ordered_strategies_for_feeder",
+                            return_value=[AutoTraceRoute.TARGET_STRATEGY_DX_ACROSS],
+                        ):
+                            with patch("traceroute.tasks.pick_traceroute_target", return_value=target):
+                                with patch("traceroute.tasks.record_strategy_run") as rec:
+                                    assert schedule_traceroutes() == {"created": 1}
+                                    assert dispatch_pending_traceroutes()["dispatched"] == 1
 
     rec.assert_called_once_with(mn, AutoTraceRoute.TARGET_STRATEGY_DX_ACROSS)
     tr = AutoTraceRoute.objects.get()
@@ -62,22 +65,25 @@ def test_strategy_cascade_then_legacy_skips_record_strategy_run(
     def immediate_async_to_sync(async_func):
         return async_func
 
-    with patch("traceroute.tasks.async_to_sync", side_effect=immediate_async_to_sync):
-        with patch("traceroute.tasks.get_channel_layer", return_value=channel_layer):
-            with patch("traceroute.tasks.eligible_traceroute_sources_ordered", return_value=[mn]):
-                with patch(
-                    "traceroute.tasks.ordered_strategies_for_feeder",
-                    return_value=[
-                        AutoTraceRoute.TARGET_STRATEGY_INTRA_ZONE,
-                        AutoTraceRoute.TARGET_STRATEGY_DX_ACROSS,
-                    ],
-                ):
-                    with patch(
-                        "traceroute.tasks.pick_traceroute_target",
-                        side_effect=[None, None, target],
-                    ):
-                        with patch("traceroute.tasks.record_strategy_run") as rec:
-                            assert schedule_traceroutes() == {"created": 1}
+    with patch("traceroute.tasks.notify_traceroute_status_changed"):
+        with patch("traceroute.dispatch.notify_traceroute_status_changed"):
+            with patch("traceroute.dispatch.async_to_sync", side_effect=immediate_async_to_sync):
+                with patch("traceroute.dispatch.get_channel_layer", return_value=channel_layer):
+                    with patch("traceroute.tasks.eligible_traceroute_sources_ordered", return_value=[mn]):
+                        with patch(
+                            "traceroute.tasks.ordered_strategies_for_feeder",
+                            return_value=[
+                                AutoTraceRoute.TARGET_STRATEGY_INTRA_ZONE,
+                                AutoTraceRoute.TARGET_STRATEGY_DX_ACROSS,
+                            ],
+                        ):
+                            with patch(
+                                "traceroute.tasks.pick_traceroute_target",
+                                side_effect=[None, None, target],
+                            ):
+                                with patch("traceroute.tasks.record_strategy_run") as rec:
+                                    assert schedule_traceroutes() == {"created": 1}
+                                    assert dispatch_pending_traceroutes()["dispatched"] == 1
 
     rec.assert_not_called()
     tr = AutoTraceRoute.objects.get()
@@ -130,22 +136,25 @@ def test_second_source_after_first_exhausts_including_legacy(
     def immediate_async_to_sync(async_func):
         return async_func
 
-    with patch("traceroute.tasks.async_to_sync", side_effect=immediate_async_to_sync):
-        with patch("traceroute.tasks.get_channel_layer", return_value=channel_layer):
-            with patch(
-                "traceroute.tasks.eligible_traceroute_sources_ordered",
-                return_value=[mn1, mn2],
-            ):
-                with patch(
-                    "traceroute.tasks.ordered_strategies_for_feeder",
-                    return_value=[AutoTraceRoute.TARGET_STRATEGY_DX_ACROSS],
-                ):
+    with patch("traceroute.tasks.notify_traceroute_status_changed"):
+        with patch("traceroute.dispatch.notify_traceroute_status_changed"):
+            with patch("traceroute.dispatch.async_to_sync", side_effect=immediate_async_to_sync):
+                with patch("traceroute.dispatch.get_channel_layer", return_value=channel_layer):
                     with patch(
-                        "traceroute.tasks.pick_traceroute_target",
-                        side_effect=[None, None, target],
+                        "traceroute.tasks.eligible_traceroute_sources_ordered",
+                        return_value=[mn1, mn2],
                     ):
-                        with patch("traceroute.tasks.record_strategy_run") as rec:
-                            assert schedule_traceroutes() == {"created": 1}
+                        with patch(
+                            "traceroute.tasks.ordered_strategies_for_feeder",
+                            return_value=[AutoTraceRoute.TARGET_STRATEGY_DX_ACROSS],
+                        ):
+                            with patch(
+                                "traceroute.tasks.pick_traceroute_target",
+                                side_effect=[None, None, target],
+                            ):
+                                with patch("traceroute.tasks.record_strategy_run") as rec:
+                                    assert schedule_traceroutes() == {"created": 1}
+                                    assert dispatch_pending_traceroutes()["dispatched"] == 1
 
     rec.assert_called_once_with(mn2, AutoTraceRoute.TARGET_STRATEGY_DX_ACROSS)
     assert AutoTraceRoute.objects.filter(source_node=mn2).exists()

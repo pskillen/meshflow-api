@@ -753,6 +753,24 @@ components:
         triggered_at:
           type: string
           format: date-time
+        earliest_send_at:
+          type: string
+          format: date-time
+          description: >
+            When this row is due for WebSocket dispatch to the source; queue pacing uses
+            this time for stale timeouts on pending work.
+        dispatched_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the command was sent to the source node via the channel layer.
+        dispatch_attempts:
+          type: integer
+          description: Count of failed channel-delivery attempts while still pending.
+        dispatch_error:
+          type: string
+          nullable: true
+          description: Last channel or dispatch error message, if any.
         status:
           type: string
           enum: [pending, sent, completed, failed]

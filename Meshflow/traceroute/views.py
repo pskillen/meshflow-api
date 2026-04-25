@@ -259,6 +259,7 @@ def traceroute_trigger(request):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+    at = timezone.now()
     auto_tr = AutoTraceRoute.objects.create(
         source_node=source_node,
         target_node=target_node,
@@ -267,6 +268,7 @@ def traceroute_trigger(request):
         trigger_source=None,
         target_strategy=persisted_strategy,
         status=AutoTraceRoute.STATUS_PENDING,
+        earliest_send_at=at,
     )
 
     if persisted_strategy and persisted_strategy != AutoTraceRoute.TARGET_STRATEGY_MANUAL:
@@ -282,7 +284,8 @@ def traceroute_trigger(request):
     )
 
     auto_tr.status = AutoTraceRoute.STATUS_SENT
-    auto_tr.save(update_fields=["status"])
+    auto_tr.dispatched_at = timezone.now()
+    auto_tr.save(update_fields=["status", "dispatched_at"])
 
     serializer = AutoTraceRouteSerializer(auto_tr)
     return Response(serializer.data, status=status.HTTP_201_CREATED)

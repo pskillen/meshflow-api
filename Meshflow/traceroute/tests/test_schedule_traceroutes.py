@@ -11,7 +11,7 @@ import nodes.tests.conftest  # noqa: F401
 import packets.tests.conftest  # noqa: F401
 from nodes.tasks import update_managed_node_statuses
 from traceroute.models import AutoTraceRoute
-from traceroute.tasks import schedule_traceroutes
+from traceroute.tasks import dispatch_pending_traceroutes, schedule_traceroutes
 
 
 @pytest.mark.django_db
@@ -54,26 +54,32 @@ def test_schedule_traceroutes_creates_when_recent_observation(
     def immediate_async_to_sync(async_func):
         return async_func
 
-    with patch("traceroute.tasks.async_to_sync", side_effect=immediate_async_to_sync):
-        with patch("traceroute.tasks.get_channel_layer", return_value=channel_layer):
-            with patch(
-                "traceroute.tasks.eligible_traceroute_sources_ordered",
-                return_value=[mn],
-            ):
-                with patch(
-                    "traceroute.tasks.ordered_strategies_for_feeder",
-                    return_value=[AutoTraceRoute.TARGET_STRATEGY_DX_ACROSS],
-                ):
-                    with patch("traceroute.tasks.pick_traceroute_target", return_value=target):
-                        assert schedule_traceroutes() == {"created": 1}
+    with patch("traceroute.tasks.notify_traceroute_status_changed") as mock_ws:
+        with patch("traceroute.dispatch.notify_traceroute_status_changed"):
+            with patch("traceroute.dispatch.async_to_sync", side_effect=immediate_async_to_sync):
+                with patch("traceroute.dispatch.get_channel_layer", return_value=channel_layer):
+                    with patch(
+                        "traceroute.tasks.eligible_traceroute_sources_ordered",
+                        return_value=[mn],
+                    ):
+                        with patch(
+                            "traceroute.tasks.ordered_strategies_for_feeder",
+                            return_value=[AutoTraceRoute.TARGET_STRATEGY_DX_ACROSS],
+                        ):
+                            with patch("traceroute.tasks.pick_traceroute_target", return_value=target):
+                                assert schedule_traceroutes() == {"created": 1}
+                                assert dispatch_pending_traceroutes()["dispatched"] == 1
 
-    assert AutoTraceRoute.objects.filter(
+    tr = AutoTraceRoute.objects.get(
         source_node=mn,
         target_node=target,
         trigger_type=AutoTraceRoute.TRIGGER_TYPE_MONITORING,
         trigger_source="scheduler",
         target_strategy=AutoTraceRoute.TARGET_STRATEGY_DX_ACROSS,
-    ).exists()
+    )
+    mock_ws.assert_called_once_with(tr.id, AutoTraceRoute.STATUS_PENDING)
+    assert tr.status == AutoTraceRoute.STATUS_SENT
+    assert tr.dispatched_at is not None
     channel_layer.group_send.assert_called_once()
     call_kw = channel_layer.group_send.call_args[0]
     assert call_kw[0] == f"node_{mn.node_id}"
