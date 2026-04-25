@@ -79,6 +79,7 @@ INSTALLED_APPS = [
     "text_messages",
     "traceroute",
     "mesh_monitoring",
+    "dx_monitoring",
     "ws",
     "django_celery_beat",
 ]
@@ -439,6 +440,35 @@ CORS_ALLOW_HEADERS = [
     "x-csrftoken",
     "x-requested-with",
 ]
+
+
+def _dx_env_bool(name: str, default: bool = False) -> bool:
+    raw = os.environ.get(name)
+    if raw is None or str(raw).strip() == "":
+        return default
+    return str(raw).strip().lower() in ("1", "true", "yes", "on")
+
+
+def _dx_env_int(name: str, default: int) -> int:
+    raw = os.environ.get(name)
+    if raw is None or str(raw).strip() == "":
+        return default
+    return int(str(raw).strip())
+
+
+def _dx_env_float(name: str, default: float) -> float:
+    raw = os.environ.get(name)
+    if raw is None or str(raw).strip() == "":
+        return default
+    return float(str(raw).strip())
+
+
+# DX Monitoring candidate detection (packet ingestion; default off).
+DX_MONITORING_DETECTION_ENABLED = _dx_env_bool("DX_MONITORING_DETECTION_ENABLED", False)
+DX_MONITORING_RETURNED_DX_QUIET_DAYS = _dx_env_int("DX_MONITORING_RETURNED_DX_QUIET_DAYS", 30)
+DX_MONITORING_EVENT_ACTIVE_MINUTES = _dx_env_int("DX_MONITORING_EVENT_ACTIVE_MINUTES", 60)
+DX_MONITORING_CLUSTER_DISTANCE_KM = _dx_env_float("DX_MONITORING_CLUSTER_DISTANCE_KM", 150.0)
+DX_MONITORING_DIRECT_DISTANCE_KM = _dx_env_float("DX_MONITORING_DIRECT_DISTANCE_KM", 100.0)
 
 # Enable Prometheus metrics if a password is set
 PROMETHEUS_PASSWORD = os.environ.get("PROMETHEUS_PASSWORD", None)

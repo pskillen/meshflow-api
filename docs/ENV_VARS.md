@@ -95,6 +95,18 @@ Discord **login** uses the OAuth pair above. **DM notifications** (test message 
 | `MESH_MONITORING_NOTIFY_VERIFICATION_START` | (unset = **on**) | When unset, mesh monitoring sends a Discord DM when verification (monitor TR) **starts** for a watched node. Set to `0`, `false`, `no`, `off`, or empty to disable; `1` / `true` / `yes` / `on` to enable explicitly. | Boolean-ish string      |
 | `MESH_MONITORING_VERIFICATION_NOTIFY_COOLDOWN_SECONDS` | `3600` | Minimum seconds between verification-start DMs for the same node (repeat episode starts). | Integer (string)        |
 
+### DX Monitoring (candidate detection)
+
+| Variable | Default | Description | Allowable Values |
+|----------|---------|-------------|------------------|
+| `DX_MONITORING_DETECTION_ENABLED` | `false` | When true, packet ingestion records DX candidate events and evidence (internal only). | Boolean-ish string |
+| `DX_MONITORING_RETURNED_DX_QUIET_DAYS` | `30` | Minimum gap between `last_heard` and a new packet for `returned_dx_node` when prior DX events exist. | Integer (string) |
+| `DX_MONITORING_EVENT_ACTIVE_MINUTES` | `60` | Deduplication window: extend the same `DxEvent` while new matching packets arrive within this many minutes after the last extension. | Integer (string) |
+| `DX_MONITORING_CLUSTER_DISTANCE_KM` | `150` | Minimum great-circle distance from the observing constellation footprint for `new_distant_node`. | Float (string) |
+| `DX_MONITORING_DIRECT_DISTANCE_KM` | `100` | Minimum observer–destination distance (km) for `distant_observation`. | Float (string) |
+
+See **[docs/features/dx-monitoring/detection.md](features/dx-monitoring/detection.md)** for behaviour.
+
 ---
 
 ## 9. Monitoring / Prometheus

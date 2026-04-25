@@ -30,8 +30,13 @@ class BasePacketService(abc.ABC):
         self.observation = observation
         self.user = user
 
+        self._dx_from_node_created = False
+        self._dx_previous_last_heard = None
         self._get_or_create_from_node()
         self._process_packet()
+        from dx_monitoring.services import maybe_detect_dx_candidate
+
+        maybe_detect_dx_candidate(self)
         self._update_node_last_heard()
 
     @abc.abstractmethod
@@ -44,7 +49,9 @@ class BasePacketService(abc.ABC):
         if self.packet.from_int:
             try:
                 self.from_node = ObservedNode.objects.get(node_id=self.packet.from_int)
+                self._dx_previous_last_heard = self.from_node.last_heard
             except ObservedNode.DoesNotExist:
+                self._dx_previous_last_heard = None
                 node_id_str = (
                     self.packet.from_str if self.packet.from_str else meshtastic_id_to_hex(self.packet.from_int)
                 )
@@ -54,6 +61,7 @@ class BasePacketService(abc.ABC):
                     long_name="Unknown Node " + node_id_str,
                     short_name=node_id_str[-4:] if len(node_id_str) >= 4 else "????",
                 )
+                self._dx_from_node_created = True
                 new_node_observed.send(sender=self, node=self.from_node, observer=self.observer)
         else:
             raise ValueError("Packet has no from_int")
