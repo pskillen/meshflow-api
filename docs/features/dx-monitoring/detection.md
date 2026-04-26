@@ -86,6 +86,14 @@ The detector ignores packets that do not have a usable `from_int`, do not have a
 `PacketObservation`, do not have a `first_reported_time`, or are observations of
 the managed observer's own node.
 
+Packet-ingest rules also require a **direct** observation: both `hop_start` and
+`hop_limit` must be present on the `PacketObservation`, and
+`hop_start - hop_limit` must be zero (no remaining relay hops). Multi-hop or
+unknown hop metadata is ignored for `new_distant_node`, `returned_dx_node`, and
+`distant_observation` so routine multi-hop DX-style paths do not open events.
+Traceroute response packets are excluded from packet-ingest DX; long RF hops can
+still surface via `traceroute_distant_hop` when a completed traceroute is processed.
+
 ## Event Records
 
 The MVP stores two levels of data:
@@ -153,7 +161,7 @@ path.
 
 The detector emits `distant_observation` when the observer and observed node have
 usable positions and their great-circle distance exceeds the configured direct
-observation threshold.
+observation threshold, and the packet observation is direct (see hop predicate above).
 
 The observer position comes from the observing `ManagedNode` default location.
 The observed-node position comes from `NodeLatestStatus` after packet-specific
@@ -164,6 +172,19 @@ match.
 This rule covers known distant nodes as well as new ones. For example, a Central
 Belt router directly hearing Aberdeen during a tropo opening is interesting even
 if the Aberdeen node already exists in the database.
+
+### `traceroute_distant_hop`
+
+When a traceroute completes, the service rebuilds the forward path (source
+managed node, each `route` relay entry, target observed node) and the return path
+(target, each `route_back` relay, source). For each consecutive pair with
+coordinates on both ends, if great-circle distance exceeds
+`DX_MONITORING_TRACEROUTE_HOP_DISTANCE_KM`, a `traceroute_distant_hop` candidate is
+recorded with the hop’s **to** node as the `DxEvent` destination (when that node
+exists as an `ObservedNode`). Pairs missing coordinates or involving nodes marked
+`exclude_from_detection` in `DxNodeMetadata` are skipped. Evidence metadata
+includes `auto_traceroute_id`, `path_direction` (`forward` or `return`), hop
+indices, endpoint node ids, `distance_km`, and `threshold_km`.
 
 ## Deduplication
 
@@ -196,6 +217,7 @@ The MVP uses configuration that favours low noise:
 - The active event window defaults to 60 minutes.
 - The cluster-distance threshold defaults to 150 km.
 - The direct-observation threshold defaults to 100 km.
+- The traceroute hop-distance threshold defaults to 150 km.
 
 Rule thresholds are independent so operators can tune sensitivity without
 changing the data model.
@@ -207,7 +229,8 @@ For each packet processed by `BasePacketService`:
 1. Capture whether the `ObservedNode` was created and the previous
   `ObservedNode.last_heard`.
 2. Run packet-specific processing so latest node status is current.
-3. Stop if detection is disabled or the packet is not eligible.
+3. Stop if detection is disabled or the packet is not eligible (including non-direct
+   hop metadata for packet-ingest rules, and traceroute packets for those rules).
 4. Load destination position state after packet-specific processing.
 5. Skip distance-based rules when the destination position is still unknown.
 6. Evaluate each MVP rule independently.

@@ -233,12 +233,15 @@ def create_packet_observation(create_raw_packet, create_managed_node):  # noqa: 
                 constellation=observer.constellation,
             )
 
+        hop_limit = kwargs.pop("hop_limit", 3)
+        hop_start = kwargs.pop("hop_start", 3)
+
         return PacketObservation.objects.create(
             packet=packet,
             observer=observer,
             channel=channel,
-            hop_limit=3,
-            hop_start=3,
+            hop_limit=hop_limit,
+            hop_start=hop_start,
             rx_time=timezone.now(),
             rx_rssi=-60.0,
             rx_snr=10.0,

@@ -104,6 +104,9 @@ Discord **login** uses the OAuth pair above. **DM notifications** (test message 
 | `DX_MONITORING_EVENT_ACTIVE_MINUTES` | `60` | Deduplication window: extend the same `DxEvent` while new matching packets arrive within this many minutes after the last extension. | Integer (string) |
 | `DX_MONITORING_CLUSTER_DISTANCE_KM` | `150` | Minimum great-circle distance from the observing constellation footprint for `new_distant_node`. | Float (string) |
 | `DX_MONITORING_DIRECT_DISTANCE_KM` | `100` | Minimum observer–destination distance (km) for `distant_observation`. | Float (string) |
+| `DX_MONITORING_TRACEROUTE_HOP_DISTANCE_KM` | `150` | Minimum great-circle distance between consecutive nodes on a completed traceroute path (forward and return) for `traceroute_distant_hop`. | Float (string) |
+
+Packet-ingest rules (`new_distant_node`, `returned_dx_node`, `distant_observation`) only run when the `PacketObservation` is **direct**: both `hop_start` and `hop_limit` must be present and `hop_start - hop_limit == 0`. Missing hop metadata or multi-hop observations are ignored for those reasons (multi-hop mesh reachability is normal).
 
 See **[docs/features/dx-monitoring/detection.md](features/dx-monitoring/detection.md)** for behaviour.
 
