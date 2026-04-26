@@ -26,6 +26,8 @@ tags:
     description: Traceroute history and manual triggering
   - name: Mesh Monitoring
     description: User watches on observed nodes for silence detection and offline verification
+  - name: DX Monitoring
+    description: Staff-only DX detection event visibility and per-node exclusion metadata
 
 components:
   parameters:
@@ -2367,6 +2369,160 @@ components:
       properties:
         detail:
           type: string
+
+    DxConstellationMinimal:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+
+    DxManagedNodeMinimal:
+      type: object
+      properties:
+        internal_id:
+          type: string
+          format: uuid
+        node_id:
+          type: integer
+        node_id_str:
+          type: string
+        name:
+          type: string
+
+    DxNodeMetadataPublic:
+      type: object
+      description: Per-destination DX tuning flags (subset exposed to the visibility API).
+      properties:
+        exclude_from_detection:
+          type: boolean
+        exclude_notes:
+          type: string
+        updated_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    DxDestinationNode:
+      type: object
+      properties:
+        internal_id:
+          type: string
+          format: uuid
+        node_id:
+          type: integer
+        node_id_str:
+          type: string
+        short_name:
+          type: string
+        long_name:
+          type: string
+        dx_metadata:
+          $ref: '#/components/schemas/DxNodeMetadataPublic'
+
+    DxEventObservation:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        observed_at:
+          type: string
+          format: date-time
+        distance_km:
+          type: number
+          nullable: true
+        metadata:
+          type: object
+        observer:
+          $ref: '#/components/schemas/DxManagedNodeMinimal'
+        raw_packet:
+          type: string
+          format: uuid
+        packet_observation:
+          type: integer
+
+    DxEventList:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        constellation:
+          $ref: '#/components/schemas/DxConstellationMinimal'
+        destination:
+          $ref: '#/components/schemas/DxDestinationNode'
+        reason_code:
+          type: string
+          enum: [new_distant_node, returned_dx_node, distant_observation]
+        state:
+          type: string
+          enum: [active, closed]
+        first_observed_at:
+          type: string
+          format: date-time
+        last_observed_at:
+          type: string
+          format: date-time
+        active_until:
+          type: string
+          format: date-time
+        observation_count:
+          type: integer
+        last_observer:
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/DxManagedNodeMinimal'
+        best_distance_km:
+          type: number
+          nullable: true
+        last_distance_km:
+          type: number
+          nullable: true
+        metadata:
+          type: object
+        evidence_count:
+          type: integer
+
+    DxEventDetail:
+      allOf:
+        - $ref: '#/components/schemas/DxEventList'
+        - type: object
+          properties:
+            observations:
+              type: array
+              items:
+                $ref: '#/components/schemas/DxEventObservation'
+
+    DxNodeExclusionRequest:
+      type: object
+      required: [node_id, exclude_from_detection]
+      properties:
+        node_id:
+          type: integer
+          description: Meshtastic node id of the observed destination node.
+        exclude_from_detection:
+          type: boolean
+        exclude_notes:
+          type: string
+          default: ''
+
+    DxNodeExclusionResponse:
+      type: object
+      properties:
+        node_id:
+          type: integer
+        node_id_str:
+          type: string
+        exclude_from_detection:
+          type: boolean
+        exclude_notes:
+          type: string
+        updated_at:
+          type: string
+          format: date-time
+          nullable: true
 
 
 paths:
@@ -5594,6 +5750,180 @@ paths:
           description: Unauthorized
         '404':
           description: Not found
+
+  /dx/events/:
+    get:
+      summary: List DX detection events
+      description: >
+        Staff-only. Paginated list of DX events with filters for operational review.
+      tags: [DX Monitoring]
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PaginationPage'
+        - $ref: '#/components/parameters/PaginationPageSize'
+        - name: state
+          in: query
+          schema:
+            type: string
+            enum: [active, closed]
+        - name: reason_code
+          in: query
+          schema:
+            type: string
+            enum: [new_distant_node, returned_dx_node, distant_observation]
+        - name: constellation
+          in: query
+          schema:
+            type: integer
+        - name: destination_node_id
+          in: query
+          schema:
+            type: integer
+        - name: last_observer_id
+          in: query
+          description: ManagedNode internal UUID
+          schema:
+            type: string
+            format: uuid
+        - name: active_now
+          in: query
+          description: When true, only events that are active and not past active_until.
+          schema:
+            type: boolean
+        - name: recent_only
+          in: query
+          description: When true, restrict to last_observed_at within recent_days (default 7, max 90).
+          schema:
+            type: boolean
+        - name: recent_days
+          in: query
+          schema:
+            type: integer
+            default: 7
+        - name: last_observed_after
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: last_observed_before
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: first_observed_after
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: first_observed_before
+          in: query
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Paginated DX events
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedResponse'
+                  - type: object
+                    properties:
+                      results:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/DxEventList'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden (not staff)
+
+  /dx/events/{id}/:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      summary: Get DX event detail with evidence rows
+      tags: [DX Monitoring]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: DX event with nested observations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DxEventDetail'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden (not staff)
+        '404':
+          description: Not found
+
+  /dx/nodes/exclusion/:
+    post:
+      summary: Set DX exclusion metadata for an observed node
+      description: >
+        Staff-only. Creates or updates DxNodeMetadata for the most recently heard ObservedNode
+        matching the given Meshtastic node_id.
+      tags: [DX Monitoring]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DxNodeExclusionRequest'
+      responses:
+        '200':
+          description: Updated exclusion flags
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DxNodeExclusionResponse'
+        '400':
+          description: Validation error
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden (not staff)
+        '404':
+          description: No observed node for node_id
+
+  /dx/nodes/by-node-id/{node_id}/exclusion/:
+    parameters:
+      - name: node_id
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      summary: Read DX exclusion metadata for an observed node
+      description: Staff-only. Resolves the same ObservedNode row as the POST exclusion endpoint.
+      tags: [DX Monitoring]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Current exclusion flags
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DxNodeExclusionResponse'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden (not staff)
+        '404':
+          description: No observed node for node_id
 
   /nodes/claims/mine/:
     get:

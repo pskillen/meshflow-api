@@ -121,6 +121,10 @@ services:
 
       # Discord notifications
       DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN}
+
+      # DX event detection
+      DX_MONITORING_DETECTION_ENABLED: true
+
     ports:
       - "${API_EXT_PORT}:8000"
     volumes:
