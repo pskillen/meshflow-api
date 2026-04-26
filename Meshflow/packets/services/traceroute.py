@@ -78,6 +78,10 @@ class TraceroutePacketService(BasePacketService):
             update_fields=["status", "route", "route_back", "raw_packet", "completed_at", "error_message"],
         )
 
+        from dx_monitoring.services import maybe_detect_dx_from_completed_traceroute
+
+        maybe_detect_dx_from_completed_traceroute(auto_tr, self.packet, self.observation)
+
         # Lazy imports so tests can patch traceroute.tasks / traceroute.ws_notify / mesh_monitoring.services.
         from mesh_monitoring.services import on_monitoring_traceroute_completed
         from traceroute.tasks import push_traceroute_to_neo4j

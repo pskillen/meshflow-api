@@ -8,6 +8,7 @@ class DxReasonCode(models.TextChoices):
     NEW_DISTANT_NODE = "new_distant_node", _("New distant node")
     RETURNED_DX_NODE = "returned_dx_node", _("Returned DX node")
     DISTANT_OBSERVATION = "distant_observation", _("Distant observation")
+    TRACEROUTE_DISTANT_HOP = "traceroute_distant_hop", _("Traceroute distant hop")
 
 
 class DxEventState(models.TextChoices):
