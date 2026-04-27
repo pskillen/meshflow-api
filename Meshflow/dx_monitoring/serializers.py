@@ -1,11 +1,14 @@
 """Serializers for DX monitoring visibility API."""
 
+from collections import Counter
+
 from rest_framework import serializers
 
 from common.mesh_node_helpers import meshtastic_id_to_hex
 from constellations.models import Constellation
-from dx_monitoring.models import DxEvent, DxEventObservation, DxNodeMetadata
+from dx_monitoring.models import DxEvent, DxEventObservation, DxEventTraceroute, DxNodeMetadata
 from nodes.models import ManagedNode, ObservedNode
+from traceroute.models import AutoTraceRoute
 
 
 class ConstellationMinimalSerializer(serializers.ModelSerializer):
@@ -66,11 +69,87 @@ class DxEventObservationSerializer(serializers.ModelSerializer):
         )
 
 
+class DxObservedNodeHopSerializer(serializers.ModelSerializer):
+    """Destination (or hop target) without nested dx_metadata — used on exploration rows."""
+
+    class Meta:
+        model = ObservedNode
+        fields = ("internal_id", "node_id", "node_id_str", "short_name", "long_name")
+
+
+class DxAutoTracerouteExplorationSerializer(serializers.ModelSerializer):
+    """Queued or completed AutoTraceRoute row when present on a DX exploration attempt."""
+
+    trigger_type_label = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AutoTraceRoute
+        fields = (
+            "id",
+            "status",
+            "trigger_type",
+            "trigger_type_label",
+            "trigger_source",
+            "triggered_at",
+            "earliest_send_at",
+            "dispatched_at",
+            "completed_at",
+            "error_message",
+        )
+
+    def get_trigger_type_label(self, obj: AutoTraceRoute) -> str:
+        labels = {
+            int(AutoTraceRoute.TRIGGER_TYPE_USER): "User",
+            int(AutoTraceRoute.TRIGGER_TYPE_EXTERNAL): "External",
+            int(AutoTraceRoute.TRIGGER_TYPE_MONITORING): "Monitoring",
+            int(AutoTraceRoute.TRIGGER_TYPE_NODE_WATCH): "Node watch",
+            int(AutoTraceRoute.TRIGGER_TYPE_DX_WATCH): "DX Watch",
+            int(AutoTraceRoute.TRIGGER_TYPE_NEW_NODE_BASELINE): "New node baseline",
+        }
+        return labels.get(int(obj.trigger_type), str(obj.trigger_type))
+
+
+class DxEventTracerouteExplorationSerializer(serializers.ModelSerializer):
+    """One DX exploration attempt: DX_WATCH queue, skip outcome, or linked new-node baseline."""
+
+    auto_traceroute = DxAutoTracerouteExplorationSerializer(read_only=True, allow_null=True)
+    source_node = DxManagedNodeMinimalSerializer(read_only=True, allow_null=True)
+    destination = serializers.SerializerMethodField()
+    link_kind = serializers.SerializerMethodField()
+
+    class Meta:
+        model = DxEventTraceroute
+        fields = (
+            "id",
+            "outcome",
+            "skip_reason",
+            "metadata",
+            "link_kind",
+            "created_at",
+            "updated_at",
+            "source_node",
+            "destination",
+            "auto_traceroute",
+        )
+
+    def get_link_kind(self, obj: DxEventTraceroute) -> str:
+        meta = obj.metadata or {}
+        return str(meta.get("link_kind") or "")
+
+    def get_destination(self, obj: DxEventTraceroute) -> dict:
+        if obj.auto_traceroute_id:
+            dest = obj.auto_traceroute.target_node
+        else:
+            dest = obj.event.destination
+        return DxObservedNodeHopSerializer(dest, context=self.context).data
+
+
 class DxEventListSerializer(serializers.ModelSerializer):
     constellation = ConstellationMinimalSerializer(read_only=True)
     destination = DxDestinationSerializer(read_only=True)
     last_observer = DxManagedNodeMinimalSerializer(read_only=True, allow_null=True)
     evidence_count = serializers.IntegerField(read_only=True)
+    exploration_attempt_count = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = DxEvent
@@ -89,14 +168,34 @@ class DxEventListSerializer(serializers.ModelSerializer):
             "last_distance_km",
             "metadata",
             "evidence_count",
+            "exploration_attempt_count",
         )
 
 
 class DxEventDetailSerializer(DxEventListSerializer):
     observations = DxEventObservationSerializer(many=True, read_only=True)
+    traceroute_explorations = DxEventTracerouteExplorationSerializer(many=True, read_only=True)
+    exploration_summary = serializers.SerializerMethodField()
 
     class Meta(DxEventListSerializer.Meta):
-        fields = DxEventListSerializer.Meta.fields + ("observations",)
+        fields = DxEventListSerializer.Meta.fields + (
+            "observations",
+            "traceroute_explorations",
+            "exploration_summary",
+        )
+
+    def get_exploration_summary(self, obj: DxEvent) -> dict:
+        rows = list(obj.traceroute_explorations.all())
+        by_outcome = Counter((r.outcome or "") for r in rows)
+        baseline_rows = sum(1 for r in rows if (r.metadata or {}).get("link_kind") == "new_node_baseline")
+        return {
+            "total": len(rows),
+            "pending": int(by_outcome.get("pending", 0)),
+            "completed": int(by_outcome.get("completed", 0)),
+            "failed": int(by_outcome.get("failed", 0)),
+            "skipped": int(by_outcome.get("skipped", 0)),
+            "baseline_linked_rows": baseline_rows,
+        }
 
 
 class DxNodeExclusionRequestSerializer(serializers.Serializer):

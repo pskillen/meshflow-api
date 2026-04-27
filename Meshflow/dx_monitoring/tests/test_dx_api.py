@@ -10,10 +10,21 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 import constellations.tests.conftest  # noqa: F401
+import dx_monitoring.tests.conftest  # noqa: F401
 import nodes.tests.conftest  # noqa: F401
 import packets.tests.conftest  # noqa: F401
 import users.tests.conftest  # noqa: F401
-from dx_monitoring.models import DxEvent, DxEventObservation, DxEventState, DxNodeMetadata, DxReasonCode
+from dx_monitoring.models import (
+    DxEvent,
+    DxEventObservation,
+    DxEventState,
+    DxEventTraceroute,
+    DxEventTracerouteOutcome,
+    DxEventTracerouteSkipReason,
+    DxNodeMetadata,
+    DxReasonCode,
+)
+from traceroute.models import AutoTraceRoute
 
 
 @pytest.fixture
@@ -68,6 +79,7 @@ def test_dx_events_list_staff_ok(api_client, create_user, create_constellation, 
     assert row["destination"]["node_id"] == dest.node_id
     assert row["destination"]["dx_metadata"]["exclude_from_detection"] is False
     assert row["evidence_count"] == 0
+    assert row["exploration_attempt_count"] == 0
 
 
 @pytest.mark.django_db
@@ -152,6 +164,90 @@ def test_dx_event_detail_includes_observations(
     assert o0["distance_km"] == 123.4
     assert str(o0["raw_packet"]) == str(pkt.id)
     assert o0["observer"]["node_id"] == observer.node_id
+
+
+@pytest.mark.django_db
+def test_dx_event_detail_includes_traceroute_explorations(
+    api_client,
+    create_user,
+    create_constellation,
+    create_observed_node,
+    create_managed_node,
+    create_auto_traceroute,
+):
+    staff = create_user(is_staff=True)
+    api_client.force_authenticate(user=staff)
+    source = create_managed_node()
+    c = create_constellation()
+    dest = create_observed_node(node_id=0x77777707)
+    now = timezone.now()
+    ev = DxEvent.objects.create(
+        constellation=c,
+        destination=dest,
+        reason_code=DxReasonCode.NEW_DISTANT_NODE,
+        state=DxEventState.ACTIVE,
+        first_observed_at=now,
+        last_observed_at=now,
+        active_until=now + timedelta(hours=1),
+    )
+    tr = create_auto_traceroute(
+        source_node=source,
+        target_node=dest,
+        trigger_type=AutoTraceRoute.TRIGGER_TYPE_DX_WATCH,
+        status=AutoTraceRoute.STATUS_PENDING,
+        triggered_by=None,
+    )
+    DxEventTraceroute.objects.create(
+        event=ev,
+        auto_traceroute=tr,
+        source_node=source,
+        outcome=DxEventTracerouteOutcome.PENDING,
+        metadata={"link_kind": "dx_watch"},
+    )
+    DxEventTraceroute.objects.create(
+        event=ev,
+        auto_traceroute=None,
+        source_node=None,
+        outcome=DxEventTracerouteOutcome.SKIPPED,
+        skip_reason=DxEventTracerouteSkipReason.NO_ELIGIBLE_SOURCE,
+        metadata={},
+    )
+    baseline_tr = create_auto_traceroute(
+        source_node=source,
+        target_node=dest,
+        trigger_type=AutoTraceRoute.TRIGGER_TYPE_NEW_NODE_BASELINE,
+        status=AutoTraceRoute.STATUS_COMPLETED,
+        triggered_by=None,
+        route=[{"node_id": 1, "snr": 0.0}],
+    )
+    DxEventTraceroute.objects.create(
+        event=ev,
+        auto_traceroute=baseline_tr,
+        source_node=source,
+        outcome=DxEventTracerouteOutcome.COMPLETED,
+        metadata={"link_kind": "new_node_baseline", "route_hops": 1},
+    )
+
+    url = reverse("dxevent-detail", kwargs={"pk": str(ev.id)})
+    r = api_client.get(url)
+    assert r.status_code == status.HTTP_200_OK
+    assert r.data["exploration_summary"]["total"] == 3
+    assert r.data["exploration_summary"]["pending"] == 1
+    assert r.data["exploration_summary"]["skipped"] == 1
+    assert r.data["exploration_summary"]["completed"] == 1
+    assert r.data["exploration_summary"]["baseline_linked_rows"] == 1
+
+    ex = {row["outcome"]: row for row in r.data["traceroute_explorations"]}
+    assert ex["pending"]["link_kind"] == "dx_watch"
+    assert ex["pending"]["auto_traceroute"]["trigger_type"] == AutoTraceRoute.TRIGGER_TYPE_DX_WATCH
+    assert ex["pending"]["destination"]["node_id"] == dest.node_id
+    assert ex["skipped"]["skip_reason"] == DxEventTracerouteSkipReason.NO_ELIGIBLE_SOURCE
+    assert ex["skipped"]["auto_traceroute"] is None
+    assert ex["completed"]["auto_traceroute"]["trigger_type"] == AutoTraceRoute.TRIGGER_TYPE_NEW_NODE_BASELINE
+
+    r_list = api_client.get(reverse("dxevent-list"))
+    row = next(x for x in r_list.data["results"] if x["id"] == str(ev.id))
+    assert row["exploration_attempt_count"] == 3
 
 
 @pytest.mark.django_db

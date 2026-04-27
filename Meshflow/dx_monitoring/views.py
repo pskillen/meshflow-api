@@ -1,13 +1,14 @@
 """Read-only DX event API and staff node exclusion for DX detection."""
 
-from django.db.models import Count, Prefetch
+from django.db.models import Count, IntegerField, OuterRef, Prefetch, Subquery, Value
+from django.db.models.functions import Coalesce
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
 from rest_framework import permissions, status, views, viewsets
 from rest_framework.response import Response
 
-from dx_monitoring.models import DxEvent, DxEventObservation, DxEventState, DxNodeMetadata
+from dx_monitoring.models import DxEvent, DxEventObservation, DxEventState, DxEventTraceroute, DxNodeMetadata
 from dx_monitoring.serializers import (
     DxEventDetailSerializer,
     DxEventListSerializer,
@@ -24,6 +25,14 @@ def _parse_dt(raw: str):
     if timezone.is_naive(dt):
         dt = timezone.make_aware(dt, timezone.get_current_timezone())
     return dt
+
+
+_exploration_attempt_count_sq = (
+    DxEventTraceroute.objects.filter(event_id=OuterRef("pk"))
+    .values("event_id")
+    .annotate(_c=Count("id"))
+    .values("_c")[:1]
+)
 
 
 class DxEventViewSet(viewsets.ReadOnlyModelViewSet):
@@ -46,7 +55,13 @@ class DxEventViewSet(viewsets.ReadOnlyModelViewSet):
         qs = (
             DxEvent.objects.all()
             .select_related("constellation", "destination", "destination__dx_metadata", "last_observer")
-            .annotate(evidence_count=Count("observations", distinct=True))
+            .annotate(
+                evidence_count=Count("observations", distinct=True),
+                exploration_attempt_count=Coalesce(
+                    Subquery(_exploration_attempt_count_sq, output_field=IntegerField()),
+                    Value(0),
+                ),
+            )
             .order_by("-last_observed_at")
         )
         if self.action == "retrieve":
@@ -58,7 +73,16 @@ class DxEventViewSet(viewsets.ReadOnlyModelViewSet):
                         "packet_observation",
                         "observer",
                     ).order_by("-observed_at"),
-                )
+                ),
+                Prefetch(
+                    "traceroute_explorations",
+                    queryset=DxEventTraceroute.objects.select_related(
+                        "source_node",
+                        "event__destination",
+                        "auto_traceroute",
+                        "auto_traceroute__target_node",
+                    ).order_by("-created_at"),
+                ),
             )
         params = self.request.query_params
 
