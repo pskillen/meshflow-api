@@ -110,6 +110,8 @@ fix(api): correct timezone handling in packet ingestion
 refactor(storage): extract packet parsing into service
 ```
 
+Note: `git commit` does not work in the sandbox, so skip the sandbox attempt
+
 ---
 
 ## 5. Pull Requests
