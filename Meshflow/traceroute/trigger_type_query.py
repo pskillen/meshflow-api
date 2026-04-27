@@ -10,6 +10,7 @@ LEGACY_SLUG_TO_INT: dict[str, int] = {
     "external": TriggerType.EXTERNAL,
     "auto": TriggerType.MONITORING,
     "monitor": TriggerType.NODE_WATCH,
+    "new_node_baseline": TriggerType.NEW_NODE_BASELINE,
 }
 
 _VALID_INTS = frozenset(int(c.value) for c in TriggerType)
@@ -19,8 +20,8 @@ def parse_trigger_type_filter_tokens(tokens: list[str]) -> list[int] | None:
     """
     Map comma-separated query tokens to integer ``TriggerType`` values.
 
-    Accepts legacy slugs (``auto``, ``user``, ``external``, ``monitor``) and
-    decimal integer strings ``1``–``5``. Unknown tokens are skipped. Returns
+    Accepts legacy slugs (``auto``, ``user``, ``external``, ``monitor``, ``new_node_baseline``) and
+    decimal integer strings ``1``–``6``. Unknown tokens are skipped. Returns
     ``None`` if no valid token remains (caller should not filter).
     """
     out: list[int] = []

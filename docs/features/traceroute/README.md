@@ -5,14 +5,14 @@ The traceroute feature tracks path discovery between Meshtastic nodes on the mes
 ## Overview
 
 - **AutoTraceRoute**: Django model recording each traceroute request (manual or scheduled) and its result.
-- **Triggering**: Manual (**User**), scheduled mesh exploration (**Monitoring**), **External** (cross-environment / orphaned responses), **Node Watch** (mesh monitoring verification), and **DX Watch** (reserved integer for future DX Monitoring exploration). See [Mesh monitoring](../mesh-monitoring/README.md) for node-watch flows.
+- **Triggering**: Manual (**User**), scheduled mesh exploration (**Monitoring**), **External** (cross-environment / orphaned responses), **Node Watch** (mesh monitoring verification), **DX Watch** (reserved integer for future DX Monitoring exploration), and **New node baseline** (first-seen `ObservedNode`; meshflow-api#236). See [Mesh monitoring](../mesh-monitoring/README.md) for node-watch flows.
 - **Command delivery**: WebSocket (`NodeConsumer`) sends traceroute commands to connected bots (meshtastic-bot).
 - **Completion**: Packet receiver matches incoming `TraceroutePacket` to `AutoTraceRoute` (same source/target within configurable window). If no match exists (e.g. cross-env: prod triggered, pre-prod received), creates an `AutoTraceRoute` with `trigger_type=2` (External). Updates status and pushes to Neo4j.
 - **Heatmap**: Neo4j stores edges; `heatmap-edges` API returns aggregated edges/nodes for map visualization.
 
 ## Trigger type (canonical)
 
-`AutoTraceRoute.trigger_type` is stored as a **stable integer**. The REST API returns `trigger_type` (int) and `trigger_type_label` (human-readable). List filters accept comma-separated **integers** and **legacy slugs** (`auto` → Monitoring, `monitor` → Node Watch) for backwards-compatible URLs.
+`AutoTraceRoute.trigger_type` is stored as a **stable integer**. The REST API returns `trigger_type` (int) and `trigger_type_label` (human-readable). List filters accept comma-separated **integers** and **legacy slugs** (`auto` → Monitoring, `monitor` → Node Watch, `new_node_baseline` → New node baseline) for backwards-compatible URLs.
 
 | Value | Name | Meaning |
 |------:|------|---------|
@@ -21,8 +21,9 @@ The traceroute feature tracks path discovery between Meshtastic nodes on the mes
 | 3 | Monitoring | Periodic scheduler (`trigger_source` e.g. `scheduler`); replaces historical string `auto`. |
 | 4 | Node Watch | Mesh monitoring verification round (`trigger_source` e.g. `mesh_monitoring`); replaces historical string `monitor`. |
 | 5 | DX Watch | Reserved for future DX Monitoring exploration (no scheduler behaviour yet). |
+| 6 | New node baseline | Queued once per target when an `ObservedNode` row is first created from packet ingestion (baseline route evidence; not DX Monitoring). |
 
-**Not the same thing:** `target_strategy` values `dx_across` and `dx_same_side` are **hypothesis-driven target selection** labels used by the scheduler when choosing an `ObservedNode` to trace. They are unrelated to trigger type **5 (DX Watch)**.
+**Not the same thing:** `target_strategy` values `dx_across` and `dx_same_side` are **hypothesis-driven target selection** labels used by the scheduler when choosing an `ObservedNode` to trace. They are unrelated to trigger type **5 (DX Watch)** or **6 (New node baseline)**.
 
 ## Data Model
 

@@ -42,6 +42,8 @@ The queue has multiple producers. They all create `pending` rows and leave WebSo
 
 Mesh monitoring creates one pending `AutoTraceRoute` per selected monitoring source when a watched node enters verification. The old `send_monitoring_traceroute_command` task remains as a legacy hook, but it now delegates to the shared dispatcher instead of sending one specific row directly.
 
+First-seen observed nodes enqueue at most one pending `AutoTraceRoute` per target with `trigger_type` **New node baseline** (integer 6). This uses the same dispatcher and per-source pacing as other producers; it is not part of DX Monitoring logic.
+
 Manual HTTP triggers are the exception: they still send immediately from the request path. They set `dispatched_at` when the immediate Channels send succeeds so downstream stale timeout and observability stay consistent with queued work.
 
 ## Dispatch Task

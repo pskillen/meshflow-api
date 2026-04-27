@@ -5,6 +5,7 @@ from django.dispatch import receiver
 from common.mesh_node_helpers import meshtastic_id_to_hex
 from constellations.models import ConstellationUserMembership
 from nodes.models import NodeLatestStatus, ObservedNode
+from traceroute.new_node_baseline import enqueue_new_node_baseline
 
 from .models import (
     AirQualityMetricsPacket,
@@ -73,7 +74,7 @@ def on_packet_received_update_inferred_max_hops(sender, packet, observer, observ
     if sender_node_id is None:
         return
     node_id_str = getattr(packet, "from_str", None) or meshtastic_id_to_hex(sender_node_id)
-    observed_node, _ = ObservedNode.objects.get_or_create(
+    observed_node, created = ObservedNode.objects.get_or_create(
         node_id=sender_node_id,
         defaults={
             "node_id_str": node_id_str,
@@ -81,6 +82,8 @@ def on_packet_received_update_inferred_max_hops(sender, packet, observer, observ
             "short_name": node_id_str[-4:] if len(node_id_str) >= 4 else "????",
         },
     )
+    if created:
+        enqueue_new_node_baseline(observed_node, observer)
     node_status, created = NodeLatestStatus.objects.get_or_create(
         node=observed_node,
         defaults={"inferred_max_hops": hop_start},
