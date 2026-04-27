@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from dx_monitoring.models import DxEvent, DxEventObservation, DxNodeMetadata
+from dx_monitoring.models import DxEvent, DxEventObservation, DxEventTraceroute, DxNodeMetadata
 
 
 class DxEventObservationInline(admin.TabularInline):
@@ -40,6 +40,14 @@ class DxEventObservationAdmin(admin.ModelAdmin):
     list_filter = ("observer__constellation",)
     search_fields = ("event__destination__node_id_str",)
     readonly_fields = ("id", "metadata")
+
+
+@admin.register(DxEventTraceroute)
+class DxEventTracerouteAdmin(admin.ModelAdmin):
+    list_display = ("id", "event", "source_node", "outcome", "skip_reason", "auto_traceroute", "created_at")
+    list_filter = ("outcome", "skip_reason")
+    search_fields = ("event__destination__node_id_str",)
+    readonly_fields = ("id", "metadata", "created_at", "updated_at")
 
 
 @admin.register(DxNodeMetadata)

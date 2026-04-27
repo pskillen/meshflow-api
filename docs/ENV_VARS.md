@@ -106,6 +106,15 @@ Discord **login** uses the OAuth pair above. **DM notifications** (test message 
 | `DX_MONITORING_DIRECT_DISTANCE_KM` | `100` | Minimum observer–destination distance (km) for `distant_observation`. | Float (string) |
 | `DX_MONITORING_TRACEROUTE_HOP_DISTANCE_KM` | `150` | Minimum great-circle distance between consecutive nodes on a completed traceroute path (forward and return) for `traceroute_distant_hop`. | Float (string) |
 
+| `DX_MONITORING_EXPLORATION_ENABLED` | `false` | When true, the periodic `explore_active_dx_events` task plans traceroute exploration for active DX events (`DX_WATCH` + baseline dedupe). | Boolean-ish string |
+| `DX_MONITORING_EXPLORATION_MAX_SOURCES_PER_EVENT` | `1` | Cap on distinct sources covered per event per planning attempt (after linking baselines). | Integer (string) |
+| `DX_MONITORING_EXPLORATION_EVENT_COOLDOWN_MINUTES` | `45` | Minimum time between exploration planning attempts for the same event (based on `DxEventTraceroute` creation times). | Integer (string) |
+| `DX_MONITORING_EXPLORATION_TARGET_COOLDOWN_MINUTES` | `30` | Minimum spacing between `DX_WATCH` rows with `trigger_source=dx_monitoring` to the same observed target. | Integer (string) |
+| `DX_MONITORING_EXPLORATION_SOURCE_COOLDOWN_MINUTES` | `30` | Minimum spacing between `DX_WATCH` rows with `trigger_source=dx_monitoring` from the same managed source. | Integer (string) |
+| `DX_MONITORING_EXPLORATION_BASELINE_RECENCY_MINUTES` | `120` | A completed `NEW_NODE_BASELINE` for the target/source is treated as fresh exploration evidence within this window (link as completed, do not queue `DX_WATCH`). | Integer (string) |
+| `DX_MONITORING_EXPLORATION_BASELINE_FAILURE_COOLDOWN_MINUTES` | `60` | After a failed baseline for the same source/target, wait this long before `DX_WATCH` from that source or before treating a failed `DX_WATCH` as blocking. | Integer (string) |
+| `DX_MONITORING_EXPLORATION_RECENCY_MINUTES` | `120` | Treat recent completed or failed `DX_WATCH` (`trigger_source=dx_monitoring`) as duplicate for the same source/target within this window. | Integer (string) |
+
 Packet-ingest rules (`new_distant_node`, `returned_dx_node`, `distant_observation`) only run when the `PacketObservation` is **direct**: both `hop_start` and `hop_limit` must be present and `hop_start - hop_limit == 0`. Missing hop metadata or multi-hop observations are ignored for those reasons (multi-hop mesh reachability is normal).
 
 See **[docs/features/dx-monitoring/detection.md](features/dx-monitoring/detection.md)** for behaviour.
