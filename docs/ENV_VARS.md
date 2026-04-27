@@ -115,6 +115,12 @@ Discord **login** uses the OAuth pair above. **DM notifications** (test message 
 | `DX_MONITORING_EXPLORATION_BASELINE_FAILURE_COOLDOWN_MINUTES` | `60` | After a failed baseline for the same source/target, wait this long before `DX_WATCH` from that source or before treating a failed `DX_WATCH` as blocking. | Integer (string) |
 | `DX_MONITORING_EXPLORATION_RECENCY_MINUTES` | `120` | Treat recent completed or failed `DX_WATCH` (`trigger_source=dx_monitoring`) as duplicate for the same source/target within this window. | Integer (string) |
 
+| `DX_MONITORING_NOTIFICATIONS_ENABLED` | `false` | When true, the API can schedule Celery `notify_dx_event` tasks for opt-in users (new event, evidence threshold, event closed). Requires verified Discord DMs. | Boolean-ish string |
+| `DX_MONITORING_NOTIFICATION_CONFIRMED_MIN_OBSERVATIONS` | `3` | Minimum `DxEvent.observation_count` to emit `confirmed_event` (emission is skipped when the configured value is less than 2). | Integer (string) |
+| `DX_MONITORING_NOTIFICATION_CATEGORY_COOLDOWN_MINUTES` | `30` | Minimum time between the same (user, category) sends across *different* DX events; set to `0` to disable per-category cool-down. | Integer (string) |
+
+See **[docs/features/dx-monitoring/notifications.md](features/dx-monitoring/notifications.md)** for categories and self-service API.
+
 Packet-ingest rules (`new_distant_node`, `returned_dx_node`, `distant_observation`) only run when the `PacketObservation` is **direct**: both `hop_start` and `hop_limit` must be present and `hop_start - hop_limit == 0`. Missing hop metadata or multi-hop observations are ignored for those reasons (multi-hop mesh reachability is normal).
 
 See **[docs/features/dx-monitoring/detection.md](features/dx-monitoring/detection.md)** for behaviour.

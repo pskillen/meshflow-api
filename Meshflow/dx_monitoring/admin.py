@@ -1,6 +1,14 @@
 from django.contrib import admin
 
-from dx_monitoring.models import DxEvent, DxEventObservation, DxEventTraceroute, DxNodeMetadata
+from dx_monitoring.models import (
+    DxEvent,
+    DxEventObservation,
+    DxEventTraceroute,
+    DxNodeMetadata,
+    DxNotificationCategorySelection,
+    DxNotificationDelivery,
+    DxNotificationSubscription,
+)
 
 
 class DxEventObservationInline(admin.TabularInline):
@@ -55,3 +63,31 @@ class DxNodeMetadataAdmin(admin.ModelAdmin):
     list_display = ("observed_node", "exclude_from_detection", "cluster_position_evaluated_for_dx", "updated_at")
     list_filter = ("exclude_from_detection", "cluster_position_evaluated_for_dx")
     search_fields = ("observed_node__node_id_str", "exclude_notes")
+
+
+class DxNotificationCategorySelectionInline(admin.TabularInline):
+    model = DxNotificationCategorySelection
+    extra = 0
+
+
+@admin.register(DxNotificationSubscription)
+class DxNotificationSubscriptionAdmin(admin.ModelAdmin):
+    list_display = ("id", "user", "enabled", "all_categories", "updated_at")
+    list_filter = ("enabled", "all_categories")
+    search_fields = ("user__username", "user__email")
+    inlines = [DxNotificationCategorySelectionInline]
+
+
+@admin.register(DxNotificationDelivery)
+class DxNotificationDeliveryAdmin(admin.ModelAdmin):
+    list_display = ("id", "event", "user", "category", "created_at")
+    list_filter = ("category",)
+    search_fields = ("user__username", "event__id")
+    readonly_fields = ("id", "event", "user", "category", "created_at")
+    date_hierarchy = "created_at"
+
+    def has_add_permission(self, request) -> bool:
+        return False
+
+    def has_change_permission(self, request, obj=None) -> bool:
+        return False

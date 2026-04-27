@@ -174,6 +174,13 @@ def _touch_event(
             "active_until",
         ]
     )
+    if getattr(settings, "DX_MONITORING_NOTIFICATIONS_ENABLED", False):
+        from dx_monitoring.notification_triggers import maybe_enqueue_confirmed_event
+
+        maybe_enqueue_confirmed_event(
+            event_id=event.pk,
+            observation_count=event.observation_count,
+        )
 
 
 def _get_or_create_active_event(
@@ -241,6 +248,10 @@ def _get_or_create_active_event(
         distance_km=distance_km,
         metadata=evidence_metadata,
     )
+    if getattr(settings, "DX_MONITORING_NOTIFICATIONS_ENABLED", False):
+        from dx_monitoring.notification_triggers import maybe_enqueue_for_new_reason_event
+
+        maybe_enqueue_for_new_reason_event(event_id=event.pk, reason_code=reason_code)
     return event
 
 

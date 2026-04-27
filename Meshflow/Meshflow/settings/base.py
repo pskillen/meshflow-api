@@ -485,6 +485,17 @@ DX_MONITORING_EXPLORATION_BASELINE_FAILURE_COOLDOWN_MINUTES = _dx_env_int(
 )
 DX_MONITORING_EXPLORATION_RECENCY_MINUTES = _dx_env_int("DX_MONITORING_EXPLORATION_RECENCY_MINUTES", 120)
 
+# DX Discord notification fan-out (default off; requires verified user Discord DMs + Celery).
+DX_MONITORING_NOTIFICATIONS_ENABLED = _dx_env_bool("DX_MONITORING_NOTIFICATIONS_ENABLED", False)
+# Minimum ``DxEvent.observation_count`` to emit ``confirmed_event`` (no-op when < 2).
+DX_MONITORING_NOTIFICATION_CONFIRMED_MIN_OBSERVATIONS = _dx_env_int(
+    "DX_MONITORING_NOTIFICATION_CONFIRMED_MIN_OBSERVATIONS", 3
+)
+# Minimum minutes between the same (user, category) sends across *different* events; 0 disables.
+DX_MONITORING_NOTIFICATION_CATEGORY_COOLDOWN_MINUTES = _dx_env_int(
+    "DX_MONITORING_NOTIFICATION_CATEGORY_COOLDOWN_MINUTES", 30
+)
+
 # Enable Prometheus metrics if a password is set
 PROMETHEUS_PASSWORD = os.environ.get("PROMETHEUS_PASSWORD", None)
 if PROMETHEUS_PASSWORD:

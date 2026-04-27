@@ -6,7 +6,13 @@ from rest_framework import serializers
 
 from common.mesh_node_helpers import meshtastic_id_to_hex
 from constellations.models import Constellation
-from dx_monitoring.models import DxEvent, DxEventObservation, DxEventTraceroute, DxNodeMetadata
+from dx_monitoring.models import (
+    DxEvent,
+    DxEventObservation,
+    DxEventTraceroute,
+    DxNodeMetadata,
+    DxNotificationCategory,
+)
 from nodes.models import ManagedNode, ObservedNode
 from traceroute.models import AutoTraceRoute
 
@@ -210,3 +216,56 @@ class DxNodeExclusionResponseSerializer(serializers.Serializer):
     exclude_from_detection = serializers.BooleanField()
     exclude_notes = serializers.CharField()
     updated_at = serializers.DateTimeField(allow_null=True)
+
+
+def _available_dx_notification_category_values() -> list[str]:
+    return [
+        c.value
+        for c in (
+            DxNotificationCategory.NEW_DISTANT_NODE,
+            DxNotificationCategory.RETURNED_DX_NODE,
+            DxNotificationCategory.DISTANT_OBSERVATION,
+            DxNotificationCategory.TRACEROUTE_DISTANT_HOP,
+            DxNotificationCategory.CONFIRMED_EVENT,
+            DxNotificationCategory.EVENT_CLOSED_SUMMARY,
+        )
+    ]
+
+
+class DiscordReadinessSerializer(serializers.Serializer):
+    status = serializers.ChoiceField(choices=["verified", "not_linked", "needs_relink"])
+    can_receive_dms = serializers.BooleanField()
+
+
+class DxNotificationSettingsResponseSerializer(serializers.Serializer):
+    """GET /api/dx/notifications/settings/"""
+
+    enabled = serializers.BooleanField()
+    all_categories = serializers.BooleanField()
+    categories = serializers.ListField(
+        child=serializers.ChoiceField(choices=[(v, v) for v in _available_dx_notification_category_values()]),
+        allow_empty=True,
+        required=True,
+    )
+    discord = DiscordReadinessSerializer()
+
+
+class DxNotificationSettingsWriteSerializer(serializers.Serializer):
+    """PUT/PATCH body for self-service notification preferences."""
+
+    enabled = serializers.BooleanField(required=False)
+    all_categories = serializers.BooleanField(required=False)
+    categories = serializers.ListField(
+        child=serializers.ChoiceField(choices=[(v, v) for v in _available_dx_notification_category_values()]),
+        allow_empty=True,
+        required=False,
+    )
+
+    def validate(self, attrs: dict) -> dict:
+        all_cat = attrs.get("all_categories", True)
+        cats = attrs.get("categories")
+        if not all_cat and (not cats or len(cats) < 1):
+            raise serializers.ValidationError(
+                {"categories": ("When all_categories is false, provide at least one category in `categories`.")}
+            )
+        return attrs
