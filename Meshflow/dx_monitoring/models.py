@@ -129,3 +129,75 @@ class DxEventObservation(models.Model):
 
     def __str__(self):
         return f"dx-obs:{self.event_id}:{self.raw_packet_id}"
+
+
+class DxEventTracerouteSkipReason(models.TextChoices):
+    NO_ELIGIBLE_SOURCE = "no_eligible_source", _("No eligible source")
+    SOURCE_QUEUE_FULL = "source_queue_full", _("Source pending queue full")
+    EVENT_COOLDOWN = "event_cooldown", _("Event exploration cooldown")
+    TARGET_COOLDOWN = "target_cooldown", _("Target exploration cooldown")
+    SOURCE_COOLDOWN = "source_cooldown", _("Source exploration cooldown")
+    BASELINE_IN_FLIGHT = "baseline_in_flight", _("Baseline traceroute already covers this source")
+    BASELINE_RECENT_SUCCESS = "baseline_recent_success", _("Recent baseline completed for this source")
+    BASELINE_FAILURE_COOLDOWN = "baseline_failure_cooldown", _("Baseline failed recently for this source")
+    DUPLICATE_DX_WATCH = "duplicate_dx_watch", _("Existing DX_WATCH for this source and target")
+    DESTINATION_EXCLUDED = "destination_excluded", _("Destination excluded from DX")
+    FANOUT_SATURATED = "fanout_saturated", _("Max exploration sources already covered for this event")
+
+
+class DxEventTracerouteOutcome(models.TextChoices):
+    PENDING = "pending", _("Awaiting traceroute result")
+    COMPLETED = "completed", _("Traceroute completed successfully")
+    FAILED = "failed", _("Traceroute failed or timed out")
+    SKIPPED = "skipped", _("Did not queue a new traceroute")
+
+
+class DxEventTraceroute(models.Model):
+    """Links a :class:`DxEvent` to queued or linked :class:`traceroute.models.AutoTraceRoute` exploration."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    event = models.ForeignKey(
+        DxEvent,
+        on_delete=models.CASCADE,
+        related_name="traceroute_explorations",
+    )
+    auto_traceroute = models.ForeignKey(
+        "traceroute.AutoTraceRoute",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="dx_event_traceroutes",
+    )
+    source_node = models.ForeignKey(
+        "nodes.ManagedNode",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="dx_event_traceroutes",
+    )
+    outcome = models.CharField(
+        max_length=24,
+        choices=DxEventTracerouteOutcome.choices,
+        default=DxEventTracerouteOutcome.PENDING,
+        db_index=True,
+    )
+    skip_reason = models.CharField(
+        max_length=48,
+        choices=DxEventTracerouteSkipReason.choices,
+        blank=True,
+        default="",
+    )
+    metadata = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = _("DX event traceroute exploration")
+        verbose_name_plural = _("DX event traceroute explorations")
+        indexes = [
+            models.Index(fields=["event", "created_at"], name="dx_evtr_event_created_idx"),
+            models.Index(fields=["auto_traceroute"], name="dx_evtr_autotr_idx"),
+        ]
+
+    def __str__(self):
+        return f"dx-ev-tr:{self.event_id}:{self.outcome}"

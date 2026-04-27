@@ -193,6 +193,9 @@ def mark_stale_traceroutes_failed():
         auto_tr.completed_at = timezone.now()
         auto_tr.error_message = f"Timed out after {FAILED_TR_TIMEOUT_SECONDS}s"
         auto_tr.save(update_fields=["status", "completed_at", "error_message"])
+        from dx_monitoring.exploration import on_auto_traceroute_exploration_finished
+
+        on_auto_traceroute_exploration_finished(auto_tr)
         notify_traceroute_status_changed(auto_tr.id, AutoTraceRoute.STATUS_FAILED)
         updated += 1
         logger.info(

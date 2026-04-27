@@ -11,6 +11,7 @@ from django.utils import timezone
 
 from common.geo import haversine_km
 from constellations.models import Constellation
+from dx_monitoring.exploration import exploration_links_auto_traceroute_to_destination
 from dx_monitoring.models import (
     DxEvent,
     DxEventObservation,
@@ -400,6 +401,8 @@ def maybe_detect_dx_from_completed_traceroute(
                 continue
             dest_node = ObservedNode.objects.filter(node_id=b_id).first()
             if dest_node is None:
+                continue
+            if exploration_links_auto_traceroute_to_destination(auto_tr, b_id):
                 continue
             _get_or_create_active_event(
                 constellation=constellation,

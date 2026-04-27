@@ -44,6 +44,8 @@ Mesh monitoring creates one pending `AutoTraceRoute` per selected monitoring sou
 
 First-seen observed nodes enqueue at most one pending `AutoTraceRoute` per target with `trigger_type` **New node baseline** (integer 6). This uses the same dispatcher and per-source pacing as other producers; it is not part of DX Monitoring logic.
 
+**DX exploration** (`trigger_type` **DX watch**, integer 5, `trigger_source=dx_monitoring`) is produced by the `explore_active_dx_events` Celery task for active `DxEvent` rows. Planning **dedupes** against existing **New node baseline** rows for the same target: in-flight or recently completed baselines are **linked** on `DxEventTraceroute` instead of queueing a second traceroute to the same source/target. Additional perspectives queue new `DX_WATCH` rows up to `DX_MONITORING_EXPLORATION_MAX_SOURCES_PER_EVENT`. See **[docs/features/dx-monitoring/exploration.md](../dx-monitoring/exploration.md)**.
+
 Manual HTTP triggers are the exception: they still send immediately from the request path. They set `dispatched_at` when the immediate Channels send succeeds so downstream stale timeout and observability stay consistent with queued work.
 
 ## Dispatch Task

@@ -167,6 +167,11 @@ verification. Mesh monitoring asks "can nearby infrastructure still reach this
 node?" DX exploration asks "what sources can capture useful path evidence for
 this unusual observation?"
 
+**Phase 4 (implemented):** Bounded exploration uses `DxEventTraceroute`,
+`trigger_type=DX_WATCH` (`trigger_source=dx_monitoring`), deduplication against
+`NEW_NODE_BASELINE`, and the celery task `explore_active_dx_events`. Details:
+**[exploration.md](exploration.md)**.
+
 ## Notifications
 
 Notifications should come after detection and exploration have enough quality to
