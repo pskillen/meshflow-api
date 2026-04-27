@@ -2,12 +2,14 @@ from django.urls import include, path
 
 from rest_framework.routers import DefaultRouter
 
+from dx_monitoring.notification_api import DxNotificationSettingsView
 from dx_monitoring.views import DxEventViewSet, DxNodeExclusionByNodeIdView, DxNodeExclusionView
 
 router = DefaultRouter()
 router.register(r"events", DxEventViewSet, basename="dxevent")
 
 urlpatterns = [
+    path("notifications/settings/", DxNotificationSettingsView.as_view(), name="dx-notifications-settings"),
     path("", include(router.urls)),
     path("nodes/exclusion/", DxNodeExclusionView.as_view(), name="dx-node-exclusion"),
     path(

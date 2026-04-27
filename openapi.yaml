@@ -27,7 +27,7 @@ tags:
   - name: Mesh Monitoring
     description: User watches on observed nodes for silence detection and offline verification
   - name: DX Monitoring
-    description: Staff-only DX detection event visibility and per-node exclusion metadata
+    description: Staff-only DX event visibility, per-node exclusion metadata, and self-service opt-in notification settings
 
 components:
   parameters:
@@ -2632,6 +2632,70 @@ components:
           type: string
           format: date-time
           nullable: true
+
+    DiscordReadiness:
+      type: object
+      required: [status, can_receive_dms]
+      properties:
+        status:
+          type: string
+          description: |
+            - `verified`: Discord DM target is linked and verified.
+            - `not_linked`: user has not linked a Discord account for DMs.
+            - `needs_relink`: a Discord id is on file but is not current (resync in user settings).
+          enum: [verified, not_linked, needs_relink]
+        can_receive_dms:
+          type: boolean
+
+    DxNotificationCategoryValue:
+      type: string
+      description: Granular DX notification category.
+      enum:
+        - new_distant_node
+        - returned_dx_node
+        - distant_observation
+        - traceroute_distant_hop
+        - confirmed_event
+        - event_closed_summary
+
+    DxNotificationSettings:
+      type: object
+      required: [enabled, all_categories, categories, discord]
+      properties:
+        enabled:
+          type: boolean
+          description: When true, the user is opted in to DX DMs (requires verified Discord).
+        all_categories:
+          type: boolean
+          description: When true, all categories in `categories` (typically all six) apply.
+        categories:
+          type: array
+          items:
+            $ref: '#/components/schemas/DxNotificationCategoryValue'
+        discord:
+          $ref: '#/components/schemas/DiscordReadiness'
+
+    DxNotificationSettingsWrite:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        all_categories:
+          type: boolean
+        categories:
+          type: array
+          items:
+            $ref: '#/components/schemas/DxNotificationCategoryValue'
+
+    DxNotificationSettingsError:
+      type: object
+      description: e.g. Discord not verified
+      properties:
+        code:
+          type: string
+          enum: [NEEDS_DISCORD_VERIFICATION]
+        detail:
+          type: string
 
 
 paths:
@@ -6050,6 +6114,80 @@ paths:
           description: Forbidden (not staff)
         '404':
           description: No observed node for node_id
+
+  /dx/notifications/settings/:
+    get:
+      summary: Get DX notification subscription for the current user
+      description: >
+        Returns opt-in state, category selection (or all categories), and Discord readiness.
+        Creates a default subscription row on first access (disabled, all categories).
+      tags: [DX Monitoring]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Current subscription and Discord readiness
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DxNotificationSettings'
+        '401':
+          description: Unauthorized
+    put:
+      summary: Replace DX notification subscription
+      description: >
+        Full replace. When `enabled` is true, the user must have verified Discord DMs
+        (same rules as other Meshflow notification features).
+      tags: [DX Monitoring]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DxNotificationSettingsWrite'
+      responses:
+        '200':
+          description: Updated subscription
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DxNotificationSettings'
+        '400':
+          description: Validation error (e.g. no categories when all_categories is false) or needs Discord
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DxNotificationSettingsError'
+        '401':
+          description: Unauthorized
+    patch:
+      summary: Partially update DX notification subscription
+      tags: [DX Monitoring]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DxNotificationSettingsWrite'
+      responses:
+        '200':
+          description: Updated subscription
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DxNotificationSettings'
+        '400':
+          description: Validation error or needs Discord
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DxNotificationSettingsError'
+        '401':
+          description: Unauthorized
 
   /nodes/claims/mine/:
     get:

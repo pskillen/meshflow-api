@@ -7,3 +7,6 @@ class DxMonitoringConfig(AppConfig):
     name = "dx_monitoring"
     label = "dx_monitoring"
     verbose_name = _("DX Monitoring")
+
+    def ready(self):
+        from . import signals  # noqa: F401

@@ -1,5 +1,6 @@
 import uuid
 
+from django.conf import settings
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
@@ -201,3 +202,107 @@ class DxEventTraceroute(models.Model):
 
     def __str__(self):
         return f"dx-ev-tr:{self.event_id}:{self.outcome}"
+
+
+class DxNotificationCategory(models.TextChoices):
+    """
+    User-selectable categories for DX Discord notifications.
+    `all` is not stored on category rows; use :class:`DxNotificationSubscription.all_categories`.
+    """
+
+    NEW_DISTANT_NODE = "new_distant_node", _("New distant node")
+    RETURNED_DX_NODE = "returned_dx_node", _("Returned DX node after quiet period")
+    DISTANT_OBSERVATION = "distant_observation", _("Distant direct/near-direct observation")
+    TRACEROUTE_DISTANT_HOP = "traceroute_distant_hop", _("Distant hop from traceroute evidence")
+    CONFIRMED_EVENT = "confirmed_event", _("Event reached evidence threshold")
+    EVENT_CLOSED_SUMMARY = "event_closed_summary", _("Event closed (summary)")
+
+
+# Categories that may appear in the granular allow-list (excludes the synthetic "all" concept).
+_DX_NOTIF_SUBSCRIPTION_CATEGORY_CHOICES = tuple(
+    (c.value, c.label)
+    for c in (
+        DxNotificationCategory.NEW_DISTANT_NODE,
+        DxNotificationCategory.RETURNED_DX_NODE,
+        DxNotificationCategory.DISTANT_OBSERVATION,
+        DxNotificationCategory.TRACEROUTE_DISTANT_HOP,
+        DxNotificationCategory.CONFIRMED_EVENT,
+        DxNotificationCategory.EVENT_CLOSED_SUMMARY,
+    )
+)
+
+
+class DxNotificationSubscription(models.Model):
+    """Per-user opt-in to DX event Discord DMs (requires verified Discord target)."""
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="dx_notification_subscription",
+    )
+    enabled = models.BooleanField(
+        default=False,
+        help_text=_("When True and Discord is verified, the user can receive category-filtered DMs."),
+    )
+    all_categories = models.BooleanField(
+        default=True,
+        help_text=_("When True, all DX notification categories are included."),
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = _("DX notification subscription")
+        verbose_name_plural = _("DX notification subscriptions")
+
+    def __str__(self):
+        return f"dx-notif-sub:{self.user_id}"
+
+
+class DxNotificationCategorySelection(models.Model):
+    """
+    When ``subscription.all_categories`` is False, the user must select at least
+    one category; each selected value is a row in this table.
+    """
+
+    subscription = models.ForeignKey(
+        DxNotificationSubscription,
+        on_delete=models.CASCADE,
+        related_name="category_selections",
+    )
+    category = models.CharField(max_length=48, db_index=True, choices=_DX_NOTIF_SUBSCRIPTION_CATEGORY_CHOICES)
+
+    class Meta:
+        verbose_name = _("DX notification category selection")
+        verbose_name_plural = _("DX notification category selections")
+        constraints = [models.UniqueConstraint(fields=("subscription", "category"), name="dx_notif_sub_cat_uniq")]
+
+
+class DxNotificationDelivery(models.Model):
+    """
+    One row per successful (event, user, category) send for idempotency;
+    not used for failed attempts (see DiscordNotificationAudit).
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    event = models.ForeignKey("DxEvent", on_delete=models.CASCADE, related_name="notification_deliveries")
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="dx_notification_deliveries",
+    )
+    category = models.CharField(max_length=48, db_index=True, choices=_DX_NOTIF_SUBSCRIPTION_CATEGORY_CHOICES)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        verbose_name = _("DX notification delivery")
+        verbose_name_plural = _("DX notification deliveries")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("event", "user", "category"),
+                name="dx_notif_deliv_event_user_category_uniq",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["user", "category", "created_at"], name="dx_notif_deliv_user_cat_time"),
+        ]
