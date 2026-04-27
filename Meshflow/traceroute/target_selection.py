@@ -128,7 +128,7 @@ def pick_traceroute_target(
         strat = None
 
     last_traced_hours = _get_last_traced_by_source(managed_node)
-    managed_node_ids = set(ManagedNode.objects.values_list("node_id", flat=True))
+    managed_node_ids = set(ManagedNode.objects.filter(deleted_at__isnull=True).values_list("node_id", flat=True))
     suppressed = list(suppressed_observed_node_ids())
     hard_cooldown, soft_penalty = load_source_target_reliability(managed_node)
 

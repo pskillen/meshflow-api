@@ -122,7 +122,7 @@ def mark_constellation_managed_nodes_feeding(mark_managed_node_feeding):
     """Mark every managed node in a constellation as actively feeding."""
 
     def _mark(constellation):
-        for mn in ManagedNode.objects.filter(constellation=constellation):
+        for mn in ManagedNode.objects.filter(constellation=constellation, deleted_at__isnull=True):
             mark_managed_node_feeding(mn, sending=True)
 
     return _mark

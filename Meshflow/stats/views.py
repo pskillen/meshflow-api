@@ -222,7 +222,7 @@ def node_received_stats(request, node_id: int):
     """
     try:
         # Check if this is a managed node
-        managed_node = ManagedNode.objects.get(node_id=node_id)
+        managed_node = ManagedNode.objects.get(node_id=node_id, deleted_at__isnull=True)
     except ManagedNode.DoesNotExist:
         # If not a managed node, return empty result
         return Response({"start_date": None, "end_date": None, "intervals": []}, status=status.HTTP_200_OK)
@@ -304,7 +304,7 @@ def node_neighbour_stats(request, node_id: int):
         Response containing packet counts by source node
     """
     try:
-        managed_node = ManagedNode.objects.get(node_id=node_id)
+        managed_node = ManagedNode.objects.get(node_id=node_id, deleted_at__isnull=True)
     except ManagedNode.DoesNotExist:
         return Response(
             {"start_date": None, "end_date": None, "by_source": [], "total_packets": 0},

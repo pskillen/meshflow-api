@@ -16,6 +16,7 @@ from django.db.models import (
     When,
 )
 from django.db.models.functions import Coalesce
+from django.db import transaction
 from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -137,7 +138,7 @@ class APIKeyViewSet(viewsets.ModelViewSet):
             return Response({"error": "node_id is required"}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            node = ManagedNode.objects.get(node_id=node_id)
+            node = ManagedNode.objects.get(node_id=node_id, deleted_at__isnull=True)
         except ManagedNode.DoesNotExist:
             return Response(
                 {"error": f"Node with ID {node_id} does not exist"},
@@ -173,7 +174,7 @@ class APIKeyViewSet(viewsets.ModelViewSet):
             return Response({"error": "node_id is required"}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            node = ManagedNode.objects.get(node_id=node_id)
+            node = ManagedNode.objects.get(node_id=node_id, deleted_at__isnull=True)
         except ManagedNode.DoesNotExist:
             return Response(
                 {"error": f"Node with ID {node_id} does not exist"},
@@ -968,7 +969,7 @@ class ManagedNodeViewSet(viewsets.ModelViewSet):
     ViewSet for managing managed nodes.
     """
 
-    queryset = ManagedNode.objects.all().order_by("node_id")
+    queryset = ManagedNode.objects.filter(deleted_at__isnull=True).order_by("node_id")
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = ManagedNodeSerializer
     lookup_field = "node_id"
@@ -1053,7 +1054,7 @@ class ManagedNodeViewSet(viewsets.ModelViewSet):
         )
 
     def _managed_nodes_queryset(self, owner=None):
-        queryset = ManagedNode.objects.all().order_by("node_id")
+        queryset = ManagedNode.objects.filter(deleted_at__isnull=True).order_by("node_id")
         if owner is not None:
             queryset = queryset.filter(owner=owner)
         queryset = self._annotate_common_fields(queryset)
@@ -1105,7 +1106,10 @@ class ManagedNodeViewSet(viewsets.ModelViewSet):
 
     def perform_destroy(self, instance):
         self._managed_node_mutate_allowed(instance)
-        super().perform_destroy(instance)
+        now = timezone.now()
+        NodeAuth.objects.filter(node=instance).delete()
+        instance.deleted_at = now
+        instance.save(update_fields=["deleted_at"])
 
     @action(detail=False, methods=["get"])
     def mine(self, request):
@@ -1152,7 +1156,11 @@ class ObservedNodeClaimView(APIView):
         claim = NodeOwnerClaim.objects.filter(node=node, user=request.user).first()
         if not claim:
             return Response({"detail": "No claim found."}, status=status.HTTP_404_NOT_FOUND)
-        claim.delete()
+        with transaction.atomic():
+            claim.delete()
+            if node.claimed_by_id == request.user.id:
+                node.claimed_by = None
+                node.save(update_fields=["claimed_by"])
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 

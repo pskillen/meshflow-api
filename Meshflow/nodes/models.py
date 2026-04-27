@@ -86,6 +86,13 @@ class ManagedNode(models.Model):
         help_text=_("If True, this node may be used for auto-scheduled traceroutes and manual triggers."),
     )
 
+    deleted_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text=_("When set, this managed node was soft-deleted and no longer participates in ingest or listings."),
+    )
+
     class Meta:
         """Model metadata."""
 
@@ -98,6 +105,14 @@ class ManagedNode(models.Model):
         if not self.node_id:
             return None
         return meshtastic_id_to_hex(self.node_id)
+
+    @property
+    def is_deleted(self) -> bool:
+        return self.deleted_at is not None
+
+    @property
+    def is_active(self) -> bool:
+        return self.deleted_at is None
 
     def __str__(self):
         """Return a string representation of the node, including user's short name if available."""

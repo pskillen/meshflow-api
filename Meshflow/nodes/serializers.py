@@ -302,7 +302,7 @@ class APIKeyCreateSerializer(serializers.ModelSerializer):
         # Link the API key to nodes
         for node_id in nodes:
             try:
-                node = ManagedNode.objects.get(node_id=node_id)
+                node = ManagedNode.objects.get(node_id=node_id, deleted_at__isnull=True)
                 NodeAuth.objects.create(api_key=api_key, node=node)
             except ManagedNode.DoesNotExist:
                 # Skip nodes that don't exist
@@ -649,6 +649,22 @@ class OwnedManagedNodeSerializer(ManagedNodeSerializer):
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
+        if self.instance is None:
+            node_id = attrs.get("node_id")
+            if node_id is not None:
+                if ManagedNode.objects.filter(node_id=node_id, deleted_at__isnull=True).exists():
+                    raise serializers.ValidationError(
+                        {"node_id": "A managed node already exists for this mesh node."}
+                    )
+                if ManagedNode.objects.filter(node_id=node_id, deleted_at__isnull=False).exists():
+                    raise serializers.ValidationError(
+                        {
+                            "node_id": (
+                                "This node was previously removed from managed service. "
+                                "Contact a system administrator to re-enable management."
+                            )
+                        }
+                    )
         constellation = attrs.get("constellation")
         if constellation is None and self.instance is not None:
             constellation = self.instance.constellation

@@ -65,7 +65,7 @@ def _select_stratified_lru_ordered(qs):
         return []
 
     rows = list(
-        ManagedNode.objects.filter(pk__in=eligible)
+        ManagedNode.objects.filter(pk__in=eligible, deleted_at__isnull=True)
         .values("constellation_id")
         .annotate(c_last_tr=Max("traceroutes_sent__triggered_at"))
         .order_by(F("c_last_tr").asc(nulls_first=True))

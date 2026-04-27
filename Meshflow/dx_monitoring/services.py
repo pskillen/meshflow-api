@@ -56,7 +56,7 @@ def _cluster_footprint(constellation_id: int) -> list[tuple[float, float]]:
     from nodes.models import ManagedNode
 
     rows = (
-        ManagedNode.objects.filter(constellation_id=constellation_id)
+        ManagedNode.objects.filter(constellation_id=constellation_id, deleted_at__isnull=True)
         .exclude(default_location_latitude__isnull=True)
         .exclude(default_location_longitude__isnull=True)
         .values_list("default_location_latitude", "default_location_longitude")

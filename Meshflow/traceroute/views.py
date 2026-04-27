@@ -53,7 +53,7 @@ def traceroute_list(request):
     managed_node = request.query_params.get("managed_node")
     if managed_node:
         try:
-            mn = ManagedNode.objects.get(node_id=int(managed_node))
+            mn = ManagedNode.objects.get(node_id=int(managed_node), deleted_at__isnull=True)
             qs = qs.filter(source_node=mn)
         except ValueError, ManagedNode.DoesNotExist:
             pass
@@ -61,7 +61,7 @@ def traceroute_list(request):
     source_node = request.query_params.get("source_node")
     if source_node:
         try:
-            mn = ManagedNode.objects.get(node_id=int(source_node))
+            mn = ManagedNode.objects.get(node_id=int(source_node), deleted_at__isnull=True)
             qs = qs.filter(source_node=mn)
         except ValueError, ManagedNode.DoesNotExist:
             pass
@@ -182,7 +182,9 @@ def traceroute_trigger(request):
     target_node_id = serializer.validated_data.get("target_node_id")
     target_strategy_req = serializer.validated_data.get("target_strategy")
 
-    source_node = ManagedNode.objects.filter(node_id=managed_node_id).order_by("internal_id").first()
+    source_node = (
+        ManagedNode.objects.filter(node_id=managed_node_id, deleted_at__isnull=True).order_by("internal_id").first()
+    )
     if source_node is None:
         return Response(
             {"managed_node_id": ["ManagedNode with this node_id not found."]},
@@ -421,7 +423,7 @@ def feeder_reach(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    feeder = ManagedNode.objects.filter(node_id=feeder_id).first()
+    feeder = ManagedNode.objects.filter(node_id=feeder_id, deleted_at__isnull=True).first()
     if feeder is None:
         return Response({"detail": "Feeder not found."}, status=status.HTTP_404_NOT_FOUND)
 
@@ -678,7 +680,10 @@ def traceroute_stats(request):
         )
     )
     source_internal_ids = [r["source_node_id"] for r in by_source_rows]
-    managed_by_internal_id = {m.internal_id: m for m in ManagedNode.objects.filter(internal_id__in=source_internal_ids)}
+    managed_by_internal_id = {
+        m.internal_id: m
+        for m in ManagedNode.objects.filter(internal_id__in=source_internal_ids, deleted_at__isnull=True)
+    }
     mesh_node_ids = [m.node_id for m in managed_by_internal_id.values()]
     observed_short_by_mesh_id = {}
     if mesh_node_ids:

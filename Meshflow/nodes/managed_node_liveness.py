@@ -23,6 +23,7 @@ def eligible_auto_traceroute_sources_queryset():
     schedule_traceroute_source_recency_seconds in nodes.tasks.update_managed_node_statuses).
     """
     return ManagedNode.objects.filter(
+        deleted_at__isnull=True,
         allow_auto_traceroute=True,
         status__is_sending_data=True,
     ).select_related("constellation", "status")

@@ -1,6 +1,11 @@
+from types import SimpleNamespace
+
 import pytest
+from django.utils import timezone
 
 from nodes.authentication import NodeAPIKeyAuthentication
+from nodes.models import NodeAuth
+from nodes.permissions import NodeAuthorizationPermission
 
 
 @pytest.mark.django_db
@@ -147,3 +152,19 @@ def test_node_api_key_authentication_prefer_x_api_key(create_node_api_key):
 
     assert user == api_key.owner
     assert auth_key == api_key
+
+
+@pytest.mark.django_db
+def test_node_authorization_permission_denies_soft_deleted_managed_node(
+    create_managed_node, create_node_api_key
+):
+    mn = create_managed_node()
+    api_key = create_node_api_key(owner=mn.owner, constellation=mn.constellation)
+    NodeAuth.objects.create(api_key=api_key, node=mn)
+    mn.deleted_at = timezone.now()
+    mn.save(update_fields=["deleted_at"])
+
+    request = SimpleNamespace(auth=api_key)
+    view = SimpleNamespace(kwargs={"node_id": mn.node_id})
+    perm = NodeAuthorizationPermission()
+    assert perm.has_permission(request, view) is False

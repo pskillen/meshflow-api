@@ -4372,6 +4372,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/OwnedManagedNode'
+        '400':
+          description: >
+            Validation error, including when a managed-node row already exists for this `node_id`,
+            or when a soft-deleted managed node exists (re-management blocked until an administrator clears deletion).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
   /nodes/managed-nodes/mine/:
     get:
@@ -4509,7 +4517,12 @@ paths:
           description: Not the node owner and not staff
 
     delete:
-      summary: Delete managed node
+      summary: Soft-delete managed node (un-manage)
+      description: >
+        Soft-deletes the managed node for the given mesh `node_id`: sets `deleted_at`, removes all
+        `NodeAuth` links for that managed node, and excludes the row from managed-node listings and
+        detail lookups (404). Allowed for the node owner or Django staff only; constellation admins
+        cannot un-manage on behalf of others. Does not clear `ObservedNode.claimed_by`.
       tags: [Nodes]
       security:
         - BearerAuth: []
@@ -4521,7 +4534,11 @@ paths:
             type: integer
       responses:
         '204':
-          description: Node deleted successfully
+          description: Managed node soft-deleted successfully
+        '403':
+          description: Not the node owner and not staff
+        '404':
+          description: Managed node not found or already soft-deleted
 
   /nodes/api-keys/:
     get:
@@ -5995,7 +6012,10 @@ paths:
                 $ref: '#/components/schemas/Error'
     delete:
       summary: Delete claim for observed node
-      description: Delete the current user's claim for the specified observed node.
+      description: >
+        Deletes the current user's NodeOwnerClaim for this observed node (pending or accepted).
+        If the observed node was claimed by this user (`claimed_by` matches), ownership is cleared;
+        the ObservedNode row is retained. There is no staff override to remove another user's claim.
       tags: [Nodes]
       security:
         - BearerAuth: []
