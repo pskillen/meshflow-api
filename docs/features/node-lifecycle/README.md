@@ -9,6 +9,8 @@ This feature area describes how Meshtastic radio nodes move through Meshflow:
 
 Observed nodes are not manually created by users during normal operation. They are discovered when a managed node ingests packets and the packet source is not already known. Packet ingestion creates the `ObservedNode`, keeps `last_heard` current, and updates related latest-status data such as position and metrics.
 
+On **first** creation of an `ObservedNode`, the API may queue one **new-node baseline** traceroute (trigger type 6) using the same durable `AutoTraceRoute` dispatch queue as scheduled and mesh-monitoring traceroutes. This captures an early route snapshot for topology evidence; it is separate from DX Monitoring event detection (see [Traceroute](../traceroute/README.md)).
+
 ## Lifecycle Documents
 
 - [Node claims](node-claims.md): how users prove ownership of an observed node.

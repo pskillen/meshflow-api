@@ -1,6 +1,7 @@
 """Models for traceroute tracking and triggering."""
 
 from django.db import models
+from django.db.models import Q
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
@@ -16,6 +17,7 @@ class TriggerType(models.IntegerChoices):
     MONITORING = 3, _("Monitoring")
     NODE_WATCH = 4, _("Node Watch")
     DX_WATCH = 5, _("DX Watch")
+    NEW_NODE_BASELINE = 6, _("New node baseline")
 
 
 class AutoTraceRoute(models.Model):
@@ -26,6 +28,7 @@ class AutoTraceRoute(models.Model):
     TRIGGER_TYPE_MONITORING = TriggerType.MONITORING
     TRIGGER_TYPE_NODE_WATCH = TriggerType.NODE_WATCH
     TRIGGER_TYPE_DX_WATCH = TriggerType.DX_WATCH
+    TRIGGER_TYPE_NEW_NODE_BASELINE = TriggerType.NEW_NODE_BASELINE
 
     STATUS_PENDING = "pending"
     STATUS_SENT = "sent"
@@ -142,6 +145,13 @@ class AutoTraceRoute(models.Model):
         ]
         permissions = [
             ("trigger_traceroute", "Can trigger traceroute commands"),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["target_node"],
+                condition=Q(trigger_type=TriggerType.NEW_NODE_BASELINE),
+                name="traceroute_autotraceroute_new_node_baseline_unique_target",
+            ),
         ]
 
     def __str__(self):

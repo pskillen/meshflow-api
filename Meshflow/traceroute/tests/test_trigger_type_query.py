@@ -11,6 +11,7 @@ def test_legacy_slug_mapping_matches_migration():
     assert LEGACY_SLUG_TO_INT["external"] == TriggerType.EXTERNAL
     assert LEGACY_SLUG_TO_INT["auto"] == TriggerType.MONITORING
     assert LEGACY_SLUG_TO_INT["monitor"] == TriggerType.NODE_WATCH
+    assert LEGACY_SLUG_TO_INT["new_node_baseline"] == TriggerType.NEW_NODE_BASELINE
 
 
 @pytest.mark.parametrize(
@@ -19,6 +20,7 @@ def test_legacy_slug_mapping_matches_migration():
         (["user", "1"], [1]),
         (["auto", "3"], [3]),
         (["monitor", "4"], [4]),
+        (["new_node_baseline", "6"], [6]),
         (["1", "4", "1"], [1, 4]),
         (["bogus", "99"], None),
         ([], None),
@@ -34,3 +36,4 @@ def test_autotraceroute_constants_match_trigger_type():
     assert AutoTraceRoute.TRIGGER_TYPE_MONITORING == TriggerType.MONITORING
     assert AutoTraceRoute.TRIGGER_TYPE_NODE_WATCH == TriggerType.NODE_WATCH
     assert AutoTraceRoute.TRIGGER_TYPE_DX_WATCH == TriggerType.DX_WATCH
+    assert AutoTraceRoute.TRIGGER_TYPE_NEW_NODE_BASELINE == TriggerType.NEW_NODE_BASELINE
