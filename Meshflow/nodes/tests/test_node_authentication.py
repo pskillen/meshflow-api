@@ -1,7 +1,8 @@
 from types import SimpleNamespace
 
-import pytest
 from django.utils import timezone
+
+import pytest
 
 from nodes.authentication import NodeAPIKeyAuthentication
 from nodes.models import NodeAuth
@@ -155,9 +156,7 @@ def test_node_api_key_authentication_prefer_x_api_key(create_node_api_key):
 
 
 @pytest.mark.django_db
-def test_node_authorization_permission_denies_soft_deleted_managed_node(
-    create_managed_node, create_node_api_key
-):
+def test_node_authorization_permission_denies_soft_deleted_managed_node(create_managed_node, create_node_api_key):
     mn = create_managed_node()
     api_key = create_node_api_key(owner=mn.owner, constellation=mn.constellation)
     NodeAuth.objects.create(api_key=api_key, node=mn)

@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from django.conf import settings
+from django.db import transaction
 from django.db.models import (
     BooleanField,
     Case,
@@ -16,7 +17,6 @@ from django.db.models import (
     When,
 )
 from django.db.models.functions import Coalesce
-from django.db import transaction
 from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404
 from django.utils import timezone

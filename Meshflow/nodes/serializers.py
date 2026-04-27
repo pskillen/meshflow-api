@@ -653,9 +653,7 @@ class OwnedManagedNodeSerializer(ManagedNodeSerializer):
             node_id = attrs.get("node_id")
             if node_id is not None:
                 if ManagedNode.objects.filter(node_id=node_id, deleted_at__isnull=True).exists():
-                    raise serializers.ValidationError(
-                        {"node_id": "A managed node already exists for this mesh node."}
-                    )
+                    raise serializers.ValidationError({"node_id": "A managed node already exists for this mesh node."})
                 if ManagedNode.objects.filter(node_id=node_id, deleted_at__isnull=False).exists():
                     raise serializers.ValidationError(
                         {

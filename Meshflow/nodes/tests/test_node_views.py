@@ -334,9 +334,7 @@ def test_managed_node_soft_delete_owner_removes_node_auth_and_excludes_from_list
 
 
 @pytest.mark.django_db
-def test_managed_node_soft_delete_staff(
-    create_user, create_constellation, create_managed_node, create_node_api_key
-):
+def test_managed_node_soft_delete_staff(create_user, create_constellation, create_managed_node, create_node_api_key):
     from constellations.models import MessageChannel
 
     owner = create_user()
@@ -363,9 +361,7 @@ def test_managed_node_soft_delete_staff(
 
 
 @pytest.mark.django_db
-def test_managed_node_delete_forbidden_for_non_owner_non_staff(
-    create_user, create_constellation, create_managed_node
-):
+def test_managed_node_delete_forbidden_for_non_owner_non_staff(create_user, create_constellation, create_managed_node):
     from constellations.models import MessageChannel
 
     owner = create_user()
@@ -414,9 +410,7 @@ def test_managed_node_create_rejected_when_soft_deleted_row_exists(
     client.force_authenticate(user=owner)
     response = client.post(
         reverse("managed-nodes-list"),
-        _managed_node_json_payload(
-            node_id=node_id, owner=owner, constellation=constellation, ch0=ch0, ch1=ch1
-        ),
+        _managed_node_json_payload(node_id=node_id, owner=owner, constellation=constellation, ch0=ch0, ch1=ch1),
         format="json",
     )
     assert response.status_code == status.HTTP_400_BAD_REQUEST
@@ -424,9 +418,7 @@ def test_managed_node_create_rejected_when_soft_deleted_row_exists(
 
 
 @pytest.mark.django_db
-def test_managed_node_create_rejected_when_active_row_exists(
-    create_user, create_constellation, create_managed_node
-):
+def test_managed_node_create_rejected_when_active_row_exists(create_user, create_constellation, create_managed_node):
     from constellations.models import MessageChannel
 
     owner = create_user()
@@ -446,9 +438,7 @@ def test_managed_node_create_rejected_when_active_row_exists(
     client.force_authenticate(user=owner)
     response = client.post(
         reverse("managed-nodes-list"),
-        _managed_node_json_payload(
-            node_id=node_id, owner=owner, constellation=constellation, ch0=ch0, ch1=ch1
-        ),
+        _managed_node_json_payload(node_id=node_id, owner=owner, constellation=constellation, ch0=ch0, ch1=ch1),
         format="json",
     )
     assert response.status_code == status.HTTP_400_BAD_REQUEST
