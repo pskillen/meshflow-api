@@ -27,7 +27,7 @@ def test_offline_dm_includes_short_name_and_deep_link(create_user, create_observ
 
     with override_settings(FRONTEND_URL="https://mesh.example/"):
         with patch("mesh_monitoring.services.user_has_verified_discord_dm_target", return_value=True):
-            with patch("mesh_monitoring.services.send_dm") as send_dm:
+            with patch("push_notifications.discord_audit.send_dm") as send_dm:
                 attempted = notify_watchers_node_offline(obs)
 
     assert attempted == 1
@@ -55,7 +55,7 @@ def test_offline_dm_omits_url_when_frontend_unset(create_user, create_observed_n
 
     with override_settings(FRONTEND_URL=""):
         with patch("mesh_monitoring.services.user_has_verified_discord_dm_target", return_value=True):
-            with patch("mesh_monitoring.services.send_dm") as send_dm:
+            with patch("push_notifications.discord_audit.send_dm") as send_dm:
                 notify_watchers_node_offline(obs)
 
     body = send_dm.call_args[0][1]
@@ -78,7 +78,7 @@ def test_verification_start_dm_includes_short_name_and_deep_link(create_user, cr
 
     with override_settings(FRONTEND_URL="https://mesh.example"):
         with patch("mesh_monitoring.services.user_has_verified_discord_dm_target", return_value=True):
-            with patch("mesh_monitoring.services.send_dm") as send_dm:
+            with patch("push_notifications.discord_audit.send_dm") as send_dm:
                 attempted = notify_watchers_verification_started(obs, silence_threshold_seconds=90)
 
     assert attempted == 1

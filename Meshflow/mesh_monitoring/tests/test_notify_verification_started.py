@@ -74,7 +74,7 @@ def test_verification_start_notify_happy_path(
 
     with override_settings(FRONTEND_URL="https://mesh.example"):
         with patch("mesh_monitoring.services.user_has_verified_discord_dm_target", return_value=True):
-            with patch("mesh_monitoring.services.send_dm") as send_dm:
+            with patch("push_notifications.discord_audit.send_dm") as send_dm:
                 with patch("mesh_monitoring.tasks.notify_traceroute_status_changed"):
                     with patch("traceroute.dispatch.notify_traceroute_status_changed"):
                         with patch("traceroute.dispatch.async_to_sync", side_effect=immediate_async_to_sync):
@@ -121,7 +121,7 @@ def test_verification_start_notify_skipped_when_flag_off(
         return async_func
 
     with patch("mesh_monitoring.services.user_has_verified_discord_dm_target", return_value=True):
-        with patch("mesh_monitoring.services.send_dm") as send_dm:
+        with patch("push_notifications.discord_audit.send_dm") as send_dm:
             with patch("mesh_monitoring.tasks.notify_traceroute_status_changed"):
                 with patch("traceroute.dispatch.notify_traceroute_status_changed"):
                     with patch("traceroute.dispatch.async_to_sync", side_effect=immediate_async_to_sync):
@@ -166,7 +166,7 @@ def test_verification_start_notify_respects_cooldown(
         return async_func
 
     with patch("mesh_monitoring.services.user_has_verified_discord_dm_target", return_value=True):
-        with patch("mesh_monitoring.services.send_dm") as send_dm:
+        with patch("push_notifications.discord_audit.send_dm") as send_dm:
             with patch("mesh_monitoring.tasks.notify_traceroute_status_changed"):
                 with patch("traceroute.dispatch.notify_traceroute_status_changed"):
                     with patch("traceroute.dispatch.async_to_sync", side_effect=immediate_async_to_sync):

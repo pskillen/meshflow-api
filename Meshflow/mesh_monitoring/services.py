@@ -7,7 +7,9 @@ import logging
 from django.db.models import Q
 
 from nodes.models import ObservedNode
-from push_notifications.discord import DiscordSendError, send_dm
+from push_notifications.constants import DiscordNotificationFeature, DiscordNotificationKind
+from push_notifications.discord import DiscordSendError
+from push_notifications.discord_audit import record_discord_notification_skip, send_discord_dm_with_audit
 from traceroute.models import AutoTraceRoute
 from users.discord_sync import user_has_verified_discord_dm_target
 
@@ -170,16 +172,42 @@ def notify_watchers_node_offline(observed_node: ObservedNode) -> int:
     if url:
         text += f"\n\n{url}"
     attempted = 0
+    related_ctx = {
+        "observed_node_id": str(observed_node.pk),
+        "node_id_str": observed_node.node_id_str,
+    }
     for user in users:
         if not user_has_verified_discord_dm_target(user):
             logger.info(
                 "mesh_monitoring: skip notify user=%s (Discord not verified)",
                 user.pk,
             )
+            record_discord_notification_skip(
+                feature=DiscordNotificationFeature.NODE_WATCH,
+                kind=DiscordNotificationKind.NODE_OFFLINE,
+                user=user,
+                reason="Discord DM target not verified (missing or stale notification settings).",
+                message_preview_text=text,
+                discord_recipient_id=getattr(user, "discord_notify_user_id", "") or "",
+                related_app_label="nodes",
+                related_model_name="ObservedNode",
+                related_object_id=str(observed_node.pk),
+                related_context=related_ctx,
+            )
             continue
         attempted += 1
         try:
-            send_dm(user.discord_notify_user_id, text)
+            send_discord_dm_with_audit(
+                feature=DiscordNotificationFeature.NODE_WATCH,
+                kind=DiscordNotificationKind.NODE_OFFLINE,
+                user=user,
+                discord_user_id=user.discord_notify_user_id,
+                content=text,
+                related_app_label="nodes",
+                related_model_name="ObservedNode",
+                related_object_id=str(observed_node.pk),
+                related_context=related_ctx,
+            )
         except DiscordSendError as e:
             logger.warning(
                 "mesh_monitoring: Discord notify failed user=%s: %s",
@@ -213,16 +241,43 @@ def notify_watchers_verification_started(observed_node: ObservedNode, silence_th
     if url:
         text += f"\n\n{url}"
     attempted = 0
+    related_ctx = {
+        "observed_node_id": str(observed_node.pk),
+        "node_id_str": observed_node.node_id_str,
+        "silence_threshold_seconds": silence_threshold_seconds,
+    }
     for user in users:
         if not user_has_verified_discord_dm_target(user):
             logger.info(
                 "mesh_monitoring: skip verification-start notify user=%s (Discord not verified)",
                 user.pk,
             )
+            record_discord_notification_skip(
+                feature=DiscordNotificationFeature.NODE_WATCH,
+                kind=DiscordNotificationKind.VERIFICATION_STARTED,
+                user=user,
+                reason="Discord DM target not verified (missing or stale notification settings).",
+                message_preview_text=text,
+                discord_recipient_id=getattr(user, "discord_notify_user_id", "") or "",
+                related_app_label="nodes",
+                related_model_name="ObservedNode",
+                related_object_id=str(observed_node.pk),
+                related_context=related_ctx,
+            )
             continue
         attempted += 1
         try:
-            send_dm(user.discord_notify_user_id, text)
+            send_discord_dm_with_audit(
+                feature=DiscordNotificationFeature.NODE_WATCH,
+                kind=DiscordNotificationKind.VERIFICATION_STARTED,
+                user=user,
+                discord_user_id=user.discord_notify_user_id,
+                content=text,
+                related_app_label="nodes",
+                related_model_name="ObservedNode",
+                related_object_id=str(observed_node.pk),
+                related_context=related_ctx,
+            )
         except DiscordSendError as e:
             logger.warning(
                 "mesh_monitoring: Discord verification-start notify failed user=%s: %s",
