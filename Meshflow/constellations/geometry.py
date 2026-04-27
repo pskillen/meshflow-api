@@ -59,7 +59,9 @@ def managed_node_position_lat_lon(managed_node: ManagedNode) -> tuple[float, flo
 def constellation_centroid(constellation) -> tuple[float, float] | None:
     """Mean of positions for managed nodes that are actively feeding (ManagedNodeStatus)."""
     positions: list[tuple[float, float]] = []
-    for mn in ManagedNode.objects.filter(constellation=constellation, status__is_sending_data=True).iterator():
+    for mn in ManagedNode.objects.filter(
+        constellation=constellation, deleted_at__isnull=True, status__is_sending_data=True
+    ).iterator():
         p = managed_node_position_lat_lon(mn)
         if p:
             positions.append(p)
@@ -79,7 +81,9 @@ def _compute_envelope_circle(constellation) -> dict[str, Any] | None:
     Returns ``None`` when fewer than three managed nodes have coordinates (undefined).
     """
     positions: list[tuple[float, float]] = []
-    for mn in ManagedNode.objects.filter(constellation=constellation, status__is_sending_data=True).iterator():
+    for mn in ManagedNode.objects.filter(
+        constellation=constellation, deleted_at__isnull=True, status__is_sending_data=True
+    ).iterator():
         p = managed_node_position_lat_lon(mn)
         if p:
             positions.append(p)

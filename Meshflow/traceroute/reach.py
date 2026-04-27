@@ -189,7 +189,7 @@ def compute_reach(
     feeder_internal_ids = {g["source_node_id"] for g in grouped}
     target_internal_ids = {g["target_node_id"] for g in grouped}
 
-    feeders = list(ManagedNode.objects.filter(internal_id__in=feeder_internal_ids))
+    feeders = list(ManagedNode.objects.filter(internal_id__in=feeder_internal_ids, deleted_at__isnull=True))
     feeder_positions = _bulk_feeder_positions(feeders)
 
     feeder_node_ids = {mn.node_id for mn in feeders}
@@ -279,7 +279,7 @@ def aggregate_reach_rows_to_constellation_targets(rows: list[ReachRow]) -> list[
 
 def constellation_feeder_markers(constellation_id: int) -> list[dict]:
     """All managed nodes in a constellation with a resolvable map position."""
-    feeders = list(ManagedNode.objects.filter(constellation_id=constellation_id))
+    feeders = list(ManagedNode.objects.filter(constellation_id=constellation_id, deleted_at__isnull=True))
     if not feeders:
         return []
 

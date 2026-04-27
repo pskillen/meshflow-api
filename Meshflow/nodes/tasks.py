@@ -32,7 +32,7 @@ def update_managed_node_statuses():
     to_update = []
     sending_count = 0
 
-    for mn in ManagedNode.objects.all().only("pk"):
+    for mn in ManagedNode.objects.filter(deleted_at__isnull=True).only("pk"):
         last = last_by_observer.get(mn.pk)
         is_sending = last is not None and last >= cutoff
         if is_sending:

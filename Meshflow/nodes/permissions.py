@@ -21,7 +21,9 @@ class NodeAuthorizationPermission(permissions.BasePermission):
 
         # Get the NodeAuth instance
         try:
-            node_auth = NodeAuth.objects.get(api_key=request.auth, node__node_id=node_id)
+            node_auth = NodeAuth.objects.select_related("node").get(api_key=request.auth, node__node_id=node_id)
+            if node_auth.node.deleted_at is not None:
+                return False
             # Attach the node to the request auth context
             request.auth.node = node_auth.node
             return True

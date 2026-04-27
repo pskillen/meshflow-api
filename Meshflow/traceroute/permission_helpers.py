@@ -26,7 +26,9 @@ def get_nodes_permitted_for_trigger_queryset(user):
     ManagedNodes the user may attempt to trigger from (allow_auto_traceroute + role),
     without requiring recent ingestion. Used for DRF object-level permission gate.
     """
-    base = ManagedNode.objects.filter(allow_auto_traceroute=True).select_related("constellation")
+    base = ManagedNode.objects.filter(deleted_at__isnull=True, allow_auto_traceroute=True).select_related(
+        "constellation"
+    )
     if user.is_staff:
         qs = base
     else:

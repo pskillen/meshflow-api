@@ -50,7 +50,7 @@ class Command(BaseCommand):
             self.stderr.write(self.style.ERROR("Provide --managed-node-id or --by-api-key to identify the bot"))
             return
 
-        if not ManagedNode.objects.filter(node_id=managed_node_id).exists():
+        if not ManagedNode.objects.filter(node_id=managed_node_id, deleted_at__isnull=True).exists():
             self.stderr.write(
                 self.style.ERROR(
                     f"ManagedNode with node_id={managed_node_id} not found. "

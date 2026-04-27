@@ -53,7 +53,9 @@ class TextMessageViewSet(viewsets.ModelViewSet):
     def get_serializer_context(self):
         context = super().get_serializer_context()
         # Build a mapping of node_id -> ObservedNode for all relevant nodes
-        observer_node_ids = ManagedNode.objects.values_list("node_id", flat=True).distinct()
+        observer_node_ids = (
+            ManagedNode.objects.filter(deleted_at__isnull=True).values_list("node_id", flat=True).distinct()
+        )
         observed_nodes = ObservedNode.objects.filter(node_id__in=observer_node_ids)
         context["observer_nodes_map"] = {n.node_id: n for n in observed_nodes}
         return context
