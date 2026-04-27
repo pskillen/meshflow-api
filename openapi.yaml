@@ -2444,6 +2444,105 @@ components:
         packet_observation:
           type: integer
 
+    DxObservedNodeHop:
+      type: object
+      properties:
+        internal_id:
+          type: string
+          format: uuid
+        node_id:
+          type: integer
+        node_id_str:
+          type: string
+        short_name:
+          type: string
+        long_name:
+          type: string
+
+    DxAutoTracerouteExploration:
+      type: object
+      properties:
+        id:
+          type: integer
+        status:
+          type: string
+          enum: [pending, sent, completed, failed]
+        trigger_type:
+          type: integer
+        trigger_type_label:
+          type: string
+        trigger_source:
+          type: string
+          nullable: true
+        triggered_at:
+          type: string
+          format: date-time
+        earliest_send_at:
+          type: string
+          format: date-time
+        dispatched_at:
+          type: string
+          format: date-time
+          nullable: true
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+        error_message:
+          type: string
+          nullable: true
+
+    DxEventTracerouteExploration:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        outcome:
+          type: string
+          enum: [pending, completed, failed, skipped]
+        skip_reason:
+          type: string
+          description: Set when outcome is skipped (DX gating / dedupe / cooldown).
+        metadata:
+          type: object
+        link_kind:
+          type: string
+          description: From metadata; dx_watch or new_node_baseline when set.
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        source_node:
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/DxManagedNodeMinimal'
+        destination:
+          $ref: '#/components/schemas/DxObservedNodeHop'
+        auto_traceroute:
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/DxAutoTracerouteExploration'
+
+    DxExplorationSummary:
+      type: object
+      properties:
+        total:
+          type: integer
+        pending:
+          type: integer
+        completed:
+          type: integer
+        failed:
+          type: integer
+        skipped:
+          type: integer
+        baseline_linked_rows:
+          type: integer
+          description: Count of exploration rows tied to a new-node baseline traceroute.
+
     DxEventList:
       type: object
       properties:
@@ -2456,7 +2555,7 @@ components:
           $ref: '#/components/schemas/DxDestinationNode'
         reason_code:
           type: string
-          enum: [new_distant_node, returned_dx_node, distant_observation]
+          enum: [new_distant_node, returned_dx_node, distant_observation, traceroute_distant_hop]
         state:
           type: string
           enum: [active, closed]
@@ -2485,6 +2584,9 @@ components:
           type: object
         evidence_count:
           type: integer
+        exploration_attempt_count:
+          type: integer
+          description: Number of DX exploration attempt rows (queued, linked baseline, or skipped).
 
     DxEventDetail:
       allOf:
@@ -2495,6 +2597,12 @@ components:
               type: array
               items:
                 $ref: '#/components/schemas/DxEventObservation'
+            traceroute_explorations:
+              type: array
+              items:
+                $ref: '#/components/schemas/DxEventTracerouteExploration'
+            exploration_summary:
+              $ref: '#/components/schemas/DxExplorationSummary'
 
     DxNodeExclusionRequest:
       type: object
@@ -5789,7 +5897,7 @@ paths:
           in: query
           schema:
             type: string
-            enum: [new_distant_node, returned_dx_node, distant_observation]
+            enum: [new_distant_node, returned_dx_node, distant_observation, traceroute_distant_hop]
         - name: constellation
           in: query
           schema:
