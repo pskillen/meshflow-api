@@ -564,8 +564,8 @@ class TestRunHeatmapQuery:
             assert n["last_seen"] is None
             assert n["role"] == "offline"
 
-    def test_run_heatmap_query_path_middle_node_backbone(self):
-        """Three-node path: middle node has highest betweenness among degree-2 nodes."""
+    def test_run_heatmap_query_path_middle_node_is_leaf_when_degree_two(self):
+        """Three-node path: middle node has degree 2; counted as leaf, not backbone."""
         mock_result = MagicMock()
         mock_result.__iter__ = lambda self: iter(
             [
@@ -624,6 +624,87 @@ class TestRunHeatmapQuery:
         by_id = {n["node_id"]: n for n in data["nodes"]}
         assert by_id[2]["centrality"] > by_id[1]["centrality"]
         assert by_id[2]["centrality"] > by_id[3]["centrality"]
-        assert by_id[2]["role"] == "backbone"
+        assert by_id[2]["degree"] == 2
+        assert by_id[2]["role"] == "leaf"
         assert by_id[1]["role"] == "leaf"
         assert by_id[3]["role"] == "leaf"
+
+    def test_run_heatmap_query_star_hub_backbone(self):
+        """Hub with degree ≥ 3 can be backbone when centrality is in the top quartile."""
+        mock_result = MagicMock()
+        mock_result.__iter__ = lambda self: iter(
+            [
+                {
+                    "from_node_id": 1,
+                    "to_node_id": 2,
+                    "from_lat": 55.0,
+                    "from_lng": -4.0,
+                    "to_lat": 55.05,
+                    "to_lng": -4.05,
+                    "from_node_id_str": "!00000001",
+                    "from_short_name": "H",
+                    "from_long_name": "Hub",
+                    "to_node_id_str": "!00000002",
+                    "to_short_name": "A",
+                    "to_long_name": "Leaf A",
+                    "weight": 2,
+                },
+                {
+                    "from_node_id": 1,
+                    "to_node_id": 3,
+                    "from_lat": 55.0,
+                    "from_lng": -4.0,
+                    "to_lat": 55.06,
+                    "to_lng": -4.06,
+                    "from_node_id_str": "!00000001",
+                    "from_short_name": "H",
+                    "from_long_name": "Hub",
+                    "to_node_id_str": "!00000003",
+                    "to_short_name": "B",
+                    "to_long_name": "Leaf B",
+                    "weight": 2,
+                },
+                {
+                    "from_node_id": 1,
+                    "to_node_id": 4,
+                    "from_lat": 55.0,
+                    "from_lng": -4.0,
+                    "to_lat": 55.07,
+                    "to_lng": -4.07,
+                    "from_node_id_str": "!00000001",
+                    "from_short_name": "H",
+                    "from_long_name": "Hub",
+                    "to_node_id_str": "!00000004",
+                    "to_short_name": "C",
+                    "to_long_name": "Leaf C",
+                    "weight": 2,
+                },
+            ]
+        )
+        mock_session = MagicMock()
+        mock_session.run.return_value = mock_result
+        mock_driver = MagicMock()
+        mock_cm = MagicMock()
+        mock_cm.__enter__.return_value = mock_session
+        mock_cm.__exit__.return_value = False
+        mock_driver.session.return_value = mock_cm
+
+        now = timezone.now()
+        with (
+            patch("traceroute_analytics.neo4j_service.get_driver", return_value=mock_driver),
+            patch("traceroute_analytics.neo4j_service.ObservedNode.objects.filter") as mock_obs,
+        ):
+            mock_obs.return_value.values.return_value = [
+                {"node_id": 1, "last_heard": now},
+                {"node_id": 2, "last_heard": now},
+                {"node_id": 3, "last_heard": now},
+                {"node_id": 4, "last_heard": now},
+            ]
+            data = run_heatmap_query(edge_metric="packets", driver=mock_driver)
+
+        by_id = {n["node_id"]: n for n in data["nodes"]}
+        assert by_id[1]["degree"] == 3
+        assert by_id[1]["role"] == "backbone"
+        assert by_id[2]["role"] == "leaf"
+        assert by_id[3]["role"] == "leaf"
+        assert by_id[4]["role"] == "leaf"
