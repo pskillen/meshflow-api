@@ -2,6 +2,8 @@
 
 from unittest.mock import MagicMock, patch
 
+from django.utils import timezone
+
 import pytest
 
 import nodes.tests.conftest  # noqa: F401 - load fixtures
@@ -406,13 +408,26 @@ class TestRunHeatmapQuery:
         mock_cm.__exit__.return_value = False
         mock_driver.session.return_value = mock_cm
 
-        with patch("traceroute_analytics.neo4j_service.get_driver", return_value=mock_driver):
+        now = timezone.now()
+        with (
+            patch("traceroute_analytics.neo4j_service.get_driver", return_value=mock_driver),
+            patch("traceroute_analytics.neo4j_service.ObservedNode.objects.filter") as mock_obs,
+        ):
+            mock_obs.return_value.values.return_value = [
+                {"node_id": 1, "last_heard": now},
+                {"node_id": 2, "last_heard": now},
+            ]
             data = run_heatmap_query(edge_metric="packets", driver=mock_driver)
 
         assert len(data["edges"]) == 1
         assert data["edges"][0]["weight"] == 5
         assert "avg_snr" not in data["edges"][0]
         assert len(data["nodes"]) == 2
+        by_id = {n["node_id"]: n for n in data["nodes"]}
+        assert by_id[1]["centrality"] == 0.0
+        assert by_id[1]["degree"] == 1
+        assert by_id[1]["role"] == "leaf"
+        assert by_id[1]["last_seen"] is not None
 
     def test_run_heatmap_query_snr_returns_avg_snr_when_present(self):
         """edge_metric=snr returns edges with weight and avg_snr when Neo4j has snr."""
@@ -445,13 +460,22 @@ class TestRunHeatmapQuery:
         mock_cm.__exit__.return_value = False
         mock_driver.session.return_value = mock_cm
 
-        with patch("traceroute_analytics.neo4j_service.get_driver", return_value=mock_driver):
+        now = timezone.now()
+        with (
+            patch("traceroute_analytics.neo4j_service.get_driver", return_value=mock_driver),
+            patch("traceroute_analytics.neo4j_service.ObservedNode.objects.filter") as mock_obs,
+        ):
+            mock_obs.return_value.values.return_value = [
+                {"node_id": 1, "last_heard": now},
+                {"node_id": 2, "last_heard": now},
+            ]
             data = run_heatmap_query(edge_metric="snr", driver=mock_driver)
 
         assert len(data["edges"]) == 1
         assert data["edges"][0]["weight"] == 3
         assert data["edges"][0]["avg_snr"] == -2.5
         assert len(data["nodes"]) == 2
+        assert all("centrality" in n and "role" in n for n in data["nodes"])
 
     def test_run_heatmap_query_snr_omits_avg_snr_when_null(self):
         """edge_metric=snr omits avg_snr when Neo4j returns null (no snr on relationships)."""
@@ -484,9 +508,122 @@ class TestRunHeatmapQuery:
         mock_cm.__exit__.return_value = False
         mock_driver.session.return_value = mock_cm
 
-        with patch("traceroute_analytics.neo4j_service.get_driver", return_value=mock_driver):
+        now = timezone.now()
+        with (
+            patch("traceroute_analytics.neo4j_service.get_driver", return_value=mock_driver),
+            patch("traceroute_analytics.neo4j_service.ObservedNode.objects.filter") as mock_obs,
+        ):
+            mock_obs.return_value.values.return_value = [
+                {"node_id": 1, "last_heard": now},
+                {"node_id": 2, "last_heard": now},
+            ]
             data = run_heatmap_query(edge_metric="snr", driver=mock_driver)
 
         assert len(data["edges"]) == 1
         assert data["edges"][0]["weight"] == 2
         assert "avg_snr" not in data["edges"][0]
+
+    def test_run_heatmap_query_without_observed_marks_offline(self):
+        """Missing ObservedNode rows yield offline role and null last_seen."""
+        mock_result = MagicMock()
+        mock_result.__iter__ = lambda self: iter(
+            [
+                {
+                    "from_node_id": 1,
+                    "to_node_id": 2,
+                    "from_lat": 55.0,
+                    "from_lng": -4.0,
+                    "to_lat": 55.1,
+                    "to_lng": -4.1,
+                    "from_node_id_str": "!00000001",
+                    "from_short_name": "A",
+                    "from_long_name": "Node A",
+                    "to_node_id_str": "!00000002",
+                    "to_short_name": "B",
+                    "to_long_name": "Node B",
+                    "weight": 5,
+                }
+            ]
+        )
+        mock_session = MagicMock()
+        mock_session.run.return_value = mock_result
+        mock_driver = MagicMock()
+        mock_cm = MagicMock()
+        mock_cm.__enter__.return_value = mock_session
+        mock_cm.__exit__.return_value = False
+        mock_driver.session.return_value = mock_cm
+
+        with (
+            patch("traceroute_analytics.neo4j_service.get_driver", return_value=mock_driver),
+            patch("traceroute_analytics.neo4j_service.ObservedNode.objects.filter") as mock_obs,
+        ):
+            mock_obs.return_value.values.return_value = []
+            data = run_heatmap_query(edge_metric="packets", driver=mock_driver)
+
+        for n in data["nodes"]:
+            assert n["last_seen"] is None
+            assert n["role"] == "offline"
+
+    def test_run_heatmap_query_path_middle_node_backbone(self):
+        """Three-node path: middle node has highest betweenness among degree-2 nodes."""
+        mock_result = MagicMock()
+        mock_result.__iter__ = lambda self: iter(
+            [
+                {
+                    "from_node_id": 1,
+                    "to_node_id": 2,
+                    "from_lat": 55.0,
+                    "from_lng": -4.0,
+                    "to_lat": 55.05,
+                    "to_lng": -4.05,
+                    "from_node_id_str": "!00000001",
+                    "from_short_name": "A",
+                    "from_long_name": "Node A",
+                    "to_node_id_str": "!00000002",
+                    "to_short_name": "B",
+                    "to_long_name": "Node B",
+                    "weight": 2,
+                },
+                {
+                    "from_node_id": 2,
+                    "to_node_id": 3,
+                    "from_lat": 55.05,
+                    "from_lng": -4.05,
+                    "to_lat": 55.1,
+                    "to_lng": -4.1,
+                    "from_node_id_str": "!00000002",
+                    "from_short_name": "B",
+                    "from_long_name": "Node B",
+                    "to_node_id_str": "!00000003",
+                    "to_short_name": "C",
+                    "to_long_name": "Node C",
+                    "weight": 2,
+                },
+            ]
+        )
+        mock_session = MagicMock()
+        mock_session.run.return_value = mock_result
+        mock_driver = MagicMock()
+        mock_cm = MagicMock()
+        mock_cm.__enter__.return_value = mock_session
+        mock_cm.__exit__.return_value = False
+        mock_driver.session.return_value = mock_cm
+
+        now = timezone.now()
+        with (
+            patch("traceroute_analytics.neo4j_service.get_driver", return_value=mock_driver),
+            patch("traceroute_analytics.neo4j_service.ObservedNode.objects.filter") as mock_obs,
+        ):
+            mock_obs.return_value.values.return_value = [
+                {"node_id": 1, "last_heard": now},
+                {"node_id": 2, "last_heard": now},
+                {"node_id": 3, "last_heard": now},
+            ]
+            data = run_heatmap_query(edge_metric="packets", driver=mock_driver)
+
+        by_id = {n["node_id"]: n for n in data["nodes"]}
+        assert by_id[2]["centrality"] > by_id[1]["centrality"]
+        assert by_id[2]["centrality"] > by_id[3]["centrality"]
+        assert by_id[2]["role"] == "backbone"
+        assert by_id[1]["role"] == "leaf"
+        assert by_id[3]["role"] == "leaf"
