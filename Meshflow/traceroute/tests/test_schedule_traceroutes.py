@@ -54,7 +54,7 @@ def test_schedule_traceroutes_creates_when_recent_observation(
     def immediate_async_to_sync(async_func):
         return async_func
 
-    with patch("traceroute.tasks.notify_traceroute_status_changed") as mock_ws:
+    with patch("traceroute.lifecycle.notify_traceroute_status_changed") as mock_ws:
         with patch("traceroute.dispatch.notify_traceroute_status_changed"):
             with patch("traceroute.dispatch.async_to_sync", side_effect=immediate_async_to_sync):
                 with patch("traceroute.dispatch.get_channel_layer", return_value=channel_layer):

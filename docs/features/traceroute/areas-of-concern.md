@@ -27,7 +27,7 @@ dispatch, monitoring, or DX workflows.
 | New-node baseline traceroutes          | `traceroute`                                    | A first-seen node baseline is a generic operational traceroute, not a user watch and not analytics. It establishes route evidence once per target and is reused by DX exploration dedupe logic, so it belongs with the core lifecycle.        |
 | Mesh watch and node monitoring         | `mesh_monitoring`                               | Watches, presence state, offline verification, watcher notifications, and monitoring-specific source selection are product concerns of mesh monitoring. The app should request `NODE_WATCH` traceroutes through the core traceroute boundary. |
 | DX monitoring and exploration          | `dx_monitoring`                                 | DX event detection, exploration planning, skip reasons, event linking, and DX notifications are product concerns of DX monitoring. The app should request `DX_WATCH` traceroutes through the core traceroute boundary.                        |
-| Source liveness / eligibility snapshot | `nodes` with `traceroute` compatibility exports | Managed-node liveness is fundamentally node state derived from ingestion. `traceroute.source_eligibility` may continue to re-export the canonical node helpers for compatibility.                                                             |
+| Source liveness / eligibility snapshot | `nodes` with `traceroute` import surface | Managed-node liveness is fundamentally node state derived from ingestion. `traceroute.source_eligibility` re-exports `nodes.managed_node_liveness` so traceroute views, selection, and permissions share one import path.                             |
 | Target selection and strategy rotation | `traceroute`                                    | These decide what generic automatic traceroute to run next. They are operational scheduling concerns, even when their output later feeds analytics.                                                                                           |
 | Traceroute analytics                   | `traceroute_analytics`                          | Stats, success/failure breakdowns, top routers, by-source/by-target summaries, success-over-time, and daily `StatsSnapshot` collection are derived reporting products over `AutoTraceRoute`. They should not live in the core lifecycle app.  |
 | Reach and coverage analytics           | `traceroute_analytics`                          | Feeder reach and constellation coverage are visualisation/reporting pivots over completed/failed traceroutes. They are useful, but not required for dispatch, completion, monitoring, or DX event handling.                                   |
@@ -50,7 +50,10 @@ packets / mesh_monitoring / dx_monitoring
 ```
 
 Core `traceroute` code should not import analytics modules for normal dispatch
-or completion. If analytics needs to react to a completed traceroute, use an
+or completion. List filtering that applies the same `AutoTraceRoute` semantics as
+analytics (for example ``target_strategy`` CSV tokens) belongs in small core
+helpers such as ``traceroute.target_strategy_query`` so list views stay free of
+``traceroute_analytics`` imports. If analytics needs to react to a completed traceroute, use an
 explicit hook, task, or signal-like boundary so a Neo4j/reporting failure cannot
 block mission-critical lifecycle work.
 
@@ -61,13 +64,11 @@ policy in the producer app while preserving one lifecycle implementation.
 
 ## Refactor Notes
 
-When splitting the code:
+The split is implemented:
 
-- Keep the `AutoTraceRoute` model and migrations in `traceroute`.
-- Keep public API paths stable during the first refactor pass.
-- Add compatibility wrappers for Celery task names if existing beat rows or
-queued jobs reference old `traceroute.tasks.*` names.
-- Move analytics implementation first, then clean up compatibility wrappers
-only after deployed task/API compatibility is understood.
-- Update this document when a functional area deliberately changes owner.
+- `AutoTraceRoute` and migrations remain in `traceroute`.
+- Public `/api/traceroutes/` paths are unchanged; analytics handlers live in `traceroute_analytics` and are included from `traceroute.urls`.
+- Celery tasks that historically registered as `traceroute.tasks.*` for analytics (Neo4j push/export, `collect_traceroute_success_daily`, `backfill_traceroute_success_daily`) remain thin wrappers on `traceroute.tasks` so `django_celery_beat` rows and in-flight broker messages keep valid names; implementations are `traceroute_analytics.tasks` (`*_impl`). See module docstring on `Meshflow/traceroute/tasks.py`. Operators do not need a manual migration unless they chose to rename tasks in the database and drain queues first.
+
+Update this document when a functional area deliberately changes owner.
 

@@ -88,11 +88,11 @@ that — the linked `ObservedNode.latest_status`) are also dropped.
 
 Implementation:
 
-- **`Meshflow/traceroute/reach.py::compute_reach()`** — single Django ORM
+- **`Meshflow/traceroute_analytics/reach.py::compute_reach()`** — single Django ORM
   pass: filter `AutoTraceRoute` → group by `(source_node_id, target_node_id)`
   → annotate `attempts = Count('id')` and
   `successes = Count('id', filter=Q(status=COMPLETED))`.
-- **`Meshflow/traceroute/reach.py::ReachRow`** — frozen dataclass row type
+- **`Meshflow/traceroute_analytics/reach.py::ReachRow`** — frozen dataclass row type
   carrying both the counts and pre-resolved feeder + target metadata
   (display names, lat/lng, hex node id) so callers don't re-query.
 - Bulk position lookups (one query for feeders, one for targets) are
@@ -126,7 +126,7 @@ constellation-membership scoping yet — see Known gaps.
 Per-target rows for a single feeder. The frontend fetches once and renders
 three layers off the same payload (dots, H3 hex, concave-hull polygon).
 
-Implemented in **`Meshflow/traceroute/views.py::feeder_reach()`**.
+Implemented in **`Meshflow/traceroute_analytics/views.py::feeder_reach()`**.
 
 **Query parameters**
 
@@ -177,7 +177,7 @@ empty array and `feeder.lat` / `feeder.lng` fall back to
 Server-side H3-binned reach for an entire constellation. The frontend
 renders a single `H3HexagonLayer` over these cells.
 
-Implemented in **`Meshflow/traceroute/views.py::constellation_coverage()`**.
+Implemented in **`Meshflow/traceroute_analytics/views.py::constellation_coverage()`**.
 
 **Query parameters**
 
@@ -360,13 +360,13 @@ central belt" with hull shapes that hug clusters.
 
 Backend (this repo):
 
-- `Meshflow/traceroute/reach.py` — `compute_reach()`, `ReachRow`
-- `Meshflow/traceroute/views.py` — `feeder_reach()`,
+- `Meshflow/traceroute_analytics/reach.py` — `compute_reach()`, `ReachRow`
+- `Meshflow/traceroute_analytics/views.py` — `feeder_reach()`,
   `constellation_coverage()`, `_parse_window()`
 - `Meshflow/traceroute/urls.py` — `feeder-reach/`,
   `constellation-coverage/`
-- `Meshflow/traceroute/tests/test_reach.py` — unit tests for the helper
-- `Meshflow/traceroute/tests/test_views.py` — `TestFeederReach`,
+- `Meshflow/traceroute_analytics/tests/test_reach.py` — unit tests for the helper
+- `Meshflow/traceroute_analytics/tests/test_views.py` — `TestFeederReach`,
   `TestConstellationCoverage`
 - `openapi.yaml` — `FeederReach`, `FeederReachFeeder`,
   `FeederReachTarget`, `ConstellationCoverage`,

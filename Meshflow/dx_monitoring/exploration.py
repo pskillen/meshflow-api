@@ -26,9 +26,9 @@ from nodes.managed_node_liveness import (
 )
 from nodes.models import ManagedNode
 from traceroute.dispatch import TRACEROUTE_MAX_PENDING_PER_SOURCE, pending_count_for_source
+from traceroute.lifecycle import create_pending_auto_traceroute
 from traceroute.models import AutoTraceRoute
 from traceroute.source_selection import eligible_traceroute_sources_ordered
-from traceroute.ws_notify import notify_traceroute_status_changed
 
 if TYPE_CHECKING:
     pass
@@ -348,17 +348,15 @@ def plan_event_exploration(event: DxEvent) -> dict:
                 continue
 
             at_now = timezone.now()
-            auto_tr = AutoTraceRoute.objects.create(
+            auto_tr = create_pending_auto_traceroute(
                 source_node=source,
                 target_node=dest,
                 trigger_type=AutoTraceRoute.TRIGGER_TYPE_DX_WATCH,
                 triggered_by=None,
                 trigger_source=TRIGGER_SOURCE,
                 target_strategy=None,
-                status=AutoTraceRoute.STATUS_PENDING,
                 earliest_send_at=at_now,
             )
-            notify_traceroute_status_changed(auto_tr.id, AutoTraceRoute.STATUS_PENDING)
             DxEventTraceroute.objects.create(
                 event=event,
                 auto_traceroute=auto_tr,

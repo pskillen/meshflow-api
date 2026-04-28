@@ -50,7 +50,7 @@ def test_process_node_watch_presence_starts_verification_and_creates_monitor_tr(
     def immediate_async_to_sync(async_func):
         return async_func
 
-    with patch("mesh_monitoring.tasks.notify_traceroute_status_changed"):
+    with patch("traceroute.lifecycle.notify_traceroute_status_changed"):
         with patch("traceroute.dispatch.notify_traceroute_status_changed"):
             with patch("traceroute.dispatch.async_to_sync", side_effect=immediate_async_to_sync):
                 with patch("traceroute.dispatch.get_channel_layer", return_value=channel_layer):

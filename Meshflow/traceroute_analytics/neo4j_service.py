@@ -1,4 +1,4 @@
-"""Neo4j service for traceroute heatmap graph operations."""
+"""Neo4j graph export and query helpers for traceroute analytics."""
 
 import logging
 from datetime import datetime
@@ -10,8 +10,7 @@ from tqdm import tqdm
 
 from common.mesh_node_helpers import meshtastic_id_to_hex
 from nodes.models import ManagedNode, ObservedNode
-
-from .models import AutoTraceRoute
+from traceroute.models import AutoTraceRoute
 
 logger = logging.getLogger(__name__)
 

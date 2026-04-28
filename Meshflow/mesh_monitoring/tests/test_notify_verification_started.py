@@ -75,7 +75,7 @@ def test_verification_start_notify_happy_path(
     with override_settings(FRONTEND_URL="https://mesh.example"):
         with patch("mesh_monitoring.services.user_has_verified_discord_dm_target", return_value=True):
             with patch("push_notifications.discord_audit.send_dm") as send_dm:
-                with patch("mesh_monitoring.tasks.notify_traceroute_status_changed"):
+                with patch("traceroute.lifecycle.notify_traceroute_status_changed"):
                     with patch("traceroute.dispatch.notify_traceroute_status_changed"):
                         with patch("traceroute.dispatch.async_to_sync", side_effect=immediate_async_to_sync):
                             with patch("traceroute.dispatch.get_channel_layer", return_value=channel_layer):
@@ -122,7 +122,7 @@ def test_verification_start_notify_skipped_when_flag_off(
 
     with patch("mesh_monitoring.services.user_has_verified_discord_dm_target", return_value=True):
         with patch("push_notifications.discord_audit.send_dm") as send_dm:
-            with patch("mesh_monitoring.tasks.notify_traceroute_status_changed"):
+            with patch("traceroute.lifecycle.notify_traceroute_status_changed"):
                 with patch("traceroute.dispatch.notify_traceroute_status_changed"):
                     with patch("traceroute.dispatch.async_to_sync", side_effect=immediate_async_to_sync):
                         with patch("traceroute.dispatch.get_channel_layer", return_value=channel_layer):
@@ -167,7 +167,7 @@ def test_verification_start_notify_respects_cooldown(
 
     with patch("mesh_monitoring.services.user_has_verified_discord_dm_target", return_value=True):
         with patch("push_notifications.discord_audit.send_dm") as send_dm:
-            with patch("mesh_monitoring.tasks.notify_traceroute_status_changed"):
+            with patch("traceroute.lifecycle.notify_traceroute_status_changed"):
                 with patch("traceroute.dispatch.notify_traceroute_status_changed"):
                     with patch("traceroute.dispatch.async_to_sync", side_effect=immediate_async_to_sync):
                         with patch("traceroute.dispatch.get_channel_layer", return_value=channel_layer):

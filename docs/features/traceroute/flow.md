@@ -66,6 +66,10 @@ Celery task `mark_stale_traceroutes_failed` runs every 60 seconds. Traceroutes s
 
 ## 7. Neo4j Export
 
-`push_traceroute_to_neo4j` (Celery): For each completed `AutoTraceRoute`, extracts edges from `route` and `route_back`, upserts `MeshNode` vertices, creates `ROUTED_TO` relationships with `weight` and `triggered_at`. Only edges where both endpoints have coordinates are stored.
+`push_traceroute_to_neo4j` (Celery, implemented in `traceroute_analytics`): For each completed `AutoTraceRoute`, extracts edges from `route` and `route_back`, upserts `MeshNode` vertices, creates `ROUTED_TO` relationships with `weight` and `triggered_at`. Only edges where both endpoints have coordinates are stored.
 
-Bulk export: `export_traceroutes_to_neo4j` task or `manage.py export_traceroutes_to_neo4j` (with `--async` to queue as Celery task).
+Bulk export: `export_traceroutes_to_neo4j` task or `manage.py export_traceroutes_to_neo4j` (with `--async` to queue as Celery task; command lives in `traceroute_analytics`).
+
+## 8. Daily success statistics
+
+Celery beat runs ``collect_traceroute_success_daily`` (daily, e.g. 1:05 AM). The implementation counts completed/failed ``AutoTraceRoute`` rows for the previous calendar day and upserts ``StatsSnapshot`` records (``stat_type=tr_success_daily``). Logic lives in ``traceroute_analytics.tasks``; the registered Celery name remains ``traceroute.tasks.collect_traceroute_success_daily`` so existing periodic task rows keep working.
