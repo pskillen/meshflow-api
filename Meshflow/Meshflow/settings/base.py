@@ -78,6 +78,7 @@ INSTALLED_APPS = [
     "stats",
     "text_messages",
     "traceroute",
+    "traceroute_analytics",
     "mesh_monitoring",
     "dx_monitoring",
     "ws",

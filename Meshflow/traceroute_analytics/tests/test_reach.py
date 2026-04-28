@@ -8,7 +8,7 @@ import pytest
 
 from nodes.models import NodeLatestStatus
 from traceroute.models import AutoTraceRoute
-from traceroute.reach import compute_reach, target_strategy_tokens_to_q
+from traceroute_analytics.reach import compute_reach, target_strategy_tokens_to_q
 
 pytestmark = pytest.mark.django_db
 

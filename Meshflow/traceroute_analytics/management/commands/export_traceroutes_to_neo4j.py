@@ -2,7 +2,7 @@
 
 from django.core.management.base import BaseCommand, CommandError
 
-from traceroute.neo4j_service import clear_all_routed_to_edges, export_all_traceroutes_to_neo4j
+from traceroute_analytics.neo4j_service import clear_all_routed_to_edges, export_all_traceroutes_to_neo4j
 
 
 class Command(BaseCommand):

@@ -15,11 +15,11 @@ class TestExportTraceroutesToNeo4jCommand:
     def test_clear_yes_runs_clear_then_export(self):
         with (
             patch(
-                "traceroute.management.commands.export_traceroutes_to_neo4j.clear_all_routed_to_edges",
+                "traceroute_analytics.management.commands.export_traceroutes_to_neo4j.clear_all_routed_to_edges",
                 return_value=7,
             ) as mock_clear,
             patch(
-                "traceroute.management.commands.export_traceroutes_to_neo4j.export_all_traceroutes_to_neo4j",
+                "traceroute_analytics.management.commands.export_traceroutes_to_neo4j.export_all_traceroutes_to_neo4j",
                 return_value={"total": 10, "exported": 10},
             ) as mock_export,
         ):
@@ -35,10 +35,10 @@ class TestExportTraceroutesToNeo4jCommand:
     def test_clear_without_yes_prompts_and_aborts_on_no(self):
         with (
             patch(
-                "traceroute.management.commands.export_traceroutes_to_neo4j.clear_all_routed_to_edges",
+                "traceroute_analytics.management.commands.export_traceroutes_to_neo4j.clear_all_routed_to_edges",
             ) as mock_clear,
             patch(
-                "traceroute.management.commands.export_traceroutes_to_neo4j.export_all_traceroutes_to_neo4j",
+                "traceroute_analytics.management.commands.export_traceroutes_to_neo4j.export_all_traceroutes_to_neo4j",
             ) as mock_export,
             patch("builtins.input", return_value="no"),
         ):
@@ -52,10 +52,10 @@ class TestExportTraceroutesToNeo4jCommand:
     def test_clear_with_async_errors_without_touching_neo4j(self):
         with (
             patch(
-                "traceroute.management.commands.export_traceroutes_to_neo4j.clear_all_routed_to_edges",
+                "traceroute_analytics.management.commands.export_traceroutes_to_neo4j.clear_all_routed_to_edges",
             ) as mock_clear,
             patch(
-                "traceroute.management.commands.export_traceroutes_to_neo4j.export_all_traceroutes_to_neo4j",
+                "traceroute_analytics.management.commands.export_traceroutes_to_neo4j.export_all_traceroutes_to_neo4j",
             ) as mock_export,
         ):
             with pytest.raises(CommandError):

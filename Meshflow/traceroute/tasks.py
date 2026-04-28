@@ -2,13 +2,12 @@
 
 import logging
 import os
-from datetime import date, datetime, timedelta
+from datetime import timedelta
 
-from django.db.models import Count, Q
+from django.db.models import Q
 from django.utils import timezone
 
 from celery import shared_task
-from tqdm import tqdm
 
 from .dispatch import TRACEROUTE_MAX_PENDING_PER_SOURCE, pending_count_for_source, try_dispatch_one
 from .lifecycle import create_pending_auto_traceroute
@@ -123,9 +122,9 @@ def export_traceroutes_to_neo4j():
     One-off export of all completed AutoTraceRoute records to Neo4j.
     Idempotent; can re-run.
     """
-    from .neo4j_service import export_all_traceroutes_to_neo4j
+    from traceroute_analytics.tasks import export_traceroutes_to_neo4j_impl
 
-    return export_all_traceroutes_to_neo4j()
+    return export_traceroutes_to_neo4j_impl()
 
 
 @shared_task
@@ -134,27 +133,9 @@ def push_traceroute_to_neo4j(auto_traceroute_id: int):
     Push a single completed AutoTraceRoute to Neo4j.
     Called when a traceroute completes (from packet receiver).
     """
-    from .neo4j_service import add_traceroute_edges, get_driver
+    from traceroute_analytics.tasks import push_traceroute_to_neo4j_impl
 
-    auto_tr = AutoTraceRoute.objects.filter(pk=auto_traceroute_id).first()
-    if not auto_tr or auto_tr.status != AutoTraceRoute.STATUS_COMPLETED:
-        logger.debug(
-            "push_traceroute_to_neo4j: skipping AutoTraceRoute %s (not completed)",
-            auto_traceroute_id,
-        )
-        return {"skipped": True}
-
-    try:
-        driver = get_driver()
-        add_traceroute_edges(auto_tr, driver=driver)
-        return {"pushed": True}
-    except Exception as e:
-        logger.exception(
-            "push_traceroute_to_neo4j: failed for AutoTraceRoute %s: %s",
-            auto_traceroute_id,
-            e,
-        )
-        raise
+    return push_traceroute_to_neo4j_impl(auto_traceroute_id)
 
 
 @shared_task
@@ -204,67 +185,15 @@ def mark_stale_traceroutes_failed():
     return {"updated": updated}
 
 
-def _collect_traceroute_success_for_day(day_date: date, *, skip_existing: bool = False) -> tuple[int, int, int, int]:
-    """
-    Collect tr_success_daily snapshot for a single calendar day.
-    Returns (created, skipped, completed, failed).
-    """
-    from stats.models import StatsSnapshot
-
-    day_start = timezone.make_aware(datetime.combine(day_date, datetime.min.time()))
-    day_end = day_start + timedelta(days=1)
-
-    if skip_existing:
-        if StatsSnapshot.objects.filter(
-            stat_type="tr_success_daily",
-            constellation__isnull=True,
-            recorded_at=day_start,
-        ).exists():
-            return (0, 1, 0, 0)
-
-    qs = (
-        AutoTraceRoute.objects.filter(
-            triggered_at__gte=day_start,
-            triggered_at__lt=day_end,
-            status__in=[AutoTraceRoute.STATUS_COMPLETED, AutoTraceRoute.STATUS_FAILED],
-        )
-        .values("status")
-        .annotate(count=Count("id"))
-    )
-    counts = {row["status"]: row["count"] for row in qs}
-    completed = counts.get(AutoTraceRoute.STATUS_COMPLETED, 0)
-    failed = counts.get(AutoTraceRoute.STATUS_FAILED, 0)
-
-    StatsSnapshot.objects.update_or_create(
-        stat_type="tr_success_daily",
-        constellation=None,
-        recorded_at=day_start,
-        defaults={
-            "value": {
-                "date": day_date.isoformat(),
-                "completed": completed,
-                "failed": failed,
-            },
-        },
-    )
-    return (1, 0, completed, failed)
-
-
 @shared_task
 def collect_traceroute_success_daily():
     """
     Run daily (e.g. 1:05 AM). For the previous calendar day, count completed and failed
     traceroutes and store in StatsSnapshot (stat_type=tr_success_daily).
     """
-    yesterday = date.today() - timedelta(days=1)
-    _, _, completed, failed = _collect_traceroute_success_for_day(yesterday)
-    logger.info(
-        "collect_traceroute_success_daily: %s completed=%d failed=%d",
-        yesterday.isoformat(),
-        completed,
-        failed,
-    )
-    return {"date": yesterday.isoformat(), "completed": completed, "failed": failed}
+    from traceroute_analytics.tasks import collect_traceroute_success_daily_impl
+
+    return collect_traceroute_success_daily_impl()
 
 
 @shared_task
@@ -273,20 +202,6 @@ def backfill_traceroute_success_daily(days: int = 30):
     Backfill tr_success_daily snapshots for the last N days.
     Idempotent: skips days that already have snapshots (when run sequentially).
     """
-    today = date.today()
-    created = 0
-    skipped = 0
+    from traceroute_analytics.tasks import backfill_traceroute_success_daily_impl
 
-    for i in tqdm(range(days), unit="day", desc="Backfilling traceroute success"):
-        day_date = today - timedelta(days=i + 1)
-        c, s, _, _ = _collect_traceroute_success_for_day(day_date, skip_existing=True)
-        created += c
-        skipped += s
-
-    logger.info(
-        "Finished backfilling traceroute success daily for the last %d days: created=%d, skipped=%d",
-        days,
-        created,
-        skipped,
-    )
-    return {"created": created, "skipped": skipped, "days": days}
+    return backfill_traceroute_success_daily_impl(days)

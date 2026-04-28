@@ -486,7 +486,7 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
         """
         from django.utils.dateparse import parse_datetime
 
-        from traceroute.neo4j_service import run_node_links_query
+        from traceroute_analytics.neo4j_service import run_node_links_query
 
         node = self.get_object()
         nid = node.node_id

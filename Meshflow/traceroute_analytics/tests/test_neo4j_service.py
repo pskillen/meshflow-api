@@ -1,4 +1,4 @@
-"""Tests for traceroute neo4j_service."""
+"""Tests for traceroute_analytics.neo4j_service."""
 
 from unittest.mock import MagicMock, patch
 
@@ -6,7 +6,7 @@ import pytest
 
 import nodes.tests.conftest  # noqa: F401 - load fixtures
 import users.tests.conftest  # noqa: F401 - load fixtures
-from traceroute.neo4j_service import (
+from traceroute_analytics.neo4j_service import (
     UNKNOWN_NODE_ID,
     _extract_edges,
     add_traceroute_edges,
@@ -152,7 +152,7 @@ class TestAddTracerouteEdges:
         )
 
         mock_driver, mock_session = _mock_driver()
-        with patch("traceroute.neo4j_service.get_driver", return_value=mock_driver):
+        with patch("traceroute_analytics.neo4j_service.get_driver", return_value=mock_driver):
             add_traceroute_edges(auto_tr, driver=mock_driver)
 
         pairs = _edge_param_pairs(mock_session)
@@ -176,7 +176,7 @@ class TestAddTracerouteEdges:
         )
 
         mock_driver, mock_session = _mock_driver()
-        with patch("traceroute.neo4j_service.get_driver", return_value=mock_driver):
+        with patch("traceroute_analytics.neo4j_service.get_driver", return_value=mock_driver):
             add_traceroute_edges(auto_tr, driver=mock_driver)
 
         pairs = _edge_param_pairs(mock_session)
@@ -201,7 +201,7 @@ class TestAddTracerouteEdges:
         )
 
         mock_driver, mock_session = _mock_driver()
-        with patch("traceroute.neo4j_service.get_driver", return_value=mock_driver):
+        with patch("traceroute_analytics.neo4j_service.get_driver", return_value=mock_driver):
             add_traceroute_edges(auto_tr, driver=mock_driver)
 
         pairs = _edge_param_pairs(mock_session)
@@ -222,7 +222,7 @@ class TestAddTracerouteEdges:
         )
 
         mock_driver, mock_session = _mock_driver()
-        with patch("traceroute.neo4j_service.get_driver", return_value=mock_driver):
+        with patch("traceroute_analytics.neo4j_service.get_driver", return_value=mock_driver):
             add_traceroute_edges(auto_tr, driver=mock_driver)
 
         pairs = _edge_param_pairs(mock_session)
@@ -242,7 +242,7 @@ class TestAddTracerouteEdges:
         )
 
         mock_driver, mock_session = _mock_driver()
-        with patch("traceroute.neo4j_service.get_driver", return_value=mock_driver):
+        with patch("traceroute_analytics.neo4j_service.get_driver", return_value=mock_driver):
             add_traceroute_edges(auto_tr, driver=mock_driver)
 
         assert _edge_param_pairs(mock_session) == []
@@ -279,7 +279,7 @@ class TestAddTracerouteEdges:
         )
 
         mock_driver, mock_session = _mock_driver()
-        with patch("traceroute.neo4j_service.get_driver", return_value=mock_driver):
+        with patch("traceroute_analytics.neo4j_service.get_driver", return_value=mock_driver):
             add_traceroute_edges(auto_tr, driver=mock_driver)
 
         target_hop_snrs = []
@@ -305,7 +305,7 @@ class TestAddTracerouteEdges:
         )
 
         mock_driver, mock_session = _mock_driver()
-        with patch("traceroute.neo4j_service.get_driver", return_value=mock_driver):
+        with patch("traceroute_analytics.neo4j_service.get_driver", return_value=mock_driver):
             add_traceroute_edges(auto_tr, driver=mock_driver)
 
         edge_calls = [
@@ -335,7 +335,7 @@ class TestAddTracerouteEdges:
         )
 
         mock_driver, mock_session = _mock_driver()
-        with patch("traceroute.neo4j_service.get_driver", return_value=mock_driver):
+        with patch("traceroute_analytics.neo4j_service.get_driver", return_value=mock_driver):
             add_traceroute_edges(auto_tr, driver=mock_driver)
             add_traceroute_edges(auto_tr, driver=mock_driver)
 
@@ -362,7 +362,7 @@ class TestClearAllRoutedToEdges:
         mock_cm.__exit__.return_value = False
         mock_driver.session.return_value = mock_cm
 
-        with patch("traceroute.neo4j_service.get_driver", return_value=mock_driver):
+        with patch("traceroute_analytics.neo4j_service.get_driver", return_value=mock_driver):
             deleted = clear_all_routed_to_edges(driver=mock_driver)
 
         assert deleted == 42
@@ -406,7 +406,7 @@ class TestRunHeatmapQuery:
         mock_cm.__exit__.return_value = False
         mock_driver.session.return_value = mock_cm
 
-        with patch("traceroute.neo4j_service.get_driver", return_value=mock_driver):
+        with patch("traceroute_analytics.neo4j_service.get_driver", return_value=mock_driver):
             data = run_heatmap_query(edge_metric="packets", driver=mock_driver)
 
         assert len(data["edges"]) == 1
@@ -445,7 +445,7 @@ class TestRunHeatmapQuery:
         mock_cm.__exit__.return_value = False
         mock_driver.session.return_value = mock_cm
 
-        with patch("traceroute.neo4j_service.get_driver", return_value=mock_driver):
+        with patch("traceroute_analytics.neo4j_service.get_driver", return_value=mock_driver):
             data = run_heatmap_query(edge_metric="snr", driver=mock_driver)
 
         assert len(data["edges"]) == 1
@@ -484,7 +484,7 @@ class TestRunHeatmapQuery:
         mock_cm.__exit__.return_value = False
         mock_driver.session.return_value = mock_cm
 
-        with patch("traceroute.neo4j_service.get_driver", return_value=mock_driver):
+        with patch("traceroute_analytics.neo4j_service.get_driver", return_value=mock_driver):
             data = run_heatmap_query(edge_metric="snr", driver=mock_driver)
 
         assert len(data["edges"]) == 1

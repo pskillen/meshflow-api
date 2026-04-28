@@ -28,8 +28,7 @@ from django.db.models import Count, Q
 
 from common.mesh_node_helpers import meshtastic_id_to_hex
 from nodes.models import ManagedNode, NodeLatestStatus, ObservedNode
-
-from .models import AutoTraceRoute
+from traceroute.models import AutoTraceRoute
 
 
 def target_strategy_tokens_to_q(tokens: Iterable[str]) -> Q | None:
