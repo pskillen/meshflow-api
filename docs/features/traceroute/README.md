@@ -15,7 +15,7 @@ The traceroute feature tracks path discovery between Meshtastic nodes on the mes
 `AutoTraceRoute.trigger_type` is stored as a **stable integer**. The REST API returns `trigger_type` (int) and `trigger_type_label` (human-readable). List filters accept comma-separated **integers** and **legacy slugs** (`auto` → Monitoring, `monitor` → Node Watch, `new_node_baseline` → New node baseline) for backwards-compatible URLs.
 
 | Value | Name | Meaning |
-|------:|------|---------|
+| ---: | --- | --- |
 | 1 | User | Manual trigger from the UI/API (`triggered_by` set). |
 | 2 | External | Response matched no local row (e.g. cross-environment ingest). |
 | 3 | Monitoring | Periodic scheduler (`trigger_source` e.g. `scheduler`); replaces historical string `auto`. |
@@ -28,7 +28,7 @@ The traceroute feature tracks path discovery between Meshtastic nodes on the mes
 ## Data Model
 
 | Field | Description |
-|-------|-------------|
+| --- | --- |
 | `source_node` | ManagedNode that sends the traceroute |
 | `target_node` | ObservedNode (destination) |
 | `trigger_type` | Integer; see table above |
@@ -42,7 +42,7 @@ The traceroute feature tracks path discovery between Meshtastic nodes on the mes
 ## API Endpoints
 
 | Endpoint | Method | Description |
-|----------|--------|-------------|
+| --- | --- | --- |
 | `/api/traceroutes/` | GET | List traceroutes (filter by managed_node, target_node, status, triggered_after, etc.) |
 | `/api/traceroutes/<pk>/` | GET | Single traceroute detail |
 | `/api/traceroutes/trigger/` | POST | Manual trigger (requires `managed_node_id`, optional `target_node_id`; user must be staff, owner of source node, or constellation admin/editor) |
@@ -55,7 +55,7 @@ The traceroute feature tracks path discovery between Meshtastic nodes on the mes
 ## Permissions
 
 | Role | Can trigger from |
-|------|------------------|
+| --- | --- |
 | System admin (`is_staff`) | Any ManagedNode with `allow_auto_traceroute=True` |
 | Constellation admin/editor | Nodes in constellations where user has admin/editor role |
 | ManagedNode owner | Nodes they own (`ManagedNode.owner == user`) |
@@ -79,6 +79,7 @@ Auto-scheduler and permission checks share one notion of a **live** source node 
 
 ## Related Documentation
 
+- [Areas of concern](areas-of-concern.md) – Ownership boundaries for core traceroute, monitoring, DX, analytics, and visualisation
 - [Algorithms](algorithms.md) – Source, strategy, and target selection (including auto reliability)
 - [Permissions](permissions.md) – Canonical rules for who may view and trigger traceroutes
 - [Flow](flow.md) – End-to-end lifecycle from trigger to completion
