@@ -5493,7 +5493,9 @@ paths:
                           type: string
                           enum: [backbone, relay, leaf, offline]
                           description: >-
-                            Derived role from centrality, degree, and recency (server uses ~24h offline cutoff).
+                            Derived role: offline if last_heard missing or older than ~24h; else leaf if degree ≤ 2;
+                            else backbone if centrality is at or above the 75th percentile among active nodes;
+                            else relay.
                   meta:
                     type: object
                     properties:

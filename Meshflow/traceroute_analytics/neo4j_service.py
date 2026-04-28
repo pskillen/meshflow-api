@@ -37,7 +37,11 @@ def _heatmap_graph_metrics(edges):
 
 
 def _assign_heatmap_roles(nodes, last_heard_by_id, now):
-    """Set ``role`` on each node: backbone, relay, leaf, or offline."""
+    """Set ``role`` on each node: backbone, relay, leaf, or offline.
+
+    Leaf includes degree 1–2 so lightly attached nodes are not labelled relay/backbone.
+    Backbone and relay require degree ≥ 3.
+    """
     offline_sec = HEATMAP_OFFLINE_ROLE_HOURS * 3600
 
     def is_offline(nid):
@@ -60,9 +64,9 @@ def _assign_heatmap_roles(nodes, last_heard_by_id, now):
         nid = n["node_id"]
         if is_offline(nid):
             n["role"] = "offline"
-        elif n["degree"] <= 1:
+        elif n["degree"] <= 2:
             n["role"] = "leaf"
-        elif n["degree"] >= 2 and n["centrality"] >= c75:
+        elif n["degree"] >= 3 and n["centrality"] >= c75:
             n["role"] = "backbone"
         else:
             n["role"] = "relay"
