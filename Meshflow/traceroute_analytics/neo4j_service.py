@@ -4,7 +4,9 @@ import logging
 from datetime import datetime
 
 from django.conf import settings
+from django.utils import timezone
 
+import networkx as nx
 from neo4j import GraphDatabase
 from tqdm import tqdm
 
@@ -16,7 +18,74 @@ logger = logging.getLogger(__name__)
 
 UNKNOWN_NODE_ID = 0xFFFFFFFF
 
+# Role classification: treat ObservedNode missing or older than this as offline.
+HEATMAP_OFFLINE_ROLE_HOURS = 24
+
 _driver = None
+
+
+def _heatmap_graph_metrics(edges):
+    """Return betweenness (0–1) and integer degree per node id for aggregated edges."""
+    g = nx.Graph()
+    for e in edges:
+        g.add_edge(e["from_node_id"], e["to_node_id"])
+    if g.number_of_nodes() == 0:
+        return {}, {}
+    betweenness = nx.betweenness_centrality(g, normalized=True)
+    degree = dict(g.degree())
+    return betweenness, degree
+
+
+def _assign_heatmap_roles(nodes, last_heard_by_id, now):
+    """Set ``role`` on each node: backbone, relay, leaf, or offline."""
+    offline_sec = HEATMAP_OFFLINE_ROLE_HOURS * 3600
+
+    def is_offline(nid):
+        lh = last_heard_by_id.get(nid)
+        if lh is None:
+            return True
+        delta = now - lh
+        return delta.total_seconds() > offline_sec
+
+    active = [n for n in nodes if not is_offline(n["node_id"])]
+    if active:
+        sorted_c = sorted(n["centrality"] for n in active)
+        last_i = len(sorted_c) - 1
+        i75 = max(0, min(last_i, int(round(0.75 * last_i))))
+        c75 = sorted_c[i75]
+    else:
+        c75 = 0.0
+
+    for n in nodes:
+        nid = n["node_id"]
+        if is_offline(nid):
+            n["role"] = "offline"
+        elif n["degree"] <= 1:
+            n["role"] = "leaf"
+        elif n["degree"] >= 2 and n["centrality"] >= c75:
+            n["role"] = "backbone"
+        else:
+            n["role"] = "relay"
+
+
+def _enrich_heatmap_nodes(nodes, edges):
+    """Add centrality, degree, last_seen (ISO), and role using NetworkX + ObservedNode."""
+    betweenness, degree = _heatmap_graph_metrics(edges)
+    ids = [n["node_id"] for n in nodes]
+    last_heard_by_id = {}
+    if ids:
+        for row in ObservedNode.objects.filter(node_id__in=ids).values("node_id", "last_heard"):
+            last_heard_by_id[row["node_id"]] = row["last_heard"]
+
+    now = timezone.now()
+    for n in nodes:
+        nid = n["node_id"]
+        n["centrality"] = float(betweenness.get(nid, 0.0))
+        n["degree"] = int(degree.get(nid, 0))
+        lh = last_heard_by_id.get(nid)
+        n["last_seen"] = lh.isoformat() if lh else None
+
+    _assign_heatmap_roles(nodes, last_heard_by_id, now)
 
 
 def get_driver():
@@ -538,6 +607,8 @@ def run_heatmap_query(
                 }
 
     nodes = list(nodes_by_id.values())
+    if nodes:
+        _enrich_heatmap_nodes(nodes, edges)
 
     # Meta: approximate counts (from Django for total TR, from Neo4j for nodes)
     from django.db.models import Q

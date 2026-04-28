@@ -5478,6 +5478,22 @@ paths:
                           type: string
                         long_name:
                           type: string
+                        centrality:
+                          type: number
+                          description: Normalised betweenness centrality (0–1) on the filtered edge subgraph.
+                        degree:
+                          type: integer
+                          description: Distinct neighbours in the filtered subgraph.
+                        last_seen:
+                          type: string
+                          format: date-time
+                          nullable: true
+                          description: ObservedNode last_heard as ISO 8601; null if unknown.
+                        role:
+                          type: string
+                          enum: [backbone, relay, leaf, offline]
+                          description: >-
+                            Derived role from centrality, degree, and recency (server uses ~24h offline cutoff).
                   meta:
                     type: object
                     properties:
