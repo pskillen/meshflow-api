@@ -10,6 +10,8 @@ import nodes.tests.conftest  # noqa: F401
 import users.tests.conftest  # noqa: F401
 from traceroute.lifecycle import (
     apply_auto_traceroute_completion,
+    apply_auto_traceroute_failure,
+    create_external_inferred_auto_traceroute,
     create_pending_auto_traceroute,
     schedule_completed_traceroute_neo4j_export,
 )
@@ -107,3 +109,40 @@ def test_schedule_completed_traceroute_neo4j_export_delegates():
     with patch("traceroute.tasks.push_traceroute_to_neo4j") as mock_push:
         schedule_completed_traceroute_neo4j_export(42)
     mock_push.delay.assert_called_once_with(42)
+
+
+@pytest.mark.django_db
+def test_create_external_inferred_auto_traceroute(
+    create_managed_node,
+    create_observed_node,
+):
+    source = create_managed_node()
+    target = create_observed_node()
+    tr = create_external_inferred_auto_traceroute(source_node=source, target_node=target)
+    assert tr.trigger_type == AutoTraceRoute.TRIGGER_TYPE_EXTERNAL
+    assert tr.status == AutoTraceRoute.STATUS_PENDING
+    assert tr.trigger_source is None
+    assert tr.triggered_by_id is None
+
+
+@pytest.mark.django_db
+def test_apply_auto_traceroute_failure_persists_fields(
+    create_managed_node,
+    create_observed_node,
+    create_user,
+):
+    source = create_managed_node()
+    target = create_observed_node()
+    u = create_user()
+    tr = AutoTraceRoute.objects.create(
+        source_node=source,
+        target_node=target,
+        trigger_type=AutoTraceRoute.TRIGGER_TYPE_USER,
+        triggered_by=u,
+        status=AutoTraceRoute.STATUS_SENT,
+    )
+    apply_auto_traceroute_failure(tr, error_message="timed out")
+    tr.refresh_from_db()
+    assert tr.status == AutoTraceRoute.STATUS_FAILED
+    assert tr.error_message == "timed out"
+    assert tr.completed_at is not None

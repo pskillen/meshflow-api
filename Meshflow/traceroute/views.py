@@ -26,6 +26,7 @@ from .serializers import (
 )
 from .source_eligibility import is_managed_node_eligible_traceroute_source
 from .target_selection import pick_traceroute_target
+from .target_strategy_query import target_strategy_tokens_to_q
 from .trigger_intervals import MANUAL_TRIGGER_MIN_INTERVAL_SEC
 from .trigger_type_query import parse_trigger_type_filter_tokens
 
@@ -83,8 +84,6 @@ def traceroute_list(request):
         parsed = parse_trigger_type_filter_tokens(trigger_types)
         if parsed:
             qs = qs.filter(trigger_type__in=parsed)
-
-    from traceroute_analytics.reach import target_strategy_tokens_to_q
 
     target_strategy_param = request.query_params.get("target_strategy")
     if target_strategy_param:

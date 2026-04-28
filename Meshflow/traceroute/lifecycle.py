@@ -14,6 +14,38 @@ if TYPE_CHECKING:
     from packets.models import TraceroutePacket
 
 
+def create_external_inferred_auto_traceroute(
+    *,
+    source_node: ManagedNode,
+    target_node: ObservedNode,
+    triggered_at=None,
+) -> AutoTraceRoute:
+    """
+    Create an ``AutoTraceRoute`` row for a traceroute response that did not match a queued row.
+
+    Packet ingestion completes this row immediately after creation (same flow as matched rows).
+    """
+    if triggered_at is None:
+        triggered_at = timezone.now()
+    return AutoTraceRoute.objects.create(
+        source_node=source_node,
+        target_node=target_node,
+        trigger_type=AutoTraceRoute.TRIGGER_TYPE_EXTERNAL,
+        trigger_source=None,
+        triggered_by=None,
+        triggered_at=triggered_at,
+        status=AutoTraceRoute.STATUS_PENDING,
+    )
+
+
+def apply_auto_traceroute_failure(auto_tr: AutoTraceRoute, *, error_message: str) -> None:
+    """Persist terminal failure fields (status, ``completed_at``, ``error_message``)."""
+    auto_tr.status = AutoTraceRoute.STATUS_FAILED
+    auto_tr.completed_at = timezone.now()
+    auto_tr.error_message = error_message
+    auto_tr.save(update_fields=["status", "completed_at", "error_message"])
+
+
 def create_pending_auto_traceroute(
     *,
     source_node: ManagedNode,

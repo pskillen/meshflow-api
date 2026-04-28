@@ -8,7 +8,7 @@ import pytest
 
 from nodes.models import NodeLatestStatus
 from traceroute.models import AutoTraceRoute
-from traceroute_analytics.reach import compute_reach, target_strategy_tokens_to_q
+from traceroute_analytics.reach import compute_reach
 
 pytestmark = pytest.mark.django_db
 
@@ -283,10 +283,6 @@ def test_target_strategy_legacy_matches_null(create_managed_node, create_observe
     rows = compute_reach(feeder_id=feeder.node_id, target_strategy_tokens=["legacy"])
     assert len(rows) == 1
     assert rows[0].attempts == 2
-
-
-def test_target_strategy_tokens_to_q_returns_none_for_invalid_only():
-    assert target_strategy_tokens_to_q(["not_a_real_strategy"]) is None
 
 
 def test_emits_display_metadata(create_managed_node, create_observed_node, create_auto_traceroute):

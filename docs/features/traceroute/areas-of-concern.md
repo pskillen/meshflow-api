@@ -50,7 +50,10 @@ packets / mesh_monitoring / dx_monitoring
 ```
 
 Core `traceroute` code should not import analytics modules for normal dispatch
-or completion. If analytics needs to react to a completed traceroute, use an
+or completion. List filtering that applies the same `AutoTraceRoute` semantics as
+analytics (for example ``target_strategy`` CSV tokens) belongs in small core
+helpers such as ``traceroute.target_strategy_query`` so list views stay free of
+``traceroute_analytics`` imports. If analytics needs to react to a completed traceroute, use an
 explicit hook, task, or signal-like boundary so a Neo4j/reporting failure cannot
 block mission-critical lifecycle work.
 

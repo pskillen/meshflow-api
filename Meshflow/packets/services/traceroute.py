@@ -8,7 +8,11 @@ from django.utils import timezone
 
 from packets.models import TraceroutePacket
 from packets.services.base import BasePacketService
-from traceroute.lifecycle import apply_auto_traceroute_completion, schedule_completed_traceroute_neo4j_export
+from traceroute.lifecycle import (
+    apply_auto_traceroute_completion,
+    create_external_inferred_auto_traceroute,
+    schedule_completed_traceroute_neo4j_export,
+)
 from traceroute.models import AutoTraceRoute
 
 logger = logging.getLogger(__name__)
@@ -50,14 +54,9 @@ class TraceroutePacketService(BasePacketService):
                 source_node.node_id_str,
                 self.from_node.node_id,
             )
-            auto_tr = AutoTraceRoute.objects.create(
+            auto_tr = create_external_inferred_auto_traceroute(
                 source_node=source_node,
                 target_node=self.from_node,
-                trigger_type=AutoTraceRoute.TRIGGER_TYPE_EXTERNAL,
-                trigger_source=None,
-                triggered_by=None,
-                triggered_at=timezone.now(),
-                status=AutoTraceRoute.STATUS_PENDING,
             )
 
         route = []

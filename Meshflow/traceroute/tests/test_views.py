@@ -108,6 +108,33 @@ class TestTracerouteList:
         assert "results" in resp.json()
         assert resp.json()["count"] >= 1
 
+    def test_list_target_strategy_comma_separated(
+        self, api_client, create_user, create_managed_node, create_observed_node, create_auto_traceroute
+    ):
+        """target_strategy param filters list (same token semantics as analytics reach)."""
+        user = create_user()
+        mn = create_managed_node()
+        on = create_observed_node()
+        api_client.force_authenticate(user=user)
+        create_auto_traceroute(
+            triggered_by=user,
+            source_node=mn,
+            target_node=on,
+            target_strategy=AutoTraceRoute.TARGET_STRATEGY_INTRA_ZONE,
+        )
+        create_auto_traceroute(
+            triggered_by=user,
+            source_node=mn,
+            target_node=on,
+            target_strategy=AutoTraceRoute.TARGET_STRATEGY_DX_ACROSS,
+        )
+        resp = api_client.get(
+            f"/api/traceroutes/?target_strategy={AutoTraceRoute.TARGET_STRATEGY_INTRA_ZONE}&source_node={mn.node_id}"
+        )
+        assert resp.status_code == 200
+        for row in resp.json()["results"]:
+            assert row["target_strategy"] == AutoTraceRoute.TARGET_STRATEGY_INTRA_ZONE
+
     def test_list_status_comma_separated(self, api_client, create_user, create_auto_traceroute):
         """status param accepts comma-separated values."""
         user = create_user()

@@ -23,7 +23,7 @@ from django.utils import timezone
 from celery import shared_task
 
 from .dispatch import TRACEROUTE_MAX_PENDING_PER_SOURCE, pending_count_for_source, try_dispatch_one
-from .lifecycle import create_pending_auto_traceroute
+from .lifecycle import apply_auto_traceroute_failure, create_pending_auto_traceroute
 from .models import AutoTraceRoute
 from .source_selection import eligible_traceroute_sources_ordered
 from .strategy_rotation import ordered_strategies_for_feeder, record_strategy_run
@@ -186,10 +186,10 @@ def mark_stale_traceroutes_failed():
     stale = AutoTraceRoute.objects.filter(too_old_pending | too_old_sent_dispatched | too_old_sent_legacy)
     updated = 0
     for auto_tr in stale:
-        auto_tr.status = AutoTraceRoute.STATUS_FAILED
-        auto_tr.completed_at = timezone.now()
-        auto_tr.error_message = f"Timed out after {FAILED_TR_TIMEOUT_SECONDS}s"
-        auto_tr.save(update_fields=["status", "completed_at", "error_message"])
+        apply_auto_traceroute_failure(
+            auto_tr,
+            error_message=f"Timed out after {FAILED_TR_TIMEOUT_SECONDS}s",
+        )
         from dx_monitoring.exploration import on_auto_traceroute_exploration_finished
 
         on_auto_traceroute_exploration_finished(auto_tr)
