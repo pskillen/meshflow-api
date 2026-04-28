@@ -1,4 +1,17 @@
-"""Celery tasks for traceroute scheduling."""
+"""Celery tasks for traceroute scheduling and lifecycle side effects.
+
+Core mesh scheduling (``schedule_traceroutes``, ``dispatch_pending_traceroutes``,
+``mark_stale_traceroutes_failed``) lives here in full.
+
+Neo4j export, daily ``tr_success_daily`` snapshots, and related backfills are
+implemented in :mod:`traceroute_analytics.tasks` (``*_impl`` functions). Thin
+``@shared_task`` wrappers remain **on this module** so registered Celery names
+stay ``traceroute.tasks.<name>``. That matches ``django_celery_beat`` rows
+created in historical migrations, broker messages already in flight, and
+``management`` commands that call ``.delay`` / ``.apply`` on the stable names.
+To retire a wrapper, add a data migration (or one-off) updating PeriodicTask
+and redeploy with no queued jobs using the old name, then remove the stub.
+"""
 
 import logging
 import os
@@ -121,6 +134,8 @@ def export_traceroutes_to_neo4j():
     """
     One-off export of all completed AutoTraceRoute records to Neo4j.
     Idempotent; can re-run.
+
+    Kept on this module for the stable Celery name (see module docstring).
     """
     from traceroute_analytics.tasks import export_traceroutes_to_neo4j_impl
 
@@ -132,6 +147,8 @@ def push_traceroute_to_neo4j(auto_traceroute_id: int):
     """
     Push a single completed AutoTraceRoute to Neo4j.
     Called when a traceroute completes (from packet receiver).
+
+    Kept on this module for the stable Celery name (see module docstring).
     """
     from traceroute_analytics.tasks import push_traceroute_to_neo4j_impl
 
@@ -190,6 +207,8 @@ def collect_traceroute_success_daily():
     """
     Run daily (e.g. 1:05 AM). For the previous calendar day, count completed and failed
     traceroutes and store in StatsSnapshot (stat_type=tr_success_daily).
+
+    Kept on this module for the stable Celery name (see module docstring).
     """
     from traceroute_analytics.tasks import collect_traceroute_success_daily_impl
 
@@ -201,6 +220,8 @@ def backfill_traceroute_success_daily(days: int = 30):
     """
     Backfill tr_success_daily snapshots for the last N days.
     Idempotent: skips days that already have snapshots (when run sequentially).
+
+    Kept on this module for the stable Celery name (see module docstring).
     """
     from traceroute_analytics.tasks import backfill_traceroute_success_daily_impl
 

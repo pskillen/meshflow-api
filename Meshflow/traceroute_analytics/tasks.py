@@ -1,6 +1,9 @@
 """Analytics Celery implementations (Neo4j export, daily success snapshots).
 
-Registered Celery names remain on ``traceroute.tasks`` wrappers for beat compatibility.
+Registered task names used by beat and ``.delay()`` calls remain
+``traceroute.tasks.<name>`` via thin wrappers in :mod:`traceroute.tasks`; this
+module holds the ``*_impl`` bodies so ``django_celery_beat`` rows need not be
+rewritten when analytics code moves.
 """
 
 import logging

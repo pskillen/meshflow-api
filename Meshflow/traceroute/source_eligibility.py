@@ -1,4 +1,9 @@
-"""Backward-compatible re-exports; canonical implementation in nodes.managed_node_liveness."""
+"""Stable re-exports of managed-node liveness helpers for the traceroute app.
+
+Canonical implementation: :mod:`nodes.managed_node_liveness`. Import from here
+in ``traceroute`` (views, selection, permissions) so call sites stay colocated
+with traceroute concerns.
+"""
 
 from nodes.managed_node_liveness import (
     DEFAULT_SCHEDULE_TRACEROUTE_SOURCE_RECENCY_SECONDS,

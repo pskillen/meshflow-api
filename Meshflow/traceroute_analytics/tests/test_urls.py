@@ -17,3 +17,4 @@ import pytest
 def test_analytics_paths_resolve(suffix, url_name):
     match = resolve(f"/api/traceroutes/{suffix}")
     assert match.url_name == url_name
+    assert match.func.__module__ == "traceroute_analytics.views"

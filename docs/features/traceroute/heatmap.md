@@ -1,6 +1,6 @@
 # Traceroute Heatmap
 
-The heatmap visualizes aggregated traceroute traffic between nodes as arcs on a map. Data is stored in Neo4j and served via the `heatmap-edges` API.
+The heatmap visualizes aggregated traceroute traffic between nodes as arcs on a map. Data is stored in Neo4j and served via the `heatmap-edges` API. **Implementation** (schema, export, query): `traceroute_analytics` (`neo4j_service`, `views.heatmap_edges`). The URL remains `/api/traceroutes/heatmap-edges/` (wired from `traceroute.urls`).
 
 ## Neo4j Schema
 

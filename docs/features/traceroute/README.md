@@ -1,14 +1,14 @@
 # Traceroute Feature
 
-The traceroute feature tracks path discovery between Meshtastic nodes on the mesh network. It records source-to-target routes (and return paths), stores them in Django, exports them to Neo4j for graph analysis, and exposes aggregated data for heatmap visualization in the UI.
+The traceroute feature tracks path discovery between Meshtastic nodes on the mesh network. **Core lifecycle** (model, scheduling, dispatch, packet completion, WebSocket status) lives in the **`traceroute`** Django app. **Derived analytics** — Neo4j export and queries, reach/coverage pivots, stats and heatmap HTTP handlers — live in **`traceroute_analytics`**, while public URLs stay under `/api/traceroutes/` for compatibility (see [areas-of-concern](areas-of-concern.md)).
 
 ## Overview
 
 - **AutoTraceRoute**: Django model recording each traceroute request (manual or scheduled) and its result.
 - **Triggering**: Manual (**User**), scheduled mesh exploration (**Monitoring**), **External** (cross-environment / orphaned responses), **Node Watch** (mesh monitoring verification), **DX Watch** (reserved integer for future DX Monitoring exploration), and **New node baseline** (first-seen `ObservedNode`; meshflow-api#236). See [Mesh monitoring](../mesh-monitoring/README.md) for node-watch flows.
 - **Command delivery**: WebSocket (`NodeConsumer`) sends traceroute commands to connected bots (meshtastic-bot).
-- **Completion**: Packet receiver matches incoming `TraceroutePacket` to `AutoTraceRoute` (same source/target within configurable window). If no match exists (e.g. cross-env: prod triggered, pre-prod received), creates an `AutoTraceRoute` with `trigger_type=2` (External). Updates status and pushes to Neo4j.
-- **Heatmap**: Neo4j stores edges; `heatmap-edges` API returns aggregated edges/nodes for map visualization.
+- **Completion**: Packet receiver matches incoming `TraceroutePacket` to `AutoTraceRoute` (same source/target within configurable window). If no match exists (e.g. cross-env: prod triggered, pre-prod received), creates an `AutoTraceRoute` with `trigger_type=2` (External). Updates status and enqueues Neo4j sync (`traceroute_analytics`).
+- **Heatmap / coverage / stats**: Implemented in `traceroute_analytics` (Neo4j + ORM); same `/api/traceroutes/` paths as before.
 
 ## Trigger type (canonical)
 

@@ -23,7 +23,11 @@ tags:
   - name: WebSocket
     description: WebSocket endpoints for real-time node commands
   - name: Traceroutes
-    description: Traceroute history and manual triggering
+    description: >-
+      Traceroute list, detail, and manual trigger (core ``traceroute`` app), plus
+      read-only aggregation endpoints for stats, Neo4j-backed heatmap edges, feeder
+      reach, and constellation coverage (implemented in ``traceroute_analytics`` at
+      the same ``/api/traceroutes/`` paths).
   - name: Mesh Monitoring
     description: User watches on observed nodes for silence detection and offline verification
   - name: DX Monitoring
