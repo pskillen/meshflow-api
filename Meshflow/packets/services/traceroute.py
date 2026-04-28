@@ -8,6 +8,7 @@ from django.utils import timezone
 
 from packets.models import TraceroutePacket
 from packets.services.base import BasePacketService
+from traceroute.lifecycle import apply_auto_traceroute_completion, schedule_completed_traceroute_neo4j_export
 from traceroute.models import AutoTraceRoute
 
 logger = logging.getLogger(__name__)
@@ -68,14 +69,11 @@ class TraceroutePacketService(BasePacketService):
             snr = self.packet.snr_back[i] if i < len(self.packet.snr_back) else None
             route_back.append({"node_id": nid, "snr": snr})
 
-        auto_tr.status = AutoTraceRoute.STATUS_COMPLETED
-        auto_tr.route = route
-        auto_tr.route_back = route_back
-        auto_tr.raw_packet = self.packet
-        auto_tr.completed_at = timezone.now()
-        auto_tr.error_message = None
-        auto_tr.save(
-            update_fields=["status", "route", "route_back", "raw_packet", "completed_at", "error_message"],
+        apply_auto_traceroute_completion(
+            auto_tr,
+            route=route,
+            route_back=route_back,
+            raw_packet=self.packet,
         )
 
         from dx_monitoring.exploration import on_auto_traceroute_exploration_finished
@@ -84,12 +82,11 @@ class TraceroutePacketService(BasePacketService):
         maybe_detect_dx_from_completed_traceroute(auto_tr, self.packet, self.observation)
         on_auto_traceroute_exploration_finished(auto_tr)
 
-        # Lazy imports so tests can patch traceroute.tasks / traceroute.ws_notify / mesh_monitoring.services.
+        # Lazy imports so tests can patch traceroute.ws_notify / mesh_monitoring.services / lifecycle Neo4j hook.
         from mesh_monitoring.services import on_monitoring_traceroute_completed
-        from traceroute.tasks import push_traceroute_to_neo4j
         from traceroute.ws_notify import notify_traceroute_status_changed
 
         on_monitoring_traceroute_completed(auto_tr)
         notify_traceroute_status_changed(auto_tr.id, AutoTraceRoute.STATUS_COMPLETED)
-        push_traceroute_to_neo4j.delay(auto_tr.id)
+        schedule_completed_traceroute_neo4j_export(auto_tr.id)
         logger.info("Linked TraceroutePacket %s to AutoTraceRoute %s", self.packet.id, auto_tr.id)

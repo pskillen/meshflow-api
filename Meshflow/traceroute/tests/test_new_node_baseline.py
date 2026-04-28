@@ -171,7 +171,7 @@ def test_enqueue_integrity_error_returns_duplicate(
     target = create_observed_node(node_id=0x71000002)
 
     with patch(
-        "traceroute.new_node_baseline.AutoTraceRoute.objects.create",
+        "traceroute.lifecycle.AutoTraceRoute.objects.create",
         side_effect=IntegrityError("duplicate baseline"),
     ):
         assert enqueue_new_node_baseline(target, observer) == RESULT_DUPLICATE

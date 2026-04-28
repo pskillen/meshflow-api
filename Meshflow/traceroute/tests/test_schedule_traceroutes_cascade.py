@@ -28,7 +28,7 @@ def test_first_strategy_wins_records_strategy(
     def immediate_async_to_sync(async_func):
         return async_func
 
-    with patch("traceroute.tasks.notify_traceroute_status_changed"):
+    with patch("traceroute.lifecycle.notify_traceroute_status_changed"):
         with patch("traceroute.dispatch.notify_traceroute_status_changed"):
             with patch("traceroute.dispatch.async_to_sync", side_effect=immediate_async_to_sync):
                 with patch("traceroute.dispatch.get_channel_layer", return_value=channel_layer):
@@ -65,7 +65,7 @@ def test_strategy_cascade_then_legacy_skips_record_strategy_run(
     def immediate_async_to_sync(async_func):
         return async_func
 
-    with patch("traceroute.tasks.notify_traceroute_status_changed"):
+    with patch("traceroute.lifecycle.notify_traceroute_status_changed"):
         with patch("traceroute.dispatch.notify_traceroute_status_changed"):
             with patch("traceroute.dispatch.async_to_sync", side_effect=immediate_async_to_sync):
                 with patch("traceroute.dispatch.get_channel_layer", return_value=channel_layer):
@@ -136,7 +136,7 @@ def test_second_source_after_first_exhausts_including_legacy(
     def immediate_async_to_sync(async_func):
         return async_func
 
-    with patch("traceroute.tasks.notify_traceroute_status_changed"):
+    with patch("traceroute.lifecycle.notify_traceroute_status_changed"):
         with patch("traceroute.dispatch.notify_traceroute_status_changed"):
             with patch("traceroute.dispatch.async_to_sync", side_effect=immediate_async_to_sync):
                 with patch("traceroute.dispatch.get_channel_layer", return_value=channel_layer):

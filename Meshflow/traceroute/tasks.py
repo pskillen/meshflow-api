@@ -11,6 +11,7 @@ from celery import shared_task
 from tqdm import tqdm
 
 from .dispatch import TRACEROUTE_MAX_PENDING_PER_SOURCE, pending_count_for_source, try_dispatch_one
+from .lifecycle import create_pending_auto_traceroute
 from .models import AutoTraceRoute
 from .source_selection import eligible_traceroute_sources_ordered
 from .strategy_rotation import ordered_strategies_for_feeder, record_strategy_run
@@ -73,14 +74,13 @@ def schedule_traceroutes():
         row_strategy = chosen_strategy or AutoTraceRoute.TARGET_STRATEGY_LEGACY
 
         at_now = timezone.now()
-        auto_tr = AutoTraceRoute.objects.create(
+        auto_tr = create_pending_auto_traceroute(
             source_node=source_node,
             target_node=target_node,
             trigger_type=AutoTraceRoute.TRIGGER_TYPE_MONITORING,
             triggered_by=None,
             trigger_source="scheduler",
             target_strategy=row_strategy,
-            status=AutoTraceRoute.STATUS_PENDING,
             earliest_send_at=at_now,
         )
         if chosen_strategy is not None:
@@ -92,7 +92,6 @@ def schedule_traceroutes():
             row_strategy,
             auto_tr.id,
         )
-        notify_traceroute_status_changed(auto_tr.id, AutoTraceRoute.STATUS_PENDING)
         return {"created": 1}
 
     logger.warning("schedule_traceroutes: cascade exhausted, no TR created: %s", attempts)

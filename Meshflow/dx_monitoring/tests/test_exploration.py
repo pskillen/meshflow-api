@@ -216,7 +216,7 @@ def test_plan_queues_dx_watch_with_expected_fields(
         destination=dest,
         last_observer=source,
     )
-    with patch("dx_monitoring.exploration.notify_traceroute_status_changed"):
+    with patch("traceroute.lifecycle.notify_traceroute_status_changed"):
         plan_event_exploration(ev)
 
     tr = AutoTraceRoute.objects.get(
@@ -387,7 +387,7 @@ def test_active_events_not_due_immediately_after_plan_attempt(
 
     assert active_events_due_for_exploration().filter(pk=ev.pk).exists()
 
-    with patch("dx_monitoring.exploration.notify_traceroute_status_changed"):
+    with patch("traceroute.lifecycle.notify_traceroute_status_changed"):
         plan_event_exploration(ev)
 
     assert not active_events_due_for_exploration().filter(pk=ev.pk).exists()

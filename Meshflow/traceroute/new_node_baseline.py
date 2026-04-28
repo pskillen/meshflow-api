@@ -10,9 +10,9 @@ from django.utils import timezone
 from nodes.managed_node_liveness import is_managed_node_eligible_traceroute_source
 from nodes.models import ManagedNode, ObservedNode
 from traceroute.dispatch import TRACEROUTE_MAX_PENDING_PER_SOURCE, pending_count_for_source
+from traceroute.lifecycle import create_pending_auto_traceroute
 from traceroute.models import AutoTraceRoute
 from traceroute.source_selection import eligible_traceroute_sources_ordered
-from traceroute.ws_notify import notify_traceroute_status_changed
 
 logger = logging.getLogger(__name__)
 
@@ -78,14 +78,13 @@ def enqueue_new_node_baseline(observed_node: ObservedNode, observer: ManagedNode
     at_now = timezone.now()
     try:
         with transaction.atomic():
-            auto_tr = AutoTraceRoute.objects.create(
+            auto_tr = create_pending_auto_traceroute(
                 source_node=source,
                 target_node=observed_node,
                 trigger_type=AutoTraceRoute.TRIGGER_TYPE_NEW_NODE_BASELINE,
                 triggered_by=None,
                 trigger_source=NEW_NODE_BASELINE_TRIGGER_SOURCE,
                 target_strategy=None,
-                status=AutoTraceRoute.STATUS_PENDING,
                 earliest_send_at=at_now,
             )
     except IntegrityError:
@@ -102,5 +101,4 @@ def enqueue_new_node_baseline(observed_node: ObservedNode, observer: ManagedNode
         source.node_id_str,
         observed_node.node_id_str,
     )
-    notify_traceroute_status_changed(auto_tr.id, AutoTraceRoute.STATUS_PENDING)
     return RESULT_QUEUED

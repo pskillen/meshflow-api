@@ -9,8 +9,8 @@ from celery import shared_task
 
 from nodes.models import ObservedNode
 from traceroute.dispatch import TRACEROUTE_MAX_PENDING_PER_SOURCE, pending_count_for_source
+from traceroute.lifecycle import create_pending_auto_traceroute
 from traceroute.models import AutoTraceRoute
-from traceroute.ws_notify import notify_traceroute_status_changed
 
 from .constants import (
     DEFAULT_OFFLINE_AFTER_SECONDS,
@@ -58,16 +58,14 @@ def _dispatch_monitoring_round(observed: ObservedNode) -> None:
                 TRACEROUTE_MAX_PENDING_PER_SOURCE,
             )
             continue
-        tr = AutoTraceRoute.objects.create(
+        create_pending_auto_traceroute(
             source_node=source,
             target_node=observed,
             trigger_type=AutoTraceRoute.TRIGGER_TYPE_NODE_WATCH,
             triggered_by=None,
             trigger_source="mesh_monitoring",
-            status=AutoTraceRoute.STATUS_PENDING,
             earliest_send_at=at,
         )
-        notify_traceroute_status_changed(tr.id, AutoTraceRoute.STATUS_PENDING)
 
 
 @shared_task
