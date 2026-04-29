@@ -7,3 +7,6 @@ class MeshMonitoringConfig(AppConfig):
     name = "mesh_monitoring"
     label = "mesh_monitoring"
     verbose_name = _("Mesh Monitoring")
+
+    def ready(self):
+        import mesh_monitoring.receivers  # noqa: F401

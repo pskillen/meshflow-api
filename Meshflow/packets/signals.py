@@ -25,6 +25,10 @@ power_metrics_packet_received = Signal()
 traffic_management_stats_packet_received = Signal()
 traceroute_packet_received = Signal()
 
+# Emitted after a DeviceMetrics row is persisted for an observed node (mesh monitoring, analytics, etc.).
+# kwargs: observed_node, device_metrics, battery_level, reported_time
+device_metrics_recorded = Signal()
+
 
 # Converted packet signals
 # These are used to signal that a text message has been received

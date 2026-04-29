@@ -6,8 +6,8 @@ Companion to [README.md](README.md). Diagrams use **Mermaid**; node IDs avoid sp
 
 | Component | Responsibility |
 |-----------|------------------|
-| **`mesh_monitoring` (Django app)** | `NodeWatch`, `NodePresence`; Celery task `process_node_watch_presence`; `selection` of monitoring TR sources; `services` state machine; future watch CRUD views |
-| **`packets`** | Update `ObservedNode.last_heard`; on advance, call into `mesh_monitoring` to clear presence; TR packet receiver completes `AutoTraceRoute` rows |
+| **`mesh_monitoring` (Django app)** | `NodeWatch`, `NodePresence`, `NodeMonitoringConfig`; Celery task `process_node_watch_presence`; `selection` of monitoring TR sources; `services` state machine; watch + config REST views |
+| **`packets`** | Update `ObservedNode.last_heard`; on advance, call into `mesh_monitoring` to clear presence; emit **`device_metrics_recorded`** after persisting device metrics; TR packet receiver completes `AutoTraceRoute` rows |
 | **`traceroute`** | `AutoTraceRoute` including `trigger_type=4` (Node Watch); `pick_traceroute_target` excludes nodes under verification/offline; channel layer sends commands to bots |
 | **`meshtastic-bot`** | WebSocket client receives `traceroute` command, runs TR on radio, reports packets back to API |
 | **`push_notifications.discord`** | Send DM to a verified Discord user id (no OAuth in this module) |
@@ -30,8 +30,8 @@ sequenceDiagram
   participant Pkt as packets_ingestion
   participant Disc as push_notifications_discord
 
-  Celery->>DB: load ObservedNode watches NodePresence
-  Note over Celery: last_heard older than NodePresence.offline_after
+  Celery->>DB: load ObservedNode watches NodePresence NodeMonitoringConfig
+  Note over Celery: last_heard older than NodeMonitoringConfig.last_heard_offline_after_seconds
   Celery->>DB: set NodePresence.verification_started_at suspected_offline_at reset episode counters
   Celery->>DB: create AutoTraceRoute monitor rows
   loop Up to three sources staggered
@@ -59,9 +59,9 @@ sequenceDiagram
 ```mermaid
 flowchart TD
   start[Periodic_task_tick]
-  start --> hasWatch{Any_enabled_NodeWatch_for_node}
+  start --> hasWatch{Any_enabled_offline_notifying_NodeWatch_for_node}
   hasWatch -->|no| skip[Skip_node]
-  hasWatch -->|yes| effThreshold[Threshold_is_NodePresence_offline_after]
+  hasWatch -->|yes| effThreshold[Threshold_from_NodeMonitoringConfig]
   effThreshold --> stale{last_heard_null_or_before_now_minus_threshold}
   stale -->|no| online[State_online_or_idle]
   stale -->|yes| checkPresence{Already_offline_confirmed}

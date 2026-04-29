@@ -1,11 +1,11 @@
 # Mesh monitoring — permissions
 
-Who may **subscribe** to alerts (create a **`NodeWatch`**) vs who may change the **node-level silence threshold** (**`NodePresence.offline_after`**) are different. Rules align with the [Mesh Monitoring epic](https://github.com/pskillen/meshflow-api/issues/147) and phase **04** watch APIs.
+Who may **subscribe** to alerts (create a **`NodeWatch`**) vs who may change **node-level monitoring configuration** (**`NodeMonitoringConfig`**: silence threshold + battery alert settings) are different. Rules align with the [Mesh Monitoring epic](https://github.com/pskillen/meshflow-api/issues/147) and phase **04** watch APIs.
 
 Implementation lives in:
 
 - **`mesh_monitoring.eligibility.user_can_watch`** — create/update/delete watches (validated on **`NodeWatch.save()`** and in **`NodeWatchSerializer`**).
-- **`mesh_monitoring.permission_helpers.user_can_edit_monitoring_offline_after`** — **`GET/PATCH …/offline-after/`** (PATCH returns **403** when not allowed).
+- **`mesh_monitoring.permission_helpers.user_can_edit_node_monitoring_config`** — **`GET/PATCH …/monitoring/nodes/{id}/config/`** (PATCH returns **403** when not allowed). Alias: **`user_can_edit_monitoring_offline_after`**.
 
 ---
 
@@ -17,10 +17,15 @@ Implementation lives in:
 - **All other (non‑infra) nodes** could raise **privacy** concerns if we let arbitrary users stack monitoring tooling on top of public mesh data. The underlying observations are already public in nature—operators choose to broadcast presence, messages, location, and so on—but we **avoid adding extra product surface** that could make it easier to track or pressure someone **without their participation**. Limiting watches to **people who have claimed the node** keeps “your own nodes are your own nodes”: the person who has identified themselves with that node controls monitoring opt‑in for that class of target.
 - **Your own nodes:** if you have **claimed** an observed node, you may watch it—aligned with ownership and consent to deeper tooling for radios you treat as yours.
 
-### Changing silence / threshold settings
+### Changing monitoring configuration (silence + battery)
 
-- **`offline_after`** applies to **every** enabled watch and the **whole** monitoring episode for that observed node (one **`NodePresence`** row per node). Changing it is not a personal preference for one subscriber; it changes behaviour for **all** watchers and for verification / offline semantics.
-- That calls for a **stronger gate** than “anyone who can watch”: only the **claim owner** (who speaks for that non‑infra node in the product) or **staff** (platform operators / “system admin” via Django’s **`is_staff`**) may **PATCH** the value. Others may still **GET** the number for context, with **`editable: false`** when they cannot change it.
+- **`NodeMonitoringConfig`** applies to **every** watch and the **whole** monitoring episode for that observed node. Changing silence timing or battery alert parameters is not a personal preference for one subscriber; it changes behaviour for **all** watchers and for verification / offline / battery semantics.
+- That calls for a **stronger gate** than “anyone who can watch”: only the **claim owner** (who speaks for that non‑infra node in the product) or **staff** (platform operators / “system admin” via Django’s **`is_staff`**) may **PATCH** config. Others may still **GET** values for context, with **`editable: false`** when they cannot change it.
+
+### Per-user notification opt-ins
+
+- Each **`NodeWatch`** has **`offline_notifications_enabled`** and **`battery_notifications_enabled`**. Only the **owning user** may PATCH their own watch row (including these flags).
+- **Discord** delivery still requires a **verified** Discord binding for that user; that is separate from watch eligibility (see [Discord notifications](../discord/notifications.md)).
 
 ---
 
@@ -36,38 +41,37 @@ Everyone else gets validation errors on create (and **`NodeWatch.clean()`** reje
 **Notes**
 
 - Watches are **per user × observed node** (unique constraint). Each user opts in individually.
-- **Discord** delivery still requires a **verified** Discord binding for that user; that is separate from watch eligibility (see [Discord notifications](../discord/notifications.md)).
 
 ---
 
-## Who may read or change the silence threshold (`offline_after`)?
-
-**`offline_after`** is stored on **`NodePresence`** (one value per observed node). It controls how long **`last_heard`** may be stale before a **verification traceroute** round may start.
+## Who may read or change `NodeMonitoringConfig`?
 
 | Action | Who |
 |--------|-----|
-| **GET** `…/monitoring/nodes/{internal_id}/offline-after/` | Any **authenticated** user. Response includes **`offline_after`** and **`editable`** (whether this user may PATCH). |
+| **GET** `…/monitoring/nodes/{internal_id}/config/` | Any **authenticated** user. Response includes config fields and **`editable`** (whether this user may PATCH). |
 | **PATCH** same URL | **Django staff** (`user.is_staff`, “system admin” / admin-site staff) **or** the **claim owner** (`observed_node.claimed_by == user`). **403** otherwise. |
 
 **Not** eligible to PATCH:
 
-- Users who only have a **watch** on an **infrastructure** node but are not staff (infrastructure nodes are often **unclaimed**; threshold is staff-only until product adds e.g. constellation-admin rules).
+- Users who only have a **watch** on an **infrastructure** node but are not staff (infrastructure nodes are often **unclaimed**; config is staff-only until product adds e.g. constellation-admin rules).
 - Other authenticated users with no claim and not staff.
 
 ---
 
-## Watch API vs offline-after API
+## Watch API vs monitoring config API
 
 | Endpoint | Auth | Extra rules |
 |----------|------|----------------|
 | **`/api/monitoring/watches/`** (CRUD) | Authenticated | Create: **`user_can_watch`**. List/detail/update/delete: only the **owning** user’s watches. |
-| **`/api/monitoring/nodes/{id}/offline-after/`** | Authenticated | PATCH: **`user_can_edit_monitoring_offline_after`**. |
+| **`/api/monitoring/nodes/{id}/config/`** | Authenticated | PATCH: **`user_can_edit_node_monitoring_config`**. |
+| **`/api/monitoring/alerts/summary/`** | Authenticated | Query **`scope=mesh_infra`**. Returns operational infrastructure alert counts (not filtered by the current user’s Discord opt-ins). |
 
 ---
 
 ## UI expectations
 
 - **Watch toggles** (add / enable / remove): only where the user is allowed to watch (same rules as API).
-- **Silence threshold editing**: treat as an **admin-style** control — expose only to users who would receive **`editable: true`** from GET (claim owner or staff); others may still **see** the current value when useful for context.
+- **Monitoring config editing**: treat as an **admin-style** control — expose only to users who would receive **`editable: true`** from GET (claim owner or staff); others may still **see** the current values when useful for context.
+- **Per-channel Discord opt-ins**: expose **`offline_notifications_enabled`** / **`battery_notifications_enabled`** on the user’s own watch rows.
 
 For background on the wider epic (verification TRs, Discord), see the epic issue and [README.md](README.md).

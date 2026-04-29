@@ -1057,6 +1057,8 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
     rf_profile_editable = serializers.SerializerMethodField()
     has_rf_profile = serializers.SerializerMethodField()
     has_ready_rf_render = serializers.SerializerMethodField()
+    battery_alert_active = serializers.SerializerMethodField()
+    battery_alert_confirmed_at = serializers.SerializerMethodField()
     owner = OwnerSerializer(source="claimed_by", read_only=True)
     claim = serializers.SerializerMethodField()
 
@@ -1094,6 +1096,8 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
             "rf_profile_editable",
             "has_rf_profile",
             "has_ready_rf_render",
+            "battery_alert_active",
+            "battery_alert_confirmed_at",
             "owner",
             "claim",
         ]
@@ -1116,6 +1120,8 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
             "rf_profile_editable",
             "has_rf_profile",
             "has_ready_rf_render",
+            "battery_alert_active",
+            "battery_alert_confirmed_at",
             "owner",
             "claim",
         ]
@@ -1146,6 +1152,19 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
             observed_node=obj,
             status=NodeRfPropagationRender.Status.READY,
         ).exists()
+
+    def get_battery_alert_active(self, obj):
+        cfg = getattr(obj, "monitoring_config", None)
+        rel = getattr(obj, "mesh_presence", None)
+        if not cfg or not rel:
+            return False
+        return bool(cfg.battery_alert_enabled and rel.battery_alert_confirmed_at is not None)
+
+    def get_battery_alert_confirmed_at(self, obj):
+        rel = getattr(obj, "mesh_presence", None)
+        if rel is None:
+            return None
+        return rel.battery_alert_confirmed_at
 
     def get_inferred_max_hops(self, obj):
         status = self._get_latest_status(obj)

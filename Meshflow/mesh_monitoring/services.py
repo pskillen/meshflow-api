@@ -23,6 +23,7 @@ __all__ = [
     "on_monitoring_traceroute_completed",
     "notify_watchers_node_offline",
     "notify_watchers_verification_started",
+    "notify_watchers_node_battery_low",
     "monitoring_traceroute_succeeded_since",
 ]
 
@@ -164,7 +165,13 @@ def notify_watchers_node_offline(observed_node: ObservedNode) -> int:
 
     User = get_user_model()
     user_ids = (
-        NodeWatch.objects.filter(observed_node=observed_node, enabled=True).values_list("user_id", flat=True).distinct()
+        NodeWatch.objects.filter(
+            observed_node=observed_node,
+            enabled=True,
+            offline_notifications_enabled=True,
+        )
+        .values_list("user_id", flat=True)
+        .distinct()
     )
     users = User.objects.filter(pk__in=user_ids)
     text = f"Meshflow mesh monitoring: node {_format_node_label(observed_node)} appears offline after verification."
@@ -229,7 +236,13 @@ def notify_watchers_verification_started(observed_node: ObservedNode, silence_th
 
     User = get_user_model()
     user_ids = (
-        NodeWatch.objects.filter(observed_node=observed_node, enabled=True).values_list("user_id", flat=True).distinct()
+        NodeWatch.objects.filter(
+            observed_node=observed_node,
+            enabled=True,
+            offline_notifications_enabled=True,
+        )
+        .values_list("user_id", flat=True)
+        .distinct()
     )
     users = User.objects.filter(pk__in=user_ids)
     text = (
@@ -281,6 +294,86 @@ def notify_watchers_verification_started(observed_node: ObservedNode, silence_th
         except DiscordSendError as e:
             logger.warning(
                 "mesh_monitoring: Discord verification-start notify failed user=%s: %s",
+                user.pk,
+                e,
+            )
+    return attempted
+
+
+def notify_watchers_node_battery_low(
+    observed_node: ObservedNode,
+    battery_level: float,
+    threshold_percent: float,
+    report_count: int,
+) -> int:
+    """
+    DM each distinct watcher who opted into battery notifications (deduped by user).
+    """
+    from django.contrib.auth import get_user_model
+
+    from .models import NodeWatch
+
+    User = get_user_model()
+    user_ids = (
+        NodeWatch.objects.filter(
+            observed_node=observed_node,
+            enabled=True,
+            battery_notifications_enabled=True,
+        )
+        .values_list("user_id", flat=True)
+        .distinct()
+    )
+    users = User.objects.filter(pk__in=user_ids)
+    text = (
+        f"Meshflow mesh monitoring: node {_format_node_label(observed_node)} battery is low "
+        f"({battery_level}% reported, below {threshold_percent}% threshold for {report_count} consecutive reports)."
+    )
+    url = _node_details_url(observed_node)
+    if url:
+        text += f"\n\n{url}"
+    attempted = 0
+    related_ctx = {
+        "observed_node_id": str(observed_node.pk),
+        "node_id_str": observed_node.node_id_str,
+        "battery_level": battery_level,
+        "threshold_percent": threshold_percent,
+        "report_count": report_count,
+    }
+    for user in users:
+        if not user_has_verified_discord_dm_target(user):
+            logger.info(
+                "mesh_monitoring: skip battery notify user=%s (Discord not verified)",
+                user.pk,
+            )
+            record_discord_notification_skip(
+                feature=DiscordNotificationFeature.NODE_WATCH,
+                kind=DiscordNotificationKind.NODE_BATTERY_LOW,
+                user=user,
+                reason="Discord DM target not verified (missing or stale notification settings).",
+                message_preview_text=text,
+                discord_recipient_id=getattr(user, "discord_notify_user_id", "") or "",
+                related_app_label="nodes",
+                related_model_name="ObservedNode",
+                related_object_id=str(observed_node.pk),
+                related_context=related_ctx,
+            )
+            continue
+        attempted += 1
+        try:
+            send_discord_dm_with_audit(
+                feature=DiscordNotificationFeature.NODE_WATCH,
+                kind=DiscordNotificationKind.NODE_BATTERY_LOW,
+                user=user,
+                discord_user_id=user.discord_notify_user_id,
+                content=text,
+                related_app_label="nodes",
+                related_model_name="ObservedNode",
+                related_object_id=str(observed_node.pk),
+                related_context=related_ctx,
+            )
+        except DiscordSendError as e:
+            logger.warning(
+                "mesh_monitoring: Discord battery notify failed user=%s: %s",
                 user.pk,
                 e,
             )

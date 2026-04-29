@@ -3,6 +3,7 @@
 from nodes.models import DeviceMetrics, NodeLatestStatus
 from packets.models import DeviceMetricsPacket
 from packets.services.base import BasePacketService
+from packets.signals import device_metrics_recorded
 
 
 class DeviceMetricsPacketService(BasePacketService):
@@ -16,10 +17,11 @@ class DeviceMetricsPacketService(BasePacketService):
         reported_time = self.packet.reading_time or self.packet.first_reported_time
 
         # Create a new DeviceMetrics record
-        DeviceMetrics.objects.create(
+        battery_level = float(self.packet.battery_level or 0.0)
+        dm = DeviceMetrics.objects.create(
             node=self.from_node,
             reported_time=reported_time,
-            battery_level=self.packet.battery_level or 0.0,
+            battery_level=battery_level,
             voltage=self.packet.voltage or 0.0,
             channel_utilization=self.packet.channel_utilization or 0.0,
             air_util_tx=self.packet.air_util_tx or 0.0,
@@ -38,4 +40,12 @@ class DeviceMetricsPacketService(BasePacketService):
                 "metrics_reported_time": reported_time,
                 "inferred_max_hops": self.observation.hop_start,
             },
+        )
+
+        device_metrics_recorded.send(
+            sender=self.__class__,
+            observed_node=self.from_node,
+            device_metrics=dm,
+            battery_level=battery_level,
+            reported_time=reported_time,
         )
