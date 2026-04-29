@@ -31,7 +31,7 @@ This document describes all environment variables used by the Meshflow Django pr
 
 | Variable                        | Default   | Description                                              | Allowable Values         |
 |----------------------------------|-----------|----------------------------------------------------------|-------------------------|
-| `JWT_ACCESS_TOKEN_LIFETIME_MINUTES` | `1440`  | JWT access token lifetime in minutes (default 24h).      | Integer (string)        |
+| `JWT_ACCESS_TOKEN_LIFETIME_MINUTES` | `43200` | JWT access token lifetime in minutes (default 30d).     | Integer (string)        |
 | `JWT_REFRESH_TOKEN_LIFETIME_DAYS`   | `30`    | JWT refresh token lifetime in days (default 30d).        | Integer (string)        |
 
 ---
@@ -186,7 +186,7 @@ Tunables for [automatic target selection reliability](../features/traceroute/alg
 
 ## 3. JWT / Authentication
 
-- **JWT_ACCESS_TOKEN_LIFETIME_MINUTES**: How long (in minutes) JWT access tokens are valid.
+- **JWT_ACCESS_TOKEN_LIFETIME_MINUTES**: How long (in minutes) JWT access tokens are valid (default 30 days, aligned with refresh token lifetime).
 - **JWT_REFRESH_TOKEN_LIFETIME_DAYS**: How long (in days) JWT refresh tokens are valid.
 
 ## 4. Django Allauth / Social Auth
@@ -250,7 +250,7 @@ POSTGRES_PASSWORD=supersecret
 POSTGRES_HOST=db
 POSTGRES_PORT=5432
 
-JWT_ACCESS_TOKEN_LIFETIME_MINUTES=1440
+JWT_ACCESS_TOKEN_LIFETIME_MINUTES=43200
 JWT_REFRESH_TOKEN_LIFETIME_DAYS=30
 
 SITE_ID=1

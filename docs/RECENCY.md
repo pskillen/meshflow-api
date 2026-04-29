@@ -47,7 +47,7 @@ source of truth for defaults.
 | `MESH_MONITORING_VERIFICATION_NOTIFY_COOLDOWN_SECONDS` | `3600` (s) | Min gap between verification-start Discord DMs |
 | `MESH_MONITORING_NOTIFY_VERIFICATION_START` | unset = on | Toggle verification-start DMs |
 | `AUTO_TR_SOURCE_SELECTION_ALGO` | `least_recently_used` | Source picker (uses `triggered_at` history) |
-| `JWT_ACCESS_TOKEN_LIFETIME_MINUTES` | `1440` (24 h) | JWT access token TTL |
+| `JWT_ACCESS_TOKEN_LIFETIME_MINUTES` | `43200` (30 d) | JWT access token TTL |
 | `JWT_REFRESH_TOKEN_LIFETIME_DAYS` | `30` | JWT refresh token TTL |
 | `RF_PROPAGATION_POLL_MAX_SECONDS` | `300` | Max Site Planner poll budget per render |
 | `RF_PROPAGATION_READY_RETENTION` | `3` | On-disk ready PNG retention count (not a duration) |
@@ -267,7 +267,7 @@ Implemented in [`Meshflow/stats/tasks.py`](../Meshflow/stats/tasks.py).
 | Item | Default | Purpose |
 | --- | --- | --- |
 | Discord connect OAuth `STATE_MAX_AGE` | **900 s (15 min)** | Max age of signed OAuth connect state + cache key |
-| `SIMPLE_JWT` access lifetime | **1440 min (24 h)** | JWT access token (env: `JWT_ACCESS_TOKEN_LIFETIME_MINUTES`) |
+| `SIMPLE_JWT` access lifetime | **43200 min (30 d)** | JWT access token (env: `JWT_ACCESS_TOKEN_LIFETIME_MINUTES`) |
 | `SIMPLE_JWT` refresh lifetime | **30 days** | JWT refresh token (env: `JWT_REFRESH_TOKEN_LIFETIME_DAYS`) |
 
 ---
