@@ -5,17 +5,18 @@ from django.shortcuts import get_object_or_404
 from rest_framework import permissions, status, views, viewsets
 from rest_framework.response import Response
 
-from mesh_monitoring.models import NodePresence, NodeWatch
-from mesh_monitoring.permission_helpers import user_can_edit_monitoring_offline_after
-from mesh_monitoring.serializers import NodePresenceOfflineAfterSerializer, NodeWatchSerializer
+from mesh_monitoring.models import NodeMonitoringConfig, NodePresence, NodeWatch
+from mesh_monitoring.permission_helpers import user_can_edit_node_monitoring_config
+from mesh_monitoring.serializers import NodeMonitoringConfigSerializer, NodeWatchSerializer
+from mesh_monitoring.summary import mesh_infra_monitoring_alert_counts
 from nodes.models import ObservedNode
 
 
-class NodeMonitoringOfflineAfterView(views.APIView):
+class NodeMonitoringConfigView(views.APIView):
     """
-    Read or update the node-level silence threshold (NodePresence.offline_after).
+    Read or update per-node monitoring configuration (silence threshold + battery alerts).
 
-    GET/PATCH /api/monitoring/nodes/{observed_node_id}/offline-after/
+    GET/PATCH /api/monitoring/nodes/{observed_node_id}/config/
     observed_node_id is ObservedNode.internal_id (UUID).
     """
 
@@ -23,34 +24,52 @@ class NodeMonitoringOfflineAfterView(views.APIView):
 
     def get(self, request, observed_node_id):
         node = get_object_or_404(ObservedNode, pk=observed_node_id)
-        presence, _ = NodePresence.objects.get_or_create(
+        NodePresence.objects.get_or_create(
             observed_node=node,
             defaults={"is_offline": False},
         )
-        return Response(
-            {
-                "offline_after": presence.offline_after,
-                "editable": user_can_edit_monitoring_offline_after(request.user, node),
-            },
+        cfg, _ = NodeMonitoringConfig.objects.get_or_create(
+            observed_node=node,
+            defaults={"last_heard_offline_after_seconds": 21600},
         )
+        ser = NodeMonitoringConfigSerializer(cfg, context={"request": request})
+        return Response(ser.data)
 
     def patch(self, request, observed_node_id):
         node = get_object_or_404(ObservedNode, pk=observed_node_id)
-        if not user_can_edit_monitoring_offline_after(request.user, node):
+        if not user_can_edit_node_monitoring_config(request.user, node):
             return Response(status=status.HTTP_403_FORBIDDEN)
-        presence, _ = NodePresence.objects.get_or_create(
+        NodePresence.objects.get_or_create(
             observed_node=node,
             defaults={"is_offline": False},
         )
-        ser = NodePresenceOfflineAfterSerializer(presence, data=request.data, partial=True)
+        cfg, _ = NodeMonitoringConfig.objects.get_or_create(
+            observed_node=node,
+            defaults={"last_heard_offline_after_seconds": 21600},
+        )
+        ser = NodeMonitoringConfigSerializer(cfg, data=request.data, partial=True, context={"request": request})
         ser.is_valid(raise_exception=True)
         ser.save()
-        return Response(
-            {
-                "offline_after": ser.instance.offline_after,
-                "editable": True,
-            },
-        )
+        return Response(NodeMonitoringConfigSerializer(cfg, context={"request": request}).data)
+
+
+class MonitoringAlertsSummaryView(views.APIView):
+    """
+    GET /api/monitoring/alerts/summary/?scope=mesh_infra
+
+    Operational counts for mesh infrastructure alerting (not filtered by the current user's Discord opt-ins).
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        scope = request.query_params.get("scope", "").strip()
+        if scope != "mesh_infra":
+            return Response(
+                {"detail": "Unsupported scope. Use ?scope=mesh_infra."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return Response({"mesh_infra": mesh_infra_monitoring_alert_counts()})
 
 
 class NodeWatchViewSet(viewsets.ModelViewSet):
@@ -71,6 +90,7 @@ class NodeWatchViewSet(viewsets.ModelViewSet):
             .select_related("observed_node")
             .select_related("observed_node__claimed_by")
             .select_related("observed_node__mesh_presence")
+            .select_related("observed_node__monitoring_config")
             .select_related("observed_node__latest_status")
             .order_by("-created_at", "-id")
         )
@@ -80,4 +100,8 @@ class NodeWatchViewSet(viewsets.ModelViewSet):
         NodePresence.objects.get_or_create(
             observed_node=watch.observed_node,
             defaults={"is_offline": False},
+        )
+        NodeMonitoringConfig.objects.get_or_create(
+            observed_node=watch.observed_node,
+            defaults={"last_heard_offline_after_seconds": 21600},
         )

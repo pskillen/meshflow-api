@@ -1002,6 +1002,16 @@ components:
         has_ready_rf_render:
           type: boolean
           description: Whether the latest RF propagation render for this node has status ready.
+        battery_alert_active:
+          type: boolean
+          description: >
+            True when battery alerting is enabled for this node and a low-battery episode has been
+            confirmed (runtime state on NodePresence). False when no config/presence row or alerting off.
+        battery_alert_confirmed_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the current low-battery episode was confirmed, if any.
         latest_position:
           $ref: '#/components/schemas/Position'
         latest_device_metrics:
@@ -1177,8 +1187,17 @@ components:
             offline_after:
               type: integer
               description: >
-                Node-level silence threshold (seconds); stored on NodePresence. Duplicated here for
+                Node-level silence threshold (seconds without last_heard before verification may start);
+                stored on NodeMonitoringConfig as last_heard_offline_after_seconds. Duplicated here for
                 convenience; same value as top-level NodeWatch.offline_after.
+            battery_alert_active:
+              type: boolean
+              description: True when battery alerts are enabled for the node and a battery alert episode is active.
+            battery_alert_confirmed_at:
+              type: string
+              format: date-time
+              nullable: true
+              description: When the current battery alert episode was confirmed (N consecutive low reports).
 
     NodeWatch:
       type: object
@@ -1192,9 +1211,15 @@ components:
           readOnly: true
           description: >
             Node-level silence threshold (seconds without last_heard before verification may start);
-            same value as observed_node.offline_after. Edit via PATCH /monitoring/nodes/{id}/offline-after/.
+            same value as observed_node.offline_after. Edit via PATCH /monitoring/nodes/{id}/config/.
         enabled:
           type: boolean
+        offline_notifications_enabled:
+          type: boolean
+          description: When true with enabled, user receives offline / verification Discord notifications.
+        battery_notifications_enabled:
+          type: boolean
+          description: When true with enabled, user receives low-battery Discord notifications.
         created_at:
           type: string
           format: date-time
@@ -1210,30 +1235,85 @@ components:
         enabled:
           type: boolean
           default: true
+        offline_notifications_enabled:
+          type: boolean
+        battery_notifications_enabled:
+          type: boolean
 
     NodeWatchUpdate:
       type: object
       properties:
         enabled:
           type: boolean
-
-    NodeMonitoringOfflineAfter:
-      type: object
-      properties:
-        offline_after:
-          type: integer
-          description: Seconds without packets (last_heard) before verification may start.
-        editable:
+        offline_notifications_enabled:
           type: boolean
-          description: Whether the current user may PATCH this value (staff or claim owner).
+        battery_notifications_enabled:
+          type: boolean
 
-    NodeMonitoringOfflineAfterPatch:
+    NodeMonitoringConfig:
       type: object
       properties:
-        offline_after:
+        last_heard_offline_after_seconds:
           type: integer
           minimum: 1
-      required: [offline_after]
+          description: Seconds since last_heard before verification may start.
+        battery_alert_enabled:
+          type: boolean
+        battery_alert_threshold_percent:
+          type: integer
+          minimum: 5
+          maximum: 80
+        battery_alert_report_count:
+          type: integer
+          minimum: 1
+          maximum: 10
+        editable:
+          type: boolean
+          readOnly: true
+          description: Whether the current user may PATCH this config (staff or claim owner).
+        battery_alert_active:
+          type: boolean
+          readOnly: true
+        battery_alert_confirmed_at:
+          type: string
+          format: date-time
+          nullable: true
+          readOnly: true
+
+    NodeMonitoringConfigPatch:
+      type: object
+      properties:
+        last_heard_offline_after_seconds:
+          type: integer
+          minimum: 1
+        battery_alert_enabled:
+          type: boolean
+        battery_alert_threshold_percent:
+          type: integer
+          minimum: 5
+          maximum: 80
+        battery_alert_report_count:
+          type: integer
+          minimum: 1
+          maximum: 10
+
+    MeshInfraMonitoringAlertSummary:
+      type: object
+      properties:
+        alerting_nodes_count:
+          type: integer
+        offline_count:
+          type: integer
+        battery_count:
+          type: integer
+        verifying_count:
+          type: integer
+
+    MonitoringAlertsSummaryResponse:
+      type: object
+      properties:
+        mesh_infra:
+          $ref: '#/components/schemas/MeshInfraMonitoringAlertSummary'
 
     ObservedNodeEnvironmentSettingsPatch:
       type: object
@@ -5774,7 +5854,7 @@ paths:
         '404':
           description: Not found
 
-  /monitoring/nodes/{observed_node_id}/offline-after/:
+  /monitoring/nodes/{observed_node_id}/config/:
     parameters:
       - name: observed_node_id
         in: path
@@ -5784,23 +5864,23 @@ paths:
           format: uuid
         description: ObservedNode primary key (internal_id)
     get:
-      summary: Get node-level mesh monitoring silence threshold
+      summary: Get node-level mesh monitoring configuration
       tags: [Mesh Monitoring]
       security:
         - BearerAuth: []
       responses:
         '200':
-          description: Current threshold and whether the user may edit it
+          description: Current monitoring configuration and whether the user may edit it
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/NodeMonitoringOfflineAfter'
+                $ref: '#/components/schemas/NodeMonitoringConfig'
         '401':
           description: Unauthorized
         '404':
           description: Observed node not found
     patch:
-      summary: Update node-level silence threshold (NodePresence.offline_after)
+      summary: Update node-level mesh monitoring configuration
       description: >
         Allowed for staff or the user who has claimed the observed node (claimed_by).
       tags: [Mesh Monitoring]
@@ -5811,14 +5891,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/NodeMonitoringOfflineAfterPatch'
+              $ref: '#/components/schemas/NodeMonitoringConfigPatch'
       responses:
         '200':
-          description: Updated threshold
+          description: Updated configuration
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/NodeMonitoringOfflineAfter'
+                $ref: '#/components/schemas/NodeMonitoringConfig'
         '400':
           description: Validation error
         '401':
@@ -5827,6 +5907,32 @@ paths:
           description: Forbidden (not claim owner or staff)
         '404':
           description: Observed node not found
+
+  /monitoring/alerts/summary/:
+    get:
+      summary: Mesh monitoring alert counts (e.g. Mesh Infra nav badge)
+      tags: [Mesh Monitoring]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: scope
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [mesh_infra]
+          description: Use mesh_infra for infrastructure alerting counts.
+      responses:
+        '200':
+          description: Alert summary for the requested scope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MonitoringAlertsSummaryResponse'
+        '400':
+          description: Unsupported or missing scope
+        '401':
+          description: Unauthorized
 
   /monitoring/watches/:
     get:

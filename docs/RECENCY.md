@@ -204,7 +204,7 @@ Node presence lifecycle:
 
 | Item | Default | Env | Purpose |
 | --- | --- | --- | --- |
-| `NodePresence.offline_after` | **21600 s (6 h)** (model default) | per-row | Silence threshold on `ObservedNode.last_heard` before verification starts |
+| `NodeMonitoringConfig.last_heard_offline_after_seconds` | **21600 s (6 h)** (model default) | per-row | Silence threshold on `ObservedNode.last_heard` before verification starts |
 | `DEFAULT_OFFLINE_AFTER_SECONDS` | **21600 s** | no | Fallback used when no `NodePresence` row exists (serializer + tasks) |
 | `MESH_MONITORING_VERIFICATION_SECONDS` | **180 s** | yes | Window after `verification_started_at` to confirm the node is offline |
 | `MESH_MONITORING_VERIFICATION_NOTIFY_COOLDOWN_SECONDS` | **3600 s** | yes | Minimum gap between verification-start Discord DMs per watch |

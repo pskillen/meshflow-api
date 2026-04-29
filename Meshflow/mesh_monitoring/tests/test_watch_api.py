@@ -50,12 +50,12 @@ def test_watch_crud_claimed_node(api_client, create_user, create_observed_node):
     assert r.data["observed_node"]["monitoring_verification_started_at"] is None
 
     r = api_client.patch(
-        f"/api/monitoring/nodes/{obs.internal_id}/offline-after/",
-        {"offline_after": 90},
+        f"/api/monitoring/nodes/{obs.internal_id}/config/",
+        {"last_heard_offline_after_seconds": 90},
         format="json",
     )
     assert r.status_code == status.HTTP_200_OK
-    assert r.data["offline_after"] == 90
+    assert r.data["last_heard_offline_after_seconds"] == 90
     assert r.data["editable"] is True
 
     r = api_client.get(f"/api/monitoring/watches/{wid}/")
@@ -77,32 +77,32 @@ def test_watch_crud_claimed_node(api_client, create_user, create_observed_node):
 
 
 @pytest.mark.django_db
-def test_monitoring_offline_after_get_editable_flags(api_client, create_user, create_observed_node):
+def test_monitoring_config_get_editable_flags(api_client, create_user, create_observed_node):
     owner = create_user()
     other = create_user()
     obs = create_observed_node(claimed_by=owner)
 
     api_client.force_authenticate(user=other)
-    r = api_client.get(f"/api/monitoring/nodes/{obs.internal_id}/offline-after/")
+    r = api_client.get(f"/api/monitoring/nodes/{obs.internal_id}/config/")
     assert r.status_code == status.HTTP_200_OK
-    assert r.data["offline_after"] == 21600
+    assert r.data["last_heard_offline_after_seconds"] == 21600
     assert r.data["editable"] is False
 
     api_client.force_authenticate(user=owner)
-    r = api_client.get(f"/api/monitoring/nodes/{obs.internal_id}/offline-after/")
+    r = api_client.get(f"/api/monitoring/nodes/{obs.internal_id}/config/")
     assert r.status_code == status.HTTP_200_OK
     assert r.data["editable"] is True
 
 
 @pytest.mark.django_db
-def test_monitoring_offline_after_patch_forbidden_for_non_owner(api_client, create_user, create_observed_node):
+def test_monitoring_config_patch_forbidden_for_non_owner(api_client, create_user, create_observed_node):
     owner = create_user()
     other = create_user()
     obs = create_observed_node(claimed_by=owner)
     api_client.force_authenticate(user=other)
     r = api_client.patch(
-        f"/api/monitoring/nodes/{obs.internal_id}/offline-after/",
-        {"offline_after": 120},
+        f"/api/monitoring/nodes/{obs.internal_id}/config/",
+        {"last_heard_offline_after_seconds": 120},
         format="json",
     )
     assert r.status_code == status.HTTP_403_FORBIDDEN

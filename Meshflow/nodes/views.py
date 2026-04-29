@@ -207,7 +207,15 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         """Filter nodes based on user permissions and prefetch latest status."""
-        qs = ObservedNode.objects.all().order_by("-last_heard", "node_id").select_related("latest_status")
+        qs = (
+            ObservedNode.objects.all()
+            .order_by("-last_heard", "node_id")
+            .select_related(
+                "latest_status",
+                "monitoring_config",
+                "mesh_presence",
+            )
+        )
         # Apply last_heard_after filter only for list action
         if self.action == "list":
             last_heard_after = self.request.query_params.get("last_heard_after")
@@ -524,7 +532,7 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
         qs = (
             ObservedNode.objects.filter(role__in=roles)
             .order_by("-last_heard", "node_id")
-            .select_related("latest_status")
+            .select_related("latest_status", "monitoring_config", "mesh_presence")
         )
 
         last_heard_after = request.query_params.get("last_heard_after")

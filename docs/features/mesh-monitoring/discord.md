@@ -4,7 +4,7 @@
 
 ## Behaviour
 
-- **Who gets a DM:** Users with an **enabled** **`NodeWatch`** on that **`ObservedNode`**, who also have **verified** Discord notification settings (same anti-spam rules as the test endpoint).
+- **Who gets a DM:** Users with an **enabled** **`NodeWatch`** on that **`ObservedNode`** with the relevant channel flag (**`offline_notifications_enabled`** for offline/verification-start; **`battery_notifications_enabled`** for low-battery), who also have **verified** Discord notification settings (same anti-spam rules as the test endpoint).
 - **Deduping:** If one user has multiple watches on the same node, they should still receive at most **one** alert per offline event (per product design).
 - **Transport:** Server-side **`push_notifications.discord.send_dm`** — no duplicate Discord REST client inside **`mesh_monitoring`**.
 - **Node identity in DMs:** Both the verification-start and offline DMs include **`node_id_str`**, **`short_name`**, and **`long_name`** so watchers can disambiguate nodes with similar long names.
@@ -12,7 +12,7 @@
 
 ## Verification-start DMs (#165)
 
-When mesh monitoring **first enters** a new verification episode (silence exceeded threshold, **`verification_started_at`** set, monitoring round dispatched), the API sends a Discord DM to the same watcher audience **before** offline is confirmed (unless turned off below). This helps with aggressive **`offline_after`** values or flap debugging (you see that RF verification has started, even if **`_dispatch_monitoring_round`** finds no sources).
+When mesh monitoring **first enters** a new verification episode (silence exceeded threshold, **`verification_started_at`** set, monitoring round dispatched), the API sends a Discord DM to the same watcher audience **before** offline is confirmed (unless turned off below). This helps with aggressive silence thresholds or flap debugging (you see that RF verification has started, even if **`_dispatch_monitoring_round`** finds no sources).
 
 | Control | Details |
 |---------|---------|
@@ -23,6 +23,10 @@ When mesh monitoring **first enters** a new verification episode (silence exceed
 | **Deep link** | If **`FRONTEND_URL`** is non-empty (see Django settings), the message appends **`{FRONTEND_URL}/nodes/{node_id}`** (decimal **`ObservedNode.node_id`**, consistent with the UI node route). |
 
 Implementation: **`mesh_monitoring.services.notify_watchers_verification_started`**, wired from **`process_node_watch_presence`** / **`_process_one_observed_node`** only on **new** verification (not on every tick while already verifying). See [models.md](models.md) for **`NodePresence.last_verification_notify_at`**.
+
+## Low-battery DMs
+
+When **`NodeMonitoringConfig.battery_alert_enabled`** is true and **`DeviceMetrics`** readings stay below the configured threshold for **N** consecutive reports, **`mesh_monitoring`** confirms a battery alert episode on **`NodePresence`** and may send **one** Discord DM per episode to watchers with **`battery_notifications_enabled=True`** (and verified Discord). Evaluation is triggered by the **`device_metrics_recorded`** signal from **`packets`** (see **`mesh_monitoring.receivers`**).
 
 ## Documentation
 

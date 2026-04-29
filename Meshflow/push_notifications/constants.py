@@ -16,6 +16,7 @@ class DiscordNotificationKind(models.TextChoices):
 
     NODE_OFFLINE = "node_offline", _("Node offline (after verification)")
     VERIFICATION_STARTED = "verification_started", _("Mesh monitoring verification started")
+    NODE_BATTERY_LOW = "node_battery_low", _("Node battery low (mesh monitoring)")
     # DX monitoring (opt-in; feature flag DX_MONITORING_NOTIFICATIONS_ENABLED)
     DX_NEW_DISTANT_NODE = "dx_new_distant_node", _("DX: new distant node")
     DX_RETURNED_NODE = "dx_returned_node", _("DX: returned node after quiet period")

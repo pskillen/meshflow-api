@@ -10,9 +10,10 @@ This document describes the **intended design** (models, Celery, APIs, and integ
 |------|-------------------|
 | Shared helpers (`nodes.managed_node_liveness`, `common.geo`, `nodes.positioning`, `traceroute.trigger_intervals`, random auto TR) | Shipped in API (refactor / traceroute) |
 | Verified Discord DMs (prefs, test, `push_notifications.discord`) | Shipped (`users` + `push_notifications`) |
-| Django app **`mesh_monitoring`** (`NodeWatch`, `NodePresence`), Celery **`process_node_watch_presence`**, `AutoTraceRoute.trigger_type=4` (Node Watch), hooks in **`packets`** + **`traceroute.target_selection`** | **Shipped** (phase 03b) |
+| Django app **`mesh_monitoring`** (`NodeWatch`, `NodePresence`, `NodeMonitoringConfig`), Celery **`process_node_watch_presence`**, `AutoTraceRoute.trigger_type=4` (Node Watch), hooks in **`packets`** + **`traceroute.target_selection`** | **Shipped** (phase 03b) |
 | Watch **REST** CRUD | **`GET/POST /api/monitoring/watches/`**, **`GET/PATCH/PUT/DELETE …/watches/{id}/`** — authenticated; see **`openapi.yaml`** (`Mesh Monitoring` tag) |
-| Node-level **`offline_after`** | **`GET/PATCH /api/monitoring/nodes/{internal_id}/offline-after/`** — staff or claim owner may PATCH |
+| Node-level monitoring config (silence + battery) | **`GET/PATCH /api/monitoring/nodes/{internal_id}/config/`** — staff or claim owner may PATCH |
+| Alert summary (e.g. Mesh Infra nav) | **`GET /api/monitoring/alerts/summary/?scope=mesh_infra`** — authenticated |
 | **UI** (My Nodes watch toggles) | **meshtastic-bot-ui** My Nodes page + `meshtastic-api` client (phase 04) |
 
 Env: **`MESH_MONITORING_VERIFICATION_SECONDS`** (default `180`) for the verification window after silence.
@@ -27,12 +28,17 @@ A node is **watched** when there is at least one **`NodeWatch`** row: a user has
 
 - **Per-user:** Each watch is `(user, observed_node)` with a **unique** constraint.
 - **Eligibility** (who may create a watch): the user **claims** the node (`observed_node.claimed_by == user`) **or** the node’s **role** is in **`nodes.constants.INFRASTRUCTURE_ROLES`** (routers/repeaters/etc., shared with other product rules).
-- **Silence threshold:** **`offline_after`** is stored once per observed node on **`NodePresence`** (seconds without **`last_heard`** before verification may start; default **6 hours** / 21600 s). Staff or the **claim owner** may edit it via **`GET/PATCH /api/monitoring/nodes/{internal_id}/offline-after/`**. **`NodeWatch`** responses still expose **`offline_after`** (read-only) for convenience.
+- **Channel opt-ins:** Each watch has **`offline_notifications_enabled`** and **`battery_notifications_enabled`**. Offline monitoring ticks and offline/verification Discord DMs only consider watches with **`enabled=True`** and **`offline_notifications_enabled=True`**. Low-battery Discord DMs require **`battery_notifications_enabled=True`** (and battery alerting must be enabled on **`NodeMonitoringConfig`** for that node).
+- **Silence threshold:** **`last_heard_offline_after_seconds`** is stored on **`NodeMonitoringConfig`** (one row per observed node; seconds without **`last_heard`** before verification may start; default **6 hours** / 21600 s). Staff or the **claim owner** may edit it via **`GET/PATCH /api/monitoring/nodes/{internal_id}/config/`**. **`NodeWatch`** / embedded observed node responses still expose read-only **`offline_after`** (seconds) as a convenience alias for the same value.
+
+### Battery alerts (optional)
+
+When **`NodeMonitoringConfig.battery_alert_enabled`** is true, consecutive low **`DeviceMetrics`** readings (below a configurable threshold for N reports) confirm a **battery alert episode** on **`NodePresence`**. Watchers with **`battery_notifications_enabled`** may receive a Discord DM once per episode. Ingestion emits **`device_metrics_recorded`** from **`packets`**; evaluation lives in **`mesh_monitoring`** (receiver + battery evaluator).
 
 ### How watching works at runtime
 
 1. **Packet path:** Whenever any packet is processed for a node, **`last_heard`** on **`ObservedNode`** is updated (see `packets` services). That is the primary signal that the node is still seen on the mesh.
-2. **Periodic job:** A Celery task (e.g. every minute), **`process_node_watch_presence`**, considers every **`ObservedNode`** that has at least one enabled watch. It compares `last_heard` to the effective threshold and maintains **`NodePresence`** (one row per observed node used for monitoring state).
+2. **Periodic job:** A Celery task (e.g. every minute), **`process_node_watch_presence`**, considers every **`ObservedNode`** that has at least one watch with **`enabled=True`** and **`offline_notifications_enabled=True`**. It compares `last_heard` to the effective threshold from **`NodeMonitoringConfig`** and maintains **`NodePresence`** (one row per observed node used for monitoring state).
 3. **Verification:** If the node is “too quiet” but not yet confirmed offline, the system enters a **verifying** state and schedules **monitoring traceroutes** — same **WebSocket** command path as manual/auto TR (`meshtastic-bot`), but `AutoTraceRoute.trigger_type=4` (Node Watch) and `trigger_source` identifies mesh monitoring.
 4. **Random auto TR:** The existing **`schedule_traceroutes`** job continues to pick random targets; **`pick_traceroute_target`** **excludes** nodes that are in verification or already **offline_confirmed** so monitoring and random scheduling do not fight over the same targets.
 
@@ -50,8 +56,8 @@ Any packet that advances **`last_heard`** should clear **`offline_confirmed_at`*
 
 | Doc | Contents |
 |-----|----------|
-| [permissions.md](permissions.md) | Who may **watch** a node vs who may change **`offline_after`** (staff / claim owner) |
-| [models.md](models.md) | **`NodeWatch`** and **`NodePresence`** fields and how they change at runtime |
+| [permissions.md](permissions.md) | Who may **watch** a node vs who may change **`NodeMonitoringConfig`** (staff / claim owner) |
+| [models.md](models.md) | **`NodeWatch`**, **`NodeMonitoringConfig`**, **`NodePresence`** fields and how they change at runtime |
 | [flow.md](flow.md) | Chronological sequence, state machine, component responsibilities |
 | [discord.md](discord.md) | How Discord alerts fit into monitoring (pointer to `docs/features/discord/`) |
 | [../discord/README.md](../discord/README.md) | Discord linking + notifications (auth vs DMs) |

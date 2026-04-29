@@ -18,7 +18,7 @@ from .constants import (
     verification_notify_cooldown_seconds,
     verification_window_seconds,
 )
-from .models import NodePresence, NodeWatch
+from .models import NodeMonitoringConfig, NodePresence, NodeWatch
 from .selection import select_monitoring_sources
 from .services import (
     monitoring_traceroute_succeeded_since,
@@ -27,6 +27,13 @@ from .services import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _effective_last_heard_offline_after_seconds(obs: ObservedNode) -> int:
+    cfg = NodeMonitoringConfig.objects.filter(pk=obs.pk).first()
+    if cfg is not None:
+        return int(cfg.last_heard_offline_after_seconds)
+    return int(DEFAULT_OFFLINE_AFTER_SECONDS)
 
 
 @shared_task
@@ -77,7 +84,11 @@ def process_node_watch_presence() -> dict:
     now = timezone.now()
     window = timedelta(seconds=verification_window_seconds())
 
-    watched_ids = NodeWatch.objects.filter(enabled=True).values_list("observed_node_id", flat=True).distinct()
+    watched_ids = (
+        NodeWatch.objects.filter(enabled=True, offline_notifications_enabled=True)
+        .values_list("observed_node_id", flat=True)
+        .distinct()
+    )
     if not watched_ids:
         return {"watched": 0}
 
@@ -91,11 +102,10 @@ def process_node_watch_presence() -> dict:
 
 
 def _process_one_observed_node(obs: ObservedNode, now, window: timedelta) -> None:
-    if not NodeWatch.objects.filter(observed_node=obs, enabled=True).exists():
+    if not NodeWatch.objects.filter(observed_node=obs, enabled=True, offline_notifications_enabled=True).exists():
         return
 
-    presence_row = NodePresence.objects.filter(pk=obs.pk).first()
-    eff = presence_row.offline_after if presence_row else DEFAULT_OFFLINE_AFTER_SECONDS
+    eff = _effective_last_heard_offline_after_seconds(obs)
 
     effective_delta = timedelta(seconds=int(eff))
     last_heard = obs.last_heard
@@ -108,7 +118,6 @@ def _process_one_observed_node(obs: ObservedNode, now, window: timedelta) -> Non
             "is_offline": False,
         },
     )
-    eff = presence.offline_after
 
     if not silent:
         had_confirmed_offline = bool(presence.offline_confirmed_at) or presence.is_offline
