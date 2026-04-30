@@ -272,6 +272,51 @@ class TestTracerouteStats:
         assert intra_a["failed"] == 1
         assert AutoTraceRoute.TARGET_STRATEGY_DX_ACROSS not in data_a["by_strategy"]
 
+    def test_success_over_time_respects_source_node(
+        self,
+        api_client,
+        create_user,
+        create_managed_node,
+        create_observed_node,
+        create_auto_traceroute,
+    ):
+        user = create_user()
+        mn_a = create_managed_node(node_id=888_888_801)
+        mn_b = create_managed_node(node_id=888_888_802)
+        on = create_observed_node()
+        api_client.force_authenticate(user=user)
+
+        today = timezone.localdate()
+        create_auto_traceroute(
+            source_node=mn_a,
+            target_node=on,
+            triggered_by=user,
+            status=AutoTraceRoute.STATUS_COMPLETED,
+        )
+        create_auto_traceroute(
+            source_node=mn_b,
+            target_node=on,
+            triggered_by=user,
+            status=AutoTraceRoute.STATUS_FAILED,
+        )
+
+        resp_all = api_client.get("/api/traceroutes/stats/")
+        assert resp_all.status_code == 200
+        over_all = resp_all.json()["success_over_time"]
+        today_all = next(r for r in over_all if r["date"] == today.isoformat())
+        assert today_all["completed"] >= 1
+        assert today_all["failed"] >= 1
+
+        resp_a = api_client.get("/api/traceroutes/stats/", {"source_node": str(mn_a.node_id)})
+        row_a = next(r for r in resp_a.json()["success_over_time"] if r["date"] == today.isoformat())
+        assert row_a["completed"] == 1
+        assert row_a["failed"] == 0
+
+        resp_b = api_client.get("/api/traceroutes/stats/", {"source_node": str(mn_b.node_id)})
+        row_b = next(r for r in resp_b.json()["success_over_time"] if r["date"] == today.isoformat())
+        assert row_b["completed"] == 0
+        assert row_b["failed"] == 1
+
     def test_by_strategy_split_for_external_trigger_type(
         self,
         api_client,
