@@ -5278,7 +5278,8 @@ paths:
         Returns traceroute stats for the given timeframe: sources (by trigger_type),
         success/failure counts, top routers (intermediate nodes), per-source managed node
         totals (with success rate among finished runs only), per-target observed node totals,
-        success over time (14d), ``by_strategy`` (all trigger types; null mapped to legacy), and
+        success over time (daily series for the same ``triggered_at_after`` window, default 14 days),
+        ``by_strategy`` (all trigger types; null mapped to legacy), and
         ``by_strategy_excluding_external`` (same shape but omits trigger_type external for hypothesis-only
         success breakdowns). All authenticated users.
       tags: [Traceroutes]
@@ -5444,6 +5445,11 @@ paths:
                             Denominator is completed + failed only.
                   success_over_time:
                     type: array
+                    description: >
+                      One row per calendar day from the start of the ``triggered_at_after`` filter (local date)
+                      through today (inclusive). When ``triggered_at_after`` is omitted, the series covers the
+                      last 14 calendar days. Counts respect the same filters as the rest of the payload
+                      (including ``source_node``). Only completed and failed runs are counted.
                     items:
                       type: object
                       properties:

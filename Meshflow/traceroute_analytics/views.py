@@ -345,6 +345,8 @@ def traceroute_stats(request):
     """Traceroute statistics: sources, success/failure, top routers, by source, success over time.
 
     Optional query params: triggered_at_after, source_node (managed mesh node_id, same as list).
+    ``success_over_time`` is one row per calendar day from ``triggered_at_after`` (date) through
+    today (default window when omitted: last 14 days), using the same ``qs`` filters as other aggregates.
     ``by_strategy`` includes all trigger types; ``by_strategy_excluding_external`` omits external
     mesh reports for success-rate style breakdowns (no hypothesis).
     """
@@ -495,9 +497,15 @@ def traceroute_stats(request):
         )
     by_target.sort(key=lambda x: (-x["total"], x["node_id_str"]))
 
-    # Success over time: last 14 days, from StatsSnapshot or on-demand
-    fourteen_days_ago = timezone.now() - timedelta(days=14)
-    success_over_time = _get_success_over_time(fourteen_days_ago)
+    # Daily completed/failed counts over the same window as ``qs`` (triggered_at_after + source_node).
+    end_date = timezone.now().date()
+    if triggered_after:
+        start_date = timezone.localtime(triggered_after).date()
+    else:
+        start_date = end_date - timedelta(days=13)
+    if start_date > end_date:
+        start_date = end_date
+    success_over_time = _success_over_time_daily(qs, start_date, end_date)
 
     return Response(
         {
@@ -513,54 +521,48 @@ def traceroute_stats(request):
     )
 
 
-def _get_success_over_time(since):
-    """Return [{date, completed, failed}, ...] for last 14 days from StatsSnapshot + gaps."""
-    from datetime import date
+def _success_over_time_daily(qs, start_date, end_date):
+    """Return [{date, completed, failed}, ...] for each calendar day from start_date through end_date inclusive.
+
+    Uses the same filtered ``qs`` as the rest of traceroute_stats (time window, source_node, etc.).
+    """
     from datetime import datetime as dt_class
 
-    from stats.models import StatsSnapshot
+    if start_date > end_date:
+        start_date, end_date = end_date, start_date
 
-    # Build date range (oldest first for ordering)
-    today = timezone.now().date()
-    dates_needed = [(today - timedelta(days=i)).isoformat() for i in range(13, -1, -1)]
+    dates_needed = []
+    d = start_date
+    while d <= end_date:
+        dates_needed.append(d.isoformat())
+        d = d + timedelta(days=1)
 
-    # Fetch from StatsSnapshot
-    snapshots = StatsSnapshot.objects.filter(
-        stat_type="tr_success_daily",
-        constellation__isnull=True,
-        recorded_at__gte=since,
-    ).order_by("recorded_at")
+    start_dt = timezone.make_aware(dt_class.combine(start_date, dt_class.min.time()))
+    end_exclusive = timezone.make_aware(dt_class.combine(end_date + timedelta(days=1), dt_class.min.time()))
 
-    result_by_date = {}
-    for s in snapshots:
-        val = s.value or {}
-        dt = val.get("date")
-        if dt:
-            result_by_date[dt] = {
-                "date": dt,
-                "completed": val.get("completed", 0),
-                "failed": val.get("failed", 0),
-            }
-
-    # Fill gaps with on-demand aggregation from AutoTraceRoute
-    gaps = [d for d in dates_needed if d not in result_by_date]
-    if gaps:
-        since_dt = timezone.make_aware(dt_class.combine(date.fromisoformat(gaps[0]), dt_class.min.time()))
-        qs = (
-            AutoTraceRoute.objects.filter(
-                triggered_at__gte=since_dt,
-                status__in=[AutoTraceRoute.STATUS_COMPLETED, AutoTraceRoute.STATUS_FAILED],
-            )
-            .annotate(date=TruncDate("triggered_at"))
-            .values("date", "status")
-            .annotate(count=Count("id"))
+    agg_rows = (
+        qs.filter(
+            triggered_at__gte=start_dt,
+            triggered_at__lt=end_exclusive,
+            status__in=[AutoTraceRoute.STATUS_COMPLETED, AutoTraceRoute.STATUS_FAILED],
         )
-        for row in qs:
-            dt_str = row["date"].isoformat() if row["date"] else None
-            if dt_str and dt_str in gaps:
-                if dt_str not in result_by_date:
-                    result_by_date[dt_str] = {"date": dt_str, "completed": 0, "failed": 0}
-                result_by_date[dt_str][row["status"]] = row["count"]
+        .annotate(day=TruncDate("triggered_at"))
+        .values("day", "status")
+        .annotate(count=Count("id"))
+    )
 
-    # Build ordered result (oldest first for line chart)
-    return [result_by_date.get(d, {"date": d, "completed": 0, "failed": 0}) for d in dates_needed]
+    result_by_date = {dt: {"date": dt, "completed": 0, "failed": 0} for dt in dates_needed}
+    for row in agg_rows:
+        day = row["day"]
+        if day is None:
+            continue
+        dt_str = day.isoformat()
+        if dt_str not in result_by_date:
+            continue
+        st = row["status"]
+        if st == AutoTraceRoute.STATUS_COMPLETED:
+            result_by_date[dt_str]["completed"] += row["count"]
+        elif st == AutoTraceRoute.STATUS_FAILED:
+            result_by_date[dt_str]["failed"] += row["count"]
+
+    return [result_by_date[dt] for dt in dates_needed]
