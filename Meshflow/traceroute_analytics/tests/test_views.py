@@ -215,6 +215,107 @@ class TestTracerouteStats:
         assert rows_f[on.node_id]["completed"] == 0
         assert rows_f[on.node_id]["failed"] == 1
 
+    def test_stats_respects_source_node(
+        self,
+        api_client,
+        create_user,
+        create_managed_node,
+        create_observed_node,
+        create_auto_traceroute,
+    ):
+        user = create_user()
+        mn_a = create_managed_node(node_id=666_666_601)
+        mn_b = create_managed_node(node_id=666_666_602)
+        on = create_observed_node()
+        api_client.force_authenticate(user=user)
+
+        create_auto_traceroute(
+            source_node=mn_a,
+            target_node=on,
+            triggered_by=user,
+            status=AutoTraceRoute.STATUS_COMPLETED,
+            target_strategy=AutoTraceRoute.TARGET_STRATEGY_INTRA_ZONE,
+        )
+        create_auto_traceroute(
+            source_node=mn_a,
+            target_node=on,
+            triggered_by=user,
+            status=AutoTraceRoute.STATUS_FAILED,
+            target_strategy=AutoTraceRoute.TARGET_STRATEGY_INTRA_ZONE,
+        )
+        create_auto_traceroute(
+            source_node=mn_b,
+            target_node=on,
+            triggered_by=user,
+            status=AutoTraceRoute.STATUS_COMPLETED,
+            target_strategy=AutoTraceRoute.TARGET_STRATEGY_DX_ACROSS,
+        )
+
+        resp_all = api_client.get("/api/traceroutes/stats/")
+        assert resp_all.status_code == 200
+        data_all = resp_all.json()
+        assert len(data_all["by_source"]) == 2
+        intra_all = data_all["by_strategy"][AutoTraceRoute.TARGET_STRATEGY_INTRA_ZONE]
+        assert intra_all["completed"] == 1
+        assert intra_all["failed"] == 1
+        dx_all = data_all["by_strategy"][AutoTraceRoute.TARGET_STRATEGY_DX_ACROSS]
+        assert dx_all["completed"] == 1
+        assert dx_all["failed"] == 0
+
+        resp_a = api_client.get("/api/traceroutes/stats/", {"source_node": str(mn_a.node_id)})
+        assert resp_a.status_code == 200
+        data_a = resp_a.json()
+        assert len(data_a["by_source"]) == 1
+        assert data_a["by_source"][0]["node_id"] == mn_a.node_id
+        intra_a = data_a["by_strategy"][AutoTraceRoute.TARGET_STRATEGY_INTRA_ZONE]
+        assert intra_a["completed"] == 1
+        assert intra_a["failed"] == 1
+        assert AutoTraceRoute.TARGET_STRATEGY_DX_ACROSS not in data_a["by_strategy"]
+
+    def test_by_strategy_split_for_external_trigger_type(
+        self,
+        api_client,
+        create_user,
+        create_managed_node,
+        create_observed_node,
+        create_auto_traceroute,
+    ):
+        user = create_user()
+        mn = create_managed_node(node_id=777_777_701)
+        on = create_observed_node()
+        api_client.force_authenticate(user=user)
+
+        create_auto_traceroute(
+            source_node=mn,
+            target_node=on,
+            triggered_by=user,
+            status=AutoTraceRoute.STATUS_COMPLETED,
+            trigger_type=AutoTraceRoute.TRIGGER_TYPE_EXTERNAL,
+            target_strategy=None,
+        )
+        create_auto_traceroute(
+            source_node=mn,
+            target_node=on,
+            triggered_by=user,
+            status=AutoTraceRoute.STATUS_COMPLETED,
+            target_strategy=AutoTraceRoute.TARGET_STRATEGY_INTRA_ZONE,
+        )
+
+        resp = api_client.get("/api/traceroutes/stats/")
+        assert resp.status_code == 200
+        body = resp.json()
+        by_strategy = body["by_strategy"]
+        by_hypothesis = body["by_strategy_excluding_external"]
+
+        assert by_strategy[AutoTraceRoute.TARGET_STRATEGY_INTRA_ZONE]["completed"] == 1
+        assert by_strategy[AutoTraceRoute.TARGET_STRATEGY_LEGACY]["completed"] == 1
+
+        assert by_hypothesis[AutoTraceRoute.TARGET_STRATEGY_INTRA_ZONE]["completed"] == 1
+        assert AutoTraceRoute.TARGET_STRATEGY_LEGACY not in by_hypothesis
+
+        sources = {s["trigger_type"]: s["count"] for s in body["sources"]}
+        assert sources.get(AutoTraceRoute.TRIGGER_TYPE_EXTERNAL) == 1
+
 
 @pytest.mark.django_db
 class TestFeederReach:

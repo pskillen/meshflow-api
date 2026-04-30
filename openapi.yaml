@@ -5278,7 +5278,9 @@ paths:
         Returns traceroute stats for the given timeframe: sources (by trigger_type),
         success/failure counts, top routers (intermediate nodes), per-source managed node
         totals (with success rate among finished runs only), per-target observed node totals,
-        success over time (14d), and counts by target_strategy (null mapped to legacy). All authenticated users.
+        success over time (14d), ``by_strategy`` (all trigger types; null mapped to legacy), and
+        ``by_strategy_excluding_external`` (same shape but omits trigger_type external for hypothesis-only
+        success breakdowns). All authenticated users.
       tags: [Traceroutes]
       security:
         - BearerAuth: []
@@ -5290,6 +5292,17 @@ paths:
             type: string
             format: date-time
             description: Filter stats by triggered_at >= value (ISO 8601)
+        - name: source_node
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+          description: >
+            Meshtastic node id of the source managed node; same semantics as GET /traceroutes/
+            source_node. When set, all aggregates (including by_strategy and
+            by_strategy_excluding_external) are limited to
+            traceroutes from that source. Invalid or unknown ids are ignored (no filter).
       responses:
         '200':
           description: Traceroute statistics
@@ -5306,6 +5319,7 @@ paths:
                     by_target,
                     success_over_time,
                     by_strategy,
+                    by_strategy_excluding_external,
                   ]
                 properties:
                   sources:
@@ -5443,7 +5457,24 @@ paths:
                   by_strategy:
                     type: object
                     description: >
-                      Counts per target_strategy (database null aggregated under key `legacy`).
+                      Counts per target_strategy for all traceroutes in the window. Rows with null
+                      target_strategy are aggregated under key `legacy`. Includes trigger_type external.
+                    additionalProperties:
+                      type: object
+                      properties:
+                        completed:
+                          type: integer
+                        failed:
+                          type: integer
+                        pending:
+                          type: integer
+                        sent:
+                          type: integer
+                  by_strategy_excluding_external:
+                    type: object
+                    description: >
+                      Same aggregation as by_strategy but excludes traceroutes with trigger_type external
+                      (mesh reports with no target selection hypothesis). Intended for success-rate-by-strategy views.
                     additionalProperties:
                       type: object
                       properties:

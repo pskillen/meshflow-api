@@ -16,6 +16,35 @@ from nodes.models import ManagedNode, ObservedNode
 from traceroute.models import AutoTraceRoute
 
 
+def _traceroute_stats_by_strategy(qs):
+    """Aggregate counts per coalesced target_strategy for a queryset."""
+    legacy_label = AutoTraceRoute.TARGET_STRATEGY_LEGACY
+    by_strategy_rows = (
+        qs.annotate(
+            strat=Coalesce(
+                "target_strategy",
+                Value(legacy_label, output_field=CharField(max_length=24)),
+            )
+        )
+        .values("strat")
+        .annotate(
+            completed=Count("id", filter=Q(status=AutoTraceRoute.STATUS_COMPLETED)),
+            failed=Count("id", filter=Q(status=AutoTraceRoute.STATUS_FAILED)),
+            pending=Count("id", filter=Q(status=AutoTraceRoute.STATUS_PENDING)),
+            sent=Count("id", filter=Q(status=AutoTraceRoute.STATUS_SENT)),
+        )
+    )
+    return {
+        row["strat"]: {
+            "completed": row["completed"],
+            "failed": row["failed"],
+            "pending": row["pending"],
+            "sent": row["sent"],
+        }
+        for row in by_strategy_rows
+    }
+
+
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def heatmap_edges(request):
@@ -313,7 +342,12 @@ def constellation_coverage(request):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def traceroute_stats(request):
-    """Traceroute statistics: sources, success/failure, top routers, by source, success over time."""
+    """Traceroute statistics: sources, success/failure, top routers, by source, success over time.
+
+    Optional query params: triggered_at_after, source_node (managed mesh node_id, same as list).
+    ``by_strategy`` includes all trigger types; ``by_strategy_excluding_external`` omits external
+    mesh reports for success-rate style breakdowns (no hypothesis).
+    """
     from django.utils.dateparse import parse_datetime
 
     from common.mesh_node_helpers import meshtastic_id_to_hex
@@ -328,6 +362,14 @@ def traceroute_stats(request):
     if triggered_after:
         qs = qs.filter(triggered_at__gte=triggered_after)
 
+    source_node = request.query_params.get("source_node")
+    if source_node:
+        try:
+            mn = ManagedNode.objects.get(node_id=int(source_node), deleted_at__isnull=True)
+            qs = qs.filter(source_node=mn)
+        except ValueError, ManagedNode.DoesNotExist:
+            pass
+
     # Sources: by trigger_type
     sources = list(qs.values("trigger_type").annotate(count=Count("id")).order_by("-count"))
 
@@ -339,31 +381,10 @@ def traceroute_stats(request):
         .order_by("-count")
     )
 
-    legacy_label = AutoTraceRoute.TARGET_STRATEGY_LEGACY
-    by_strategy_rows = (
-        qs.annotate(
-            strat=Coalesce(
-                "target_strategy",
-                Value(legacy_label, output_field=CharField(max_length=24)),
-            )
-        )
-        .values("strat")
-        .annotate(
-            completed=Count("id", filter=Q(status=AutoTraceRoute.STATUS_COMPLETED)),
-            failed=Count("id", filter=Q(status=AutoTraceRoute.STATUS_FAILED)),
-            pending=Count("id", filter=Q(status=AutoTraceRoute.STATUS_PENDING)),
-            sent=Count("id", filter=Q(status=AutoTraceRoute.STATUS_SENT)),
-        )
+    by_strategy = _traceroute_stats_by_strategy(qs)
+    by_strategy_excluding_external = _traceroute_stats_by_strategy(
+        qs.exclude(trigger_type=AutoTraceRoute.TRIGGER_TYPE_EXTERNAL)
     )
-    by_strategy = {
-        row["strat"]: {
-            "completed": row["completed"],
-            "failed": row["failed"],
-            "pending": row["pending"],
-            "sent": row["sent"],
-        }
-        for row in by_strategy_rows
-    }
 
     # Top routers: intermediate nodes from completed traceroutes
     UNKNOWN_NODE_ID = 0xFFFFFFFF
@@ -487,6 +508,7 @@ def traceroute_stats(request):
             "by_target": by_target,
             "success_over_time": success_over_time,
             "by_strategy": by_strategy,
+            "by_strategy_excluding_external": by_strategy_excluding_external,
         }
     )
 
