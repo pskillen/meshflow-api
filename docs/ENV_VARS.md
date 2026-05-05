@@ -208,7 +208,7 @@ Tunables for [automatic target selection reliability](../features/traceroute/alg
 
 ## 7. Packet Ingestion
 
-- **PACKET_DEDUP_WINDOW_MINUTES**: Time window (minutes) within which the same sender+packet_id is treated as a duplicate. See `docs/packets/DEDUPLICATION.md`.
+- **PACKET_DEDUP_WINDOW_MINUTES**: Time window (minutes) within which the same sender+packet_id is treated as a duplicate. See `docs/features/packet-ingestion/DEDUPLICATION.md`.
 
 ## 8. Mesh monitoring
 
