@@ -28,6 +28,28 @@ ingested packets describe the same on-air transmission.
 Sample raw packet payloads (one per port number) live in
 `[docs/packets/](../../packets/)` at the top of `docs/`.
 
+## MeshCore (Phase 0.5 — design only)
+
+MeshCore (MC) is being added as a second first-class protocol alongside
+Meshtastic (MT). The wire shape is different — Ed25519 pubkeys instead of
+32-bit node ids, no `packet_id`, channel index without a channel hash — so
+the API gets a parallel ingest path rather than coercing MC into the MT
+schema.
+
+Phase 0.5 lands the schema decisions only; no models, endpoints, or
+`openapi.yaml` changes yet (those are Phase 1, tracked under
+[meshflow-api#265](https://github.com/pskillen/meshflow-api/issues/265)).
+
+- [MESHCORE_PACKET_FIELDS.md](MESHCORE_PACKET_FIELDS.md) — capture-verified
+field reference, derivative of the Phase 0.4 bundle in
+[meshflow-bot/docs/meshcore_packets/](https://github.com/pskillen/meshflow-bot/tree/main/docs/meshcore_packets).
+- [adr/](adr/README.md) — ADRs covering MC node identity, channels,
+broadcast semantics, and dedup key. Tracked in
+[meshflow-api#276](https://github.com/pskillen/meshflow-api/issues/276)
+(epic [#264](https://github.com/pskillen/meshflow-api/issues/264)).
+- Representative MC sample JSONs (one per event shape) live in
+[`docs/packets/meshcore/`](../../packets/meshcore/README.md).
+
 ## End-to-end Flow
 
 ```mermaid
