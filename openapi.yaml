@@ -3,7 +3,11 @@ openapi: 3.1.0
 info:
   title: Meshflow API
   version: 1.0.0
-  description: API for managing Meshtastic networks and nodes
+  description: >
+    API for managing Meshtastic networks and nodes. The service is moving toward
+    multi-protocol support (MeshCore alongside Meshtastic); new responses may
+    include a ``protocol`` discriminator on shared models. See
+    ``docs/features/meshcore/implementation-plan.md`` for the phased rollout.
 
 servers:
   - url: /api
@@ -12,8 +16,10 @@ servers:
 tags:
   - name: Authentication
     description: JWT token management endpoints
+  - name: Meshtastic packets
+    description: Meshtastic packet ingestion and feeder node upsert (Node API key)
   - name: Packets
-    description: Packet ingestion and node information endpoints
+    description: Legacy tag name; prefer Meshtastic packets for /api/packets operations
   - name: Constellations
     description: Constellation management endpoints
   - name: Nodes
@@ -71,6 +77,12 @@ components:
       name: X-API-Key
 
   schemas:
+    MeshProtocol:
+      type: integer
+      enum: [1, 2]
+      description: >
+        Radio protocol discriminator stored on shared models: 1 = Meshtastic,
+        2 = MeshCore. MeshCore rows are not yet created by this API in Phase 1.0.
     FeederReach:
       type: object
       description: >
@@ -910,6 +922,9 @@ components:
         map_color:
           type: string
           description: The color used for the constellation on maps
+        protocol:
+          $ref: '#/components/schemas/MeshProtocol'
+          description: Mesh protocol for this constellation and its channels
         bot_default_ignore_portnums:
           type: string
           nullable: true
@@ -930,9 +945,13 @@ components:
         internal_id:
           type: integer
           description: The internal ID of the observed node
+        protocol:
+          $ref: '#/components/schemas/MeshProtocol'
+          description: Mesh protocol for this observed node
         node_id:
           type: integer
-          description: The ID of the node in the mesh network
+          nullable: true
+          description: The ID of the node in the mesh network (Meshtastic numeric id; null reserved for MeshCore)
         node_id_str:
           type: string
           description: The ID of the node in Meshastic !hex format
@@ -1403,6 +1422,9 @@ components:
         map_color:
           type: string
           description: The color used for the constellation on maps
+        protocol:
+          $ref: '#/components/schemas/MeshProtocol'
+          description: Mesh protocol for this constellation
         bot_default_ignore_portnums:
           type: string
           nullable: true
@@ -1564,6 +1586,9 @@ components:
           type: integer
           format: int64
           description: Node ID
+        protocol:
+          $ref: '#/components/schemas/MeshProtocol'
+          description: Mesh protocol for this managed node
         long_name:
           type: string
           description: The long name of the node
@@ -1608,6 +1633,9 @@ components:
             map_color:
               type: string
               description: The color used for the constellation on maps
+            protocol:
+              $ref: '#/components/schemas/MeshProtocol'
+              description: Mesh protocol for this constellation
             bot_default_ignore_portnums:
               type: string
               nullable: true
@@ -2386,6 +2414,14 @@ components:
           type: integer
         name:
           type: string
+        protocol:
+          $ref: '#/components/schemas/MeshProtocol'
+          description: Mesh protocol for this channel row
+        mc_channel_idx:
+          type: integer
+          nullable: true
+          minimum: 0
+          description: MeshCore channel index when protocol is MeshCore; null for Meshtastic
         constellation:
           type: integer
           description: The ID of the constellation this channel belongs to
@@ -3321,9 +3357,9 @@ paths:
       description: >
         Node bots should send incoming packets to this endpoint. The endpoint will automatically
         identify the packet type and process it accordingly.
-      tags: [Packets]
+      tags: [Meshtastic packets]
       security:
-        - ApiKeyAuth: []
+        - NodeApiKeyAuth: []
       requestBody:
         required: true
         content:
@@ -3353,9 +3389,9 @@ paths:
 
         This endpoint is similar to the /nodes/observed-nodes endpoint, but is specifically used by
         node bots, and is authenticated with a Node API Key.
-      tags: [Packets]
+      tags: [Meshtastic packets]
       security:
-        - ApiKeyAuth: []
+        - NodeApiKeyAuth: []
       requestBody:
         required: true
         content:
