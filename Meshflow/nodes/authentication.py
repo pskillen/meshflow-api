@@ -9,6 +9,9 @@ class NodeAPIKeyAuthentication(authentication.BaseAuthentication):
     """
     Custom authentication class for API keys.
 
+    Protocol-agnostic: the same Node API key flow applies regardless of radio
+    protocol; constellation and managed node ``protocol`` must match the feeder.
+
     This class authenticates requests using API keys provided in either:
     1. X-API-KEY header
     2. Authorization: Token <key> header
