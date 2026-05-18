@@ -450,7 +450,11 @@ class NodeAuth(models.Model):
 
 
 class BaseNodeItem(models.Model):
-    """Base model for node items."""
+    """Shared time-series row keyed to an ``ObservedNode`` (Meshtastic data today).
+
+    Multi-protocol work will attach rows via the observed node's ``protocol`` and
+    later dual FKs where a single ``node`` FK is not enough; class names stay shared.
+    """
 
     node = models.ForeignKey(ObservedNode, on_delete=models.CASCADE)
     logged_time = models.DateTimeField(default=timezone.now)
@@ -471,7 +475,7 @@ class BaseNodeItem(models.Model):
 
 
 class Position(BaseNodeItem):
-    """Model representing a position report from a mesh node."""
+    """Position sample for an observed node (Meshtastic path today; shared table)."""
 
     latitude = models.FloatField(null=True, blank=True)
     longitude = models.FloatField(null=True, blank=True)
@@ -499,7 +503,7 @@ class Position(BaseNodeItem):
 
 
 class DeviceMetrics(BaseNodeItem):
-    """Model representing device metrics reported by a mesh node."""
+    """Device telemetry sample (Meshtastic path today; shared table)."""
 
     battery_level = models.FloatField(help_text="Battery level as a percentage")
     voltage = models.FloatField(help_text="Battery voltage in volts")
