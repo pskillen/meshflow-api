@@ -1,4 +1,8 @@
-"""DX candidate detection during packet ingestion and from traceroute results."""
+"""DX candidate detection during packet ingestion and from traceroute results.
+
+Meshtastic node_id correlation today; TODO(meshcore phase 2+): generalise hop and
+observed-node resolution when MeshCore rows share this pipeline.
+"""
 
 from __future__ import annotations
 
@@ -10,6 +14,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from common.geo import haversine_km
+from common.protocol import Protocol
 from constellations.models import Constellation
 from dx_monitoring.exploration import exploration_links_auto_traceroute_to_destination
 from dx_monitoring.models import (
@@ -85,7 +90,7 @@ def _observer_coords(observer: ManagedNode) -> tuple[float | None, float | None]
 def _coords_for_mesh_node(node_id: int, source_managed: ManagedNode) -> tuple[float | None, float | None]:
     if int(node_id) == int(source_managed.node_id):
         return _observer_coords(source_managed)
-    observed = ObservedNode.objects.filter(node_id=node_id).first()
+    observed = ObservedNode.objects.filter(node_id=node_id, protocol=Protocol.MESHTASTIC).first()
     if observed is None:
         return None, None
     return _destination_coords(observed)
@@ -410,7 +415,7 @@ def maybe_detect_dx_from_completed_traceroute(
             dist = haversine_km(la, loa, lb, lob)
             if dist <= hop_km:
                 continue
-            dest_node = ObservedNode.objects.filter(node_id=b_id).first()
+            dest_node = ObservedNode.objects.filter(node_id=b_id, protocol=Protocol.MESHTASTIC).first()
             if dest_node is None:
                 continue
             if exploration_links_auto_traceroute_to_destination(auto_tr, b_id):

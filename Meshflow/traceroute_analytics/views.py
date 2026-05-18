@@ -1,4 +1,8 @@
-"""Analytics and visualization API views for traceroutes (Neo4j heatmap, reach, stats)."""
+"""Analytics and visualization API views for traceroutes (Neo4j heatmap, reach, stats).
+
+Meshtastic numeric node ids in route JSON today; TODO(meshcore phase 3d) for
+protocol-aware stats once MeshCore traceroutes are stored.
+"""
 
 from collections import Counter
 from datetime import timedelta
@@ -12,6 +16,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from common.mesh_node_helpers import MESHTASTIC_BROADCAST_ID
 from nodes.models import ManagedNode, ObservedNode
 from traceroute.models import AutoTraceRoute
 
@@ -389,7 +394,7 @@ def traceroute_stats(request):
     )
 
     # Top routers: intermediate nodes from completed traceroutes
-    UNKNOWN_NODE_ID = 0xFFFFFFFF
+    UNKNOWN_NODE_ID = MESHTASTIC_BROADCAST_ID
     router_counts = Counter()
     completed_qs = qs.filter(status=AutoTraceRoute.STATUS_COMPLETED).select_related("source_node", "target_node")
     for tr in completed_qs:

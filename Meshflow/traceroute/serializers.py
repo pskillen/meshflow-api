@@ -2,14 +2,14 @@
 
 from rest_framework import serializers
 
-from common.mesh_node_helpers import meshtastic_id_to_hex
+from common.mesh_node_helpers import MESHTASTIC_BROADCAST_ID, meshtastic_id_to_hex
 from constellations.models import Constellation
 from nodes.models import ManagedNode, ObservedNode
 from nodes.serializers import ManagedNodeSerializer, ObservedNodeSerializer, PositionSerializer
 
 from .models import AutoTraceRoute, TriggerType
 
-UNKNOWN_NODE_ID = 0xFFFFFFFF
+UNKNOWN_NODE_ID = MESHTASTIC_BROADCAST_ID
 
 
 def trigger_type_label_for(value: int) -> str:

@@ -1,4 +1,7 @@
-"""Views for traceroute list, detail, and trigger."""
+"""Views for traceroute list, detail, and trigger (Meshtastic hop ids today).
+
+TODO(meshcore phase 3): route assembly assumes Meshtastic ``node_id`` integers.
+"""
 
 from datetime import timedelta
 
@@ -13,6 +16,8 @@ from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from common.mesh_node_helpers import MESHTASTIC_BROADCAST_ID
+from common.protocol import Protocol
 from nodes.models import ManagedNode, NodeOwnerClaim, ObservedNode
 
 from .models import AutoTraceRoute
@@ -122,7 +127,9 @@ def traceroute_list(request):
     source_node_ids = list({item.source_node.node_id for item in page if item.source_node})
     observed_short_names = {}
     if source_node_ids:
-        for row in ObservedNode.objects.filter(node_id__in=source_node_ids).values("node_id", "short_name"):
+        for row in ObservedNode.objects.filter(
+            node_id__in=source_node_ids, protocol=Protocol.MESHTASTIC
+        ).values("node_id", "short_name"):
             observed_short_names[row["node_id"]] = row["short_name"]
 
     all_route_node_ids = set()
@@ -131,10 +138,12 @@ def traceroute_list(request):
             all_route_node_ids.update(x["node_id"] for x in item.route)
         if item.route_back:
             all_route_node_ids.update(x["node_id"] for x in item.route_back)
-    all_route_node_ids.discard(0xFFFFFFFF)
+    all_route_node_ids.discard(MESHTASTIC_BROADCAST_ID)
     observed_by_id = {}
     if all_route_node_ids:
-        for o in ObservedNode.objects.filter(node_id__in=all_route_node_ids).select_related("latest_status"):
+        for o in ObservedNode.objects.filter(
+            node_id__in=all_route_node_ids, protocol=Protocol.MESHTASTIC
+        ).select_related("latest_status"):
             observed_by_id[o.node_id] = o
 
     target_node_pks = list({item.target_node_id for item in page if item.target_node})

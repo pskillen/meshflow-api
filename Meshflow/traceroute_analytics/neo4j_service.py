@@ -1,4 +1,8 @@
-"""Neo4j graph export and query helpers for traceroute analytics."""
+"""Neo4j graph export and query helpers for traceroute analytics.
+
+TODO(meshcore phase 3d): edge export should carry ``protocol`` once Neo4j schema
+labels relationships per mesh protocol (see ADR / implementation plan).
+"""
 
 import logging
 from datetime import datetime
@@ -10,13 +14,14 @@ import networkx as nx
 from neo4j import GraphDatabase
 from tqdm import tqdm
 
-from common.mesh_node_helpers import meshtastic_id_to_hex
+from common.mesh_node_helpers import MESHTASTIC_BROADCAST_ID, meshtastic_id_to_hex
 from nodes.models import ManagedNode, ObservedNode
 from traceroute.models import AutoTraceRoute
 
 logger = logging.getLogger(__name__)
 
-UNKNOWN_NODE_ID = 0xFFFFFFFF
+# Meshtastic unknown hop sentinel in traceroute route JSON (not MC broadcast).
+UNKNOWN_NODE_ID = MESHTASTIC_BROADCAST_ID
 
 # Role classification: treat ObservedNode missing or older than this as offline.
 HEATMAP_OFFLINE_ROLE_HOURS = 24

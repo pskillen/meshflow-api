@@ -1,4 +1,8 @@
-"""Read-only DX event API and staff node exclusion for DX detection."""
+"""Read-only DX event API and staff node exclusion for DX detection.
+
+Meshtastic ``node_id`` lookups today; TODO(meshcore phase 2+): resolve MeshCore
+observed identities when DX spans protocols.
+"""
 
 from django.db.models import Count, IntegerField, OuterRef, Prefetch, Subquery, Value
 from django.db.models.functions import Coalesce
@@ -8,6 +12,7 @@ from django.utils.dateparse import parse_datetime
 from rest_framework import permissions, status, views, viewsets
 from rest_framework.response import Response
 
+from common.protocol import Protocol
 from dx_monitoring.models import DxEvent, DxEventObservation, DxEventState, DxEventTraceroute, DxNodeMetadata
 from dx_monitoring.serializers import (
     DxEventDetailSerializer,
@@ -153,7 +158,11 @@ class DxNodeExclusionView(views.APIView):
         exclude = ser.validated_data["exclude_from_detection"]
         notes = ser.validated_data.get("exclude_notes") or ""
 
-        observed = ObservedNode.objects.filter(node_id=node_id).order_by("-last_heard", "-created_at").first()
+        observed = (
+            ObservedNode.objects.filter(node_id=node_id, protocol=Protocol.MESHTASTIC)
+            .order_by("-last_heard", "-created_at")
+            .first()
+        )
         if observed is None:
             return Response(
                 {"detail": "No observed node found for this node_id."},
@@ -178,7 +187,11 @@ class DxNodeExclusionView(views.APIView):
 
 
 def _resolve_observed_by_node_id(node_id: int) -> ObservedNode | None:
-    return ObservedNode.objects.filter(node_id=node_id).order_by("-last_heard", "-created_at").first()
+    return (
+        ObservedNode.objects.filter(node_id=node_id, protocol=Protocol.MESHTASTIC)
+        .order_by("-last_heard", "-created_at")
+        .first()
+    )
 
 
 class DxNodeExclusionByNodeIdView(views.APIView):

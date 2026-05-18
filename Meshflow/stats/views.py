@@ -1,3 +1,9 @@
+"""HTTP views for packet and neighbour statistics (Meshtastic node ids today).
+
+TODO(meshcore phase 2+): stats keyed by numeric ``node_id`` need protocol or
+alternate identity once MeshCore packets contribute to aggregates.
+"""
+
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Optional, Tuple
 
@@ -10,6 +16,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from common.mesh_node_helpers import meshtastic_id_to_hex
+from common.protocol import Protocol
 from nodes.models import ManagedNode, ObservedNode
 from packets.models import PacketObservation, RawPacket
 
@@ -134,7 +141,7 @@ def node_packet_stats(request, node_id: int):
     """
     try:
         # Validate node exists
-        ObservedNode.objects.get(node_id=node_id)
+        ObservedNode.objects.get(node_id=node_id, protocol=Protocol.MESHTASTIC)
     except ObservedNode.DoesNotExist:
         return Response({"status": "error", "message": "Node not found"}, status=status.HTTP_404_NOT_FOUND)
 
@@ -354,7 +361,7 @@ def node_neighbour_stats(request, node_id: int):
                 source_type = "lsb"
                 candidates_qs = (
                     ObservedNode.objects.annotate(lsb=Mod(F("node_id"), 256))
-                    .filter(lsb=source_val)
+                    .filter(lsb=source_val, protocol=Protocol.MESHTASTIC)
                     .only("node_id", "node_id_str", "short_name")
                 )
                 candidates = [
@@ -364,7 +371,9 @@ def node_neighbour_stats(request, node_id: int):
             else:
                 source_type = "full"
                 try:
-                    obs = ObservedNode.objects.only("node_id", "node_id_str", "short_name").get(node_id=source_val)
+                    obs = ObservedNode.objects.only("node_id", "node_id_str", "short_name").get(
+                        node_id=source_val, protocol=Protocol.MESHTASTIC
+                    )
                     candidates = [
                         {
                             "node_id": obs.node_id,

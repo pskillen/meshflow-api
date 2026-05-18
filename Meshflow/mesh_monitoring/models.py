@@ -1,3 +1,9 @@
+"""Mesh monitoring for Meshtastic ``ObservedNode`` rows today.
+
+TODO(meshcore phase 2+): extend watches and notifications once MeshCore observed
+nodes and ingest exist (see docs/features/meshcore/implementation-plan.md).
+"""
+
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
