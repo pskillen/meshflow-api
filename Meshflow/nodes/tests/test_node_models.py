@@ -1,5 +1,7 @@
 import pytest
 
+from common.protocol import Protocol
+
 
 @pytest.mark.django_db
 def test_managed_node_creation(create_managed_node):
@@ -10,6 +12,12 @@ def test_managed_node_creation(create_managed_node):
     assert node.owner is not None
     assert node.constellation is not None
     assert node.node_id_str == "!075bcd15"
+
+
+@pytest.mark.django_db
+def test_managed_meshcore_feeder_node_id_str(create_managed_node):
+    node = create_managed_node(protocol=Protocol.MESHCORE, node_id=0)
+    assert node.node_id_str == f"mc:feeder:{node.internal_id.hex[:12]}"
 
 
 @pytest.mark.django_db

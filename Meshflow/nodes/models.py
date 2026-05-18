@@ -148,9 +148,9 @@ class ManagedNode(models.Model):
 
     @property
     def node_id_str(self) -> str:
-        """Return the node ID in hex format."""
-        if not self.node_id:
-            return None
+        """Protocol-aware display id (not a DB column)."""
+        if self.protocol == Protocol.MESHCORE:
+            return f"mc:feeder:{self.internal_id.hex[:12]}"
         return meshtastic_id_to_hex(self.node_id)
 
     @property
