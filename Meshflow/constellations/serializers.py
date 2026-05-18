@@ -25,7 +25,15 @@ class ConstellationSerializer(serializers.ModelSerializer):
 
     def get_channels(self, obj):
         channels = MessageChannel.objects.filter(constellation=obj)
-        return [{"id": channel.id, "name": channel.name, "protocol": channel.protocol} for channel in channels]
+        return [
+            {
+                "id": channel.id,
+                "name": channel.name,
+                "protocol": channel.protocol,
+                "mc_channel_idx": channel.mc_channel_idx,
+            }
+            for channel in channels
+        ]
 
     def create(self, validated_data):
         """Create a new constellation."""
