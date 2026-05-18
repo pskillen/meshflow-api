@@ -17,6 +17,7 @@ class ConstellationSerializer(serializers.ModelSerializer):
             "created_by",
             "channels",
             "map_color",
+            "protocol",
             "bot_default_ignore_portnums",
             "bot_default_hop_limit",
         ]
@@ -24,7 +25,7 @@ class ConstellationSerializer(serializers.ModelSerializer):
 
     def get_channels(self, obj):
         channels = MessageChannel.objects.filter(constellation=obj)
-        return [{"id": channel.id, "name": channel.name} for channel in channels]
+        return [{"id": channel.id, "name": channel.name, "protocol": channel.protocol} for channel in channels]
 
     def create(self, validated_data):
         """Create a new constellation."""
