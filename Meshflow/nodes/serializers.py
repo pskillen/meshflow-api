@@ -505,10 +505,14 @@ class ManagedNodeSerializer(serializers.ModelSerializer):
 
     def _get_managed_node_latest_status(self, obj):
         """Get NodeLatestStatus for ManagedNode via ObservedNode lookup."""
-        observed = ObservedNode.objects.filter(
-            node_id=obj.node_id,
-            protocol=Protocol.MESHTASTIC,
-        ).select_related("latest_status").first()
+        observed = (
+            ObservedNode.objects.filter(
+                node_id=obj.node_id,
+                protocol=Protocol.MESHTASTIC,
+            )
+            .select_related("latest_status")
+            .first()
+        )
         return observed.latest_status if observed else None
 
     def get_latest_environment_metrics(self, obj):

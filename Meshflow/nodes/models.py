@@ -235,9 +235,7 @@ class ObservedNode(models.Model):
         null=True,
         blank=True,
         db_index=True,
-        help_text=_(
-            "Meshtastic numeric node id when protocol is Meshtastic; null for MeshCore rows once supported."
-        ),
+        help_text=_("Meshtastic numeric node id when protocol is Meshtastic; null for MeshCore rows once supported."),
     )
     node_id_str = models.CharField(
         null=False,
@@ -289,8 +287,7 @@ class ObservedNode(models.Model):
         constraints = [
             models.CheckConstraint(
                 condition=(
-                    models.Q(protocol=Protocol.MESHTASTIC, node_id__isnull=False)
-                    | models.Q(protocol=Protocol.MESHCORE)
+                    models.Q(protocol=Protocol.MESHTASTIC, node_id__isnull=False) | models.Q(protocol=Protocol.MESHCORE)
                 ),
                 name="nodes_observednode_protocol_node_id",
             ),

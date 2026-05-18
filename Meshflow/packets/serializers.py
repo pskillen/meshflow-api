@@ -47,7 +47,7 @@ def convert_location_source(source):
     try:
         # Try to convert directly to int if it's a numeric string
         return int(source)
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         # If not a number, look up the string value
         for source_choice in LocationSource:
             if source_choice.label == source:

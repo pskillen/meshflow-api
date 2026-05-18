@@ -127,9 +127,9 @@ def traceroute_list(request):
     source_node_ids = list({item.source_node.node_id for item in page if item.source_node})
     observed_short_names = {}
     if source_node_ids:
-        for row in ObservedNode.objects.filter(
-            node_id__in=source_node_ids, protocol=Protocol.MESHTASTIC
-        ).values("node_id", "short_name"):
+        for row in ObservedNode.objects.filter(node_id__in=source_node_ids, protocol=Protocol.MESHTASTIC).values(
+            "node_id", "short_name"
+        ):
             observed_short_names[row["node_id"]] = row["short_name"]
 
     all_route_node_ids = set()
