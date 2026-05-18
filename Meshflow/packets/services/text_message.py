@@ -5,7 +5,7 @@ import re
 
 from django.utils import timezone
 
-from common.mesh_node_helpers import BROADCAST_ID
+from common.mesh_node_helpers import MESHTASTIC_BROADCAST_ID
 from nodes.models import NodeOwnerClaim
 from packets.models import MessagePacket
 from packets.services.base import BasePacketService
@@ -48,7 +48,7 @@ class TextMessagePacketService(BasePacketService):
             channel=self.observation.channel,
         )
 
-        if self.packet.to_int == BROADCAST_ID:
+        if self.packet.to_int == MESHTASTIC_BROADCAST_ID:
             # send the text message packet received signal
             text_message_received.send(sender=self, message=message, observer=self.observer)
 
@@ -56,7 +56,7 @@ class TextMessagePacketService(BasePacketService):
         """Authorize a user's claim to a node via the claim key in the message."""
 
         # Only accept claims via direct messages
-        if self.packet.to_int == BROADCAST_ID:
+        if self.packet.to_int == MESHTASTIC_BROADCAST_ID:
             return
 
         # check whether this looks like a claim key (2-3 words and 2-3 digits)

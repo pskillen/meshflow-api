@@ -8,6 +8,7 @@ from django.utils import timezone as django_timezone
 from rest_framework import serializers
 
 from common.mesh_node_helpers import meshtastic_hex_to_int, meshtastic_id_to_hex, parse_b64_mac_address
+from common.protocol import Protocol
 from constellations.models import MessageChannel
 from nodes.models import DeviceMetrics, ManagedNode, NodeLatestStatus, ObservedNode, Position
 
@@ -46,7 +47,7 @@ def convert_location_source(source):
     try:
         # Try to convert directly to int if it's a numeric string
         return int(source)
-    except ValueError, TypeError:
+    except (ValueError, TypeError):
         # If not a number, look up the string value
         for source_choice in LocationSource:
             if source_choice.label == source:
@@ -1510,7 +1511,7 @@ class PrefetchedPacketObservationSerializer(serializers.ModelSerializer):
             if hasattr(obj, "prefetched_observed_nodes") and obj.prefetched_observed_nodes:
                 return obj.prefetched_observed_nodes[0]
             # Fallback: DB hit (should be rare)
-            return ObservedNode.objects.filter(node_id=obj.node_id).first()
+            return ObservedNode.objects.filter(node_id=obj.node_id, protocol=Protocol.MESHTASTIC).first()
 
     # observer = serializers.SerializerMethodField()
     observer = ObserverSerializer(read_only=True)

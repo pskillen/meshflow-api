@@ -1,4 +1,4 @@
-"""Models for storing and managing different types of mesh network packets."""
+"""Models for storing Meshtastic wire packets ingested via the ``packets`` app."""
 
 import uuid
 
@@ -20,7 +20,7 @@ class LocationSource(models.IntegerChoices):
 
 
 class RawPacket(models.Model):
-    """Base model for storing raw mesh network packets with common attributes."""
+    """Meshtastic raw packet row (common metadata shared by all portnums)."""
 
     id = models.UUIDField(primary_key=True, null=False, default=uuid.uuid4, editable=False)
     packet_id = models.BigIntegerField(null=False)

@@ -1,6 +1,6 @@
 import pytest
 
-from common.mesh_node_helpers import BROADCAST_ID
+from common.mesh_node_helpers import MESHTASTIC_BROADCAST_ID
 from constellations.models import ConstellationUserMembership, MessageChannel
 from nodes.models import NodeOwnerClaim, ObservedNode
 from packets.services.text_message import TextMessagePacketService
@@ -105,7 +105,7 @@ def test_authorize_node_claim_broadcast_message(
 ):
     """Test authorizing a node claim with a broadcast message."""
     service = TextMessagePacketService()
-    packet = create_message_packet(to_int=BROADCAST_ID, to_str="!broadcast")
+    packet = create_message_packet(to_int=MESHTASTIC_BROADCAST_ID, to_str="!broadcast")
     observer = create_managed_node()
     observation = create_packet_observation(packet=packet, observer=observer)
     user = create_user()

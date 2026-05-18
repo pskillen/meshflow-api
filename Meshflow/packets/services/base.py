@@ -3,6 +3,7 @@
 import abc
 
 from common.mesh_node_helpers import meshtastic_id_to_hex
+from common.protocol import Protocol
 from nodes.models import ManagedNode, ObservedNode
 from packets.models import PacketObservation, RawPacket
 from packets.signals import new_node_observed
@@ -48,7 +49,10 @@ class BasePacketService(abc.ABC):
         """Get or create the from node."""
         if self.packet.from_int:
             try:
-                self.from_node = ObservedNode.objects.get(node_id=self.packet.from_int)
+                self.from_node = ObservedNode.objects.get(
+                    node_id=self.packet.from_int,
+                    protocol=Protocol.MESHTASTIC,
+                )
                 self._dx_previous_last_heard = self.from_node.last_heard
             except ObservedNode.DoesNotExist:
                 self._dx_previous_last_heard = None
@@ -56,6 +60,7 @@ class BasePacketService(abc.ABC):
                     self.packet.from_str if self.packet.from_str else meshtastic_id_to_hex(self.packet.from_int)
                 )
                 self.from_node = ObservedNode.objects.create(
+                    protocol=Protocol.MESHTASTIC,
                     node_id=self.packet.from_int,
                     node_id_str=node_id_str,
                     long_name="Unknown Node " + node_id_str,

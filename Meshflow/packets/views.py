@@ -3,6 +3,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from common.mesh_node_helpers import meshtastic_hex_to_int
+from common.protocol import Protocol
 from nodes.authentication import NodeAPIKeyAuthentication
 from nodes.models import ObservedNode
 from nodes.permissions import NodeAuthorizationPermission
@@ -41,13 +42,11 @@ from .signals import (
 
 class PacketIngestView(APIView):
     """
-    API endpoint for ingesting packets of any type.
+    Meshtastic packet ingestion endpoint.
 
-    This endpoint accepts JSON data representing a packet and processes it
-    based on the packet type determined by the 'portnum' field.
-
-    Authentication is required using an API key that is linked to the node
-    specified in the 'from' field of the packet.
+    Accepts JSON representing a Meshtastic wire packet (portnum + decoded payload)
+    from an authenticated feeder (Node API key). MeshCore ingestion will use
+    separate routes when implemented.
     """
 
     authentication_classes = [NodeAPIKeyAuthentication]
@@ -161,12 +160,10 @@ class PacketIngestView(APIView):
 
 class NodeUpsertView(APIView):
     """
-    API endpoint for upserting node information.
+    Meshtastic observed-node upsert for feeders (Node API key).
 
-    This endpoint allows a node to update its own information using its API key.
-    If the node doesn't exist, it will be created. This is an upsert operation.
-
-    Authentication is required using the node's API key.
+    Creates or updates an ``ObservedNode`` row for Meshtastic ``node_id`` / ``node_id_str``.
+    MeshCore will use separate endpoints when implemented.
     """
 
     authentication_classes = [NodeAPIKeyAuthentication]
@@ -231,7 +228,7 @@ class NodeUpsertView(APIView):
                         status=status.HTTP_400_BAD_REQUEST,
                     )
 
-        q = ObservedNode.objects.filter(node_id=observed_node_id)
+        q = ObservedNode.objects.filter(node_id=observed_node_id, protocol=Protocol.MESHTASTIC)
         if q.exists():
             node = q.first()
             serializer = NodeSerializer(instance=node, data=request.data, partial=True)
