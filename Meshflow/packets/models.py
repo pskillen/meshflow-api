@@ -19,7 +19,7 @@ class LocationSource(models.IntegerChoices):
     EXTERNAL = 3, "LOC_EXTERNAL"
 
 
-class RawPacket(models.Model):
+class MtRawPacket(models.Model):
     """Meshtastic raw packet row (common metadata shared by all portnums)."""
 
     id = models.UUIDField(primary_key=True, null=False, default=uuid.uuid4, editable=False)
@@ -32,17 +32,18 @@ class RawPacket(models.Model):
     first_reported_time = models.DateTimeField(null=False, default=timezone.now)
 
     class Meta:
+        db_table = "packets_mt_raw_packet"
         indexes = [
             models.Index(fields=["packet_id"]),
             models.Index(fields=["from_int"]),
             models.Index(fields=["from_int", "packet_id"]),
             models.Index(fields=["to_int"]),
         ]
-        verbose_name = _("Raw packet")
-        verbose_name_plural = _("Raw packets")
+        verbose_name = _("Meshtastic raw packet")
+        verbose_name_plural = _("Meshtastic raw packets")
 
 
-class MessagePacket(RawPacket):
+class MessagePacket(MtRawPacket):
     """Meshtastic text message payload row."""
 
     message_text = models.TextField(null=False)
@@ -56,7 +57,7 @@ class MessagePacket(RawPacket):
         verbose_name_plural = _("Message packets")
 
 
-class PositionPacket(RawPacket):
+class PositionPacket(MtRawPacket):
     """Meshtastic position payload row."""
 
     latitude = models.FloatField(null=True)
@@ -74,7 +75,7 @@ class PositionPacket(RawPacket):
         verbose_name_plural = _("Position packets")
 
 
-class NodeInfoPacket(RawPacket):
+class NodeInfoPacket(MtRawPacket):
     """Meshtastic NODEINFO payload row."""
 
     node_id = models.CharField(max_length=9, null=True, db_index=True)
@@ -92,7 +93,7 @@ class NodeInfoPacket(RawPacket):
         verbose_name_plural = _("Node info packets")
 
 
-class BaseTelemetryPacket(RawPacket):
+class BaseTelemetryPacket(MtRawPacket):
     """Abstract Meshtastic telemetry payload (shared reading_time)."""
 
     reading_time = models.DateTimeField(null=False)
@@ -275,7 +276,7 @@ class TrafficManagementStatsPacket(BaseTelemetryPacket):
         verbose_name_plural = _("Traffic management stats packets")
 
 
-class TraceroutePacket(RawPacket):
+class TraceroutePacket(MtRawPacket):
     """Meshtastic TRACEROUTE_APP payload row."""
 
     route = models.JSONField(default=list, help_text="List of node_ids, path from source to dest")
@@ -297,7 +298,7 @@ class TraceroutePacket(RawPacket):
 class PacketObservation(models.Model):
     """Meshtastic ingest observation: which feeder saw a raw packet on mesh."""
 
-    packet = models.ForeignKey(RawPacket, on_delete=models.CASCADE, related_name="observations")
+    packet = models.ForeignKey(MtRawPacket, on_delete=models.CASCADE, related_name="observations")
     observer = models.ForeignKey(ManagedNode, on_delete=models.CASCADE)
 
     channel = models.ForeignKey(MessageChannel, on_delete=models.CASCADE, null=True)

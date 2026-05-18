@@ -5,7 +5,7 @@ import abc
 from common.mesh_node_helpers import meshtastic_id_to_hex
 from common.protocol import Protocol
 from nodes.models import ManagedNode, ObservedNode
-from packets.models import PacketObservation, RawPacket
+from packets.models import MtRawPacket, PacketObservation
 from packets.signals import new_node_observed
 from users.models import User
 
@@ -13,7 +13,7 @@ from users.models import User
 class BasePacketService(abc.ABC):
     """Base service for processing packets."""
 
-    packet: RawPacket
+    packet: MtRawPacket
     observer: ManagedNode
     observation: PacketObservation
     from_node: ObservedNode
@@ -23,7 +23,7 @@ class BasePacketService(abc.ABC):
         """Initialize the service with a packet and its observer."""
 
     def process_packet(
-        self, packet: RawPacket, observer: ManagedNode, observation: PacketObservation, user: User
+        self, packet: MtRawPacket, observer: ManagedNode, observation: PacketObservation, user: User
     ) -> None:
         """Process the packet and create any necessary related records."""
         self.packet = packet

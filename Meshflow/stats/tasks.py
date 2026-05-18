@@ -14,7 +14,7 @@ from tqdm import tqdm
 
 from constellations.models import Constellation
 from nodes.models import ObservedNode
-from packets.models import PacketObservation, RawPacket
+from packets.models import MtRawPacket, PacketObservation
 
 from .models import StatsSnapshot
 
@@ -56,7 +56,7 @@ def _collect_online_nodes(
     Uses threshold = recorded_at - ONLINE_NODE_WINDOW_HOURS for consistency.
     Returns (created, skipped).
 
-    When use_raw_packet_for_global=True, derives global count from RawPacket
+    When use_raw_packet_for_global=True, derives global count from MtRawPacket
     (distinct from_int in window) instead of ObservedNode.last_heard. Use for
     backfill when last_heard may not extend far back (e.g. bulk-imported packets).
     """
@@ -65,15 +65,15 @@ def _collect_online_nodes(
     created = 0
     skipped = 0
 
-    # Global: ObservedNode.last_heard or RawPacket-based (for backfill)
+    # Global: ObservedNode.last_heard or MtRawPacket-based (for backfill)
     if skip_existing and _snapshot_exists(recorded_at, "online_nodes", None):
         skipped += 1
     else:
         if use_raw_packet_for_global:
-            # Derive from RawPacket for historical hours when last_heard may be incomplete.
+            # Derive from MtRawPacket for historical hours when last_heard may be incomplete.
             # Window [threshold, recorded_at] = nodes heard in the 2h before the hour boundary.
             global_count = (
-                RawPacket.objects.filter(
+                MtRawPacket.objects.filter(
                     from_int__isnull=False,
                     first_reported_time__gte=threshold,
                     first_reported_time__lte=recorded_at,
@@ -137,14 +137,14 @@ def _collect_packet_volume(
     skip_existing: bool = False,
 ) -> tuple[int, int]:
     """
-    Collect packet_volume snapshot (hourly) for global - count of RawPackets in the hour,
+    Collect packet_volume snapshot (hourly) for global - count of MtRawPacket rows in the hour,
     with per-type breakdown. Returns (created, skipped).
     """
     if skip_existing and _snapshot_exists(recorded_at, "packet_volume", None):
         return (0, 1)
 
     hour_end = recorded_at + timedelta(hours=1)
-    base_qs = RawPacket.objects.filter(
+    base_qs = MtRawPacket.objects.filter(
         first_reported_time__gte=recorded_at,
         first_reported_time__lt=hour_end,
     )

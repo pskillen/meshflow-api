@@ -11,10 +11,10 @@ from packets.models import (
     LocalStatsPacket,
     LocationSource,
     MessagePacket,
+    MtRawPacket,
     NodeInfoPacket,
     PacketObservation,
     PositionPacket,
-    RawPacket,
     RoleSource,
 )
 from users.tests.conftest import create_user  # noqa: F401
@@ -152,7 +152,7 @@ def create_raw_packet(raw_packet_data):
     def make_packet(**kwargs):
         data = raw_packet_data.copy()
         data.update(kwargs)
-        return RawPacket.objects.create(**data)
+        return MtRawPacket.objects.create(**data)
 
     return make_packet
 

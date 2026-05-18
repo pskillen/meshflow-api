@@ -25,7 +25,7 @@ from dx_monitoring.models import (
     DxReasonCode,
 )
 from nodes.models import ManagedNode, NodeLatestStatus, ObservedNode
-from packets.models import PacketObservation, RawPacket, TraceroutePacket
+from packets.models import MtRawPacket, PacketObservation, TraceroutePacket
 from traceroute.models import AutoTraceRoute
 
 if TYPE_CHECKING:
@@ -48,7 +48,7 @@ def is_node_suppressed_for_dx(node_id: int) -> bool:
     ).exists()
 
 
-def is_packet_ingest_suppressed(packet: RawPacket, observer: ManagedNode) -> bool:
+def is_packet_ingest_suppressed(packet: MtRawPacket, observer: ManagedNode) -> bool:
     """Bidirectional suppression: sender or managed observer/receiver."""
     if is_node_suppressed_for_dx(int(packet.from_int)):
         return True
@@ -133,7 +133,7 @@ def _tr_return_hop_pairs(target_id: int, source_id: int, route_back: list | None
 def _append_observation(
     *,
     event: DxEvent,
-    raw_packet: RawPacket,
+    raw_packet: MtRawPacket,
     packet_observation: PacketObservation,
     observer: ManagedNode,
     observed_at,
@@ -198,7 +198,7 @@ def _get_or_create_active_event(
     distance_km: float | None,
     active_extension: timedelta,
     evidence_metadata: dict[str, Any],
-    raw_packet: RawPacket,
+    raw_packet: MtRawPacket,
     packet_observation: PacketObservation,
 ) -> DxEvent:
     now = timezone.now()
@@ -265,7 +265,7 @@ def maybe_detect_dx_candidate(packet_service: BasePacketService) -> None:
     if not getattr(settings, "DX_MONITORING_DETECTION_ENABLED", False):
         return
 
-    packet: RawPacket = packet_service.packet
+    packet: MtRawPacket = packet_service.packet
     observer: ManagedNode = packet_service.observer
     observation: PacketObservation = packet_service.observation
     from_node: ObservedNode = packet_service.from_node
@@ -382,7 +382,7 @@ def maybe_detect_dx_candidate(packet_service: BasePacketService) -> None:
 
 def maybe_detect_dx_from_completed_traceroute(
     auto_tr: AutoTraceRoute,
-    raw_packet: RawPacket,
+    raw_packet: MtRawPacket,
     packet_observation: PacketObservation,
 ) -> None:
     """Detect distant consecutive hops from a completed traceroute path."""

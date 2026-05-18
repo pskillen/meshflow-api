@@ -35,7 +35,7 @@ def test_same_packet_different_packet_id_creates_new(api_client):
 
 
 def test_same_packet_two_observers_both_succeed(api_client):
-    """Same packet from two different observers should both return 200 (one RawPacket, two PacketObservations)."""
+    """Same packet from two different observers should both return 200 (one MtRawPacket, two PacketObservations)."""
     payload = load_fixture("TEXT_MESSAGE_APP/minimal.json")
     resp1 = api_client.post_ingest(payload, observer_node_id=OBSERVER_NODE_ID)
     assert resp1.status_code == 201

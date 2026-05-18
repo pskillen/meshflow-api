@@ -9,7 +9,7 @@ Python bot running next to each managed Meshtastic radio. Subscribes to the
 radio over TCP, transforms the firmware's packet structure into JSON, and
 uploads each packet to the API.
 - **meshflow-api `packets` Django app** — receives ingest requests,
-authenticates the observer, deduplicates, persists `RawPacket` subclasses and
+authenticates the observer, deduplicates, persists `MtRawPacket` subclasses and
 `PacketObservation` rows, and emits Django signals.
 
 Specific features such as text messages, traceroutes, mesh monitoring, and DX
@@ -68,9 +68,9 @@ sequenceDiagram
     API->>API: PacketIngestSerializer<br/>(camelCase -> snake_case, portnum dispatch)
     API->>DB: find_existing_packet (dedup window)
     alt new transmission
-        API->>DB: INSERT RawPacket subclass
+        API->>DB: INSERT MtRawPacket subclass
     else duplicate within window
-        API->>DB: reuse existing RawPacket
+        API->>DB: reuse existing MtRawPacket
     end
     API->>DB: INSERT PacketObservation (observer, rx_*)
     API-->>Bot: 201 Created (or 304 if encrypted)
@@ -185,7 +185,7 @@ Each subclass:
 4. Calls `find_existing_packet(model, from_int, packet_id, rx_time)` to
   apply the dedup window (see [DEDUPLICATION.md](DEDUPLICATION.md) and
    `PACKET_DEDUP_WINDOW_MINUTES` in `ENV_VARS.md`).
-5. Either reuses the existing `RawPacket` row or `INSERT`s a new one of the
+5. Either reuses the existing `MtRawPacket` row or `INSERT`s a new one of the
   correct subclass.
 6. Always creates a `PacketObservation` linking observer → packet
   (idempotent for the same `(packet, observer)` pair).
@@ -194,7 +194,7 @@ Each subclass:
 
 Persisted models live in `packets.models`:
 
-- `RawPacket` — abstract base (UUID PK, `packet_id`, `from_int`, `from_str`,
+- `MtRawPacket` — abstract base (UUID PK, `packet_id`, `from_int`, `from_str`,
 `to_int`, `to_str`, `port_num`, `first_reported_time`).
 - One concrete subclass per port number: `MessagePacket`, `PositionPacket`,
 `NodeInfoPacket`, `TraceroutePacket`, `DeviceMetricsPacket`,
@@ -202,7 +202,7 @@ Persisted models live in `packets.models`:
 `PowerMetricsPacket`, `HealthMetricsPacket`, `HostMetricsPacket`,
 `TrafficManagementStatsPacket`. Each carries the fields specific to that
 port.
-- `PacketObservation` — many-to-one onto `RawPacket`, foreign key to the
+- `PacketObservation` — many-to-one onto `MtRawPacket`, foreign key to the
 observer `ManagedNode`, plus per-observation fields the radio reports
 (`rx_time`, `rx_rssi`, `rx_snr`, `hop_limit`, `hop_start`, `relay_node`,
 `channel`, `upload_time`).
@@ -274,7 +274,7 @@ handles this by creating an `AutoTraceRoute` with `trigger_type=2` (External).
 See [features/traceroute/](../traceroute/) for the full story.
 
 Deduplication is per-instance — the dedup window only collapses observations
-within a single API. Each instance keeps its own copy of the `RawPacket`.
+within a single API. Each instance keeps its own copy of the `MtRawPacket`.
 
 ## Operational notes
 

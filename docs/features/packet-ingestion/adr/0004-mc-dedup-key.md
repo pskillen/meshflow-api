@@ -6,7 +6,7 @@
 
 ## Context
 
-Meshtastic ingestion deduplicates on `(from_int, packet_id, rx_time window)` — see [`DEDUPLICATION.md`](../DEDUPLICATION.md). The window (`PACKET_DEDUP_WINDOW_MINUTES`, default 10) collapses observations of the same on-air transmission heard by multiple feeders into one `RawPacket` plus N `PacketObservation` rows.
+Meshtastic ingestion deduplicates on `(from_int, packet_id, rx_time window)` — see [`DEDUPLICATION.md`](../DEDUPLICATION.md). The window (`PACKET_DEDUP_WINDOW_MINUTES`, default 10) collapses observations of the same on-air transmission heard by multiple feeders into one `MtRawPacket` plus N `PacketObservation` rows.
 
 MeshCore has no `packet_id` and no consistent sender id on every event. The Phase 0.4 captures (see [`MESHCORE_PACKET_FIELDS.md`](../MESHCORE_PACKET_FIELDS.md)) show:
 

@@ -43,7 +43,7 @@ Detection runs inside packet processing for each ingested packet.
 
 ```mermaid
 flowchart LR
-  packet["RawPacket and PacketObservation"] --> source["Get or create ObservedNode"]
+  packet["MtRawPacket and PacketObservation"] --> source["Get or create ObservedNode"]
   source --> packetSpecific["Packet-specific status updates"]
   packetSpecific --> detection["DX detection"]
   detection --> lastHeard["Update ObservedNode.last_heard"]
@@ -79,10 +79,10 @@ non-event.
 
 Each detection pass receives:
 
-- The `RawPacket` being processed.
+- The `MtRawPacket` being processed.
 - The `PacketObservation` linking the packet to the observing `ManagedNode`.
 - The observing `ManagedNode`.
-- The observed `ObservedNode` identified by `RawPacket.from_int`.
+- The observed `ObservedNode` identified by `MtRawPacket.from_int`.
 - Whether the observed node was created by this packet.
 - The observed node's previous `last_heard` value.
 - Whether the observed node has already had a usable position evaluated for DX.
@@ -118,7 +118,7 @@ reason code, state, first-observed and last-observed timestamps, active-window
 expiry, observation counter, last observer, and the best or latest distance
 values when the rule can calculate them.
 
-`DxEventObservation` links the event to the `RawPacket`, `PacketObservation`,
+`DxEventObservation` links the event to the `MtRawPacket`, `PacketObservation`,
 observer, observed timestamp, reason metadata, and optional distance.
 
 ## Reason Codes

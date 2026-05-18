@@ -18,7 +18,7 @@ from rest_framework.response import Response
 from common.mesh_node_helpers import meshtastic_id_to_hex
 from common.protocol import Protocol
 from nodes.models import ManagedNode, ObservedNode
-from packets.models import PacketObservation, RawPacket
+from packets.models import MtRawPacket, PacketObservation
 
 from .models import StatsSnapshot
 from .serializers import GlobalStatsSerializer, NeighbourStatsSerializer, NodeStatsSerializer, StatsSnapshotSerializer
@@ -151,7 +151,7 @@ def node_packet_stats(request, node_id: int):
         return Response({"status": "error", "message": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
     # Build base query for packets from this node
-    packets = RawPacket.objects.filter(from_int=node_id)
+    packets = MtRawPacket.objects.filter(from_int=node_id)
     # Exclude device metrics that were only observed by the sender (self-ingested)
     packets = packets.exclude(
         Q(devicemetricspacket__isnull=False)
@@ -439,7 +439,7 @@ def global_packet_stats(request):
         return Response({"status": "error", "message": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
     # Build base query
-    packets = RawPacket.objects.all()
+    packets = MtRawPacket.objects.all()
 
     # Apply date filters if provided
     if start_date:
