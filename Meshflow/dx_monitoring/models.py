@@ -103,7 +103,7 @@ class DxEventObservation(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     event = models.ForeignKey(DxEvent, on_delete=models.CASCADE, related_name="observations")
     raw_packet = models.ForeignKey(
-        "packets.RawPacket",
+        "packets.MtRawPacket",
         on_delete=models.CASCADE,
         related_name="dx_event_observations",
     )

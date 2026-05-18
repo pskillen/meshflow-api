@@ -21,7 +21,7 @@ When you change any threshold in code, **update this file in the same PR**.
 - Defaults listed here are **code defaults**; operators can override via env
   vars (where indicated) or by editing `django_celery_beat.PeriodicTask` rows
   in admin (for Celery beat schedules).
-- `ObservedNode.last_heard` is updated from `RawPacket.first_reported_time`
+- `ObservedNode.last_heard` is updated from `MtRawPacket.first_reported_time`
   in `packets/services/base.py` at ingest. It is the canonical "mesh heard"
   time.
 - `PacketObservation.upload_time` (feeder upload) is the canonical
@@ -123,7 +123,7 @@ with the `environment_reported_after` query parameter.
 
 ### `ObservedNode.last_heard` source
 
-Set from `RawPacket.first_reported_time` in
+Set from `MtRawPacket.first_reported_time` in
 [`Meshflow/packets/services/base.py`](../Meshflow/packets/services/base.py).
 Mesh monitoring, traceroute target selection, and all UI "online" tiers
 depend on this.
@@ -136,7 +136,7 @@ depend on this.
 | --- | --- | --- | --- |
 | `PACKET_DEDUP_WINDOW_MINUTES` | **10 min** | yes | `find_existing_packet` matches on `from_int` + `packet_id` + `first_reported_time ± window` |
 | `STALE_TR_TIMEOUT_SECONDS` | **180 s** | yes | Match inbound traceroute response packets to a pending/sent/failed `AutoTraceRoute` by `triggered_at >= now - cutoff` |
-| `RawPacket.first_reported_time`, `PacketObservation.upload_time` | `timezone.now()` | n/a | Ingestion timestamps; drive ordering, dedupe, liveness |
+| `MtRawPacket.first_reported_time`, `PacketObservation.upload_time` | `timezone.now()` | n/a | Ingestion timestamps; drive ordering, dedupe, liveness |
 
 ---
 

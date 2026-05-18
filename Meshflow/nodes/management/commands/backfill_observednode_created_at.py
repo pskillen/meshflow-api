@@ -1,5 +1,5 @@
 """
-Backfill ObservedNode.created_at from earliest RawPacket.first_reported_time per from_int.
+Backfill ObservedNode.created_at from earliest MtRawPacket.first_reported_time per from_int.
 
 Same logic as migration nodes.0026_backfill_observednode_created_at. Use when the migration
 did not run, failed partway, or data was later imported with incorrect created_at values.
@@ -11,12 +11,12 @@ from django.db.models import Min
 from tqdm import tqdm
 
 from nodes.models import ObservedNode
-from packets.models import RawPacket
+from packets.models import MtRawPacket
 
 
 class Command(BaseCommand):
     help = (
-        "Set ObservedNode.created_at from Min(RawPacket.first_reported_time) for each from_int / node_id. "
+        "Set ObservedNode.created_at from Min(MtRawPacket.first_reported_time) for each from_int / node_id. "
         "By default only rows with created_at IS NULL are updated (migration 0026 parity). "
         "Use --overwrite to refresh created_at from packet history for all matching nodes."
     )
@@ -30,7 +30,7 @@ class Command(BaseCommand):
         parser.add_argument(
             "--overwrite",
             action="store_true",
-            help="Update all ObservedNodes that have RawPackets, not only created_at IS NULL",
+            help="Update all ObservedNodes that have MtRawPacket rows, not only created_at IS NULL",
         )
 
     def handle(self, *args, **options):
@@ -41,14 +41,14 @@ class Command(BaseCommand):
             self.stdout.write(self.style.WARNING("Dry run — no database writes"))
 
         earliest_rows = (
-            RawPacket.objects.filter(from_int__isnull=False)
+            MtRawPacket.objects.filter(from_int__isnull=False)
             .values("from_int")
             .annotate(earliest_time=Min("first_reported_time"))
         )
 
         total_candidates = earliest_rows.count()
         if total_candidates == 0:
-            self.stdout.write("No RawPacket rows with from_int; nothing to do.")
+            self.stdout.write("No MtRawPacket rows with from_int; nothing to do.")
             return
 
         would_update = 0

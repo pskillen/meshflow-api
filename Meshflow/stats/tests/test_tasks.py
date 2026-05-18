@@ -28,7 +28,7 @@ def test_backfill_stats_snapshots_creates_online_nodes_and_packet_volume(
     observed.last_heard = timezone.make_aware(datetime(2025, 3, 15, 11, 30, 0))
     observed.save()
 
-    # RawPacket in hour 12:00
+    # MtRawPacket in hour 12:00
     packet = create_raw_packet(packet_id=1)
     packet.first_reported_time = timezone.make_aware(datetime(2025, 3, 15, 12, 15, 0))
     packet.save()

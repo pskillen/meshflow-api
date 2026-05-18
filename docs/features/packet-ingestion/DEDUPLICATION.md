@@ -56,6 +56,6 @@ In this case: create a new packet record and an initial `PacketObservation`.
 
 ## Data Model
 
-- **RawPacket** (and subclasses: MessagePacket, PositionPacket, NodeInfoPacket, DeviceMetricsPacket, LocalStatsPacket, etc.): One row per unique packet as determined by the deduplication rules.
+- **MtRawPacket** (and subclasses: MessagePacket, PositionPacket, NodeInfoPacket, DeviceMetricsPacket, LocalStatsPacket, etc.): One row per unique packet as determined by the deduplication rules.
 - **PacketObservation**: Many-to-many relationship between packets and observer nodes. Each observation records which ManagedNode heard the packet, along with rx_time, rx_rssi, rx_snr, hop_limit, hop_start, and channel.
 
