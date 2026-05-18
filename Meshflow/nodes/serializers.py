@@ -1086,6 +1086,8 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
             "protocol",
             "node_id",
             "node_id_str",
+            "mc_pubkey",
+            "mc_pubkey_prefix",
             "mac_addr",
             "long_name",
             "short_name",
