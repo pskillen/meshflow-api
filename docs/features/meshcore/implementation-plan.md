@@ -202,7 +202,7 @@ Turn Phase **0.4** capture evidence into **locked architecture decisions** (ADRs
 
 ## Phase 1.0 — API protocol prep + Meshtastic (MT) relabelling (meshflow-api)
 
-**Status:** In progress (meshflow-api code + OpenAPI + docs in this branch). **Tracking:** GitHub `pskillen/meshflow-api` **[#290](https://github.com/pskillen/meshflow-api/issues/290)** (child of epic **[#265](https://github.com/pskillen/meshflow-api/issues/265)**).  
+**Status:** Open PR **[#291](https://github.com/pskillen/meshflow-api/pull/291)** (branch `meshcore/phase-1-0/api-protocol-prep`). **Tracking:** GitHub `pskillen/meshflow-api` **[#290](https://github.com/pskillen/meshflow-api/issues/290)** (child of epic **[#265](https://github.com/pskillen/meshflow-api/issues/265)**).  
 **Repos touched in this phase:** **meshflow-api only** (no meshflow-bot / meshflow-ui in this phase).
 
 ### Purpose of this phase
@@ -211,6 +211,7 @@ Add **multi-protocol–ready schema defaults** (existing rows remain **Meshtasti
 
 ### meshflow-api — done (concrete checklist)
 
+- **Canonical delivery:** **[PR #291](https://github.com/pskillen/meshflow-api/pull/291)** on branch **`meshcore/phase-1-0/api-protocol-prep`** (verify on `main` after merge).
 - **`Meshflow/common/protocol.py`** — shared `Protocol` `IntegerChoices` (`MESHTASTIC=1`, `MESHCORE=2`).
 - **`Meshflow/common/meshcore_node_helpers.py`** — placeholder module for future MC-specific helpers.
 - **`Meshflow/common/mesh_node_helpers.py`** — `MESHTASTIC_BROADCAST_ID` + deprecated `BROADCAST_ID` alias; ADR pointer for MC broadcast semantics.
