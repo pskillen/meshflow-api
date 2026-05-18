@@ -1,4 +1,4 @@
-"""Models for storing and managing different types of mesh network packets."""
+"""Models for storing Meshtastic wire packets ingested via the ``packets`` app."""
 
 import uuid
 
@@ -20,7 +20,7 @@ class LocationSource(models.IntegerChoices):
 
 
 class RawPacket(models.Model):
-    """Base model for storing raw mesh network packets with common attributes."""
+    """Meshtastic raw packet row (common metadata shared by all portnums)."""
 
     id = models.UUIDField(primary_key=True, null=False, default=uuid.uuid4, editable=False)
     packet_id = models.BigIntegerField(null=False)
@@ -43,7 +43,7 @@ class RawPacket(models.Model):
 
 
 class MessagePacket(RawPacket):
-    """Model for storing text message packets in the mesh network."""
+    """Meshtastic text message payload row."""
 
     message_text = models.TextField(null=False)
 
@@ -57,7 +57,7 @@ class MessagePacket(RawPacket):
 
 
 class PositionPacket(RawPacket):
-    """Model for storing node position data packets."""
+    """Meshtastic position payload row."""
 
     latitude = models.FloatField(null=True)
     longitude = models.FloatField(null=True)
@@ -75,7 +75,7 @@ class PositionPacket(RawPacket):
 
 
 class NodeInfoPacket(RawPacket):
-    """Model for storing node information packets."""
+    """Meshtastic NODEINFO payload row."""
 
     node_id = models.CharField(max_length=9, null=True, db_index=True)
     short_name = models.CharField(max_length=5, null=True)
@@ -93,7 +93,7 @@ class NodeInfoPacket(RawPacket):
 
 
 class BaseTelemetryPacket(RawPacket):
-    """Base model for all telemetry packet types."""
+    """Abstract Meshtastic telemetry payload (shared reading_time)."""
 
     reading_time = models.DateTimeField(null=False)
 
@@ -102,7 +102,7 @@ class BaseTelemetryPacket(RawPacket):
 
 
 class DeviceMetricsPacket(BaseTelemetryPacket):
-    """Model for storing device-specific metrics like battery and voltage."""
+    """Meshtastic device telemetry payload row."""
 
     battery_level = models.FloatField(null=True)
     voltage = models.FloatField(null=True)
@@ -116,7 +116,7 @@ class DeviceMetricsPacket(BaseTelemetryPacket):
 
 
 class LocalStatsPacket(BaseTelemetryPacket):
-    """Model for storing local network statistics."""
+    """Meshtastic local stats telemetry row."""
 
     uptime_seconds = models.BigIntegerField(null=True)
     channel_utilization = models.FloatField(null=True)
@@ -140,7 +140,7 @@ class LocalStatsPacket(BaseTelemetryPacket):
 
 
 class EnvironmentMetricsPacket(BaseTelemetryPacket):
-    """Model for storing environmental sensor data."""
+    """Meshtastic environment telemetry row."""
 
     temperature = models.FloatField(null=True)
     relative_humidity = models.FloatField(null=True)
@@ -171,7 +171,7 @@ class EnvironmentMetricsPacket(BaseTelemetryPacket):
 
 
 class AirQualityMetricsPacket(BaseTelemetryPacket):
-    """Model for storing air quality sensor data."""
+    """Meshtastic air quality telemetry row."""
 
     pm10_standard = models.IntegerField(null=True)
     pm25_standard = models.IntegerField(null=True)
@@ -205,7 +205,7 @@ class AirQualityMetricsPacket(BaseTelemetryPacket):
 
 
 class PowerMetricsPacket(BaseTelemetryPacket):
-    """Model for storing power metrics (voltage/current per channel)."""
+    """Meshtastic power telemetry row."""
 
     ch1_voltage = models.FloatField(null=True)
     ch1_current = models.FloatField(null=True)
@@ -230,7 +230,7 @@ class PowerMetricsPacket(BaseTelemetryPacket):
 
 
 class HealthMetricsPacket(BaseTelemetryPacket):
-    """Model for storing health telemetry metrics."""
+    """Meshtastic health telemetry row."""
 
     heart_bpm = models.IntegerField(null=True)
     spo2 = models.IntegerField(null=True)
@@ -242,7 +242,7 @@ class HealthMetricsPacket(BaseTelemetryPacket):
 
 
 class HostMetricsPacket(BaseTelemetryPacket):
-    """Model for storing Linux host metrics."""
+    """Meshtastic host telemetry row."""
 
     uptime_seconds = models.IntegerField(null=True)
     freemem_bytes = models.BigIntegerField(null=True)
@@ -260,7 +260,7 @@ class HostMetricsPacket(BaseTelemetryPacket):
 
 
 class TrafficManagementStatsPacket(BaseTelemetryPacket):
-    """Model for storing traffic management statistics."""
+    """Meshtastic traffic management stats row."""
 
     packets_inspected = models.IntegerField(null=True)
     position_dedup_drops = models.IntegerField(null=True)
@@ -276,7 +276,7 @@ class TrafficManagementStatsPacket(BaseTelemetryPacket):
 
 
 class TraceroutePacket(RawPacket):
-    """Model for storing TRACEROUTE_APP packets."""
+    """Meshtastic TRACEROUTE_APP payload row."""
 
     route = models.JSONField(default=list, help_text="List of node_ids, path from source to dest")
     route_back = models.JSONField(default=list, help_text="List of node_ids, path from dest back to source")
@@ -295,7 +295,7 @@ class TraceroutePacket(RawPacket):
 
 
 class PacketObservation(models.Model):
-    """Relates packets to node(s) which observed the packet."""
+    """Meshtastic ingest observation: which feeder saw a raw packet on mesh."""
 
     packet = models.ForeignKey(RawPacket, on_delete=models.CASCADE, related_name="observations")
     observer = models.ForeignKey(ManagedNode, on_delete=models.CASCADE)

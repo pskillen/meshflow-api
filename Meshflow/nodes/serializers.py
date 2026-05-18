@@ -5,6 +5,7 @@ from django.urls import reverse
 from rest_framework import serializers
 
 from common.mesh_node_helpers import meshtastic_id_to_hex
+from common.protocol import Protocol
 from constellations.models import Constellation, ConstellationUserMembership, MessageChannel
 from users.models import User
 
@@ -195,10 +196,11 @@ class APIKeyConstellationSerializer(serializers.ModelSerializer):
             "id",
             "name",
             "map_color",
+            "protocol",
             "bot_default_ignore_portnums",
             "bot_default_hop_limit",
         ]
-        read_only_fields = ["name", "map_color", "bot_default_ignore_portnums", "bot_default_hop_limit"]
+        read_only_fields = ["name", "map_color", "protocol", "bot_default_ignore_portnums", "bot_default_hop_limit"]
 
 
 class APIKeySerializer(serializers.ModelSerializer):
@@ -330,10 +332,11 @@ class ManagedNodeSerializer(serializers.ModelSerializer):
                 "id",
                 "name",
                 "map_color",
+                "protocol",
                 "bot_default_ignore_portnums",
                 "bot_default_hop_limit",
             ]
-            read_only_fields = ["name", "map_color", "bot_default_ignore_portnums", "bot_default_hop_limit"]
+            read_only_fields = ["name", "map_color", "protocol", "bot_default_ignore_portnums", "bot_default_hop_limit"]
 
     owner_id = serializers.PrimaryKeyRelatedField(
         queryset=User.objects.all(), source="owner", write_only=True, required=True
@@ -367,6 +370,7 @@ class ManagedNodeSerializer(serializers.ModelSerializer):
         model = ManagedNode
         fields = [
             "node_id",
+            "protocol",
             "name",
             "long_name",
             "short_name",
@@ -393,6 +397,7 @@ class ManagedNodeSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [
             "internal_id",
+            "protocol",
             "long_name",
             "short_name",
             "last_heard",
@@ -500,7 +505,14 @@ class ManagedNodeSerializer(serializers.ModelSerializer):
 
     def _get_managed_node_latest_status(self, obj):
         """Get NodeLatestStatus for ManagedNode via ObservedNode lookup."""
-        observed = ObservedNode.objects.filter(node_id=obj.node_id).select_related("latest_status").first()
+        observed = (
+            ObservedNode.objects.filter(
+                node_id=obj.node_id,
+                protocol=Protocol.MESHTASTIC,
+            )
+            .select_related("latest_status")
+            .first()
+        )
         return observed.latest_status if observed else None
 
     def get_latest_environment_metrics(self, obj):
@@ -1071,6 +1083,7 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
         model = ObservedNode
         fields = [
             "internal_id",
+            "protocol",
             "node_id",
             "node_id_str",
             "mac_addr",
@@ -1103,6 +1116,7 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [
             "internal_id",
+            "protocol",
             "node_id_str",
             "last_heard",
             "role",

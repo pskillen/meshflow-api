@@ -9,8 +9,8 @@ urlpatterns = [
         "<int:node_id>/",
         include(
             [
-                path("ingest/", PacketIngestView.as_view(), name="packet-ingest"),
-                path("nodes/", NodeUpsertView.as_view(), name="node-upsert"),
+                path("ingest/", PacketIngestView.as_view(), name="meshtastic-packet-ingest"),
+                path("nodes/", NodeUpsertView.as_view(), name="meshtastic-node-upsert"),
             ]
         ),
     ),

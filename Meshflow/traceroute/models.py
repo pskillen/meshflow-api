@@ -1,4 +1,8 @@
-"""Models for traceroute tracking and triggering."""
+"""Models for traceroute tracking and triggering (Meshtastic wire format today).
+
+TODO(meshcore phase 3): route JSON and hop lists assume Meshtastic numeric ids;
+revisit when MeshCore traceroute storage lands (master plan traceroute section).
+"""
 
 from django.db import models
 from django.db.models import Q

@@ -8,7 +8,12 @@ from packets.models import MessagePacket
 
 
 class TextMessage(models.Model):
-    """Model representing a text message sent to a node."""
+    """Text message on the mesh (Meshtastic-backed storage today).
+
+    Phase 2 is expected to split provenance across ``original_mt_packet`` and
+    ``original_mc_packet`` instead of a single ``original_packet`` FK; fields are
+    unchanged in Phase 1.0.
+    """
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     original_packet = models.ForeignKey(MessagePacket, null=True, on_delete=models.CASCADE)

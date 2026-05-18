@@ -1,13 +1,19 @@
-"""Helper functions for working with Meshtastic node IDs and timestamps."""
+"""Meshtastic-specific helpers for node IDs and the MT broadcast sentinel.
+
+MeshCore broadcast semantics differ; see docs/features/packet-ingestion/adr/0003-mc-broadcast-semantics.md.
+"""
 
 import base64
 
-BROADCAST_ID = 0xFFFFFFFF
+MESHTASTIC_BROADCAST_ID = 0xFFFFFFFF
+
+# Deprecated alias — prefer MESHTASTIC_BROADCAST_ID; remove once all call sites are migrated.
+BROADCAST_ID = MESHTASTIC_BROADCAST_ID
 
 
 def meshtastic_id_to_hex(meshtastic_id: int) -> str:
     """Convert a Meshtastic ID (integer form) to hex representation (!abcdef12)."""
-    if meshtastic_id == BROADCAST_ID:
+    if meshtastic_id == MESHTASTIC_BROADCAST_ID:
         return "^all"
 
     return f"!{meshtastic_id:08x}"
@@ -16,7 +22,7 @@ def meshtastic_id_to_hex(meshtastic_id: int) -> str:
 def meshtastic_hex_to_int(node_id: str) -> int:
     """Convert a Meshtastic ID (hex representation) to integer form."""
     if node_id == "^all":
-        return BROADCAST_ID
+        return MESHTASTIC_BROADCAST_ID
 
     return int(node_id[1:], 16)
 

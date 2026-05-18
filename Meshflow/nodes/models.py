@@ -7,6 +7,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from common.mesh_node_helpers import meshtastic_id_to_hex
+from common.protocol import Protocol
 from constellations.models import MessageChannel
 
 
@@ -40,10 +41,16 @@ class RoleSource(models.IntegerChoices):
 
 
 class ManagedNode(models.Model):
-    """Model representing a mesh network node."""
+    """User-owned feeder / infrastructure node (Meshtastic today; MeshCore in a later phase)."""
 
     internal_id = models.UUIDField(primary_key=True, null=False, default=uuid.uuid4, editable=False)
     node_id = models.BigIntegerField(null=False, db_index=True)
+    protocol = models.PositiveSmallIntegerField(
+        choices=Protocol.choices,
+        default=Protocol.MESHTASTIC,
+        db_index=True,
+        help_text=_("Mesh protocol for this managed node (constellation must match)."),
+    )
     owner = models.ForeignKey(
         "users.User",
         on_delete=models.CASCADE,
@@ -57,28 +64,68 @@ class ManagedNode(models.Model):
     default_location_longitude = models.FloatField(null=True, blank=True)
 
     channel_0 = models.ForeignKey(
-        "constellations.MessageChannel", on_delete=models.CASCADE, null=True, blank=True, related_name="+"
+        "constellations.MessageChannel",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="+",
+        help_text=_("Meshtastic channel slot 0 (PSK-backed MessageChannel)."),
     )
     channel_1 = models.ForeignKey(
-        "constellations.MessageChannel", on_delete=models.CASCADE, null=True, blank=True, related_name="+"
+        "constellations.MessageChannel",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="+",
+        help_text=_("Meshtastic channel slot 1 (PSK-backed MessageChannel)."),
     )
     channel_2 = models.ForeignKey(
-        "constellations.MessageChannel", on_delete=models.CASCADE, null=True, blank=True, related_name="+"
+        "constellations.MessageChannel",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="+",
+        help_text=_("Meshtastic channel slot 2 (PSK-backed MessageChannel)."),
     )
     channel_3 = models.ForeignKey(
-        "constellations.MessageChannel", on_delete=models.CASCADE, null=True, blank=True, related_name="+"
+        "constellations.MessageChannel",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="+",
+        help_text=_("Meshtastic channel slot 3 (PSK-backed MessageChannel)."),
     )
     channel_4 = models.ForeignKey(
-        "constellations.MessageChannel", on_delete=models.CASCADE, null=True, blank=True, related_name="+"
+        "constellations.MessageChannel",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="+",
+        help_text=_("Meshtastic channel slot 4 (PSK-backed MessageChannel)."),
     )
     channel_5 = models.ForeignKey(
-        "constellations.MessageChannel", on_delete=models.CASCADE, null=True, blank=True, related_name="+"
+        "constellations.MessageChannel",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="+",
+        help_text=_("Meshtastic channel slot 5 (PSK-backed MessageChannel)."),
     )
     channel_6 = models.ForeignKey(
-        "constellations.MessageChannel", on_delete=models.CASCADE, null=True, blank=True, related_name="+"
+        "constellations.MessageChannel",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="+",
+        help_text=_("Meshtastic channel slot 6 (PSK-backed MessageChannel)."),
     )
     channel_7 = models.ForeignKey(
-        "constellations.MessageChannel", on_delete=models.CASCADE, null=True, blank=True, related_name="+"
+        "constellations.MessageChannel",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="+",
+        help_text=_("Meshtastic channel slot 7 (PSK-backed MessageChannel)."),
     )
 
     allow_auto_traceroute = models.BooleanField(
@@ -175,11 +222,28 @@ class WeatherUse(models.IntegerChoices):
 
 
 class ObservedNode(models.Model):
-    """Model representing a mesh network node."""
+    """Node observed on the mesh (Meshtastic today; MeshCore identity fields land in a later phase)."""
 
     internal_id = models.UUIDField(primary_key=True, null=False, default=uuid.uuid4, editable=False)
-    node_id = models.BigIntegerField(null=False, db_index=True)
-    node_id_str = models.CharField(null=False, blank=False, max_length=9, db_index=True)
+    protocol = models.PositiveSmallIntegerField(
+        choices=Protocol.choices,
+        default=Protocol.MESHTASTIC,
+        db_index=True,
+        help_text=_("Mesh protocol for this observed node."),
+    )
+    node_id = models.BigIntegerField(
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text=_("Meshtastic numeric node id when protocol is Meshtastic; null for MeshCore rows once supported."),
+    )
+    node_id_str = models.CharField(
+        null=False,
+        blank=False,
+        max_length=9,
+        db_index=True,
+        help_text=_("Meshtastic display id (!hex or ^all); MeshCore display ids arrive in a later phase."),
+    )
     mac_addr = models.CharField(max_length=20, null=True, blank=True)
     long_name = models.CharField(max_length=50)
     short_name = models.CharField(max_length=5)
@@ -220,6 +284,14 @@ class ObservedNode(models.Model):
 
         verbose_name = _("Observed node")
         verbose_name_plural = _("Observed nodes")
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(protocol=Protocol.MESHTASTIC, node_id__isnull=False) | models.Q(protocol=Protocol.MESHCORE)
+                ),
+                name="nodes_observednode_protocol_node_id",
+            ),
+        ]
 
     def __str__(self):
         """Return a string representation of the node, including user's short name if available."""
@@ -375,7 +447,11 @@ class NodeAuth(models.Model):
 
 
 class BaseNodeItem(models.Model):
-    """Base model for node items."""
+    """Shared time-series row keyed to an ``ObservedNode`` (Meshtastic data today).
+
+    Multi-protocol work will attach rows via the observed node's ``protocol`` and
+    later dual FKs where a single ``node`` FK is not enough; class names stay shared.
+    """
 
     node = models.ForeignKey(ObservedNode, on_delete=models.CASCADE)
     logged_time = models.DateTimeField(default=timezone.now)
@@ -396,7 +472,7 @@ class BaseNodeItem(models.Model):
 
 
 class Position(BaseNodeItem):
-    """Model representing a position report from a mesh node."""
+    """Position sample for an observed node (Meshtastic path today; shared table)."""
 
     latitude = models.FloatField(null=True, blank=True)
     longitude = models.FloatField(null=True, blank=True)
@@ -424,7 +500,7 @@ class Position(BaseNodeItem):
 
 
 class DeviceMetrics(BaseNodeItem):
-    """Model representing device metrics reported by a mesh node."""
+    """Device telemetry sample (Meshtastic path today; shared table)."""
 
     battery_level = models.FloatField(help_text="Battery level as a percentage")
     voltage = models.FloatField(help_text="Battery voltage in volts")

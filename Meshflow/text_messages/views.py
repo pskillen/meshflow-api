@@ -3,7 +3,7 @@ from django.db import models
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 
-from common.mesh_node_helpers import BROADCAST_ID
+from common.mesh_node_helpers import MESHTASTIC_BROADCAST_ID
 from nodes.models import ManagedNode, ObservedNode
 from packets.models import PacketObservation
 
@@ -30,7 +30,7 @@ class TextMessageViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(sender__node_id=int(sender_node_id))
 
         # filter out any DMs (i.e. recipient_node_id must be '^all')
-        queryset = queryset.filter(recipient_node_id=BROADCAST_ID)
+        queryset = queryset.filter(recipient_node_id=MESHTASTIC_BROADCAST_ID)
 
         # Prefetch observations and their observer for each original_packet
         observation_qs = PacketObservation.objects.select_related("observer")

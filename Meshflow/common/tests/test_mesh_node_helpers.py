@@ -1,6 +1,16 @@
 import pytest
 
-from common.mesh_node_helpers import BROADCAST_ID, meshtastic_hex_to_int, meshtastic_id_to_hex, parse_b64_mac_address
+from common.mesh_node_helpers import (
+    BROADCAST_ID,
+    MESHTASTIC_BROADCAST_ID,
+    meshtastic_hex_to_int,
+    meshtastic_id_to_hex,
+    parse_b64_mac_address,
+)
+
+
+def test_broadcast_id_deprecated_alias_matches_meshtastic_broadcast():
+    assert BROADCAST_ID == MESHTASTIC_BROADCAST_ID
 
 
 def test_meshtastic_id_to_hex():
@@ -9,7 +19,7 @@ def test_meshtastic_id_to_hex():
     assert meshtastic_id_to_hex(0x12345678) == "!12345678"
 
     # Test broadcast ID
-    assert meshtastic_id_to_hex(BROADCAST_ID) == "^all"
+    assert meshtastic_id_to_hex(MESHTASTIC_BROADCAST_ID) == "^all"
 
     # Test zero ID
     assert meshtastic_id_to_hex(0) == "!00000000"
@@ -21,7 +31,7 @@ def test_meshtastic_hex_to_int():
     assert meshtastic_hex_to_int("!12345678") == 0x12345678
 
     # Test broadcast ID
-    assert meshtastic_hex_to_int("^all") == BROADCAST_ID
+    assert meshtastic_hex_to_int("^all") == MESHTASTIC_BROADCAST_ID
 
     # Test zero ID
     assert meshtastic_hex_to_int("!00000000") == 0
