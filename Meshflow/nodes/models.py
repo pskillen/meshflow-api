@@ -222,7 +222,7 @@ class WeatherUse(models.IntegerChoices):
 
 
 class ObservedNode(models.Model):
-    """Node observed on the mesh (Meshtastic today; MeshCore identity fields land in a later phase)."""
+    """Node observed on the mesh (Meshtastic or MeshCore)."""
 
     internal_id = models.UUIDField(primary_key=True, null=False, default=uuid.uuid4, editable=False)
     protocol = models.PositiveSmallIntegerField(
@@ -235,14 +235,28 @@ class ObservedNode(models.Model):
         null=True,
         blank=True,
         db_index=True,
-        help_text=_("Meshtastic numeric node id when protocol is Meshtastic; null for MeshCore rows once supported."),
+        help_text=_("Meshtastic numeric node id when protocol is Meshtastic; null for MeshCore."),
     )
     node_id_str = models.CharField(
         null=False,
         blank=False,
-        max_length=9,
+        max_length=16,
         db_index=True,
-        help_text=_("Meshtastic display id (!hex or ^all); MeshCore display ids arrive in a later phase."),
+        help_text=_("Display id: !hex8 (Meshtastic) or mc:prefix12 (MeshCore)."),
+    )
+    mc_pubkey = models.CharField(
+        max_length=64,
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text=_("MeshCore Ed25519 public key (64 hex chars) when known."),
+    )
+    mc_pubkey_prefix = models.CharField(
+        max_length=12,
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text=_("MeshCore 6-byte pubkey prefix (12 hex chars); from contact_message or derived from full key."),
     )
     mac_addr = models.CharField(max_length=20, null=True, blank=True)
     long_name = models.CharField(max_length=50)
@@ -287,9 +301,18 @@ class ObservedNode(models.Model):
         constraints = [
             models.CheckConstraint(
                 condition=(
-                    models.Q(protocol=Protocol.MESHTASTIC, node_id__isnull=False) | models.Q(protocol=Protocol.MESHCORE)
+                    models.Q(protocol=Protocol.MESHTASTIC, node_id__isnull=False)
+                    | (
+                        models.Q(protocol=Protocol.MESHCORE)
+                        & (models.Q(mc_pubkey__isnull=False) | models.Q(mc_pubkey_prefix__isnull=False))
+                    )
                 ),
-                name="nodes_observednode_protocol_node_id",
+                name="nodes_observednode_protocol_identity",
+            ),
+            models.UniqueConstraint(
+                fields=["mc_pubkey"],
+                condition=models.Q(protocol=Protocol.MESHCORE, mc_pubkey__isnull=False),
+                name="nodes_observednode_mc_pubkey_unique",
             ),
         ]
 
