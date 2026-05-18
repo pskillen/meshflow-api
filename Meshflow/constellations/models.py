@@ -1,16 +1,25 @@
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
+from common.protocol import Protocol
 from users.models import User
 
 
 class Constellation(models.Model):
+    """Regional grouping; single protocol per constellation (Meshtastic today)."""
+
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True)
     created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name="created_constellations")
     map_color = models.CharField(max_length=7, default="#000000")
     bot_default_ignore_portnums = models.CharField(max_length=255, blank=True)
     bot_default_hop_limit = models.PositiveSmallIntegerField(null=True, blank=True)
+    protocol = models.PositiveSmallIntegerField(
+        choices=Protocol.choices,
+        default=Protocol.MESHTASTIC,
+        db_index=True,
+        help_text=_("Mesh protocol for this constellation and its channels."),
+    )
 
     class Meta:
         verbose_name = _("Constellation")
@@ -42,8 +51,21 @@ class ConstellationUserMembership(models.Model):
 
 
 class MessageChannel(models.Model):
+    """Message channel within a constellation (protocol-specific PSK/name; see ADR-0002)."""
+
     name = models.CharField(max_length=100)
     constellation = models.ForeignKey(Constellation, on_delete=models.CASCADE)
+    protocol = models.PositiveSmallIntegerField(
+        choices=Protocol.choices,
+        default=Protocol.MESHTASTIC,
+        db_index=True,
+        help_text=_("Mesh protocol for this channel row."),
+    )
+    mc_channel_idx = models.PositiveSmallIntegerField(
+        null=True,
+        blank=True,
+        help_text=_("MeshCore channel index when protocol is MeshCore; null for Meshtastic."),
+    )
 
     class Meta:
         verbose_name = _("Message channel")
