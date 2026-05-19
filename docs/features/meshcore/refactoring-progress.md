@@ -8,7 +8,7 @@ Living tracker for the [rename audit index](file:///Users/patricks/IdeaProjects/
 
 **Convention**
 
-- Status: `not_started` | `in_progress` | `merged` | `deferred`
+- Status: `not_started` | `in_progress` | `merged` | `deferred` | `skipped`
 - Link the GitHub issue when filed; link the PR when opened.
 - After merge, set status to `merged` and note the merge commit or PR number.
 
@@ -21,8 +21,8 @@ Living tracker for the [rename audit index](file:///Users/patricks/IdeaProjects/
 | SP-01 | OpenAPI contract docs | api | 1 | merged | [#308](https://github.com/pskillen/meshflow-api/issues/308) | [#320](https://github.com/pskillen/meshflow-api/pull/320) |
 | SP-02 | Comment-only labelling | api, bot, ui | 1–3 | merged | [#309](https://github.com/pskillen/meshflow-api/issues/309) | [#321](https://github.com/pskillen/meshflow-api/pull/321) · [bot#96](https://github.com/pskillen/meshflow-bot/pull/96) · [ui#267](https://github.com/pskillen/meshflow-ui/pull/267) |
 | SP-03 | `node_id` → `meshtastic_node_id` | api, bot, ui | 1 (coordinated) | merged | [#310](https://github.com/pskillen/meshflow-api/issues/310) | [#322](https://github.com/pskillen/meshflow-api/pull/322) · [ui#268](https://github.com/pskillen/meshflow-ui/pull/268) |
-| SP-04 | ObservedNode MT identity fields | api, ui | 1 | in_progress | [#312](https://github.com/pskillen/meshflow-api/issues/312) | |
-| SP-05 | MtRawPacket wire + observations | api | 1 | not_started | [#311](https://github.com/pskillen/meshflow-api/issues/311) | |
+| SP-04 | ObservedNode MT identity fields | api, ui | 1 | in_progress | [#312](https://github.com/pskillen/meshflow-api/issues/312) | [#323](https://github.com/pskillen/meshflow-api/pull/323) · [ui#270](https://github.com/pskillen/meshflow-ui/pull/270) |
+| SP-05 | MtRawPacket wire + observations | api | — | skipped | [#311](https://github.com/pskillen/meshflow-api/issues/311) | — |
 | SP-06 | ManagedNode channels + constellation bot defaults | api, ui | 1 | not_started | [#313](https://github.com/pskillen/meshflow-api/issues/313) | |
 | SP-07 | TextMessage MT fields | api, ui | 1 | not_started | [#314](https://github.com/pskillen/meshflow-api/issues/314) | |
 | SP-08 | NodeLatestStatus / metrics MT columns | api | 1 | not_started | [#315](https://github.com/pskillen/meshflow-api/issues/315) | |
@@ -77,15 +77,17 @@ Parent index: [meshcore-rename-index](file:///Users/patricks/IdeaProjects/MeshFl
 - **Merged:** —
 - **Branch:** `api-312/pskillen/meshcore-rename-sp04-observed-node-mt` (api, ui)
 - **Delivered:**
-  - **api:** `RenameField` migration `0039_rename_observednode_meshtastic_identity_fields` (`hw_model` → `meshtastic_hw_model`, `public_key` → `meshtastic_public_key`, `role` → `meshtastic_role`, `is_licensed` → `meshtastic_is_licensed`, `is_unmessagable` → `meshtastic_is_unmessagable`); model, `ObservedNodeSerializer`, admin, infrastructure filter (`meshtastic_role__in`), mesh monitoring eligibility/summary; `NodeInfoPacketService` copies packet fields onto `meshtastic_*`; `NodeSerializer` uses `meshtastic_*` in API with legacy `hw_model` / `public_key` accepted on ingest (bot unchanged); `openapi.yaml` `ObservedNode`, `ObservedNodeSearch`, `ObservedNodeUpdate`; unit + integration test JSON keys
-  - **ui:** `ObservedNode` type and components (`NodeDetailContent`, `NodeCard`, maps, `meshtastic.ts`, `my-nodes-grouping`); test fixtures
-- **Out of scope (unchanged):** `NodeInfoPacket` columns; NODEINFO wire JSON; bot `MeshNodeSerializer` still sends `hw_model` / `public_key` (API aliases in `NodeSerializer.to_internal_value`); `node_id_str` → `display_id`; `mac_addr`
-- **Notes:** Deploy api before or with ui. `meshtastic_hw_model` has no `help_text` yet (SP-02 carry-over). MeshCore ingest does not set these fields.
+  - **api ([#323](https://github.com/pskillen/meshflow-api/pull/323)):** `RenameField` migration `0039_rename_observednode_meshtastic_identity_fields`; model, `ObservedNodeSerializer`, admin, infrastructure filter (`meshtastic_role__in`), mesh monitoring eligibility/summary; `NodeInfoPacketService` copies `NodeInfoPacket.*` onto `ObservedNode.meshtastic_*`; `NodeSerializer` (feeder upsert) exposes `meshtastic_*` in responses and accepts legacy `hw_model` / `public_key` on request; `openapi.yaml` `ObservedNode`, `ObservedNodeSearch`, `ObservedNodeUpdate`; unit + integration test JSON keys; follow-up `8488fae` — `create_observed_node` legacy kwargs + two mesh_monitoring tests
+  - **ui ([#270](https://github.com/pskillen/meshflow-ui/pull/270)):** `ObservedNode` type and components; test fixtures (incl. `coverageHeardGhosts.test.ts`)
+- **Out of scope (unchanged):** `NodeInfoPacket` / `MtRawPacket` columns and NODEINFO ingest wire JSON (SP-05 skipped — models are Meshtastic-specific); bot `MeshNodeSerializer.to_api_dict` still sends `hw_model` / `public_key`; `node_id_str` → `display_id` (comment-only defer); optional later `mac_addr` → `meshtastic_mac_addr`
+- **Notes:** Deploy api before or with ui. MeshCore ingest does not set `meshtastic_*` identity fields. Feeder upsert wire shape still uses `id` / `macaddr` / nested `user` (not the same as `ObservedNodeUpdate` schema keys).
 
 ### SP-05 — Packet wire fields
 
 - **Merged:** —
-- **Notes:**
+- **Skipped:** 2026-05-19 — [#311](https://github.com/pskillen/meshflow-api/issues/311) closed without implementation
+- **Rationale:** `MtRawPacket`, `NodeInfoPacket`, and related ingest serializers already live on Meshtastic-only models/tables; column names (`hw_model`, `from_int`, `port_num`, etc.) describe Meshtastic wire semantics and do not need a `meshtastic_` prefix. SP-04 copies `NodeInfoPacket` → `ObservedNode.meshtastic_*` at the domain boundary. Stored traceroute hop JSON and NODEINFO camelCase ingest payloads stay unchanged.
+- **Plan:** [meshcore-rename-sp05-packet-wire.plan.md](file:///Users/patricks/IdeaProjects/MeshFlow/.cursor/plans/meshcore-rename-sp05-packet-wire.plan.md) (not executed)
 
 ### SP-06 — Channels + constellation
 
@@ -123,16 +125,33 @@ Parent index: [meshcore-rename-index](file:///Users/patricks/IdeaProjects/MeshFl
 
 _Capture follow-ups so they are not lost between sub-plans. Remove or strike through items when resolved._
 
+### SP-05 / #311 (skipped)
+
+- [x] Close [#311](https://github.com/pskillen/meshflow-api/issues/311) — no `RenameField` on `MtRawPacket` / `NodeInfoPacket` / `PacketObservation`; keep ingest wire JSON as documented in OpenAPI NODEINFO schemas.
+- [ ] **Rename index plan** — optional: mark SP-05 `skipped` in `IdeaProjects/MeshFlow/.cursor/plans/meshcore-rename-index.plan.md` (Cursor plans repo, not meshflow-api).
+
+### SP-04 / #312 (in progress — carry-overs)
+
+- [ ] Merge [#323](https://github.com/pskillen/meshflow-api/pull/323) and [ui#270](https://github.com/pskillen/meshflow-ui/pull/270); set SP-04 to `merged`.
+- [ ] **`tests/integration/`** — assertions updated for `meshtastic_*` JSON keys; re-run against deployed API with migration `0039` applied (`pytest tests/integration/ -v`).
+- [ ] **`meshtastic_hw_model` help_text** — field has no `help_text` (SP-02 gap); optional `nodes/0040` `AlterField` only.
+- [ ] **`meshtastic_is_licensed` / `meshtastic_is_unmessagable` help_text** — still bare booleans on the model; optional labelling migration.
+- [ ] **Bot node upsert** — `MeshNodeSerializer` still POSTs `hw_model` / `public_key`; API accepts via `NodeSerializer.to_internal_value` alias until SP-10 or a bot PR. Responses from upsert now return `meshtastic_*`.
+- [ ] **External JSON consumers** — anything reading observed-node list/detail JSON for `hw_model`, `role`, `public_key`, `is_licensed`, `is_unmessagable` must switch to `meshtastic_*` (UI done in #270; bot ingest path unchanged).
+- [ ] **Test factories** — `create_observed_node` accepts legacy kwargs `role`, `hw_model`, `public_key`, `is_licensed`, `is_unmessagable` as aliases (like SP-03 `node_id`); prefer `meshtastic_*` in new tests. CI initially missed `role=` in two mesh_monitoring tests — grep for old names when closing rename sub-plans.
+- [ ] **OpenAPI prose** — `/nodes/observed-nodes/infrastructure/` description still says “whose role is infrastructure” (human text; filter is `meshtastic_role__in`). Optional tweak to “Meshtastic role”.
+- [ ] **`POST /packets/{node_id}/nodes/`** — OpenAPI may not document legacy request keys `hw_model` / `public_key` on feeder upsert (behaviour: accepted, not returned).
+
 ### SP-03 / #310 (done — carry-overs)
 
 - [x] Merge [#322](https://github.com/pskillen/meshflow-api/pull/322) and [ui#268](https://github.com/pskillen/meshflow-ui/pull/268); set SP-03 to `merged`.
 - [ ] **`tests/integration/`** — `tests/integration/test_node_lifecycle.py` and related files updated for `meshtastic_node_id` in JSON; re-run against a deployed API with migration `0037` applied (`pytest tests/integration/ -v`).
 - [ ] **URL path names unchanged** — OpenAPI path params still named `node_id` on `/nodes/observed-nodes/{node_id}/`, `/packets/{node_id}/ingest/`, `/stats/nodes/{node_id}/*`, etc.; only response/request **body** fields renamed. Optional later epic: rename path param to `meshtastic_node_id` (Django kwarg can stay `node_id` via `lookup_url_kwarg`).
 - [ ] **Bulk / admin request keys** — `APIKeyViewSet.add_node` and device/environment metrics bulk may still accept `node_id` / `node_ids` in request bodies (intentional for feeder nodenums); confirm OpenAPI documents `meshtastic_node_id` vs legacy names consistently.
-- [ ] **Stored traceroute wire JSON** — `AutoTraceRoute.route` / `route_back` hop arrays still use Meshtastic wire key `node_id`; enriched API fields (`route_nodes`, heatmap nodes, etc.) use `meshtastic_node_id`. Do not rename wire JSON without SP-05.
+- [ ] **Stored traceroute wire JSON** — `AutoTraceRoute.route` / `route_back` hop arrays still use Meshtastic wire key `node_id`; enriched API fields (`route_nodes`, heatmap nodes, etc.) use `meshtastic_node_id`. Intentionally unchanged (SP-05 skipped).
 - [ ] **`NodeInfoPacket.node_id`** — packet model hex id field unchanged (not `ObservedNode`).
 - [ ] **`Position.node_id` FK** — Django FK column on `Position` still named `node_id` (points at `ObservedNode.internal_id`); only ORM joins on numeric id use `node__meshtastic_node_id`.
-- [ ] **Test factories** — `create_observed_node` / `create_managed_node` accept legacy kwarg `node_id` as alias for `meshtastic_node_id` (conftest); new tests should prefer `meshtastic_node_id`.
+- [ ] **Test factories** — `create_observed_node` / `create_managed_node` accept legacy kwarg `node_id` as alias for `meshtastic_node_id` (conftest); SP-04 adds aliases for `role`, `hw_model`, `public_key`, `is_licensed`, `is_unmessagable` → `meshtastic_*`. New tests should prefer `meshtastic_*` names.
 - [ ] **Migration numbering on `main`** — SP-02 landed `nodes/0037` help_text alters on some branches; SP-03 adds `0037_rename_node_id_meshtastic_node_id` + `0038` help_text. After both merge, verify single linear chain on `main` (no duplicate `0037` filenames).
 - [ ] **External clients** — any scripts, Grafana, or third-party consumers of observed/managed node JSON still sending/reading `node_id` need updating (bot unchanged; UI done in #268).
 - [ ] **meshflow-ui nav parity** — separate from SP-03: [ui#269](https://github.com/pskillen/meshflow-ui/issues/269) (Meshtastic/MeshCore sidebar sections, shared map/list).
