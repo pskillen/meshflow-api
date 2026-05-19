@@ -27,7 +27,7 @@ class LocationSource(models.IntegerChoices):
 class RoleSource(models.IntegerChoices):
     """Meshtastic ``Config.DeviceConfig.Role`` values (protobuf).
 
-    Stored on ``ObservedNode.role`` for Meshtastic nodes; null for MeshCore observed nodes.
+    Stored on ``ObservedNode.meshtastic_role`` for Meshtastic nodes; null for MeshCore observed nodes.
     """
 
     # Updated per https://github.com/meshtastic/protobufs/blob/master/meshtastic/config.proto
@@ -280,21 +280,21 @@ class ObservedNode(models.Model):
         help_text=_("Display name (short); populated for both Meshtastic and MeshCore from ingest."),
     )
 
-    hw_model = models.CharField(max_length=50, null=True, blank=True)
-    public_key = models.CharField(
+    meshtastic_hw_model = models.CharField(max_length=50, null=True, blank=True)
+    meshtastic_public_key = models.CharField(
         max_length=64,
         null=True,
         blank=True,
         help_text=_("Meshtastic device public key (PKI hex); null for MeshCore."),
     )
-    role = models.IntegerField(
+    meshtastic_role = models.IntegerField(
         choices=RoleSource.choices,
         null=True,
         blank=True,
         help_text=_("Meshtastic role (RoleSource); null for MeshCore."),
     )
-    is_licensed = models.BooleanField(null=True, blank=True)
-    is_unmessagable = models.BooleanField(null=True, blank=True)
+    meshtastic_is_licensed = models.BooleanField(null=True, blank=True)
+    meshtastic_is_unmessagable = models.BooleanField(null=True, blank=True)
 
     environment_exposure = models.IntegerField(
         choices=EnvironmentExposure.choices,

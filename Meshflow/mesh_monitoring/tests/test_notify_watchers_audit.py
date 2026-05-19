@@ -79,7 +79,7 @@ def test_verification_started_writes_sent_and_skipped_audits(create_user, create
     obs = create_observed_node(
         meshtastic_node_id=0x40404040,
         node_id_str=meshtastic_id_to_hex(0x40404040),
-        role=RoleSource.ROUTER,
+        meshtastic_role=RoleSource.ROUTER,
     )
     create_watch_with_offline_threshold(user=u_send, observed_node=obs, offline_after=60)
     create_watch_with_offline_threshold(user=u_skip, observed_node=obs, offline_after=60)

@@ -1300,8 +1300,8 @@ class NodeSerializer(serializers.ModelSerializer):
     id = serializers.IntegerField(source="meshtastic_node_id")
     id_str = serializers.CharField(source="node_id_str")
     macaddr = serializers.CharField(source="mac_addr", allow_null=True, allow_blank=True)
-    hw_model = serializers.CharField(required=False, allow_null=True, allow_blank=True)
-    public_key = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    meshtastic_hw_model = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    meshtastic_public_key = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     user = UserSerializer(required=False)
     position = PositionSerializer(required=False, allow_null=True)
     device_metrics = DeviceMetricsSerializer(required=False, allow_null=True)
@@ -1312,8 +1312,8 @@ class NodeSerializer(serializers.ModelSerializer):
             "id",
             "id_str",
             "macaddr",
-            "hw_model",
-            "public_key",
+            "meshtastic_hw_model",
+            "meshtastic_public_key",
             "user",
             "position",
             "device_metrics",
@@ -1324,6 +1324,11 @@ class NodeSerializer(serializers.ModelSerializer):
 
     def to_internal_value(self, data):
         """Convert the incoming data to the appropriate format."""
+        data = dict(data)
+        if "hw_model" in data and "meshtastic_hw_model" not in data:
+            data["meshtastic_hw_model"] = data.pop("hw_model")
+        if "public_key" in data and "meshtastic_public_key" not in data:
+            data["meshtastic_public_key"] = data.pop("public_key")
 
         # Some clients _may_ send the node_id as a string, so we need to convert it to an integer
         if "id" in data:

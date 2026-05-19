@@ -111,7 +111,7 @@ def test_monitoring_config_patch_forbidden_for_non_owner(api_client, create_user
 @pytest.mark.django_db
 def test_watch_infrastructure_node_any_user(api_client, create_user, create_observed_node):
     user = create_user()
-    obs = create_observed_node(role=INFRASTRUCTURE_ROLES[0], claimed_by=None)
+    obs = create_observed_node(meshtastic_role=INFRASTRUCTURE_ROLES[0], claimed_by=None)
     api_client.force_authenticate(user=user)
     r = api_client.post(
         "/api/monitoring/watches/",
@@ -124,7 +124,7 @@ def test_watch_infrastructure_node_any_user(api_client, create_user, create_obse
 @pytest.mark.django_db
 def test_watch_reject_ineligible_node(api_client, create_user, create_observed_node):
     user = create_user()
-    obs = create_observed_node(role=RoleSource.CLIENT, claimed_by=None)
+    obs = create_observed_node(meshtastic_role=RoleSource.CLIENT, claimed_by=None)
     api_client.force_authenticate(user=user)
     r = api_client.post(
         "/api/monitoring/watches/",

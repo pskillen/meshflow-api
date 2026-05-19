@@ -621,13 +621,13 @@ class ObservedNodeAdmin(admin.ModelAdmin):
         "meshtastic_node_id",
         "node_id_str",
         "mc_pubkey_prefix",
-        "hw_model",
+        "meshtastic_hw_model",
         "get_inferred_max_hops",
         "last_heard",
         "environment_exposure",
         "weather_use",
         "claimed_by",
-        "role",
+        "meshtastic_role",
     )
 
     def get_inferred_max_hops(self, obj):
@@ -637,11 +637,11 @@ class ObservedNodeAdmin(admin.ModelAdmin):
     list_filter = (
         ProtocolListFilter,
         MeshCoreObservedIdentityFilter,
-        "hw_model",
+        "meshtastic_hw_model",
         "environment_exposure",
         "weather_use",
         "claimed_by",
-        "role",
+        "meshtastic_role",
         ("last_heard", admin.EmptyFieldListFilter),
     )
     search_fields = (
@@ -652,8 +652,8 @@ class ObservedNodeAdmin(admin.ModelAdmin):
         "mc_pubkey",
         "mc_pubkey_prefix",
         "mac_addr",
-        "hw_model",
-        "public_key",
+        "meshtastic_hw_model",
+        "meshtastic_public_key",
         "claimed_by__username",
     )
     readonly_fields = (
@@ -662,8 +662,8 @@ class ObservedNodeAdmin(admin.ModelAdmin):
         "meshtastic_node_id",
         "node_id_str",
         "mac_addr",
-        "public_key",
-        "role",
+        "meshtastic_public_key",
+        "meshtastic_role",
         "last_heard",
     )
 
@@ -681,14 +681,14 @@ class ObservedNodeAdmin(admin.ModelAdmin):
             "environment_exposure",
             "weather_use",
             "claimed_by",
-            "role",
+            "meshtastic_role",
         ]
         if obj and obj.protocol == Protocol.MESHCORE:
             return common + ["mc_pubkey", "mc_pubkey_prefix"]
         return common + [
             "mac_addr",
-            "hw_model",
-            "public_key",
+            "meshtastic_hw_model",
+            "meshtastic_public_key",
         ]
 
 

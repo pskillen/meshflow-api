@@ -113,9 +113,9 @@ def test_node_info_updates_inferred_node(api_client):
     node_data = node_resp.json()
     assert node_data["long_name"] == user["longName"]
     assert node_data["short_name"] == user["shortName"]
-    assert node_data["hw_model"] == user["hwModel"]
-    assert node_data["role"] is not None
-    assert node_data.get("public_key") == user.get("publicKey")
+    assert node_data["meshtastic_hw_model"] == user["hwModel"]
+    assert node_data["meshtastic_role"] is not None
+    assert node_data.get("meshtastic_public_key") == user.get("publicKey")
 
 
 def test_node_id_str_inferred_from_from_int(api_client):

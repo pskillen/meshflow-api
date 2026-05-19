@@ -20,7 +20,7 @@ def api_client():
 @pytest.mark.django_db
 def test_battery_alert_confirms_after_n_low_reports(create_user, create_observed_node):
     user = create_user()
-    obs = create_observed_node(claimed_by=user, role=INFRASTRUCTURE_ROLES[0])
+    obs = create_observed_node(claimed_by=user, meshtastic_role=INFRASTRUCTURE_ROLES[0])
     NodeWatch.objects.create(user=user, observed_node=obs, enabled=True, battery_notifications_enabled=True)
     NodeMonitoringConfig.objects.create(
         observed_node=obs,
@@ -60,7 +60,7 @@ def test_battery_recovery_clears_streak(create_user, create_observed_node):
 @pytest.mark.django_db
 def test_monitoring_alerts_summary_mesh_infra(api_client, create_user, create_observed_node):
     user = create_user()
-    obs = create_observed_node(role=INFRASTRUCTURE_ROLES[0], claimed_by=None)
+    obs = create_observed_node(meshtastic_role=INFRASTRUCTURE_ROLES[0], claimed_by=None)
     NodePresence.objects.create(observed_node=obs, is_offline=True, offline_confirmed_at=timezone.now())
 
     api_client.force_authenticate(user=user)

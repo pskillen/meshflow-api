@@ -1041,27 +1041,27 @@ components:
           type: string
           description: Display name (short); shared across Meshtastic and MeshCore ingest
           nullable: true
-        hw_model:
+        meshtastic_hw_model:
           type: string
-          description: The hardware model of the node
+          description: Meshtastic hardware model; null for MeshCore
           nullable: true
-        public_key:
+        meshtastic_public_key:
           type: string
           description: Meshtastic device public key (PKI hex); null for MeshCore
           nullable: true
-        role:
+        meshtastic_role:
           type: integer
           description: >
             Meshtastic Config.DeviceConfig.Role integer (RoleSource enum, e.g. CLIENT, ROUTER);
             null for MeshCore.
           nullable: true
-        is_licensed:
+        meshtastic_is_licensed:
           type: boolean
-          description: Whether the node operator is a licensed ham radio operator
+          description: Whether the Meshtastic node operator is a licensed ham radio operator
           nullable: true
-        is_unmessagable:
+        meshtastic_is_unmessagable:
           type: boolean
-          description: Whether the node can receive messages
+          description: Whether the Meshtastic node can receive messages
           nullable: true
         last_heard:
           type: string
@@ -1480,9 +1480,9 @@ components:
           type: string
           description: The short name of the node
           nullable: true
-        public_key:
+        meshtastic_public_key:
           type: string
-          description: The public key of the node
+          description: Meshtastic device public key (PKI hex); null for MeshCore
           nullable: true
         last_heard:
           type: string
@@ -1638,14 +1638,14 @@ components:
         macaddr:
           type: string
           description: The MAC address of the node
-        hw_model:
+        meshtastic_hw_model:
           type: string
           nullable: true
-          description: The hardware model of the node
-        public_key:
+          description: Meshtastic hardware model
+        meshtastic_public_key:
           type: string
           nullable: true
-          description: The public key of the node
+          description: Meshtastic device public key (PKI hex)
         last_heard:
           type: string
           format: date-time
