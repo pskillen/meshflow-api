@@ -291,8 +291,8 @@ def _managed_node_json_payload(*, meshtastic_node_id, owner, constellation, ch0,
         "name": "Test MN",
         "owner_id": owner.id,
         "constellation_id": constellation.id,
-        "channel_0": ch0.id,
-        "channel_1": ch1.id,
+        "meshtastic_channel_0": ch0.id,
+        "meshtastic_channel_1": ch1.id,
     }
 
 
@@ -311,8 +311,8 @@ def test_managed_node_soft_delete_owner_removes_node_auth_and_excludes_from_list
         owner=owner,
         constellation=constellation,
         meshtastic_node_id=node_id,
-        channel_0=ch0,
-        channel_1=ch1,
+        meshtastic_channel_0=ch0,
+        meshtastic_channel_1=ch1,
     )
     api_key = create_node_api_key(owner=owner, constellation=constellation)
     NodeAuth.objects.create(api_key=api_key, node=mn)
@@ -348,8 +348,8 @@ def test_managed_node_soft_delete_staff(create_user, create_constellation, creat
         owner=owner,
         constellation=constellation,
         meshtastic_node_id=777001002,
-        channel_0=ch0,
-        channel_1=ch1,
+        meshtastic_channel_0=ch0,
+        meshtastic_channel_1=ch1,
     )
     api_key = create_node_api_key(owner=owner, constellation=constellation)
     NodeAuth.objects.create(api_key=api_key, node=mn)
@@ -375,8 +375,8 @@ def test_managed_node_delete_forbidden_for_non_owner_non_staff(create_user, crea
         owner=owner,
         constellation=constellation,
         meshtastic_node_id=777001003,
-        channel_0=ch0,
-        channel_1=ch1,
+        meshtastic_channel_0=ch0,
+        meshtastic_channel_1=ch1,
     )
 
     client = APIClient()
@@ -402,8 +402,8 @@ def test_managed_node_create_rejected_when_soft_deleted_row_exists(
         owner=owner,
         constellation=constellation,
         meshtastic_node_id=node_id,
-        channel_0=ch0,
-        channel_1=ch1,
+        meshtastic_channel_0=ch0,
+        meshtastic_channel_1=ch1,
     )
     mn.deleted_at = timezone.now()
     mn.save(update_fields=["deleted_at"])
@@ -434,8 +434,8 @@ def test_managed_node_create_rejected_when_active_row_exists(create_user, create
         owner=owner,
         constellation=constellation,
         meshtastic_node_id=node_id,
-        channel_0=ch0,
-        channel_1=ch1,
+        meshtastic_channel_0=ch0,
+        meshtastic_channel_1=ch1,
     )
 
     client = APIClient()

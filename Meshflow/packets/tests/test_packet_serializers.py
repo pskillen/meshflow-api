@@ -202,8 +202,8 @@ class MessagePacketSerializerTest(BasePacketSerializerTestCase):
             name="Test Channel",
             constellation=self.observer.constellation,
         )
-        # Assign to observer's channel_0
-        self.observer.channel_0 = message_channel
+        # Assign to observer's meshtastic_channel_0
+        self.observer.meshtastic_channel_0 = message_channel
         self.observer.save()
 
         data = {

@@ -988,11 +988,11 @@ components:
         protocol:
           $ref: '#/components/schemas/MeshProtocol'
           description: Mesh protocol for this constellation and its channels
-        bot_default_ignore_portnums:
+        bot_default_ignore_meshtastic_portnums:
           type: string
           nullable: true
           description: Comma-separated portnums for IGNORE_PORTNUMS env var in generated docker-compose
-        bot_default_hop_limit:
+        bot_default_meshtastic_hop_limit:
           type: integer
           nullable: true
           minimum: 1
@@ -1518,11 +1518,11 @@ components:
         protocol:
           $ref: '#/components/schemas/MeshProtocol'
           description: Mesh protocol for this constellation
-        bot_default_ignore_portnums:
+        bot_default_ignore_meshtastic_portnums:
           type: string
           nullable: true
           description: Comma-separated portnums for IGNORE_PORTNUMS env var
-        bot_default_hop_limit:
+        bot_default_meshtastic_hop_limit:
           type: integer
           nullable: true
           minimum: 1
@@ -1729,11 +1729,11 @@ components:
             protocol:
               $ref: '#/components/schemas/MeshProtocol'
               description: Mesh protocol for this constellation
-            bot_default_ignore_portnums:
+            bot_default_ignore_meshtastic_portnums:
               type: string
               nullable: true
               description: Comma-separated portnums for IGNORE_PORTNUMS env var
-            bot_default_hop_limit:
+            bot_default_meshtastic_hop_limit:
               type: integer
               nullable: true
               minimum: 1
@@ -1813,21 +1813,21 @@ components:
         - type: object
           description: A managed node that is owned by the current user
           properties:
-            channel_0:
+            meshtastic_channel_0:
               $ref: '#/components/schemas/MessageChannel'
-            channel_1:
+            meshtastic_channel_1:
               $ref: '#/components/schemas/MessageChannel'
-            channel_2:
+            meshtastic_channel_2:
               $ref: '#/components/schemas/MessageChannel'
-            channel_3:
+            meshtastic_channel_3:
               $ref: '#/components/schemas/MessageChannel'
-            channel_4:
+            meshtastic_channel_4:
               $ref: '#/components/schemas/MessageChannel'
-            channel_5:
+            meshtastic_channel_5:
               $ref: '#/components/schemas/MessageChannel'
-            channel_6:
+            meshtastic_channel_6:
               $ref: '#/components/schemas/MessageChannel'
-            channel_7:
+            meshtastic_channel_7:
               $ref: '#/components/schemas/MessageChannel'
 
     PaginatedResponse:
@@ -4962,7 +4962,7 @@ paths:
       summary: Get managed node details
       description: >-
         Returns full details. If the current user is the node owner or staff, the response includes
-        OwnedManagedNode fields (e.g. channel_0–channel_7 as nested MessageChannel). Other authenticated users receive ManagedNodeRead without channel mappings.
+        OwnedManagedNode fields (e.g. meshtastic_channel_0–meshtastic_channel_7 as nested MessageChannel). Other authenticated users receive ManagedNodeRead without channel mappings.
       tags: [Nodes]
       security:
         - BearerAuth: []
@@ -5022,7 +5022,7 @@ paths:
     patch:
       summary: Partially update managed node
       description: >-
-        Owner or staff only. Typical body fields include channel_0–channel_7 (nullable MessageChannel IDs),
+        Owner or staff only. Typical body fields include meshtastic_channel_0–meshtastic_channel_7 (nullable MessageChannel IDs),
         name, allow_auto_traceroute, default location via position, etc. Non-owners receive 403.
       tags: [Nodes]
       security:
@@ -5041,7 +5041,7 @@ paths:
               type: object
               additionalProperties: true
               description: >-
-                Any subset of OwnedManagedNode writable fields (e.g. channel_0–channel_7 as integer IDs or null).
+                Any subset of OwnedManagedNode writable fields (e.g. meshtastic_channel_0–meshtastic_channel_7 as integer IDs or null).
       responses:
         '200':
           description: Updated managed node

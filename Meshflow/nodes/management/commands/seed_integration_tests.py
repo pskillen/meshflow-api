@@ -88,8 +88,8 @@ class Command(BaseCommand):
                 "owner": user,
                 "constellation": constellation,
                 "name": "Integration Test Observer",
-                "channel_0": ch0,
-                "channel_1": ch1,
+                "meshtastic_channel_0": ch0,
+                "meshtastic_channel_1": ch1,
                 "allow_auto_traceroute": True,
             },
         )
@@ -107,8 +107,8 @@ class Command(BaseCommand):
                 "owner": user,
                 "constellation": constellation,
                 "name": "Integration Test Observer 2",
-                "channel_0": ch0,
-                "channel_1": ch1,
+                "meshtastic_channel_0": ch0,
+                "meshtastic_channel_1": ch1,
                 "allow_auto_traceroute": True,
             },
         )

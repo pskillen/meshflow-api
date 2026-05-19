@@ -20,20 +20,20 @@ def test_managed_node_patch_channels_owner_success(create_user, create_constella
     node = create_managed_node(
         owner=owner,
         constellation=constellation,
-        channel_0=None,
-        channel_1=None,
+        meshtastic_channel_0=None,
+        meshtastic_channel_1=None,
     )
 
     client = APIClient()
     client.force_authenticate(user=owner)
     url = reverse("managed-nodes-detail", kwargs={"node_id": node.meshtastic_node_id})
 
-    response = client.patch(url, {"channel_0": ch_ok.id}, format="json")
+    response = client.patch(url, {"meshtastic_channel_0": ch_ok.id}, format="json")
     assert response.status_code == status.HTTP_200_OK
-    assert response.data["channel_0"] == {"id": ch_ok.id, "name": ch_ok.name}
+    assert response.data["meshtastic_channel_0"] == {"id": ch_ok.id, "name": ch_ok.name}
 
     node.refresh_from_db()
-    assert node.channel_0_id == ch_ok.id
+    assert node.meshtastic_channel_0_id == ch_ok.id
 
 
 @pytest.mark.django_db
@@ -48,17 +48,17 @@ def test_managed_node_patch_channel_wrong_constellation_returns_400(
     node = create_managed_node(
         owner=owner,
         constellation=constellation,
-        channel_0=None,
-        channel_1=None,
+        meshtastic_channel_0=None,
+        meshtastic_channel_1=None,
     )
 
     client = APIClient()
     client.force_authenticate(user=owner)
     url = reverse("managed-nodes-detail", kwargs={"node_id": node.meshtastic_node_id})
 
-    response = client.patch(url, {"channel_0": ch_wrong.id}, format="json")
+    response = client.patch(url, {"meshtastic_channel_0": ch_wrong.id}, format="json")
     assert response.status_code == status.HTTP_400_BAD_REQUEST
-    assert "channel_0" in response.data
+    assert "meshtastic_channel_0" in response.data
 
 
 @pytest.mark.django_db
@@ -71,15 +71,15 @@ def test_managed_node_patch_channels_non_owner_forbidden(create_user, create_con
     node = create_managed_node(
         owner=owner,
         constellation=constellation,
-        channel_0=None,
-        channel_1=None,
+        meshtastic_channel_0=None,
+        meshtastic_channel_1=None,
     )
 
     client = APIClient()
     client.force_authenticate(user=other)
     url = reverse("managed-nodes-detail", kwargs={"node_id": node.meshtastic_node_id})
 
-    response = client.patch(url, {"channel_0": ch.id}, format="json")
+    response = client.patch(url, {"meshtastic_channel_0": ch.id}, format="json")
     assert response.status_code == status.HTTP_403_FORBIDDEN
 
 
@@ -92,8 +92,8 @@ def test_managed_node_retrieve_owner_includes_channels(create_user, create_const
     node = create_managed_node(
         owner=owner,
         constellation=constellation,
-        channel_0=ch,
-        channel_1=None,
+        meshtastic_channel_0=ch,
+        meshtastic_channel_1=None,
     )
 
     client = APIClient()
@@ -102,7 +102,7 @@ def test_managed_node_retrieve_owner_includes_channels(create_user, create_const
 
     response = client.get(url)
     assert response.status_code == status.HTTP_200_OK
-    assert response.data["channel_0"] == {"id": ch.id, "name": ch.name}
+    assert response.data["meshtastic_channel_0"] == {"id": ch.id, "name": ch.name}
 
 
 @pytest.mark.django_db
@@ -115,8 +115,8 @@ def test_managed_node_retrieve_non_owner_omits_channels(create_user, create_cons
     node = create_managed_node(
         owner=owner,
         constellation=constellation,
-        channel_0=ch,
-        channel_1=None,
+        meshtastic_channel_0=ch,
+        meshtastic_channel_1=None,
     )
 
     client = APIClient()
@@ -125,4 +125,4 @@ def test_managed_node_retrieve_non_owner_omits_channels(create_user, create_cons
 
     response = client.get(url)
     assert response.status_code == status.HTTP_200_OK
-    assert "channel_0" not in response.data
+    assert "meshtastic_channel_0" not in response.data

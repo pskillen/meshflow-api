@@ -70,7 +70,7 @@ class ManagedNode(models.Model):
     default_location_latitude = models.FloatField(null=True, blank=True)
     default_location_longitude = models.FloatField(null=True, blank=True)
 
-    channel_0 = models.ForeignKey(
+    meshtastic_channel_0 = models.ForeignKey(
         "constellations.MessageChannel",
         on_delete=models.CASCADE,
         null=True,
@@ -78,7 +78,7 @@ class ManagedNode(models.Model):
         related_name="+",
         help_text=_("Meshtastic channel slot 0 (PSK-backed MessageChannel)."),
     )
-    channel_1 = models.ForeignKey(
+    meshtastic_channel_1 = models.ForeignKey(
         "constellations.MessageChannel",
         on_delete=models.CASCADE,
         null=True,
@@ -86,7 +86,7 @@ class ManagedNode(models.Model):
         related_name="+",
         help_text=_("Meshtastic channel slot 1 (PSK-backed MessageChannel)."),
     )
-    channel_2 = models.ForeignKey(
+    meshtastic_channel_2 = models.ForeignKey(
         "constellations.MessageChannel",
         on_delete=models.CASCADE,
         null=True,
@@ -94,7 +94,7 @@ class ManagedNode(models.Model):
         related_name="+",
         help_text=_("Meshtastic channel slot 2 (PSK-backed MessageChannel)."),
     )
-    channel_3 = models.ForeignKey(
+    meshtastic_channel_3 = models.ForeignKey(
         "constellations.MessageChannel",
         on_delete=models.CASCADE,
         null=True,
@@ -102,7 +102,7 @@ class ManagedNode(models.Model):
         related_name="+",
         help_text=_("Meshtastic channel slot 3 (PSK-backed MessageChannel)."),
     )
-    channel_4 = models.ForeignKey(
+    meshtastic_channel_4 = models.ForeignKey(
         "constellations.MessageChannel",
         on_delete=models.CASCADE,
         null=True,
@@ -110,7 +110,7 @@ class ManagedNode(models.Model):
         related_name="+",
         help_text=_("Meshtastic channel slot 4 (PSK-backed MessageChannel)."),
     )
-    channel_5 = models.ForeignKey(
+    meshtastic_channel_5 = models.ForeignKey(
         "constellations.MessageChannel",
         on_delete=models.CASCADE,
         null=True,
@@ -118,7 +118,7 @@ class ManagedNode(models.Model):
         related_name="+",
         help_text=_("Meshtastic channel slot 5 (PSK-backed MessageChannel)."),
     )
-    channel_6 = models.ForeignKey(
+    meshtastic_channel_6 = models.ForeignKey(
         "constellations.MessageChannel",
         on_delete=models.CASCADE,
         null=True,
@@ -126,7 +126,7 @@ class ManagedNode(models.Model):
         related_name="+",
         help_text=_("Meshtastic channel slot 6 (PSK-backed MessageChannel)."),
     )
-    channel_7 = models.ForeignKey(
+    meshtastic_channel_7 = models.ForeignKey(
         "constellations.MessageChannel",
         on_delete=models.CASCADE,
         null=True,
@@ -178,7 +178,7 @@ class ManagedNode(models.Model):
         if channel_idx < 0 or channel_idx > 7:
             raise ValueError(f"Invalid channel index: {channel_idx}")
 
-        return getattr(self, f"channel_{channel_idx}")
+        return getattr(self, f"meshtastic_channel_{channel_idx}")
 
 
 class ManagedNodeStatus(models.Model):

@@ -21,7 +21,7 @@ def test_backfill_stats_snapshots_creates_online_nodes_and_packet_volume(
 ):
     """Backfill creates online_nodes and packet_volume snapshots for each hour."""
     managed = create_managed_node(meshtastic_node_id=111111111)
-    channel = managed.channel_0
+    channel = managed.meshtastic_channel_0
 
     # ObservedNode with last_heard in the 2h window before hour 12:00
     observed = create_observed_node(meshtastic_node_id=222222222)
@@ -80,7 +80,7 @@ def test_backfill_stats_snapshots_idempotent(
 ):
     """Backfill skips hours that already have snapshots (idempotent)."""
     managed = create_managed_node(meshtastic_node_id=111111111)
-    channel = managed.channel_0
+    channel = managed.meshtastic_channel_0
 
     packet = create_raw_packet(packet_id=1)
     packet.first_reported_time = timezone.make_aware(datetime(2025, 3, 15, 12, 15, 0))
@@ -151,7 +151,7 @@ def test_packet_volume_includes_by_type(create_managed_node):
 def test_packet_volume_excludes_self_only_device_metrics(create_managed_node):
     """packet_volume excludes device metrics that were only observed by the sender."""
     managed = create_managed_node(meshtastic_node_id=111111111)
-    channel = managed.channel_0
+    channel = managed.meshtastic_channel_0
 
     hour = timezone.make_aware(datetime(2025, 3, 15, 12, 0, 0))
 
@@ -194,7 +194,7 @@ def test_packet_volume_excludes_self_only_device_metrics(create_managed_node):
 def test_packet_volume_includes_device_metrics_with_other_observer(create_managed_node):
     """packet_volume includes device metrics when observed by a non-sender."""
     managed_b = create_managed_node(meshtastic_node_id=222222222)
-    channel_b = managed_b.channel_0
+    channel_b = managed_b.meshtastic_channel_0
 
     hour = timezone.make_aware(datetime(2025, 3, 15, 12, 0, 0))
 

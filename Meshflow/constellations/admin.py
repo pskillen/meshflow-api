@@ -26,8 +26,8 @@ class ConstellationAdmin(admin.ModelAdmin):
         "get_admin_count",
         "get_node_count",
         "map_color",
-        "bot_default_ignore_portnums",
-        "bot_default_hop_limit",
+        "bot_default_ignore_meshtastic_portnums",
+        "bot_default_meshtastic_hop_limit",
     )
     list_filter = (("protocol", admin.ChoicesFieldListFilter), "created_by")
     search_fields = ("name", "description", "created_by__username", "created_by__email")
@@ -38,7 +38,7 @@ class ConstellationAdmin(admin.ModelAdmin):
         (
             _("Bot setup defaults"),
             {
-                "fields": ("bot_default_ignore_portnums", "bot_default_hop_limit"),
+                "fields": ("bot_default_ignore_meshtastic_portnums", "bot_default_meshtastic_hop_limit"),
                 "description": _(
                     "Default env vars for generated docker-compose/.env during onboarding. "
                     "Leave blank to omit from generated config."

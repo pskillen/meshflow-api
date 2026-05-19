@@ -197,10 +197,16 @@ class APIKeyConstellationSerializer(serializers.ModelSerializer):
             "name",
             "map_color",
             "protocol",
-            "bot_default_ignore_portnums",
-            "bot_default_hop_limit",
+            "bot_default_ignore_meshtastic_portnums",
+            "bot_default_meshtastic_hop_limit",
         ]
-        read_only_fields = ["name", "map_color", "protocol", "bot_default_ignore_portnums", "bot_default_hop_limit"]
+        read_only_fields = [
+            "name",
+            "map_color",
+            "protocol",
+            "bot_default_ignore_meshtastic_portnums",
+            "bot_default_meshtastic_hop_limit",
+        ]
 
 
 class APIKeySerializer(serializers.ModelSerializer):
@@ -333,10 +339,16 @@ class ManagedNodeSerializer(serializers.ModelSerializer):
                 "name",
                 "map_color",
                 "protocol",
-                "bot_default_ignore_portnums",
-                "bot_default_hop_limit",
+                "bot_default_ignore_meshtastic_portnums",
+                "bot_default_meshtastic_hop_limit",
             ]
-            read_only_fields = ["name", "map_color", "protocol", "bot_default_ignore_portnums", "bot_default_hop_limit"]
+            read_only_fields = [
+                "name",
+                "map_color",
+                "protocol",
+                "bot_default_ignore_meshtastic_portnums",
+                "bot_default_meshtastic_hop_limit",
+            ]
 
     owner_id = serializers.PrimaryKeyRelatedField(
         queryset=User.objects.all(), source="owner", write_only=True, required=True
@@ -644,28 +656,28 @@ class OwnedManagedNodeSerializer(ManagedNodeSerializer):
     """Serializer for managed nodes owned by the current user."""
 
     # For write
-    channel_0 = serializers.PrimaryKeyRelatedField(
+    meshtastic_channel_0 = serializers.PrimaryKeyRelatedField(
         queryset=MessageChannel.objects.all(), required=False, allow_null=True
     )
-    channel_1 = serializers.PrimaryKeyRelatedField(
+    meshtastic_channel_1 = serializers.PrimaryKeyRelatedField(
         queryset=MessageChannel.objects.all(), required=False, allow_null=True
     )
-    channel_2 = serializers.PrimaryKeyRelatedField(
+    meshtastic_channel_2 = serializers.PrimaryKeyRelatedField(
         queryset=MessageChannel.objects.all(), required=False, allow_null=True
     )
-    channel_3 = serializers.PrimaryKeyRelatedField(
+    meshtastic_channel_3 = serializers.PrimaryKeyRelatedField(
         queryset=MessageChannel.objects.all(), required=False, allow_null=True
     )
-    channel_4 = serializers.PrimaryKeyRelatedField(
+    meshtastic_channel_4 = serializers.PrimaryKeyRelatedField(
         queryset=MessageChannel.objects.all(), required=False, allow_null=True
     )
-    channel_5 = serializers.PrimaryKeyRelatedField(
+    meshtastic_channel_5 = serializers.PrimaryKeyRelatedField(
         queryset=MessageChannel.objects.all(), required=False, allow_null=True
     )
-    channel_6 = serializers.PrimaryKeyRelatedField(
+    meshtastic_channel_6 = serializers.PrimaryKeyRelatedField(
         queryset=MessageChannel.objects.all(), required=False, allow_null=True
     )
-    channel_7 = serializers.PrimaryKeyRelatedField(
+    meshtastic_channel_7 = serializers.PrimaryKeyRelatedField(
         queryset=MessageChannel.objects.all(), required=False, allow_null=True
     )
 
@@ -695,7 +707,7 @@ class OwnedManagedNodeSerializer(ManagedNodeSerializer):
 
         errors = {}
         for i in range(8):
-            key = f"channel_{i}"
+            key = f"meshtastic_channel_{i}"
             if key not in attrs:
                 continue
             ch = attrs[key]
@@ -719,60 +731,60 @@ class OwnedManagedNodeSerializer(ManagedNodeSerializer):
 
     def to_representation(self, instance):
         rep = super().to_representation(instance)
-        # Replace channel_0 with nested representation
-        if instance.channel_0_id:
-            rep["channel_0"] = NestedChannelSerializer(instance.channel_0).data
+        # Replace meshtastic_channel_0 with nested representation
+        if instance.meshtastic_channel_0_id:
+            rep["meshtastic_channel_0"] = NestedChannelSerializer(instance.meshtastic_channel_0).data
         else:
-            rep["channel_0"] = None
+            rep["meshtastic_channel_0"] = None
 
-        if instance.channel_1_id:
-            rep["channel_1"] = NestedChannelSerializer(instance.channel_1).data
+        if instance.meshtastic_channel_1_id:
+            rep["meshtastic_channel_1"] = NestedChannelSerializer(instance.meshtastic_channel_1).data
         else:
-            rep["channel_1"] = None
+            rep["meshtastic_channel_1"] = None
 
-        if instance.channel_2_id:
-            rep["channel_2"] = NestedChannelSerializer(instance.channel_2).data
+        if instance.meshtastic_channel_2_id:
+            rep["meshtastic_channel_2"] = NestedChannelSerializer(instance.meshtastic_channel_2).data
         else:
-            rep["channel_2"] = None
+            rep["meshtastic_channel_2"] = None
 
-        if instance.channel_3_id:
-            rep["channel_3"] = NestedChannelSerializer(instance.channel_3).data
+        if instance.meshtastic_channel_3_id:
+            rep["meshtastic_channel_3"] = NestedChannelSerializer(instance.meshtastic_channel_3).data
         else:
-            rep["channel_3"] = None
+            rep["meshtastic_channel_3"] = None
 
-        if instance.channel_4_id:
-            rep["channel_4"] = NestedChannelSerializer(instance.channel_4).data
+        if instance.meshtastic_channel_4_id:
+            rep["meshtastic_channel_4"] = NestedChannelSerializer(instance.meshtastic_channel_4).data
         else:
-            rep["channel_4"] = None
+            rep["meshtastic_channel_4"] = None
 
-        if instance.channel_5_id:
-            rep["channel_5"] = NestedChannelSerializer(instance.channel_5).data
+        if instance.meshtastic_channel_5_id:
+            rep["meshtastic_channel_5"] = NestedChannelSerializer(instance.meshtastic_channel_5).data
         else:
-            rep["channel_5"] = None
+            rep["meshtastic_channel_5"] = None
 
-        if instance.channel_6_id:
-            rep["channel_6"] = NestedChannelSerializer(instance.channel_6).data
+        if instance.meshtastic_channel_6_id:
+            rep["meshtastic_channel_6"] = NestedChannelSerializer(instance.meshtastic_channel_6).data
         else:
-            rep["channel_6"] = None
+            rep["meshtastic_channel_6"] = None
 
-        if instance.channel_7_id:
-            rep["channel_7"] = NestedChannelSerializer(instance.channel_7).data
+        if instance.meshtastic_channel_7_id:
+            rep["meshtastic_channel_7"] = NestedChannelSerializer(instance.meshtastic_channel_7).data
         else:
-            rep["channel_7"] = None
+            rep["meshtastic_channel_7"] = None
 
         return rep
 
     class Meta:
         model = ManagedNode
         fields = ManagedNodeSerializer.Meta.fields + [
-            "channel_0",
-            "channel_1",
-            "channel_2",
-            "channel_3",
-            "channel_4",
-            "channel_5",
-            "channel_6",
-            "channel_7",
+            "meshtastic_channel_0",
+            "meshtastic_channel_1",
+            "meshtastic_channel_2",
+            "meshtastic_channel_3",
+            "meshtastic_channel_4",
+            "meshtastic_channel_5",
+            "meshtastic_channel_6",
+            "meshtastic_channel_7",
         ]
 
 
