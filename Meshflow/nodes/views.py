@@ -196,8 +196,11 @@ class APIKeyViewSet(viewsets.ModelViewSet):
 
 
 class ObservedNodeViewSet(viewsets.ModelViewSet):
-    """
-    ViewSet for managing observed nodes.
+    """Observed nodes across Meshtastic and MeshCore.
+
+    List supports ``protocol`` (``meshtastic`` / ``meshcore``) and ``last_heard_after``.
+    Detail lookup uses Meshtastic numeric ``node_id``; MeshCore clients should list or
+    search with ``protocol=meshcore`` until lookup by ``internal_id`` ([#318]).
     """
 
     queryset = ObservedNode.objects.all().order_by("node_id")

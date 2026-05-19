@@ -16,7 +16,15 @@ class TextMessage(models.Model):
     """
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    original_packet = models.ForeignKey(MessagePacket, null=True, on_delete=models.CASCADE)
+    original_packet = models.ForeignKey(
+        MessagePacket,
+        null=True,
+        on_delete=models.CASCADE,
+        help_text=_(
+            "Provenance: Meshtastic ``MessagePacket`` today. Phase 2 may split into "
+            "``original_mt_packet`` / ``original_mc_packet`` FKs without renaming this column."
+        ),
+    )
 
     sender = models.ForeignKey(ObservedNode, on_delete=models.CASCADE)
     recipient_node_id = models.BigIntegerField(null=True, blank=True)

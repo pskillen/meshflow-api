@@ -8,6 +8,11 @@ from .models import TextMessage
 
 
 class TextMessageSerializer(serializers.ModelSerializer):
+    """Mesh text message (Meshtastic-backed storage today).
+
+    ``original_packet`` / ``packet_id`` reference a Meshtastic ``MessagePacket``; Phase 2
+    may add MeshCore provenance without changing JSON field names in Phase 1.
+    """
 
     class ObservedNodeSerializer(serializers.ModelSerializer):
         class Meta:

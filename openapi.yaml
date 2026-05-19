@@ -999,8 +999,9 @@ components:
     ObservedNode:
       type: object
       description: >
-        A node that is observed by the system, usually inferred from ingested packets from the mesh network,
-        but may also be manually added by a listener system.
+        A node observed on the mesh (Meshtastic or MeshCore), usually inferred from ingested packets.
+        List via GET /nodes/observed-nodes/ with optional protocol filter. Nested latest_* fields are
+        Meshtastic protobuf shapes from NodeLatestStatus today; MeshCore nodes typically omit them.
       properties:
         internal_id:
           type: string
@@ -1026,14 +1027,16 @@ components:
           description: MeshCore 6-byte pubkey prefix (12 hex chars)
         mac_addr:
           type: string
-          description: The MAC address of the node
+          nullable: true
+          description: >
+            Meshtastic nodeinfo MAC when protocol is meshtastic; usually null for MeshCore.
         long_name:
           type: string
-          description: The long name of the node
+          description: Display name (long); shared across Meshtastic and MeshCore ingest
           nullable: true
         short_name:
           type: string
-          description: The short name of the node
+          description: Display name (short); shared across Meshtastic and MeshCore ingest
           nullable: true
         hw_model:
           type: string
@@ -1041,11 +1044,13 @@ components:
           nullable: true
         public_key:
           type: string
-          description: The public key of the node
+          description: Meshtastic device public key (PKI hex); null for MeshCore
           nullable: true
         role:
           type: integer
-          description: The Meshtastic role of the node (e.g. CLIENT, ROUTER)
+          description: >
+            Meshtastic Config.DeviceConfig.Role integer (RoleSource enum, e.g. CLIENT, ROUTER);
+            null for MeshCore.
           nullable: true
         is_licensed:
           type: boolean
@@ -1064,8 +1069,8 @@ components:
           type: integer
           nullable: true
           description: >
-            Inferred from packet hop_start when received; the node's max hops setting.
-            Helps identify nodes with suboptimal hop limits (e.g. below recommended 7).
+            Meshtastic-only: inferred from packet hop_start when received; the node's max hops setting.
+            Helps identify nodes with suboptimal hop limits (e.g. below recommended 7). Null for MeshCore.
         environment_exposure:
           type: string
           enum: [unknown, indoor, outdoor, sheltered]
@@ -1101,13 +1106,29 @@ components:
           nullable: true
           description: When the current low-battery episode was confirmed, if any.
         latest_position:
-          $ref: '#/components/schemas/Position'
+          description: >
+            Latest Meshtastic position snapshot (NodeLatestStatus); null when never reported or MeshCore-only.
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/Position'
         latest_device_metrics:
-          $ref: '#/components/schemas/DeviceMetrics'
+          description: >
+            Latest Meshtastic device telemetry (NodeLatestStatus); null for MeshCore or when never reported.
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/DeviceMetrics'
         latest_environment_metrics:
-          $ref: '#/components/schemas/LatestEnvironmentMetrics'
+          description: >
+            Latest Meshtastic environment telemetry (NodeLatestStatus); null when never reported.
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/LatestEnvironmentMetrics'
         latest_power_metrics:
-          $ref: '#/components/schemas/LatestPowerMetrics'
+          description: >
+            Latest Meshtastic power telemetry (NodeLatestStatus); null when never reported.
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/LatestPowerMetrics'
         latest_air_quality_metrics:
           $ref: '#/components/schemas/LatestAirQualityMetrics'
         latest_health_metrics:
@@ -1884,7 +1905,9 @@ components:
 
     DeviceMetrics:
       type: object
-      description: Device metrics for a node
+      description: >
+        Meshtastic device telemetry (protobuf DeviceMetrics). Observed-node nested latest_device_metrics
+        and history endpoints are Meshtastic-only today; keyed by ObservedNode.protocol.
       properties:
         id:
           type: integer
@@ -1918,7 +1941,8 @@ components:
 
     LatestEnvironmentMetrics:
       type: object
-      description: Latest environment metrics from NodeLatestStatus
+      description: >
+        Latest Meshtastic environment telemetry from NodeLatestStatus (protobuf EnvironmentMetrics).
       nullable: true
       properties:
         temperature:
@@ -2418,7 +2442,9 @@ components:
 
     TextMessage:
       type: object
-      description: A text message sent to a node
+      description: >
+        A text message on the mesh (Meshtastic-backed storage today). packet_id references the
+        Meshtastic MessagePacket; Phase 2 may add MeshCore provenance without renaming JSON keys.
       properties:
         id:
           description: The internal ID of the text message
@@ -2426,7 +2452,7 @@ components:
           readOnly: true
           format: uuid
         packet_id:
-          description: The packet ID of the text message
+          description: Meshtastic MessagePacket.packet_id for the ingested message (provenance)
           type: integer
           readOnly: true
         sender:
@@ -3960,6 +3986,10 @@ paths:
   /nodes/observed-nodes/:
     get:
       summary: List observed nodes
+      description: >
+        Mixed Meshtastic and MeshCore observed nodes. Use protocol query to filter; nested latest_*
+        metrics are Meshtastic protobuf shapes when present. Detail by numeric node_id is Meshtastic-only
+        ([#318](https://github.com/pskillen/meshflow-api/issues/318) for MeshCore internal_id lookup).
       tags: [Nodes]
       security:
         - BearerAuth: []
