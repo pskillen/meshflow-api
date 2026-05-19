@@ -9,6 +9,15 @@ from nodes.models import ManagedNode, ManagedNodeStatus, NodeAPIKey, NodeAuth, O
 from users.tests.conftest import create_user  # noqa: F401
 
 
+def _coerce_meshtastic_node_id_kwargs(data: dict) -> dict:
+    """Map legacy test kwarg ``node_id`` to ``meshtastic_node_id`` (SP-03)."""
+    if "node_id" in data:
+        if "meshtastic_node_id" in data:
+            raise ValueError("Pass only one of node_id or meshtastic_node_id")
+        data["meshtastic_node_id"] = data.pop("node_id")
+    return data
+
+
 @pytest.fixture
 def constellation_data():
     return {
@@ -41,6 +50,7 @@ def create_managed_node(managed_node_data, create_user, create_constellation):  
     def make_managed_node(**kwargs):
         data = managed_node_data.copy()
         data.update(kwargs)
+        _coerce_meshtastic_node_id_kwargs(data)
         if "owner" not in data:
             data["owner"] = create_user()
         if "constellation" not in data:
@@ -67,8 +77,10 @@ def create_managed_node(managed_node_data, create_user, create_constellation):  
 def create_observed_node(observed_node_data):
     def make_observed_node(**kwargs):
         data = observed_node_data.copy()
-        data["node_id_str"] = meshtastic_id_to_hex(data["meshtastic_node_id"])
         data.update(kwargs)
+        _coerce_meshtastic_node_id_kwargs(data)
+        if data.get("meshtastic_node_id") is not None and "node_id_str" not in data:
+            data["node_id_str"] = meshtastic_id_to_hex(data["meshtastic_node_id"])
         return ObservedNode.objects.create(**data)
 
     return make_observed_node

@@ -122,7 +122,7 @@ def test_task_happy_path_writes_png_and_marks_ready(asset_dir, create_observed_n
     from rf_propagation import tasks as task_mod
 
     node = create_observed_node(
-        node_id=820_820_820,
+        meshtastic_node_id=820_820_820,
         node_id_str=meshtastic_id_to_hex(820_820_820),
     )
     _make_profile(node)
@@ -148,7 +148,7 @@ def test_task_uses_bounds_from_geotiff_when_present(asset_dir, create_observed_n
     from rf_propagation import tasks as task_mod
 
     node = create_observed_node(
-        node_id=820_820_830,
+        meshtastic_node_id=820_820_830,
         node_id_str=meshtastic_id_to_hex(820_820_830),
     )
     _make_profile(node)
@@ -174,7 +174,7 @@ def test_task_falls_back_to_center_bbox_when_geotiff_lacks_georef(asset_dir, cre
     from rf_propagation import tasks as task_mod
 
     node = create_observed_node(
-        node_id=820_820_831,
+        meshtastic_node_id=820_820_831,
         node_id_str=meshtastic_id_to_hex(820_820_831),
     )
     _make_profile(node)
@@ -197,7 +197,7 @@ def test_task_engine_fatal_marks_failed(asset_dir, create_observed_node):
     from rf_propagation import tasks as task_mod
 
     node = create_observed_node(
-        node_id=820_820_821,
+        meshtastic_node_id=820_820_821,
         node_id_str=meshtastic_id_to_hex(820_820_821),
     )
     _make_profile(node)
@@ -217,7 +217,7 @@ def test_task_transient_error_retries(asset_dir, create_observed_node, settings)
     from rf_propagation import tasks as task_mod
 
     node = create_observed_node(
-        node_id=820_820_822,
+        meshtastic_node_id=820_820_822,
         node_id_str=meshtastic_id_to_hex(820_820_822),
     )
     _make_profile(node)
@@ -237,7 +237,7 @@ def test_task_cache_hit_reuses_existing_asset(asset_dir, create_observed_node):
     from rf_propagation.payload import build_request, hash_extras_from_payload
 
     node = create_observed_node(
-        node_id=820_820_823,
+        meshtastic_node_id=820_820_823,
         node_id_str=meshtastic_id_to_hex(820_820_823),
     )
     profile = _make_profile(node)
@@ -276,7 +276,7 @@ def test_task_retention_keeps_only_n_ready_per_node(asset_dir, create_observed_n
     settings.RF_PROPAGATION_READY_RETENTION = 2
 
     node = create_observed_node(
-        node_id=820_820_824,
+        meshtastic_node_id=820_820_824,
         node_id_str=meshtastic_id_to_hex(820_820_824),
     )
     _make_profile(node)
@@ -313,7 +313,7 @@ def test_task_missing_profile_fails_gracefully(asset_dir, create_observed_node):
     from rf_propagation import tasks as task_mod
 
     node = create_observed_node(
-        node_id=820_820_825,
+        meshtastic_node_id=820_820_825,
         node_id_str=meshtastic_id_to_hex(820_820_825),
     )
     render = NodeRfPropagationRender.objects.create(observed_node=node)
@@ -330,7 +330,7 @@ def test_task_skips_when_row_already_cancelled(asset_dir, create_observed_node):
     from rf_propagation import tasks as task_mod
 
     node = create_observed_node(
-        node_id=820_820_827,
+        meshtastic_node_id=820_820_827,
         node_id_str=meshtastic_id_to_hex(820_820_827),
     )
     _make_profile(node)
@@ -359,7 +359,7 @@ def test_task_respects_cancellation_during_engine_run(asset_dir, create_observed
     settings.RF_PROPAGATION_ENGINE_URL = "http://fake-engine:8080"
 
     node = create_observed_node(
-        node_id=820_820_828,
+        meshtastic_node_id=820_820_828,
         node_id_str=meshtastic_id_to_hex(820_820_828),
     )
     _make_profile(node)
@@ -392,7 +392,7 @@ def test_task_handles_row_deleted_mid_flight(asset_dir, create_observed_node, se
     settings.RF_PROPAGATION_ENGINE_URL = "http://fake-engine:8080"
 
     node = create_observed_node(
-        node_id=820_820_829,
+        meshtastic_node_id=820_820_829,
         node_id_str=meshtastic_id_to_hex(820_820_829),
     )
     _make_profile(node)
@@ -420,7 +420,7 @@ def test_task_missing_engine_url_fails(asset_dir, create_observed_node, settings
     settings.RF_PROPAGATION_ENGINE_URL = ""
 
     node = create_observed_node(
-        node_id=820_820_826,
+        meshtastic_node_id=820_820_826,
         node_id_str=meshtastic_id_to_hex(820_820_826),
     )
     _make_profile(node)
@@ -447,7 +447,7 @@ def test_task_compute_hash_includes_engine_tuning_extras(asset_dir, create_obser
     monkeypatch.setattr(task_mod, "compute_input_hash", _tracing_compute)
 
     node = create_observed_node(
-        node_id=820_820_827,
+        meshtastic_node_id=820_820_827,
         node_id_str=meshtastic_id_to_hex(820_820_827),
     )
     _make_profile(node)

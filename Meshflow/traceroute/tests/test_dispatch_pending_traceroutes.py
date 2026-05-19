@@ -78,8 +78,8 @@ def test_cooldown_second_row_same_source_waits(
     create_observed_node,
 ):
     a = create_managed_node(allow_auto_traceroute=True)
-    b = create_observed_node(node_id=0xAABB0001)
-    c = create_observed_node(node_id=0xAABB0002)
+    b = create_observed_node(meshtastic_node_id=0xAABB0001)
+    c = create_observed_node(meshtastic_node_id=0xAABB0002)
     at = timezone.now()
     t1 = AutoTraceRoute.objects.create(
         source_node=a,

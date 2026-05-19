@@ -47,7 +47,7 @@ def test_schedule_traceroutes_creates_when_recent_observation(
     mn = create_managed_node(allow_auto_traceroute=True)
     create_packet_observation(observer=mn)
     update_managed_node_statuses()
-    target = create_observed_node(node_id=111222333)
+    target = create_observed_node(meshtastic_node_id=111222333)
 
     channel_layer = MagicMock()
 
@@ -82,6 +82,6 @@ def test_schedule_traceroutes_creates_when_recent_observation(
     assert tr.dispatched_at is not None
     channel_layer.group_send.assert_called_once()
     call_kw = channel_layer.group_send.call_args[0]
-    assert call_kw[0] == f"node_{mn.node_id}"
+    assert call_kw[0] == f"node_{mn.meshtastic_node_id}"
     assert call_kw[1]["type"] == "node_command"
-    assert call_kw[1]["command"] == {"type": "traceroute", "target": target.node_id}
+    assert call_kw[1]["command"] == {"type": "traceroute", "target": target.meshtastic_node_id}

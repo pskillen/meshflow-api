@@ -54,7 +54,7 @@ def test_verification_start_notify_happy_path(
     monkeypatch.setenv("MESH_MONITORING_NOTIFY_VERIFICATION_START", "1")
 
     user = create_user()
-    obs = create_observed_node(node_id=0xAABBCCDD, claimed_by=user)
+    obs = create_observed_node(meshtastic_node_id=0xAABBCCDD, claimed_by=user)
     obs.last_heard = timezone.now() - timedelta(seconds=120)
     obs.save(update_fields=["last_heard"])
     create_watch_with_offline_threshold(user=user, observed_node=obs, offline_after=60)
@@ -103,7 +103,7 @@ def test_verification_start_notify_skipped_when_flag_off(
     monkeypatch.setenv("MESH_MONITORING_NOTIFY_VERIFICATION_START", "false")
 
     user = create_user()
-    obs = create_observed_node(node_id=0xBBCCDDEE, claimed_by=user)
+    obs = create_observed_node(meshtastic_node_id=0xBBCCDDEE, claimed_by=user)
     obs.last_heard = timezone.now() - timedelta(seconds=120)
     obs.save(update_fields=["last_heard"])
     create_watch_with_offline_threshold(user=user, observed_node=obs, offline_after=60)
@@ -145,7 +145,7 @@ def test_verification_start_notify_respects_cooldown(
     monkeypatch.setenv("MESH_MONITORING_VERIFICATION_NOTIFY_COOLDOWN_SECONDS", "3600")
 
     user = create_user()
-    obs = create_observed_node(node_id=0xCCDDEEFF, claimed_by=user)
+    obs = create_observed_node(meshtastic_node_id=0xCCDDEEFF, claimed_by=user)
     obs.last_heard = timezone.now() - timedelta(seconds=120)
     obs.save(update_fields=["last_heard"])
     create_watch_with_offline_threshold(user=user, observed_node=obs, offline_after=60)
@@ -183,7 +183,7 @@ def test_not_silent_clears_last_verification_notify_at(
     create_observed_node,
 ):
     user = create_user()
-    obs = create_observed_node(node_id=0xDDEEFF00, claimed_by=user)
+    obs = create_observed_node(meshtastic_node_id=0xDDEEFF00, claimed_by=user)
     obs.last_heard = timezone.now()
     obs.save(update_fields=["last_heard"])
     create_watch_with_offline_threshold(user=user, observed_node=obs, offline_after=60)

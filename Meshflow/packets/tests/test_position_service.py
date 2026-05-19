@@ -40,7 +40,7 @@ def test_process_position_packet(create_position_packet, create_managed_node, cr
     assert Position.objects.count() == initial_count + 1
 
     position = Position.objects.latest("id")
-    assert position.node.node_id == packet.from_int
+    assert position.node.meshtastic_node_id == packet.from_int
     assert position.latitude == packet.latitude
     assert position.longitude == packet.longitude
     assert position.altitude == packet.altitude
@@ -130,7 +130,7 @@ def test_process_position_packet_updates_nodelateststatus(
 
     from_node = packet.from_int
     observed_node = Position.objects.latest("id").node
-    assert observed_node.node_id == from_node
+    assert observed_node.meshtastic_node_id == from_node
 
     latest_status = NodeLatestStatus.objects.get(node=observed_node)
     assert latest_status.latitude == 12.34

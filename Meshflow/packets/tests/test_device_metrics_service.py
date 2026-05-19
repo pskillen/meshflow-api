@@ -44,7 +44,7 @@ def test_process_device_metrics_packet(
     assert DeviceMetrics.objects.count() == initial_count + 1
 
     metrics = DeviceMetrics.objects.latest("id")
-    assert metrics.node.node_id == packet.from_int
+    assert metrics.node.meshtastic_node_id == packet.from_int
     assert metrics.battery_level == packet.battery_level
     assert metrics.voltage == packet.voltage
     assert metrics.channel_utilization == packet.channel_utilization
@@ -132,7 +132,7 @@ def test_update_node_last_heard(
     user = create_user()
 
     # Create the from_node with an old last_heard
-    from_node = ObservedNode.objects.get_or_create(node_id=packet.from_int)[0]
+    from_node = ObservedNode.objects.get_or_create(meshtastic_node_id=packet.from_int)[0]
     old_time = timezone.now() - timezone.timedelta(days=1)
     from_node.last_heard = old_time
     from_node.save()

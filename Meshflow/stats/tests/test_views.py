@@ -336,7 +336,7 @@ def test_node_received_stats_excludes_self_device_metrics(create_managed_node, c
 
     rx_time = timezone.make_aware(datetime(2025, 6, 15, 12, 0, 0))
 
-    # Self device metrics: from_int == managed.node_id, observed by managed
+    # Self device metrics: from_int == managed.meshtastic_node_id, observed by managed
     dm_self = DeviceMetricsPacket.objects.create(
         packet_id=1,
         from_int=111111111,

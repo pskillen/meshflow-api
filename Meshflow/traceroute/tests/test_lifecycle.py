@@ -83,9 +83,9 @@ def test_apply_auto_traceroute_completion_persists_fields(
     )
     packet = TraceroutePacket.objects.create(
         packet_id=111,
-        from_int=target.node_id,
+        from_int=target.meshtastic_node_id,
         from_str=target.node_id_str,
-        to_int=source.node_id,
+        to_int=source.meshtastic_node_id,
         to_str=source.node_id_str,
         port_num="TRACEROUTE_APP",
         route=[1, 2],

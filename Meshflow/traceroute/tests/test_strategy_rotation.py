@@ -31,7 +31,7 @@ def test_pick_strategy_rotates_cold_cache(create_user, create_managed_node):
         allow_auto_traceroute=True,
         default_location_latitude=55.0,
         default_location_longitude=-4.2,
-        node_id=0xB0000001,
+        meshtastic_node_id=0xB0000001,
     )
     first = pick_strategy_for_feeder(mn)
     assert first in applicable_strategies(mn)
@@ -49,28 +49,28 @@ def test_applicable_strategies_includes_intra_for_internal_feeder_when_envelope_
     user = create_user()
     c1 = create_managed_node(
         owner=user,
-        node_id=0xC0000001,
+        meshtastic_node_id=0xC0000001,
         default_location_latitude=55.0,
         default_location_longitude=-4.25,
     ).constellation
     create_managed_node(
         owner=user,
         constellation=c1,
-        node_id=0xC0000002,
+        meshtastic_node_id=0xC0000002,
         default_location_latitude=55.03,
         default_location_longitude=-4.25,
     )
     create_managed_node(
         owner=user,
         constellation=c1,
-        node_id=0xC0000003,
+        meshtastic_node_id=0xC0000003,
         default_location_latitude=55.015,
         default_location_longitude=-4.22,
     )
     internal_feeder = create_managed_node(
         owner=user,
         constellation=c1,
-        node_id=0xC0000004,
+        meshtastic_node_id=0xC0000004,
         default_location_latitude=55.015,
         default_location_longitude=-4.24,
     )
@@ -90,7 +90,7 @@ def test_ordered_strategies_first_matches_pick(create_user, create_managed_node)
         allow_auto_traceroute=True,
         default_location_latitude=55.0,
         default_location_longitude=-4.2,
-        node_id=0xB0000002,
+        meshtastic_node_id=0xB0000002,
     )
     ordered = ordered_strategies_for_feeder(mn)
     assert ordered[0] == pick_strategy_for_feeder(mn)

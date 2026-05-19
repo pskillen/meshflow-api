@@ -82,7 +82,7 @@ class BasePacketSerializerTest(BasePacketSerializerTestCase):
         data = {
             "id": 123,
             "from": self.from_node.meshtastic_node_id,
-            "fromId": self.from_node.meshtastic_node_id_str,
+            "fromId": self.from_node.node_id_str,
             "to": 789,
             "toId": "!789012",
             "decoded": {"portnum": "TEXT_MESSAGE_APP"},
@@ -105,7 +105,7 @@ class BasePacketSerializerTest(BasePacketSerializerTestCase):
         # Test field mapping
         self.assertEqual(validated_data["packet_id"], 123)
         self.assertEqual(validated_data["from_int"], self.from_node.meshtastic_node_id)
-        self.assertEqual(validated_data["from_str"], self.from_node.meshtastic_node_id_str)
+        self.assertEqual(validated_data["from_str"], self.from_node.node_id_str)
         self.assertEqual(validated_data["to_int"], 789)
         self.assertEqual(validated_data["to_str"], "!789012")
         self.assertEqual(validated_data["port_num"], "TEXT_MESSAGE_APP")
@@ -130,7 +130,7 @@ class BasePacketSerializerTest(BasePacketSerializerTestCase):
         data = {
             "id": 123,
             "from": self.from_node.meshtastic_node_id,
-            "fromId": self.from_node.meshtastic_node_id_str,
+            "fromId": self.from_node.node_id_str,
             "decoded": {"portnum": "TEXT_MESSAGE_APP"},
             "rxTime": "invalid",
         }
@@ -148,7 +148,7 @@ class MessagePacketSerializerTest(BasePacketSerializerTestCase):
         data = {
             "id": 123,
             "from": self.from_node.meshtastic_node_id,
-            "fromId": self.from_node.meshtastic_node_id_str,
+            "fromId": self.from_node.node_id_str,
             "decoded": {
                 "portnum": "TEXT_MESSAGE_APP",
                 "text": "Hello, world!",
@@ -172,7 +172,7 @@ class MessagePacketSerializerTest(BasePacketSerializerTestCase):
         data = {
             "id": 123456789,
             "from": self.from_node.meshtastic_node_id,
-            "fromId": self.from_node.meshtastic_node_id_str,
+            "fromId": self.from_node.node_id_str,
             "decoded": {
                 "portnum": "TEXT_MESSAGE_APP",
                 "text": "Hello, world!",
@@ -209,7 +209,7 @@ class MessagePacketSerializerTest(BasePacketSerializerTestCase):
         data = {
             "id": 987654321,
             "from": self.from_node.meshtastic_node_id,
-            "fromId": self.from_node.meshtastic_node_id_str,
+            "fromId": self.from_node.node_id_str,
             "decoded": {
                 "portnum": "TEXT_MESSAGE_APP",
                 "text": "Channel test!",
@@ -243,7 +243,7 @@ class PositionPacketSerializerTest(BasePacketSerializerTestCase):
         data = {
             "id": 123,
             "from": self.from_node.meshtastic_node_id,
-            "fromId": self.from_node.meshtastic_node_id_str,
+            "fromId": self.from_node.node_id_str,
             "decoded": {
                 "portnum": "POSITION_APP",
                 "position": {
@@ -280,7 +280,7 @@ class PositionPacketSerializerTest(BasePacketSerializerTestCase):
         data = {
             "id": 123,
             "from": self.from_node.meshtastic_node_id,
-            "fromId": self.from_node.meshtastic_node_id_str,
+            "fromId": self.from_node.node_id_str,
             "decoded": {
                 "portnum": "POSITION_APP",
                 "position": {
@@ -312,7 +312,7 @@ class NodeInfoPacketSerializerTest(BasePacketSerializerTestCase):
         data = {
             "id": 123,
             "from": self.from_node.meshtastic_node_id,
-            "fromId": self.from_node.meshtastic_node_id_str,
+            "fromId": self.from_node.node_id_str,
             "decoded": {
                 "portnum": "NODEINFO_APP",
                 "user": {
@@ -351,7 +351,7 @@ class NodeInfoPacketSerializerTest(BasePacketSerializerTestCase):
         data = {
             "id": 456,
             "from": self.from_node.meshtastic_node_id,
-            "fromId": self.from_node.meshtastic_node_id_str,
+            "fromId": self.from_node.node_id_str,
             "decoded": {
                 "portnum": "NODEINFO_APP",
                 "user": {
@@ -371,7 +371,7 @@ class NodeInfoPacketSerializerTest(BasePacketSerializerTestCase):
         data = {
             "id": 123,
             "from": self.from_node.meshtastic_node_id,
-            "fromId": self.from_node.meshtastic_node_id_str,
+            "fromId": self.from_node.node_id_str,
             "decoded": {
                 "portnum": "NODEINFO_APP",
                 "user": {
@@ -403,7 +403,7 @@ class DeviceMetricsPacketSerializerTest(BasePacketSerializerTestCase):
         data = {
             "id": 123,
             "from": self.from_node.meshtastic_node_id,
-            "fromId": self.from_node.meshtastic_node_id_str,
+            "fromId": self.from_node.node_id_str,
             "decoded": {
                 "portnum": "TELEMETRY_APP",
                 "telemetry": {
@@ -436,7 +436,7 @@ class DeviceMetricsPacketSerializerTest(BasePacketSerializerTestCase):
         data = {
             "id": 123,
             "from": self.from_node.meshtastic_node_id,
-            "fromId": self.from_node.meshtastic_node_id_str,
+            "fromId": self.from_node.node_id_str,
             "decoded": {
                 "portnum": "TELEMETRY_APP",
                 "telemetry": {
@@ -469,7 +469,7 @@ class LocalStatsPacketSerializerTest(BasePacketSerializerTestCase):
         data = {
             "id": 123,
             "from": self.from_node.meshtastic_node_id,
-            "fromId": self.from_node.meshtastic_node_id_str,
+            "fromId": self.from_node.node_id_str,
             "decoded": {
                 "portnum": "TELEMETRY_APP",
                 "telemetry": {
@@ -510,7 +510,7 @@ class LocalStatsPacketSerializerTest(BasePacketSerializerTestCase):
         data = {
             "id": 123,
             "from": self.from_node.meshtastic_node_id,
-            "fromId": self.from_node.meshtastic_node_id_str,
+            "fromId": self.from_node.node_id_str,
             "decoded": {
                 "portnum": "TELEMETRY_APP",
                 "telemetry": {
@@ -543,7 +543,7 @@ class PacketIngestSerializerTest(BasePacketSerializerTestCase):
         data = {
             "id": 123456789,
             "from": self.from_node.meshtastic_node_id,
-            "fromId": self.from_node.meshtastic_node_id_str,
+            "fromId": self.from_node.node_id_str,
             "decoded": {
                 "portnum": "TEXT_MESSAGE_APP",
                 "text": "Hello, world!",
@@ -564,7 +564,7 @@ class PacketIngestSerializerTest(BasePacketSerializerTestCase):
         data = {
             "id": 123,
             "from": self.from_node.meshtastic_node_id,
-            "fromId": self.from_node.meshtastic_node_id_str,
+            "fromId": self.from_node.node_id_str,
             "decoded": {
                 "portnum": "POSITION_APP",
                 "position": {
@@ -709,7 +709,7 @@ class PacketIngestSerializerTest(BasePacketSerializerTestCase):
         data = {
             "id": 123,
             "from": self.from_node.meshtastic_node_id,
-            "fromId": self.from_node.meshtastic_node_id_str,
+            "fromId": self.from_node.node_id_str,
             "decoded": {
                 "portnum": "INVALID_TYPE",
             },
@@ -730,7 +730,7 @@ class NodeSerializerTest(BasePacketSerializerTestCase):
 
         data = {
             "id": self.from_node.meshtastic_node_id,
-            "id_str": self.from_node.meshtastic_node_id_str,
+            "id_str": self.from_node.node_id_str,
             "long_name": "Updated Node",
             "short_name": "UPD",
             "position": {
@@ -759,7 +759,7 @@ class NodeSerializerTest(BasePacketSerializerTestCase):
 
         data = {
             "id": self.from_node.meshtastic_node_id,
-            "id_str": self.from_node.meshtastic_node_id_str,
+            "id_str": self.from_node.node_id_str,
             "long_name": "Updated Node",
             "short_name": "UPD",
             "device_metrics": {
@@ -816,14 +816,14 @@ class PacketDeduplicationTest(BasePacketSerializerTestCase):
         data_a = {
             "id": 123,
             "from": self.from_node.meshtastic_node_id,
-            "fromId": self.from_node.meshtastic_node_id_str,
+            "fromId": self.from_node.node_id_str,
             "decoded": {"portnum": "TEXT_MESSAGE_APP", "text": "From A"},
             "rxTime": base_time,
         }
         data_b = {
             "id": 123,
             "from": self.from_node_b.meshtastic_node_id,
-            "fromId": self.from_node_b.meshtastic_node_id_str,
+            "fromId": self.from_node_b.node_id_str,
             "decoded": {"portnum": "TEXT_MESSAGE_APP", "text": "From B"},
             "rxTime": base_time,
         }
@@ -852,14 +852,14 @@ class PacketDeduplicationTest(BasePacketSerializerTestCase):
         data = {
             "id": 456,
             "from": self.from_node.meshtastic_node_id,
-            "fromId": self.from_node.meshtastic_node_id_str,
+            "fromId": self.from_node.node_id_str,
             "decoded": {"portnum": "TEXT_MESSAGE_APP", "text": "Hello"},
             "rxTime": base_time,
         }
         data_observer2 = {
             "id": 456,
             "from": self.from_node.meshtastic_node_id,
-            "fromId": self.from_node.meshtastic_node_id_str,
+            "fromId": self.from_node.node_id_str,
             "decoded": {"portnum": "TEXT_MESSAGE_APP", "text": "Hello"},
             "rxTime": base_time + 300,  # 5 min later
         }
@@ -888,7 +888,7 @@ class PacketDeduplicationTest(BasePacketSerializerTestCase):
         data_first = {
             "id": 789,
             "from": self.from_node.meshtastic_node_id,
-            "fromId": self.from_node.meshtastic_node_id_str,
+            "fromId": self.from_node.node_id_str,
             "decoded": {"portnum": "TEXT_MESSAGE_APP", "text": "First"},
             "rxTime": base_time,
         }
@@ -902,7 +902,7 @@ class PacketDeduplicationTest(BasePacketSerializerTestCase):
         data_second = {
             "id": 789,
             "from": self.from_node.meshtastic_node_id,
-            "fromId": self.from_node.meshtastic_node_id_str,
+            "fromId": self.from_node.node_id_str,
             "decoded": {"portnum": "TEXT_MESSAGE_APP", "text": "Second"},
             "rxTime": first_reported_ts + 660,  # 11 min later
         }
@@ -925,7 +925,7 @@ class PacketDeduplicationTest(BasePacketSerializerTestCase):
         data = {
             "id": 321,
             "from": self.from_node.meshtastic_node_id,
-            "fromId": self.from_node.meshtastic_node_id_str,
+            "fromId": self.from_node.node_id_str,
             "decoded": {"portnum": "TEXT_MESSAGE_APP", "text": "Once"},
             "rxTime": base_time,
         }

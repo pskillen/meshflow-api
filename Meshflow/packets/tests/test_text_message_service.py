@@ -40,7 +40,7 @@ def test_process_packet_already_processed(
 
     # Create a message with the same packet_id to simulate already processed
     TextMessage.objects.create(
-        sender=ObservedNode.objects.get_or_create(node_id=packet.from_int)[0],
+        sender=ObservedNode.objects.get_or_create(meshtastic_node_id=packet.from_int)[0],
         original_packet=packet,
         recipient_node_id=packet.to_int,
         message_text=packet.message_text,
@@ -67,7 +67,7 @@ def test_create_message(create_message_packet, create_managed_node, create_packe
     assert TextMessage.objects.count() == initial_count + 1
 
     message = TextMessage.objects.latest("id")
-    assert message.sender.node_id == packet.from_int
+    assert message.sender.meshtastic_node_id == packet.from_int
     assert message.original_packet == packet
     assert message.recipient_node_id == packet.to_int
     assert message.message_text == packet.message_text
@@ -159,7 +159,7 @@ def test_authorize_node_claim_success(
     user = create_user()
 
     # Create a node and a claim for it
-    from_node = ObservedNode.objects.get_or_create(node_id=packet.from_int)[0]
+    from_node = ObservedNode.objects.get_or_create(meshtastic_node_id=packet.from_int)[0]
     claim = NodeOwnerClaim.objects.create(
         node=from_node,
         user=user,
@@ -190,7 +190,7 @@ def test_authorize_node_claim_adds_user_to_constellation_as_viewer(
     observation = create_packet_observation(packet=packet, observer=observer)
     user = create_user()
 
-    from_node = ObservedNode.objects.get_or_create(node_id=packet.from_int)[0]
+    from_node = ObservedNode.objects.get_or_create(meshtastic_node_id=packet.from_int)[0]
     NodeOwnerClaim.objects.create(
         node=from_node,
         user=user,

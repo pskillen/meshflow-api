@@ -112,14 +112,14 @@ def test_traceroute_receiver_inferred_creation(
     )
     observation = create_packet_observation_for_tr(packet=packet, observer=source_node)
 
-    assert not AutoTraceRoute.objects.filter(source_node=source_node, target_node__node_id=target_node_id).exists()
-    assert not ObservedNode.objects.filter(node_id=target_node_id).exists()
+    assert not AutoTraceRoute.objects.filter(source_node=source_node, target_node__meshtastic_node_id=target_node_id).exists()
+    assert not ObservedNode.objects.filter(meshtastic_node_id=target_node_id).exists()
 
     with patch("traceroute.tasks.push_traceroute_to_neo4j") as mock_push:
         with patch("traceroute.ws_notify.notify_traceroute_status_changed"):
             traceroute_packet_received.send(sender=None, packet=packet, observer=source_node, observation=observation)
 
-    auto_tr = AutoTraceRoute.objects.get(source_node=source_node, target_node__node_id=target_node_id)
+    auto_tr = AutoTraceRoute.objects.get(source_node=source_node, target_node__meshtastic_node_id=target_node_id)
     assert auto_tr.trigger_type == AutoTraceRoute.TRIGGER_TYPE_EXTERNAL
     assert auto_tr.triggered_by is None
     assert auto_tr.status == AutoTraceRoute.STATUS_COMPLETED
@@ -127,7 +127,7 @@ def test_traceroute_receiver_inferred_creation(
     assert auto_tr.route == [{"node_id": 0x11111111, "snr": -5.0}]
     assert auto_tr.route_back == [{"node_id": 0x11111111, "snr": -4.0}]
 
-    target_node = ObservedNode.objects.get(node_id=target_node_id)
+    target_node = ObservedNode.objects.get(meshtastic_node_id=target_node_id)
     assert target_node.node_id_str == "!abcdef12"
     mock_push.delay.assert_called_once_with(auto_tr.id)
 
@@ -153,7 +153,7 @@ def test_traceroute_receiver_snr_mapping_route_longer_than_snr(
         with patch("traceroute.ws_notify.notify_traceroute_status_changed"):
             traceroute_packet_received.send(sender=None, packet=packet, observer=source_node, observation=observation)
 
-    auto_tr = AutoTraceRoute.objects.get(source_node=source_node, target_node__node_id=target_node_id)
+    auto_tr = AutoTraceRoute.objects.get(source_node=source_node, target_node__meshtastic_node_id=target_node_id)
     assert auto_tr.route == [
         {"node_id": 0x11111111, "snr": -5.0},
         {"node_id": 0x22222222, "snr": -3.0},
@@ -176,7 +176,7 @@ def test_traceroute_receiver_late_response_updates_failed(
 ):
     """When a failed AutoTraceRoute exists within 5 mins, late response updates it to completed."""
     source_node = create_managed_node()
-    target_node = create_observed_node(node_id=0xDEADBEEF)
+    target_node = create_observed_node(meshtastic_node_id=0xDEADBEEF)
     auto_tr = create_auto_traceroute(
         source_node=source_node,
         target_node=target_node,
@@ -188,7 +188,7 @@ def test_traceroute_receiver_late_response_updates_failed(
 
     packet = create_traceroute_packet(
         observer=source_node,
-        from_int=target_node.node_id,
+        from_int=target_node.meshtastic_node_id,
         route=[0x11111111],
         route_back=[0x11111111],
         snr_towards=[-5.0],
@@ -221,7 +221,7 @@ def test_traceroute_response_updates_target_last_heard(
 ):
     """Ingested TR response advances target ObservedNode.last_heard (same as other packet services)."""
     source_node = create_managed_node()
-    target_node = create_observed_node(node_id=0xBEEFCAFE)
+    target_node = create_observed_node(meshtastic_node_id=0xBEEFCAFE)
     old_last = timezone.now() - timedelta(days=1)
     target_node.last_heard = old_last
     target_node.save(update_fields=["last_heard"])
@@ -238,7 +238,7 @@ def test_traceroute_response_updates_target_last_heard(
     rx_time = timezone.now() - timedelta(seconds=30)
     packet = create_traceroute_packet(
         observer=source_node,
-        from_int=target_node.node_id,
+        from_int=target_node.meshtastic_node_id,
         route=[0x11111111],
         route_back=[0x11111111],
         snr_towards=[-5.0],
@@ -276,7 +276,7 @@ def test_traceroute_receiver_external_inferred_empty_routes_completed(
         with patch("traceroute.ws_notify.notify_traceroute_status_changed"):
             traceroute_packet_received.send(sender=None, packet=packet, observer=source_node, observation=observation)
 
-    auto_tr = AutoTraceRoute.objects.get(source_node=source_node, target_node__node_id=target_node_id)
+    auto_tr = AutoTraceRoute.objects.get(source_node=source_node, target_node__meshtastic_node_id=target_node_id)
     assert auto_tr.trigger_type == AutoTraceRoute.TRIGGER_TYPE_EXTERNAL
     assert auto_tr.status == AutoTraceRoute.STATUS_COMPLETED
     assert auto_tr.route == []
@@ -295,7 +295,7 @@ def test_traceroute_receiver_late_response_empty_routes_updates_failed_to_comple
 ):
     """Late response with empty route/route_back clears error_message and completes."""
     source_node = create_managed_node()
-    target_node = create_observed_node(node_id=0xCAFEBABE)
+    target_node = create_observed_node(meshtastic_node_id=0xCAFEBABE)
     auto_tr = create_auto_traceroute(
         source_node=source_node,
         target_node=target_node,
@@ -308,7 +308,7 @@ def test_traceroute_receiver_late_response_empty_routes_updates_failed_to_comple
 
     packet = create_traceroute_packet(
         observer=source_node,
-        from_int=target_node.node_id,
+        from_int=target_node.meshtastic_node_id,
         route=[],
         route_back=[],
         snr_towards=[],

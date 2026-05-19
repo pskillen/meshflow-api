@@ -177,7 +177,7 @@ def test_notify_sends_to_subscriber_and_creates_delivery_and_audit(
     )[0].save()
 
     c = create_constellation()
-    dest = create_observed_node(node_id=0xAABB00CC)
+    dest = create_observed_node(meshtastic_node_id=0xAABB00CC)
     now = timezone.now()
     event = DxEvent.objects.create(
         constellation=c,
@@ -311,7 +311,7 @@ def test_category_cooldown_skips_second_event(
     )
     e2 = DxEvent.objects.create(
         constellation=const,
-        destination=create_observed_node(node_id=0xDEAD00BE),
+        destination=create_observed_node(meshtastic_node_id=0xDEAD00BE),
         reason_code=DxReasonCode.NEW_DISTANT_NODE,
         state=DxEventState.ACTIVE,
         first_observed_at=now,

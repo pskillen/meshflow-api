@@ -24,7 +24,7 @@ def test_pick_traceroute_target_excludes_mesh_monitoring_suppressed(
     )
     create_packet_observation(observer=mn)
 
-    obs = create_observed_node(node_id=998877665)
+    obs = create_observed_node(meshtastic_node_id=998877665)
     obs.last_heard = timezone.now()
     obs.save(update_fields=["last_heard"])
     NodeLatestStatus.objects.create(node=obs, latitude=50.2, longitude=0.2)
