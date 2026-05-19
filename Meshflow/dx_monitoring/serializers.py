@@ -28,10 +28,10 @@ class DxManagedNodeMinimalSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ManagedNode
-        fields = ("internal_id", "node_id", "node_id_str", "name")
+        fields = ("internal_id", "meshtastic_node_id", "node_id_str", "name")
 
     def get_node_id_str(self, obj: ManagedNode) -> str:
-        return meshtastic_id_to_hex(obj.node_id)
+        return meshtastic_id_to_hex(obj.meshtastic_node_id)
 
 
 class DxDestinationSerializer(serializers.ModelSerializer):
@@ -41,7 +41,7 @@ class DxDestinationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ObservedNode
-        fields = ("internal_id", "node_id", "node_id_str", "short_name", "long_name", "dx_metadata")
+        fields = ("internal_id", "meshtastic_node_id", "node_id_str", "short_name", "long_name", "dx_metadata")
 
     def get_dx_metadata(self, obj: ObservedNode) -> dict:
         try:
@@ -80,7 +80,7 @@ class DxObservedNodeHopSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ObservedNode
-        fields = ("internal_id", "node_id", "node_id_str", "short_name", "long_name")
+        fields = ("internal_id", "meshtastic_node_id", "node_id_str", "short_name", "long_name")
 
 
 class DxAutoTracerouteExplorationSerializer(serializers.ModelSerializer):
@@ -205,13 +205,13 @@ class DxEventDetailSerializer(DxEventListSerializer):
 
 
 class DxNodeExclusionRequestSerializer(serializers.Serializer):
-    node_id = serializers.IntegerField(min_value=1)
+    meshtastic_node_id = serializers.IntegerField(min_value=1)
     exclude_from_detection = serializers.BooleanField()
     exclude_notes = serializers.CharField(required=False, allow_blank=True, default="")
 
 
 class DxNodeExclusionResponseSerializer(serializers.Serializer):
-    node_id = serializers.IntegerField()
+    meshtastic_node_id = serializers.IntegerField()
     node_id_str = serializers.CharField()
     exclude_from_detection = serializers.BooleanField()
     exclude_notes = serializers.CharField()

@@ -19,7 +19,7 @@ def test_node_info_packet_updates_observed_node(api_client):
     node_resp = api_client.get_observed_node(from_int)
     assert node_resp.status_code == 200
     node_data = node_resp.json()
-    assert node_data["node_id"] == from_int
+    assert node_data["meshtastic_node_id"] == from_int
     assert node_data["long_name"] == user["longName"]
     assert node_data["short_name"] == user["shortName"]
     assert node_data["hw_model"] == user["hwModel"]

@@ -87,7 +87,7 @@ def _create_observed_with_coords(node_id: int, lat: float, lng: float, short_nam
     from nodes.models import NodeLatestStatus, ObservedNode
 
     obs = ObservedNode.objects.create(
-        node_id=node_id,
+        meshtastic_node_id=node_id,
         node_id_str=meshtastic_id_to_hex(node_id),
         short_name=short_name,
         long_name=f"Node {short_name}",
@@ -117,11 +117,11 @@ class TestAddTracerouteEdges:
 
         user = create_user()
         source_node = create_managed_node(
-            node_id=0xAAAAAAAA,
+            meshtastic_node_id=0xAAAAAAAA,
             default_location_latitude=source_coords[0] if source_coords else None,
             default_location_longitude=source_coords[1] if source_coords else None,
         )
-        target_node = create_observed_node(node_id=0xBBBBBBBB)
+        target_node = create_observed_node(meshtastic_node_id=0xBBBBBBBB)
         if target_coords is not None:
             NodeLatestStatus.objects.create(
                 node=target_node,
@@ -414,8 +414,8 @@ class TestRunHeatmapQuery:
             patch("traceroute_analytics.neo4j_service.ObservedNode.objects.filter") as mock_obs,
         ):
             mock_obs.return_value.values.return_value = [
-                {"node_id": 1, "last_heard": now},
-                {"node_id": 2, "last_heard": now},
+                {"meshtastic_node_id": 1, "last_heard": now},
+                {"meshtastic_node_id": 2, "last_heard": now},
             ]
             data = run_heatmap_query(edge_metric="packets", driver=mock_driver)
 
@@ -423,7 +423,7 @@ class TestRunHeatmapQuery:
         assert data["edges"][0]["weight"] == 5
         assert "avg_snr" not in data["edges"][0]
         assert len(data["nodes"]) == 2
-        by_id = {n["node_id"]: n for n in data["nodes"]}
+        by_id = {n["meshtastic_node_id"]: n for n in data["nodes"]}
         assert by_id[1]["centrality"] == 0.0
         assert by_id[1]["degree"] == 1
         assert by_id[1]["role"] == "leaf"
@@ -466,8 +466,8 @@ class TestRunHeatmapQuery:
             patch("traceroute_analytics.neo4j_service.ObservedNode.objects.filter") as mock_obs,
         ):
             mock_obs.return_value.values.return_value = [
-                {"node_id": 1, "last_heard": now},
-                {"node_id": 2, "last_heard": now},
+                {"meshtastic_node_id": 1, "last_heard": now},
+                {"meshtastic_node_id": 2, "last_heard": now},
             ]
             data = run_heatmap_query(edge_metric="snr", driver=mock_driver)
 
@@ -514,8 +514,8 @@ class TestRunHeatmapQuery:
             patch("traceroute_analytics.neo4j_service.ObservedNode.objects.filter") as mock_obs,
         ):
             mock_obs.return_value.values.return_value = [
-                {"node_id": 1, "last_heard": now},
-                {"node_id": 2, "last_heard": now},
+                {"meshtastic_node_id": 1, "last_heard": now},
+                {"meshtastic_node_id": 2, "last_heard": now},
             ]
             data = run_heatmap_query(edge_metric="snr", driver=mock_driver)
 
@@ -615,13 +615,13 @@ class TestRunHeatmapQuery:
             patch("traceroute_analytics.neo4j_service.ObservedNode.objects.filter") as mock_obs,
         ):
             mock_obs.return_value.values.return_value = [
-                {"node_id": 1, "last_heard": now},
-                {"node_id": 2, "last_heard": now},
-                {"node_id": 3, "last_heard": now},
+                {"meshtastic_node_id": 1, "last_heard": now},
+                {"meshtastic_node_id": 2, "last_heard": now},
+                {"meshtastic_node_id": 3, "last_heard": now},
             ]
             data = run_heatmap_query(edge_metric="packets", driver=mock_driver)
 
-        by_id = {n["node_id"]: n for n in data["nodes"]}
+        by_id = {n["meshtastic_node_id"]: n for n in data["nodes"]}
         assert by_id[2]["centrality"] > by_id[1]["centrality"]
         assert by_id[2]["centrality"] > by_id[3]["centrality"]
         assert by_id[2]["degree"] == 2
@@ -695,14 +695,14 @@ class TestRunHeatmapQuery:
             patch("traceroute_analytics.neo4j_service.ObservedNode.objects.filter") as mock_obs,
         ):
             mock_obs.return_value.values.return_value = [
-                {"node_id": 1, "last_heard": now},
-                {"node_id": 2, "last_heard": now},
-                {"node_id": 3, "last_heard": now},
-                {"node_id": 4, "last_heard": now},
+                {"meshtastic_node_id": 1, "last_heard": now},
+                {"meshtastic_node_id": 2, "last_heard": now},
+                {"meshtastic_node_id": 3, "last_heard": now},
+                {"meshtastic_node_id": 4, "last_heard": now},
             ]
             data = run_heatmap_query(edge_metric="packets", driver=mock_driver)
 
-        by_id = {n["node_id"]: n for n in data["nodes"]}
+        by_id = {n["meshtastic_node_id"]: n for n in data["nodes"]}
         assert by_id[1]["degree"] == 3
         assert by_id[1]["role"] == "backbone"
         assert by_id[2]["role"] == "leaf"

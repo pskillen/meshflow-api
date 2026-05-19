@@ -49,7 +49,7 @@ def create_traceroute_packet(create_managed_node):
             packet_id=kwargs.pop("packet_id", 999888777),
             from_int=from_int,
             from_str=node_id_str,
-            to_int=observer.node_id,
+            to_int=observer.meshtastic_node_id,
             to_str=observer.node_id_str,
             port_num="TRACEROUTE_APP",
             route=route,

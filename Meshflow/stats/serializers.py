@@ -25,7 +25,7 @@ class NodeStatsSerializer(serializers.Serializer):
 class NeighbourStatsCandidateSerializer(serializers.Serializer):
     """Serializer for a candidate node matching a source."""
 
-    node_id = serializers.IntegerField()
+    meshtastic_node_id = serializers.IntegerField()
     node_id_str = serializers.CharField(allow_blank=True)
     short_name = serializers.CharField(allow_null=True, allow_blank=True)
 

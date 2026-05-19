@@ -38,17 +38,19 @@ class NodeConsumer(AsyncWebsocketConsumer):
             return
 
         self.managed_node = managed_node
-        self.node_group = f"node_{managed_node.node_id}"
+        self.node_group = f"node_{managed_node.meshtastic_node_id}"
 
         await self.channel_layer.group_add(self.node_group, self.channel_name)
         await self.accept()
-        logger.info(f"NodeConsumer: bot connected for node {managed_node.node_id} ({managed_node.node_id_str})")
+        logger.info(
+            f"NodeConsumer: bot connected for node {managed_node.meshtastic_node_id} ({managed_node.node_id_str})"
+        )
 
     async def disconnect(self, close_code):
         if hasattr(self, "node_group"):
             await self.channel_layer.group_discard(self.node_group, self.channel_name)
         managed_node = getattr(self, "managed_node", None)
-        node_id = getattr(managed_node, "node_id", "unknown") if managed_node else "unknown"
+        node_id = getattr(managed_node, "meshtastic_node_id", "unknown") if managed_node else "unknown"
         logger.info(f"NodeConsumer: bot disconnected for node {node_id}")
 
     async def receive(self, text_data):

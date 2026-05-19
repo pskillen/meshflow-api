@@ -29,7 +29,7 @@ def test_device_metrics_creates_observed_node(api_client):
     node_resp = api_client.get_observed_node(from_int)
     assert node_resp.status_code == 200
     node_data = node_resp.json()
-    assert node_data["node_id"] == from_int
+    assert node_data["meshtastic_node_id"] == from_int
 
 
 def test_node_info_creates_observed_node(api_client):
@@ -48,7 +48,7 @@ def test_node_info_creates_observed_node(api_client):
     node_resp = api_client.get_observed_node(from_int)
     assert node_resp.status_code == 200
     node_data = node_resp.json()
-    assert node_data["node_id"] == from_int
+    assert node_data["meshtastic_node_id"] == from_int
     assert node_data["long_name"] == user["longName"]
     assert node_data["short_name"] == user["shortName"]
 
@@ -67,7 +67,7 @@ def test_text_message_creates_observed_node(api_client):
     node_resp = api_client.get_observed_node(from_int)
     assert node_resp.status_code == 200
     node_data = node_resp.json()
-    assert node_data["node_id"] == from_int
+    assert node_data["meshtastic_node_id"] == from_int
 
 
 def test_inferred_node_has_placeholder_names(api_client):
@@ -131,7 +131,7 @@ def test_node_id_str_inferred_from_from_int(api_client):
     assert node_resp.status_code == 200
     node_data = node_resp.json()
     assert node_data["node_id_str"] == expected_node_id_str
-    assert node_data["node_id"] == from_int
+    assert node_data["meshtastic_node_id"] == from_int
 
 
 def test_last_heard_updated_on_packet(api_client):

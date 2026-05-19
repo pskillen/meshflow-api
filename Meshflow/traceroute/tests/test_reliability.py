@@ -28,16 +28,16 @@ def test_load_reliability_hard_cooldown_consecutive_auto_fails(
         allow_auto_traceroute=True,
         default_location_latitude=55.0,
         default_location_longitude=-3.5,
-        node_id=0xE1000001,
+        meshtastic_node_id=0xE1000001,
     )
     bad = create_observed_node(
-        node_id=0xE10000AA,
+        meshtastic_node_id=0xE10000AA,
         node_id_str=meshtastic_id_to_hex(0xE10000AA),
         last_heard=timezone.now(),
     )
     NodeLatestStatus.objects.create(node=bad, latitude=55.6, longitude=-3.5)
     good = create_observed_node(
-        node_id=0xE10000BB,
+        meshtastic_node_id=0xE10000BB,
         node_id_str=meshtastic_id_to_hex(0xE10000BB),
         last_heard=timezone.now(),
     )
@@ -55,11 +55,11 @@ def test_load_reliability_hard_cooldown_consecutive_auto_fails(
         )
 
     hard, _soft = load_source_target_reliability(source)
-    assert bad.node_id in hard
+    assert bad.meshtastic_node_id in hard
 
     picked = pick_traceroute_target(source, slot="test_reliability_hard")
     assert picked is not None
-    assert picked.node_id == good.node_id
+    assert picked.meshtastic_node_id == good.meshtastic_node_id
 
 
 @pytest.mark.django_db
@@ -73,16 +73,16 @@ def test_load_reliability_ignores_non_auto_triggers(
         allow_auto_traceroute=True,
         default_location_latitude=56.0,
         default_location_longitude=-3.0,
-        node_id=0xE2000001,
+        meshtastic_node_id=0xE2000001,
     )
     target = create_observed_node(
-        node_id=0xE20000AA,
+        meshtastic_node_id=0xE20000AA,
         node_id_str=meshtastic_id_to_hex(0xE20000AA),
         last_heard=timezone.now(),
     )
     NodeLatestStatus.objects.create(node=target, latitude=56.8, longitude=-3.0)
     other = create_observed_node(
-        node_id=0xE20000BB,
+        meshtastic_node_id=0xE20000BB,
         node_id_str=meshtastic_id_to_hex(0xE20000BB),
         last_heard=timezone.now(),
     )
@@ -100,7 +100,7 @@ def test_load_reliability_ignores_non_auto_triggers(
         )
 
     hard, _ = load_source_target_reliability(source)
-    assert target.node_id not in hard
+    assert target.meshtastic_node_id not in hard
     assert hard == set()
 
 
@@ -116,10 +116,10 @@ def test_load_reliability_streak_broken_by_recent_success(
         allow_auto_traceroute=True,
         default_location_latitude=57.0,
         default_location_longitude=-3.0,
-        node_id=0xE3000001,
+        meshtastic_node_id=0xE3000001,
     )
     t = create_observed_node(
-        node_id=0xE30000AA,
+        meshtastic_node_id=0xE30000AA,
         node_id_str=meshtastic_id_to_hex(0xE30000AA),
         last_heard=timezone.now(),
     )
@@ -152,4 +152,4 @@ def test_load_reliability_streak_broken_by_recent_success(
     )
 
     hard, _ = load_source_target_reliability(source)
-    assert t.node_id not in hard
+    assert t.meshtastic_node_id not in hard

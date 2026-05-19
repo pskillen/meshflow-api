@@ -21,13 +21,13 @@ def test_constellation_centroid_mean(create_user, create_managed_node, mark_cons
         constellation=c,
         default_location_latitude=0.0,
         default_location_longitude=0.0,
-        node_id=1,
+        meshtastic_node_id=1,
     )
     create_managed_node(
         constellation=c,
         default_location_latitude=2.0,
         default_location_longitude=2.0,
-        node_id=2,
+        meshtastic_node_id=2,
     )
     mark_constellation_managed_nodes_feeding(c)
     cc = constellation_centroid(c)
@@ -46,19 +46,19 @@ def test_envelope_circle_counts_only_actively_feeding_managed_nodes(
         constellation=c,
         default_location_latitude=55.0,
         default_location_longitude=-4.25,
-        node_id=10,
+        meshtastic_node_id=10,
     )
     b = create_managed_node(
         constellation=c,
         default_location_latitude=55.03,
         default_location_longitude=-4.25,
-        node_id=11,
+        meshtastic_node_id=11,
     )
     d = create_managed_node(
         constellation=c,
         default_location_latitude=55.02,
         default_location_longitude=-4.22,
-        node_id=12,
+        meshtastic_node_id=12,
     )
     mark_managed_node_feeding(a, sending=True)
     mark_managed_node_feeding(b, sending=True)

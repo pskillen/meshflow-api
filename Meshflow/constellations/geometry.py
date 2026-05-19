@@ -47,7 +47,9 @@ def managed_node_position_lat_lon(managed_node: ManagedNode) -> tuple[float, flo
     if managed_node.default_location_latitude is not None and managed_node.default_location_longitude is not None:
         return (managed_node.default_location_latitude, managed_node.default_location_longitude)
     try:
-        obs = ObservedNode.objects.select_related("latest_status").get(node_id=managed_node.node_id)
+        obs = ObservedNode.objects.select_related("latest_status").get(
+            meshtastic_node_id=managed_node.meshtastic_node_id
+        )
     except ObservedNode.DoesNotExist:
         return None
     st = obs.latest_status

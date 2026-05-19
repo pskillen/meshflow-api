@@ -57,7 +57,7 @@ def select_monitoring_sources(target: ObservedNode, max_sources: int = 3) -> lis
 
     eligible = []
     for mn in eligible_auto_traceroute_sources_queryset():
-        if mn.node_id == target.node_id:
+        if mn.meshtastic_node_id == target.meshtastic_node_id:
             continue
         if not _source_ready_for_monitoring_tr(mn, now):
             continue
@@ -66,7 +66,7 @@ def select_monitoring_sources(target: ObservedNode, max_sources: int = 3) -> lis
     eligible.sort(
         key=lambda mn: (
             _distance_km(mn, target_lat, target_lon),
-            mn.node_id,
+            mn.meshtastic_node_id,
         )
     )
 

@@ -50,7 +50,7 @@ class BasePacketService(abc.ABC):
         if self.packet.from_int:
             try:
                 self.from_node = ObservedNode.objects.get(
-                    node_id=self.packet.from_int,
+                    meshtastic_node_id=self.packet.from_int,
                     protocol=Protocol.MESHTASTIC,
                 )
                 self._dx_previous_last_heard = self.from_node.last_heard
@@ -61,7 +61,7 @@ class BasePacketService(abc.ABC):
                 )
                 self.from_node = ObservedNode.objects.create(
                     protocol=Protocol.MESHTASTIC,
-                    node_id=self.packet.from_int,
+                    meshtastic_node_id=self.packet.from_int,
                     node_id_str=node_id_str,
                     long_name="Unknown Node " + node_id_str,
                     short_name=node_id_str[-4:] if len(node_id_str) >= 4 else "????",

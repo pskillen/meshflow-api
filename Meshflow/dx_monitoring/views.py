@@ -102,7 +102,7 @@ class DxEventViewSet(viewsets.ReadOnlyModelViewSet):
                 qs = qs.none()
         if raw := params.get("destination_node_id"):
             try:
-                qs = qs.filter(destination__node_id=int(raw))
+                qs = qs.filter(destination__meshtastic_node_id=int(raw))
             except ValueError:
                 qs = qs.none()
         if raw := params.get("last_observer_id"):
@@ -154,12 +154,12 @@ class DxNodeExclusionView(views.APIView):
     def post(self, request):
         ser = DxNodeExclusionRequestSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
-        node_id = ser.validated_data["node_id"]
+        node_id = ser.validated_data["meshtastic_node_id"]
         exclude = ser.validated_data["exclude_from_detection"]
         notes = ser.validated_data.get("exclude_notes") or ""
 
         observed = (
-            ObservedNode.objects.filter(node_id=node_id, protocol=Protocol.MESHTASTIC)
+            ObservedNode.objects.filter(meshtastic_node_id=node_id, protocol=Protocol.MESHTASTIC)
             .order_by("-last_heard", "-created_at")
             .first()
         )
@@ -176,7 +176,7 @@ class DxNodeExclusionView(views.APIView):
 
         out = DxNodeExclusionResponseSerializer(
             {
-                "node_id": observed.node_id,
+                "meshtastic_node_id": observed.meshtastic_node_id,
                 "node_id_str": observed.node_id_str,
                 "exclude_from_detection": meta.exclude_from_detection,
                 "exclude_notes": meta.exclude_notes,
@@ -188,7 +188,7 @@ class DxNodeExclusionView(views.APIView):
 
 def _resolve_observed_by_node_id(node_id: int) -> ObservedNode | None:
     return (
-        ObservedNode.objects.filter(node_id=node_id, protocol=Protocol.MESHTASTIC)
+        ObservedNode.objects.filter(meshtastic_node_id=node_id, protocol=Protocol.MESHTASTIC)
         .order_by("-last_heard", "-created_at")
         .first()
     )
@@ -214,7 +214,7 @@ class DxNodeExclusionByNodeIdView(views.APIView):
         meta = DxNodeMetadata.objects.filter(observed_node=observed).first()
         if meta is None:
             payload = {
-                "node_id": observed.node_id,
+                "meshtastic_node_id": observed.meshtastic_node_id,
                 "node_id_str": observed.node_id_str,
                 "exclude_from_detection": False,
                 "exclude_notes": "",
@@ -222,7 +222,7 @@ class DxNodeExclusionByNodeIdView(views.APIView):
             }
         else:
             payload = {
-                "node_id": observed.node_id,
+                "meshtastic_node_id": observed.meshtastic_node_id,
                 "node_id_str": observed.node_id_str,
                 "exclude_from_detection": meta.exclude_from_detection,
                 "exclude_notes": meta.exclude_notes,

@@ -56,7 +56,7 @@ def traceroute_list(request):
     managed_node = request.query_params.get("managed_node")
     if managed_node:
         try:
-            mn = ManagedNode.objects.get(node_id=int(managed_node), deleted_at__isnull=True)
+            mn = ManagedNode.objects.get(meshtastic_node_id=int(managed_node), deleted_at__isnull=True)
             qs = qs.filter(source_node=mn)
         except ValueError, ManagedNode.DoesNotExist:
             pass
@@ -64,7 +64,7 @@ def traceroute_list(request):
     source_node = request.query_params.get("source_node")
     if source_node:
         try:
-            mn = ManagedNode.objects.get(node_id=int(source_node), deleted_at__isnull=True)
+            mn = ManagedNode.objects.get(meshtastic_node_id=int(source_node), deleted_at__isnull=True)
             qs = qs.filter(source_node=mn)
         except ValueError, ManagedNode.DoesNotExist:
             pass
@@ -72,7 +72,7 @@ def traceroute_list(request):
     target_node = request.query_params.get("target_node")
     if target_node:
         try:
-            on = ObservedNode.objects.get(node_id=int(target_node))
+            on = ObservedNode.objects.get(meshtastic_node_id=int(target_node))
             qs = qs.filter(target_node=on)
         except ValueError, ObservedNode.DoesNotExist:
             pass
@@ -124,13 +124,13 @@ def traceroute_list(request):
     page = paginator.paginate_queryset(qs, request)
 
     # Bulk-fetch for list view to avoid N+1
-    source_node_ids = list({item.source_node.node_id for item in page if item.source_node})
+    source_node_ids = list({item.source_node.meshtastic_node_id for item in page if item.source_node})
     observed_short_names = {}
     if source_node_ids:
-        for row in ObservedNode.objects.filter(node_id__in=source_node_ids, protocol=Protocol.MESHTASTIC).values(
-            "node_id", "short_name"
-        ):
-            observed_short_names[row["node_id"]] = row["short_name"]
+        for row in ObservedNode.objects.filter(
+            meshtastic_node_id__in=source_node_ids, protocol=Protocol.MESHTASTIC
+        ).values("meshtastic_node_id", "short_name"):
+            observed_short_names[row["meshtastic_node_id"]] = row["short_name"]
 
     all_route_node_ids = set()
     for item in page:
@@ -142,9 +142,9 @@ def traceroute_list(request):
     observed_by_id = {}
     if all_route_node_ids:
         for o in ObservedNode.objects.filter(
-            node_id__in=all_route_node_ids, protocol=Protocol.MESHTASTIC
+            meshtastic_node_id__in=all_route_node_ids, protocol=Protocol.MESHTASTIC
         ).select_related("latest_status"):
-            observed_by_id[o.node_id] = o
+            observed_by_id[o.meshtastic_node_id] = o
 
     target_node_pks = list({item.target_node_id for item in page if item.target_node})
     user_claims_by_node = {}
@@ -188,7 +188,9 @@ def traceroute_trigger(request):
     target_strategy_req = serializer.validated_data.get("target_strategy")
 
     source_node = (
-        ManagedNode.objects.filter(node_id=managed_node_id, deleted_at__isnull=True).order_by("internal_id").first()
+        ManagedNode.objects.filter(meshtastic_node_id=managed_node_id, deleted_at__isnull=True)
+        .order_by("internal_id")
+        .first()
     )
     if source_node is None:
         return Response(
@@ -240,7 +242,7 @@ def traceroute_trigger(request):
 
     if target_node_id is not None:
         try:
-            target_node = ObservedNode.objects.get(node_id=target_node_id)
+            target_node = ObservedNode.objects.get(meshtastic_node_id=target_node_id)
         except ObservedNode.DoesNotExist:
             return Response(
                 {"target_node_id": ["ObservedNode with this node_id not found."]},
@@ -286,8 +288,8 @@ def traceroute_trigger(request):
     # Send command via channel layer
     channel_layer = get_channel_layer()
     async_to_sync(channel_layer.group_send)(
-        f"node_{source_node.node_id}",
-        {"type": "node_command", "command": {"type": "traceroute", "target": target_node.node_id}},
+        f"node_{source_node.meshtastic_node_id}",
+        {"type": "node_command", "command": {"type": "traceroute", "target": target_node.meshtastic_node_id}},
     )
 
     auto_tr.status = AutoTraceRoute.STATUS_SENT

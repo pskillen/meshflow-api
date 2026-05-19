@@ -129,7 +129,9 @@ class TestTracerouteList:
             target_strategy=AutoTraceRoute.TARGET_STRATEGY_DX_ACROSS,
         )
         resp = api_client.get(
-            f"/api/traceroutes/?target_strategy={AutoTraceRoute.TARGET_STRATEGY_INTRA_ZONE}&source_node={mn.node_id}"
+            "/api/traceroutes/"
+            f"?target_strategy={AutoTraceRoute.TARGET_STRATEGY_INTRA_ZONE}"
+            f"&source_node={mn.meshtastic_node_id}"
         )
         assert resp.status_code == 200
         for row in resp.json()["results"]:
@@ -164,7 +166,7 @@ class TestTracerouteList:
             source_node=mn,
             target_node=on,
         )
-        resp = api_client.get(f"/api/traceroutes/?trigger_type=auto,user&source_node={mn.node_id}")
+        resp = api_client.get(f"/api/traceroutes/?trigger_type=auto,user&source_node={mn.meshtastic_node_id}")
         assert resp.status_code == 200
         data = resp.json()
         assert data["count"] >= 2
@@ -188,7 +190,7 @@ class TestTracerouteList:
         create_auto_traceroute(
             triggered_by=user, trigger_type=AutoTraceRoute.TRIGGER_TYPE_USER, source_node=mn, target_node=on
         )
-        resp = api_client.get(f"/api/traceroutes/?trigger_type=user&source_node={mn.node_id}")
+        resp = api_client.get(f"/api/traceroutes/?trigger_type=user&source_node={mn.meshtastic_node_id}")
         assert resp.status_code == 200
         for row in resp.json()["results"]:
             assert row["trigger_type"] == AutoTraceRoute.TRIGGER_TYPE_USER
@@ -213,7 +215,7 @@ class TestTracerouteList:
             source_node=mn,
             target_node=on,
         )
-        resp = api_client.get(f"/api/traceroutes/?trigger_type=4,1&source_node={mn.node_id}")
+        resp = api_client.get(f"/api/traceroutes/?trigger_type=4,1&source_node={mn.meshtastic_node_id}")
         assert resp.status_code == 200
         types = {r["trigger_type"] for r in resp.json()["results"]}
         assert AutoTraceRoute.TRIGGER_TYPE_NODE_WATCH in types
@@ -232,7 +234,7 @@ class TestTracerouteList:
         # TracerouteListSourceNodeSerializer fields
         assert "source_node" in tr
         sn = tr["source_node"]
-        assert "node_id" in sn
+        assert "meshtastic_node_id" in sn
         assert "name" in sn
         assert "short_name" in sn
         assert "node_id_str" in sn
@@ -241,7 +243,7 @@ class TestTracerouteList:
         # TracerouteTargetNodeSerializer fields
         assert "target_node" in tr
         tn = tr["target_node"]
-        assert "node_id" in tn
+        assert "meshtastic_node_id" in tn
         assert "node_id_str" in tn
         assert "short_name" in tn
         assert "last_heard" in tn
@@ -350,8 +352,8 @@ class TestTracerouteTriggerableNodes:
         assert resp.status_code == 200
         data = resp.json()
         assert isinstance(data, list)
-        node_ids = [n["node_id"] for n in data]
-        assert mn.node_id in node_ids
+        node_ids = [n["meshtastic_node_id"] for n in data]
+        assert mn.meshtastic_node_id in node_ids
 
     def test_triggerable_nodes_returns_owned_nodes_for_owner(self, api_client, owner_managed_node):
         owner = owner_managed_node.owner
@@ -360,8 +362,8 @@ class TestTracerouteTriggerableNodes:
         assert resp.status_code == 200
         data = resp.json()
         assert isinstance(data, list)
-        node_ids = [n["node_id"] for n in data]
-        assert owner_managed_node.node_id in node_ids
+        node_ids = [n["meshtastic_node_id"] for n in data]
+        assert owner_managed_node.meshtastic_node_id in node_ids
 
     def test_triggerable_nodes_returns_constellation_nodes_for_editor(
         self, api_client, editor_user, editor_managed_node
@@ -371,8 +373,8 @@ class TestTracerouteTriggerableNodes:
         assert resp.status_code == 200
         data = resp.json()
         assert isinstance(data, list)
-        node_ids = [n["node_id"] for n in data]
-        assert editor_managed_node.node_id in node_ids
+        node_ids = [n["meshtastic_node_id"] for n in data]
+        assert editor_managed_node.meshtastic_node_id in node_ids
 
     def test_triggerable_nodes_empty_for_viewer(self, api_client, viewer_user, create_managed_node):
         """Viewer has no triggerable nodes (viewer role is not admin/editor)."""
@@ -385,8 +387,8 @@ class TestTracerouteTriggerableNodes:
         assert resp.status_code == 200
         data = resp.json()
         assert isinstance(data, list)
-        node_ids = [n["node_id"] for n in data]
-        assert mn.node_id not in node_ids
+        node_ids = [n["meshtastic_node_id"] for n in data]
+        assert mn.meshtastic_node_id not in node_ids
 
     def test_triggerable_nodes_response_shape(self, api_client, editor_user, editor_managed_node):
         api_client.force_authenticate(user=editor_user)
@@ -395,7 +397,7 @@ class TestTracerouteTriggerableNodes:
         data = resp.json()
         assert len(data) >= 1
         node = data[0]
-        assert "node_id" in node
+        assert "meshtastic_node_id" in node
         assert "node_id_str" in node
         assert "short_name" in node
         assert "long_name" in node
@@ -408,14 +410,18 @@ class TestTracerouteTriggerableNodes:
         self, api_client, editor_user, editor_managed_node
     ):
         """position is populated from NodeLatestStatus when the node has been heard."""
+        from common.mesh_node_helpers import meshtastic_id_to_hex
         from nodes.models import NodeLatestStatus, ObservedNode
 
-        observed, _ = ObservedNode.objects.get_or_create(node_id=editor_managed_node.node_id)
+        observed, _ = ObservedNode.objects.get_or_create(
+            meshtastic_node_id=editor_managed_node.meshtastic_node_id,
+            defaults={"node_id_str": meshtastic_id_to_hex(editor_managed_node.meshtastic_node_id)},
+        )
         NodeLatestStatus.objects.update_or_create(node=observed, defaults={"latitude": 55.86, "longitude": -4.25})
         api_client.force_authenticate(user=editor_user)
         resp = api_client.get("/api/traceroutes/triggerable-nodes/")
         assert resp.status_code == 200
-        node = next(n for n in resp.json() if n["node_id"] == editor_managed_node.node_id)
+        node = next(n for n in resp.json() if n["meshtastic_node_id"] == editor_managed_node.meshtastic_node_id)
         assert node["position"] == {"latitude": 55.86, "longitude": -4.25}
 
     def test_triggerable_nodes_position_falls_back_to_default_location(
@@ -428,7 +434,7 @@ class TestTracerouteTriggerableNodes:
         api_client.force_authenticate(user=editor_user)
         resp = api_client.get("/api/traceroutes/triggerable-nodes/")
         assert resp.status_code == 200
-        node = next(n for n in resp.json() if n["node_id"] == editor_managed_node.node_id)
+        node = next(n for n in resp.json() if n["meshtastic_node_id"] == editor_managed_node.meshtastic_node_id)
         assert node["position"] == {"latitude": 51.5, "longitude": -0.12}
 
     def test_triggerable_nodes_excludes_without_recent_ingestion(self, api_client, staff_user, create_managed_node):
@@ -437,8 +443,8 @@ class TestTracerouteTriggerableNodes:
         api_client.force_authenticate(user=staff_user)
         resp = api_client.get("/api/traceroutes/triggerable-nodes/")
         assert resp.status_code == 200
-        node_ids = [n["node_id"] for n in resp.json()]
-        assert mn.node_id not in node_ids
+        node_ids = [n["meshtastic_node_id"] for n in resp.json()]
+        assert mn.meshtastic_node_id not in node_ids
 
 
 @pytest.mark.django_db
@@ -448,7 +454,7 @@ class TestTracerouteTrigger:
         on = create_observed_node()
         resp = api_client.post(
             "/api/traceroutes/trigger/",
-            {"managed_node_id": mn.node_id, "target_node_id": on.node_id},
+            {"managed_node_id": mn.meshtastic_node_id, "target_node_id": on.meshtastic_node_id},
             format="json",
         )
         assert resp.status_code == 401
@@ -459,7 +465,7 @@ class TestTracerouteTrigger:
         api_client.force_authenticate(user=viewer_user)
         resp = api_client.post(
             "/api/traceroutes/trigger/",
-            {"managed_node_id": mn.node_id, "target_node_id": on.node_id},
+            {"managed_node_id": mn.meshtastic_node_id, "target_node_id": on.meshtastic_node_id},
             format="json",
         )
         assert resp.status_code == 403
@@ -470,13 +476,13 @@ class TestTracerouteTrigger:
         api_client.force_authenticate(user=editor_user)
         resp = api_client.post(
             "/api/traceroutes/trigger/",
-            {"managed_node_id": mn.node_id, "target_node_id": on.node_id},
+            {"managed_node_id": mn.meshtastic_node_id, "target_node_id": on.meshtastic_node_id},
             format="json",
         )
         assert resp.status_code == 201
         data = resp.json()
-        assert data["source_node"]["node_id"] == mn.node_id
-        assert data["target_node"]["node_id"] == on.node_id
+        assert data["source_node"]["meshtastic_node_id"] == mn.meshtastic_node_id
+        assert data["target_node"]["meshtastic_node_id"] == on.meshtastic_node_id
         assert data["trigger_type"] == AutoTraceRoute.TRIGGER_TYPE_USER
         assert data["trigger_type_label"] == "User"
         assert data["status"] == "sent"
@@ -493,8 +499,8 @@ class TestTracerouteTrigger:
         resp = api_client.post(
             "/api/traceroutes/trigger/",
             {
-                "managed_node_id": mn.node_id,
-                "target_node_id": on.node_id,
+                "managed_node_id": mn.meshtastic_node_id,
+                "target_node_id": on.meshtastic_node_id,
                 "target_strategy": AutoTraceRoute.TARGET_STRATEGY_DX_ACROSS,
             },
             format="json",
@@ -516,7 +522,7 @@ class TestTracerouteTrigger:
             with patch("traceroute.views.pick_traceroute_target", return_value=on) as mock_pick:
                 resp = api_client.post(
                     "/api/traceroutes/trigger/",
-                    {"managed_node_id": mn.node_id},
+                    {"managed_node_id": mn.meshtastic_node_id},
                     format="json",
                 )
         assert resp.status_code == 201
@@ -535,7 +541,7 @@ class TestTracerouteTrigger:
             resp = api_client.post(
                 "/api/traceroutes/trigger/",
                 {
-                    "managed_node_id": mn.node_id,
+                    "managed_node_id": mn.meshtastic_node_id,
                     "target_strategy": AutoTraceRoute.TARGET_STRATEGY_INTRA_ZONE,
                 },
                 format="json",
@@ -556,7 +562,7 @@ class TestTracerouteTrigger:
             with patch("traceroute.views.pick_traceroute_target", return_value=on):
                 resp = api_client.post(
                     "/api/traceroutes/trigger/",
-                    {"managed_node_id": mn.node_id},
+                    {"managed_node_id": mn.meshtastic_node_id},
                     format="json",
                 )
         assert resp.status_code == 201
@@ -576,7 +582,7 @@ class TestTracerouteTrigger:
         constellation = editor_managed_node.constellation
         creator = constellation.created_by
         mn_disabled = create_managed_node(
-            node_id=editor_managed_node.node_id + 1,
+            meshtastic_node_id=editor_managed_node.meshtastic_node_id + 1,
             owner=creator,
             constellation=constellation,
             allow_auto_traceroute=False,
@@ -585,7 +591,7 @@ class TestTracerouteTrigger:
         api_client.force_authenticate(user=editor_user)
         resp = api_client.post(
             "/api/traceroutes/trigger/",
-            {"managed_node_id": mn_disabled.node_id, "target_node_id": on.node_id},
+            {"managed_node_id": mn_disabled.meshtastic_node_id, "target_node_id": on.meshtastic_node_id},
             format="json",
         )
         assert resp.status_code == 400
@@ -600,13 +606,13 @@ class TestTracerouteTrigger:
         api_client.force_authenticate(user=editor_user)
         resp1 = api_client.post(
             "/api/traceroutes/trigger/",
-            {"managed_node_id": mn.node_id, "target_node_id": on.node_id},
+            {"managed_node_id": mn.meshtastic_node_id, "target_node_id": on.meshtastic_node_id},
             format="json",
         )
         assert resp1.status_code == 201
         resp2 = api_client.post(
             "/api/traceroutes/trigger/",
-            {"managed_node_id": mn.node_id, "target_node_id": on.node_id},
+            {"managed_node_id": mn.meshtastic_node_id, "target_node_id": on.meshtastic_node_id},
             format="json",
         )
         assert resp2.status_code == 429
@@ -622,11 +628,11 @@ class TestTracerouteTrigger:
         api_client.force_authenticate(user=staff_user)
         resp = api_client.post(
             "/api/traceroutes/trigger/",
-            {"managed_node_id": mn.node_id, "target_node_id": on.node_id},
+            {"managed_node_id": mn.meshtastic_node_id, "target_node_id": on.meshtastic_node_id},
             format="json",
         )
         assert resp.status_code == 201
-        assert resp.json()["source_node"]["node_id"] == mn.node_id
+        assert resp.json()["source_node"]["meshtastic_node_id"] == mn.meshtastic_node_id
 
     def test_trigger_owner_can_trigger_from_own_node(self, api_client, owner_managed_node, create_observed_node):
         """Owner can trigger from their own ManagedNode."""
@@ -636,11 +642,11 @@ class TestTracerouteTrigger:
         api_client.force_authenticate(user=owner)
         resp = api_client.post(
             "/api/traceroutes/trigger/",
-            {"managed_node_id": mn.node_id, "target_node_id": on.node_id},
+            {"managed_node_id": mn.meshtastic_node_id, "target_node_id": on.meshtastic_node_id},
             format="json",
         )
         assert resp.status_code == 201
-        assert resp.json()["source_node"]["node_id"] == mn.node_id
+        assert resp.json()["source_node"]["meshtastic_node_id"] == mn.meshtastic_node_id
 
     def test_trigger_forbidden_when_no_permission(
         self, api_client, viewer_user, owner_managed_node, create_observed_node
@@ -651,7 +657,7 @@ class TestTracerouteTrigger:
         api_client.force_authenticate(user=viewer_user)
         resp = api_client.post(
             "/api/traceroutes/trigger/",
-            {"managed_node_id": mn.node_id, "target_node_id": on.node_id},
+            {"managed_node_id": mn.meshtastic_node_id, "target_node_id": on.meshtastic_node_id},
             format="json",
         )
         assert resp.status_code == 403
@@ -671,13 +677,13 @@ class TestTracerouteTrigger:
             owner=creator,
             constellation=constellation,
             allow_auto_traceroute=True,
-            node_id=888_777_666,
+            meshtastic_node_id=888_777_666,
         )
         on = create_observed_node()
         api_client.force_authenticate(user=editor_user)
         resp = api_client.post(
             "/api/traceroutes/trigger/",
-            {"managed_node_id": mn.node_id, "target_node_id": on.node_id},
+            {"managed_node_id": mn.meshtastic_node_id, "target_node_id": on.meshtastic_node_id},
             format="json",
         )
         assert resp.status_code == 400

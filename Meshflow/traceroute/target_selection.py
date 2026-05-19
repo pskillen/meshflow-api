@@ -35,11 +35,13 @@ def _get_last_traced_by_source(managed_node: ManagedNode) -> dict[int, float]:
             source_node=managed_node,
             triggered_at__gte=cutoff,
         )
-        .values("target_node__node_id")
+        .values("target_node__meshtastic_node_id")
         .annotate(last_triggered=Max("triggered_at"))
     )
     now = timezone.now()
-    return {row["target_node__node_id"]: (now - row["last_triggered"]).total_seconds() / 3600 for row in rows}
+    return {
+        row["target_node__meshtastic_node_id"]: (now - row["last_triggered"]).total_seconds() / 3600 for row in rows
+    }
 
 
 def _demerit_hours(hours_since_last: float | None) -> float:
@@ -75,21 +77,21 @@ def _iter_scored_candidates(
             latest_status__latitude__isnull=False,
             latest_status__longitude__isnull=False,
         )
-        .exclude(node_id=managed_node.node_id)
-        .exclude(node_id__in=managed_node_ids)
+        .exclude(meshtastic_node_id=managed_node.meshtastic_node_id)
+        .exclude(meshtastic_node_id__in=managed_node_ids)
         .exclude(pk__in=suppressed)
         .select_related("latest_status")
     )
 
     for obs in candidates:
-        if obs.node_id in hard:
+        if obs.meshtastic_node_id in hard:
             continue
         lat = obs.latest_status.latitude
         lon = obs.latest_status.longitude
         dist = haversine_km(source_pos[0], source_pos[1], lat, lon)
-        hours_since = last_traced_hours.get(obs.node_id)
+        hours_since = last_traced_hours.get(obs.meshtastic_node_id)
         demerit = _demerit_hours(hours_since)
-        sp = soft.get(obs.node_id, 0.0)
+        sp = soft.get(obs.meshtastic_node_id, 0.0)
         score = dist - demerit - sp
         yield score, obs
 
@@ -103,7 +105,7 @@ def _deterministic_pick(
         return None
     date_str = timezone.now().date().isoformat()
     slot_str = slot or "default"
-    h = hash((managed_node.node_id, date_str, slot_str)) % (1 << 32)
+    h = hash((managed_node.meshtastic_node_id, date_str, slot_str)) % (1 << 32)
     idx = h % len(ranked)
     return ranked[idx]
 
@@ -128,7 +130,9 @@ def pick_traceroute_target(
         strat = None
 
     last_traced_hours = _get_last_traced_by_source(managed_node)
-    managed_node_ids = set(ManagedNode.objects.filter(deleted_at__isnull=True).values_list("node_id", flat=True))
+    managed_node_ids = set(
+        ManagedNode.objects.filter(deleted_at__isnull=True).values_list("meshtastic_node_id", flat=True)
+    )
     suppressed = list(suppressed_observed_node_ids())
     hard_cooldown, soft_penalty = load_source_target_reliability(managed_node)
 
@@ -274,10 +278,10 @@ def _pick_intra_zone(
     scored = []
     soft = soft_penalty or {}
     for d_src, obs in inside:
-        hours_since = last_traced_hours.get(obs.node_id)
+        hours_since = last_traced_hours.get(obs.meshtastic_node_id)
         demerit = _demerit_hours(hours_since)
         base = -abs(d_src - med)
-        sp = soft.get(obs.node_id, 0.0)
+        sp = soft.get(obs.meshtastic_node_id, 0.0)
         total = base - demerit - sp
         scored.append((total, obs))
     scored.sort(key=lambda x: -x[0])

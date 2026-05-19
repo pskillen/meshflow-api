@@ -148,7 +148,7 @@ def build_request(profile: "NodeRfProfile", *, radius_m: int | None = None) -> d
         logger.warning(
             "rf_propagation.payload: directional antenna requested for node_id=%s; "
             "Site Planner only supports omni — rendering omni",
-            getattr(profile.observed_node, "node_id", "?"),
+            getattr(profile.observed_node, "meshtastic_node_id", "?"),
         )
 
     colormap = normalize_colormap(getattr(settings, "RF_PROPAGATION_COLORMAP", DEFAULT_COLORMAP))

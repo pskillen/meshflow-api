@@ -52,7 +52,7 @@ class TraceroutePacketService(BasePacketService):
                 "No AutoTraceRoute found for packet %s from %s to %s; creating external record",
                 self.packet.id,
                 source_node.node_id_str,
-                self.from_node.node_id,
+                self.from_node.meshtastic_node_id,
             )
             auto_tr = create_external_inferred_auto_traceroute(
                 source_node=source_node,

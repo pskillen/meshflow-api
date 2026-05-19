@@ -133,10 +133,10 @@ def _send_and_update(tr: AutoTraceRoute, channel_layer) -> dict:
     now = timezone.now()
     try:
         async_to_sync(channel_layer.group_send)(
-            f"node_{tr.source_node.node_id}",
+            f"node_{tr.source_node.meshtastic_node_id}",
             {
                 "type": "node_command",
-                "command": {"type": "traceroute", "target": tr.target_node.node_id},
+                "command": {"type": "traceroute", "target": tr.target_node.meshtastic_node_id},
             },
         )
     except Exception as e:  # noqa: BLE001 — record channel errors for observability

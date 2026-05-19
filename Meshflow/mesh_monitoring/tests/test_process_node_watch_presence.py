@@ -30,7 +30,7 @@ def test_process_node_watch_presence_starts_verification_and_creates_monitor_tr(
     monkeypatch.setenv("SCHEDULE_TRACEROUTE_SOURCE_RECENCY_SECONDS", "600")
 
     user = create_user()
-    obs = create_observed_node(node_id=112233445, claimed_by=user)
+    obs = create_observed_node(meshtastic_node_id=112233445, claimed_by=user)
     obs.last_heard = timezone.now() - timedelta(seconds=120)
     obs.save(update_fields=["last_heard"])
     NodeLatestStatus.objects.create(node=obs, latitude=48.0, longitude=2.0)
@@ -83,7 +83,7 @@ def test_monitoring_traceroute_succeeded_since_true_when_route_empty(
 ):
     """Completed monitor TR with direct path (empty route lists) counts as success."""
     user = create_user()
-    obs = create_observed_node(node_id=0x11223344, claimed_by=user)
+    obs = create_observed_node(meshtastic_node_id=0x11223344, claimed_by=user)
     source = create_managed_node()
     since = timezone.now() - timedelta(minutes=10)
     AutoTraceRoute.objects.create(
@@ -106,7 +106,7 @@ def test_on_monitoring_traceroute_completed_clears_verification_when_routes_empt
 ):
     """Direct-path monitor completion clears verification_started_at."""
     user = create_user()
-    obs = create_observed_node(node_id=0x22334455, claimed_by=user)
+    obs = create_observed_node(meshtastic_node_id=0x22334455, claimed_by=user)
     vs = timezone.now() - timedelta(minutes=2)
     NodePresence.objects.create(observed_node=obs, verification_started_at=vs)
     source = create_managed_node()
@@ -141,7 +141,7 @@ def test_dispatch_zero_sources_sets_last_zero_sources_at(
     monkeypatch.setenv("SCHEDULE_TRACEROUTE_SOURCE_RECENCY_SECONDS", "600")
 
     user = create_user()
-    obs = create_observed_node(node_id=0x33445566, claimed_by=user)
+    obs = create_observed_node(meshtastic_node_id=0x33445566, claimed_by=user)
     obs.last_heard = timezone.now() - timedelta(seconds=120)
     obs.save(update_fields=["last_heard"])
     NodeLatestStatus.objects.create(node=obs, latitude=48.0, longitude=2.0)
@@ -170,7 +170,7 @@ def test_process_node_watch_presence_clears_observability_when_node_not_silent(
     create_observed_node,
 ):
     user = create_user()
-    obs = create_observed_node(node_id=0x44556677, claimed_by=user)
+    obs = create_observed_node(meshtastic_node_id=0x44556677, claimed_by=user)
     obs.last_heard = timezone.now() - timedelta(seconds=120)
     obs.save(update_fields=["last_heard"])
     create_watch_with_offline_threshold(user=user, observed_node=obs, offline_after=60)
@@ -202,7 +202,7 @@ def test_process_node_watch_presence_sets_observed_online_at_when_created_heard(
 ):
     """First presence row while last_heard is fresh records observed_online_at."""
     user = create_user()
-    obs = create_observed_node(node_id=0x66778899, claimed_by=user)
+    obs = create_observed_node(meshtastic_node_id=0x66778899, claimed_by=user)
     obs.last_heard = timezone.now()
     obs.save(update_fields=["last_heard"])
     NodeWatch.objects.create(user=user, observed_node=obs, enabled=True)
@@ -221,7 +221,7 @@ def test_process_node_watch_presence_recovery_from_offline_sets_observed_online_
     create_observed_node,
 ):
     user = create_user()
-    obs = create_observed_node(node_id=0x778899AA, claimed_by=user)
+    obs = create_observed_node(meshtastic_node_id=0x778899AA, claimed_by=user)
     obs.last_heard = timezone.now()
     obs.save(update_fields=["last_heard"])
     create_watch_with_offline_threshold(user=user, observed_node=obs, offline_after=60)
@@ -249,7 +249,7 @@ def test_process_node_watch_presence_offline_confirm_sets_is_offline(
     monkeypatch.setenv("SCHEDULE_TRACEROUTE_SOURCE_RECENCY_SECONDS", "600")
 
     user = create_user()
-    obs = create_observed_node(node_id=0x88990011, claimed_by=user)
+    obs = create_observed_node(meshtastic_node_id=0x88990011, claimed_by=user)
     now = timezone.now()
     obs.last_heard = now - timedelta(minutes=10)
     obs.save(update_fields=["last_heard"])
@@ -286,7 +286,7 @@ def test_send_monitoring_traceroute_command_updates_presence_tr_fields(
     create_managed_node,
 ):
     user = create_user()
-    obs = create_observed_node(node_id=0x55667788, claimed_by=user)
+    obs = create_observed_node(meshtastic_node_id=0x55667788, claimed_by=user)
     NodePresence.objects.get_or_create(observed_node=obs)
     source = create_managed_node(allow_auto_traceroute=True)
     at = timezone.now()

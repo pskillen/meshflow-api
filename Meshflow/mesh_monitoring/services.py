@@ -142,7 +142,7 @@ def _node_details_url(observed_node: ObservedNode) -> str | None:
     base_url = (getattr(settings, "FRONTEND_URL", None) or "").strip().rstrip("/")
     if not base_url:
         return None
-    return f"{base_url}/nodes/{observed_node.node_id}"
+    return f"{base_url}/nodes/{observed_node.meshtastic_node_id}"
 
 
 def _format_node_label(observed_node: ObservedNode) -> str:
