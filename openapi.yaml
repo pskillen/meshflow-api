@@ -23,7 +23,7 @@ tags:
   - name: Packets
     description: >
       Legacy tag name retained for compatibility. All Meshtastic packet ingestion and feeder
-      node upsert operations use the **Meshtastic packets** tag and live under ``/api/packets/{node_id}/``.
+      node upsert operations use the **Meshtastic packets** tag and live under ``/api/packets/{meshtastic_node_id}/``.
   - name: Constellations
     description: Constellation management endpoints
   - name: Nodes
@@ -165,14 +165,14 @@ components:
 
     FeederReachFeeder:
       type: object
-      required: [managed_node_id, node_id, node_id_str, lat, lng]
+      required: [managed_node_id, meshtastic_node_id, node_id_str, lat, lng]
       properties:
         managed_node_id:
           type: string
           description: ManagedNode internal UUID.
-        node_id:
+        meshtastic_node_id:
           type: integer
-          description: Meshtastic node id.
+          description: Meshtastic numeric node id for the feeder.
         node_id_str:
           type: string
           description: Meshtastic node id in `!hex` form.
@@ -194,10 +194,11 @@ components:
       description: >
         One ObservedNode that the feeder has attempted at least one COMPLETED or
         FAILED traceroute to in the window, with attempt and success counts.
-      required: [node_id, node_id_str, lat, lng, attempts, successes]
+      required: [meshtastic_node_id, node_id_str, lat, lng, attempts, successes]
       properties:
-        node_id:
+        meshtastic_node_id:
           type: integer
+          description: Meshtastic numeric node id of the target ObservedNode.
         node_id_str:
           type: string
         short_name:
@@ -882,8 +883,9 @@ components:
           items:
             type: object
             properties:
-              node_id:
+              meshtastic_node_id:
                 type: integer
+                description: Meshtastic numeric node id for this hop.
               node_id_str:
                 type: string
               short_name:
@@ -907,8 +909,9 @@ components:
           items:
             type: object
             properties:
-              node_id:
+              meshtastic_node_id:
                 type: integer
+                description: Meshtastic numeric node id for this hop.
               node_id_str:
                 type: string
               short_name:
@@ -1010,10 +1013,10 @@ components:
         protocol:
           $ref: '#/components/schemas/MeshProtocol'
           description: Mesh protocol for this observed node
-        node_id:
+        meshtastic_node_id:
           type: integer
           nullable: true
-          description: The ID of the node in the mesh network (Meshtastic numeric id; null reserved for MeshCore)
+          description: Meshtastic numeric node id on the mesh (null for MeshCore observed nodes)
         node_id_str:
           type: string
           description: Display id (!hex8 for Meshtastic, mc:prefix12 for MeshCore)
@@ -1463,9 +1466,9 @@ components:
       description: >
         A subset of ObservedNode fields returned by the search endpoint.
       properties:
-        node_id:
+        meshtastic_node_id:
           type: integer
-          description: The ID of the node in the mesh network
+          description: Meshtastic numeric node id on the mesh network
         node_id_str:
           type: string
           description: The ID of the node in Meshastic !hex format
@@ -1580,10 +1583,10 @@ components:
           description: The observed node being claimed
           readOnly: true
           properties:
-            node_id:
+            meshtastic_node_id:
               type: integer
               format: int64
-              description: The numeric ID of the node
+              description: Meshtastic numeric node id
               readOnly: true
             node_id_str:
               type: string
@@ -1629,9 +1632,9 @@ components:
         Used to update an observed node directly. Normally observed nodes are updated automatically via the ingest endpoint,
         but this endpoint can be used to update node information directly (e.g. via the on_node_updated event)
       properties:
-        id:
+        meshtastic_node_id:
           type: integer
-          description: The integer ID of the observed node
+          description: The Meshtastic numeric node id of the observed node
         macaddr:
           type: string
           description: The MAC address of the node
@@ -1672,10 +1675,10 @@ components:
         Managed nodes submit data to the API (or a bot process does), and a managed node often has an
         associated ObservedNode.
       properties:
-        node_id:
+        meshtastic_node_id:
           type: integer
           format: int64
-          description: Node ID
+          description: Meshtastic numeric node id for this managed feeder
         protocol:
           $ref: '#/components/schemas/MeshProtocol'
           description: Mesh protocol for this managed node
@@ -1758,7 +1761,7 @@ components:
           type: string
           format: date-time
           nullable: true
-          description: Included when include=status. ObservedNode last_heard matched by node_id.
+          description: Included when include=status. ObservedNode last_heard matched by meshtastic_node_id.
           readOnly: true
         is_eligible_traceroute_source:
           type: boolean
@@ -2340,11 +2343,11 @@ components:
 
     NeighbourStatsCandidate:
       type: object
-      description: A candidate node matching a source (full node_id or LSB match)
+      description: A candidate node matching a source (full meshtastic_node_id or LSB match)
       properties:
-        node_id:
+        meshtastic_node_id:
           type: integer
-          description: The node ID
+          description: Meshtastic numeric node id
         node_id_str:
           type: string
           description: The node ID in Meshtastic !hex format
@@ -2404,9 +2407,9 @@ components:
           type: object
           description: The node that observed the packet
           properties:
-            node_id:
+            meshtastic_node_id:
               type: integer
-              description: The ID of the node
+              description: Meshtastic numeric node id of the observer ManagedNode
             node_id_str:
               type: string
               description: The ID of the node in Meshastic !hex format
@@ -2600,8 +2603,9 @@ components:
         internal_id:
           type: string
           format: uuid
-        node_id:
+        meshtastic_node_id:
           type: integer
+          description: Meshtastic numeric node id of the managed feeder
         node_id_str:
           type: string
         name:
@@ -2626,8 +2630,9 @@ components:
         internal_id:
           type: string
           format: uuid
-        node_id:
+        meshtastic_node_id:
           type: integer
+          description: Meshtastic numeric node id of the observed destination
         node_id_str:
           type: string
         short_name:
@@ -2665,8 +2670,9 @@ components:
         internal_id:
           type: string
           format: uuid
-        node_id:
+        meshtastic_node_id:
           type: integer
+          description: Meshtastic numeric node id of the hop node
         node_id_str:
           type: string
         short_name:
@@ -2821,11 +2827,11 @@ components:
 
     DxNodeExclusionRequest:
       type: object
-      required: [node_id, exclude_from_detection]
+      required: [meshtastic_node_id, exclude_from_detection]
       properties:
-        node_id:
+        meshtastic_node_id:
           type: integer
-          description: Meshtastic node id of the observed destination node.
+          description: Meshtastic numeric node id of the observed destination node.
         exclude_from_detection:
           type: boolean
         exclude_notes:
@@ -2835,8 +2841,9 @@ components:
     DxNodeExclusionResponse:
       type: object
       properties:
-        node_id:
+        meshtastic_node_id:
           type: integer
+          description: Meshtastic numeric node id of the observed destination node
         node_id_str:
           type: string
         exclude_from_detection:
@@ -3451,7 +3458,7 @@ paths:
       deprecated: true
       summary: Ingest a packet (legacy v1)
       description: >
-        **Deprecated.** Meshtastic bots should use ``POST /packets/{node_id}/ingest/`` instead
+        **Deprecated.** Meshtastic bots should use ``POST /packets/{meshtastic_node_id}/ingest/`` instead
         (v2 ingest; observer nodenum in the path). This URL is still used by meshtastic-bot when
         ``api_version`` is 1 (``/api/raw-packet/``). It is not registered in the current Django
         urlconf; production stacks may proxy it to the v2 ingest route or run an older API build.
@@ -3478,18 +3485,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /packets/{node_id}/ingest/:
+  /packets/{meshtastic_node_id}/ingest/:
     post:
       summary: Ingest a Meshtastic packet
       description: >
-        Meshtastic feeder bots POST incoming packets here. The path ``node_id`` is the observer's
-        Meshtastic numeric node number and must match the authenticated ManagedNode. The endpoint
-        identifies the packet type and processes it accordingly.
+        Meshtastic feeder bots POST incoming packets here. The path segment is the observer's
+        Meshtastic numeric node id (``meshtastic_node_id``) and must match the authenticated
+        ManagedNode. The endpoint identifies the packet type and processes it accordingly.
       tags: [Meshtastic packets]
       security:
         - NodeApiKeyAuth: []
       parameters:
-        - name: node_id
+        - name: meshtastic_node_id
           in: path
           required: true
           schema:
@@ -3577,18 +3584,19 @@ paths:
         '200':
           description: Paginated MeshCore raw packets
 
-  /packets/{node_id}/nodes/:
+  /packets/{meshtastic_node_id}/nodes/:
     post:
       summary: Upsert observed node (feeder)
       description: >
-        Meshtastic feeder bots upsert observed-node rows via this endpoint. The path ``node_id`` is
-        the observer's Meshtastic numeric node number and must match the authenticated ManagedNode.
-        Similar to ``/nodes/observed-nodes/`` but scoped to Node API key auth for bots.
+        Meshtastic feeder bots upsert observed-node rows via this endpoint. The path segment is
+        the observer's Meshtastic numeric node id (``meshtastic_node_id``) and must match the
+        authenticated ManagedNode. Similar to ``/nodes/observed-nodes/`` but scoped to Node API
+        key auth for bots.
       tags: [Meshtastic packets]
       security:
         - NodeApiKeyAuth: []
       parameters:
-        - name: node_id
+        - name: meshtastic_node_id
           in: path
           required: true
           schema:
@@ -4164,7 +4172,7 @@ paths:
     get:
       summary: Bulk device metrics for multiple nodes
       description: >
-        Meshtastic-only: ``node_ids`` are Meshtastic numeric node numbers (``ObservedNode.node_id``).
+        Meshtastic-only: ``node_ids`` are Meshtastic numeric node numbers (``ObservedNode.meshtastic_node_id``).
         Get device metrics (battery, channel utilisation, uptime) for multiple nodes in one request.
         Returns flat list; frontend groups by node_id for per-node charts.
         Reusable by Infrastructure, Monitor, My Nodes pages.
@@ -4192,7 +4200,7 @@ paths:
             format: date-time
       responses:
         '200':
-          description: Flat list of device metrics with node_id, node_id_str, short_name per item
+          description: Flat list of device metrics with meshtastic_node_id, node_id_str, short_name per item
           content:
             application/json:
               schema:
@@ -4203,7 +4211,7 @@ paths:
                     items:
                       type: object
                       properties:
-                        node_id:
+                        meshtastic_node_id:
                           type: integer
                         node_id_str:
                           type: string
@@ -4283,7 +4291,7 @@ paths:
             format: date-time
       responses:
         '200':
-          description: Flat list of environment metrics with node_id, node_id_str, short_name per item
+          description: Flat list of environment metrics with meshtastic_node_id, node_id_str, short_name per item
           content:
             application/json:
               schema:
@@ -4294,7 +4302,7 @@ paths:
                     items:
                       type: object
                       properties:
-                        node_id:
+                        meshtastic_node_id:
                           type: integer
                         node_id_str:
                           type: string
@@ -4346,7 +4354,7 @@ paths:
   /nodes/observed-nodes/search/:
     get:
       summary: Search observed nodes
-      description: Search for observed nodes by node_id_str, short_name, long_name, or node_id
+      description: Search for observed nodes by node_id_str, short_name, long_name, or meshtastic_node_id
       tags: [Nodes]
       security:
         - BearerAuth: []
@@ -4356,7 +4364,7 @@ paths:
           required: true
           schema:
             type: string
-            description: Search term to match against node_id_str, short_name, long_name, or node_id
+            description: Search term to match against node_id_str, short_name, long_name, or meshtastic numeric id
       responses:
         '200':
           description: List of matching nodes
@@ -4377,7 +4385,7 @@ paths:
     get:
       summary: Get observed node details
       description: >
-        Detail lookup by Meshtastic numeric ``node_id`` (``ObservedNode.node_id``). For MeshCore
+        Detail lookup by Meshtastic numeric id (``ObservedNode.meshtastic_node_id``). For MeshCore
         nodes, use ``GET /nodes/observed-nodes/?protocol=meshcore`` (and search) until lookup by
         ``internal_id`` is added ([#318](https://github.com/pskillen/meshflow-api/issues/318)).
       tags: [Nodes]
@@ -4476,7 +4484,7 @@ paths:
     get:
       summary: Get device metrics for a specific node
       description: >
-        Meshtastic-only: path ``node_id`` is the Meshtastic numeric node number (``ObservedNode.node_id``).
+        Meshtastic-only: path ``node_id`` is the Meshtastic numeric node number (``ObservedNode.meshtastic_node_id``).
         Returns device metrics for that node with optional date filtering.
       tags: [Nodes]
       security:
@@ -4508,7 +4516,7 @@ paths:
     get:
       summary: Get environment metrics for a specific node
       description: >
-        Meshtastic-only: path ``node_id`` is the Meshtastic numeric node number (``ObservedNode.node_id``).
+        Meshtastic-only: path ``node_id`` is the Meshtastic numeric node number (``ObservedNode.meshtastic_node_id``).
         Returns environment metrics for that node with optional date filtering.
       tags: [Nodes]
       security:
@@ -4540,7 +4548,7 @@ paths:
     get:
       summary: Get power metrics for a specific node
       description: >
-        Meshtastic-only: path ``node_id`` is the Meshtastic numeric node number (``ObservedNode.node_id``).
+        Meshtastic-only: path ``node_id`` is the Meshtastic numeric node number (``ObservedNode.meshtastic_node_id``).
         Returns power metrics for that node with optional date filtering.
       tags: [Nodes]
       security:
@@ -4628,7 +4636,7 @@ paths:
                     items:
                       type: object
                       properties:
-                        node_id:
+                        meshtastic_node_id:
                           type: integer
                         lat:
                           type: number
@@ -4904,7 +4912,7 @@ paths:
                 $ref: '#/components/schemas/OwnedManagedNode'
         '400':
           description: >
-            Validation error, including when a managed-node row already exists for this `node_id`,
+            Validation error, including when a managed-node row already exists for this `meshtastic_node_id`,
             or when a soft-deleted managed node exists (re-management blocked until an administrator clears deletion).
           content:
             application/json:
@@ -5206,8 +5214,9 @@ paths:
             schema:
               type: object
               properties:
-                node_id:
+                meshtastic_node_id:
                   type: integer
+                  description: Meshtastic numeric node id of the managed node to link
       responses:
         '200':
           description: Node added successfully
@@ -5235,8 +5244,9 @@ paths:
             schema:
               type: object
               properties:
-                node_id:
+                meshtastic_node_id:
                   type: integer
+                  description: Meshtastic numeric node id of the managed node to unlink
       responses:
         '200':
           description: Node removed successfully
@@ -5478,7 +5488,7 @@ paths:
           required: false
           schema:
             type: integer
-            description: Filter by source ManagedNode node_id
+            description: Filter by source ManagedNode meshtastic_node_id
         - name: source_node
           in: query
           required: false
@@ -5625,7 +5635,7 @@ paths:
                     items:
                       type: object
                       properties:
-                        node_id:
+                        meshtastic_node_id:
                           type: integer
                         node_id_str:
                           type: string
@@ -5644,7 +5654,7 @@ paths:
                       type: object
                       required:
                         - managed_node_id
-                        - node_id
+                        - meshtastic_node_id
                         - node_id_str
                         - name
                         - short_name
@@ -5656,7 +5666,7 @@ paths:
                         managed_node_id:
                           type: string
                           format: uuid
-                        node_id:
+                        meshtastic_node_id:
                           type: integer
                         node_id_str:
                           type: string
@@ -5688,7 +5698,7 @@ paths:
                     items:
                       type: object
                       required:
-                        - node_id
+                        - meshtastic_node_id
                         - node_id_str
                         - short_name
                         - long_name
@@ -5697,7 +5707,7 @@ paths:
                         - failed
                         - success_rate
                       properties:
-                        node_id:
+                        meshtastic_node_id:
                           type: integer
                         node_id_str:
                           type: string
@@ -5859,9 +5869,9 @@ paths:
                     type: array
                     items:
                       type: object
-                      required: [node_id, node_id_str, lat, lng]
+                      required: [meshtastic_node_id, node_id_str, lat, lng]
                       properties:
-                        node_id:
+                        meshtastic_node_id:
                           type: integer
                         node_id_str:
                           type: string
@@ -6052,10 +6062,11 @@ paths:
                 type: array
                 items:
                   type: object
-                  required: [node_id, node_id_str, short_name, long_name, allow_auto_traceroute, constellation, position]
+                  required: [meshtastic_node_id, node_id_str, short_name, long_name, allow_auto_traceroute, constellation, position]
                   properties:
-                    node_id:
+                    meshtastic_node_id:
                       type: integer
+                      description: Meshtastic numeric node id of the triggerable managed node
                     node_id_str:
                       type: string
                     short_name:
@@ -6106,7 +6117,7 @@ paths:
                   description: Node ID of the ManagedNode (source/bot)
                 target_node_id:
                   type: integer
-                  description: Target ObservedNode node_id (optional for auto-selection)
+                  description: Target ObservedNode meshtastic_node_id (optional for auto-selection)
                   nullable: true
                 target_strategy:
                   type: string

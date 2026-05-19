@@ -19,8 +19,8 @@ Living tracker for the [rename audit index](file:///Users/patricks/IdeaProjects/
 | ID | Sub-plan | Repos | PRs | Status | Issue | PR |
 |----|----------|-------|-----|--------|-------|-----|
 | SP-01 | OpenAPI contract docs | api | 1 | in_progress | [#308](https://github.com/pskillen/meshflow-api/issues/308) | [#320](https://github.com/pskillen/meshflow-api/pull/320) |
-| SP-02 | Comment-only labelling | api, bot, ui | 1–3 | in_progress | [#309](https://github.com/pskillen/meshflow-api/issues/309) | api / bot / ui (see notes) |
-| SP-03 | `node_id` → `meshtastic_node_id` | api, bot, ui | 1 (coordinated) | not_started | [#310](https://github.com/pskillen/meshflow-api/issues/310) | |
+| SP-02 | Comment-only labelling | api, bot, ui | 1–3 | in_progress | [#309](https://github.com/pskillen/meshflow-api/issues/309) | [#321](https://github.com/pskillen/meshflow-api/pull/321) · [bot#96](https://github.com/pskillen/meshflow-bot/pull/96) · [ui#267](https://github.com/pskillen/meshflow-ui/pull/267) |
+| SP-03 | `node_id` → `meshtastic_node_id` | api, bot, ui | 1 (coordinated) | in_progress | [#310](https://github.com/pskillen/meshflow-api/issues/310) | |
 | SP-04 | ObservedNode MT identity fields | api, ui | 1 | not_started | [#312](https://github.com/pskillen/meshflow-api/issues/312) | |
 | SP-05 | MtRawPacket wire + observations | api | 1 | not_started | [#311](https://github.com/pskillen/meshflow-api/issues/311) | |
 | SP-06 | ManagedNode channels + constellation bot defaults | api, ui | 1 | not_started | [#313](https://github.com/pskillen/meshflow-api/issues/313) | |
@@ -52,18 +52,23 @@ Parent index: [meshcore-rename-index](file:///Users/patricks/IdeaProjects/MeshFl
 ### SP-02 — Comment-only labelling
 
 - **Merged:** —
-- **Branch:** `api-309/{author}/meshcore-rename-sp02-comments` (api, bot, ui)
+- **Branch:** `api-309/pskillen/meshcore-rename-sp02-comments` (api, bot, ui)
 - **Delivered (doc-only, no migrations / JSON renames):**
   - **api:** `ObservedNode` help_text (`mac_addr`, names, `public_key`, `role`); `NodeLatestStatus.inferred_max_hops`; `RoleSource` / `LocationSource` module docstrings; `BaseNodeItem` (unchanged, already labelled); `TextMessage.original_packet` help_text; serializer/view docstrings; OpenAPI `ObservedNode`, nested `latest_*`, `TextMessage`, list `GET /nodes/observed-nodes/`
   - **bot:** `src/radio/events.py` (`portnum`, `from_id`/`to_id` with `mc:` examples, hops); `interface.py` (`local_nodenum`, `send_traceroute` MT-only); `StorageAPI.py` v2 Meshtastic ingest vs `/api/meshcore/packets/ingest/`
   - **ui:** `src/lib/models.ts` JSDoc on `ObservedNode` + MT-only nested metrics; `meshtastic-api.ts` list/detail comments for mixed resource + `protocol` filter
-- **PRs:** meshflow-api (this tracker), meshflow-bot, meshflow-ui — link here when opened
+- **PRs:** [#321](https://github.com/pskillen/meshflow-api/pull/321) · [meshflow-bot#96](https://github.com/pskillen/meshflow-bot/pull/96) · [meshflow-ui#267](https://github.com/pskillen/meshflow-ui/pull/267)
 - **Notes:** Closes #309 when all three PRs merge. Detail route remains Meshtastic `node_id` ([#318](https://github.com/pskillen/meshflow-api/issues/318)).
 
 ### SP-03 — `meshtastic_node_id`
 
 - **Merged:** —
-- **Notes:**
+- **Branch:** `api-310/{author}/meshcore-rename-sp03-meshtastic-node-id` (api, bot, ui)
+- **Delivered:**
+  - **api:** `RenameField` migration `0037_rename_node_id_meshtastic_node_id`; `ObservedNode` / `ManagedNode` field + CHECK constraint; serializers, views (`lookup_field` + `lookup_url_kwarg=node_id`), admin, packets ingest auth, stats/traceroute/dx/ws call sites; `openapi.yaml` JSON field rename; integration/unit tests
+  - **bot:** No payload change (node upsert still uses JSON `id`; ingest URL path `<int:node_id>` unchanged)
+  - **ui:** `ObservedNode` / `ManagedNode` types and all `.meshtastic_node_id` usages; Playwright fixtures
+- **Notes:** URL path segment and Django kwarg remain `node_id` until a URL epic; MeshCore detail by int still blocked ([#318](https://github.com/pskillen/meshflow-api/issues/318)). Closes #310 when coordinated PRs merge.
 
 ### SP-04 — ObservedNode MT identity fields
 
