@@ -64,8 +64,8 @@ class PositionPacket(MtRawPacket):
     longitude = models.FloatField(null=True)
     altitude = models.FloatField(null=True)
     heading = models.FloatField(null=True)
-    location_source = models.IntegerField(choices=LocationSource.choices, null=True)
-    precision_bits = models.SmallIntegerField(null=True)
+    meshtastic_location_source = models.IntegerField(choices=LocationSource.choices, null=True)
+    meshtastic_precision_bits = models.SmallIntegerField(null=True)
     position_time = models.DateTimeField(null=True)  # Unix timestamp converted to datetime
     ground_speed = models.FloatField(null=True)  # in m/s
     ground_track = models.FloatField(null=True)  # in degrees (0-359)
@@ -107,8 +107,8 @@ class DeviceMetricsPacket(BaseTelemetryPacket):
 
     battery_level = models.FloatField(null=True)
     voltage = models.FloatField(null=True)
-    channel_utilization = models.FloatField(null=True)
-    air_util_tx = models.FloatField(null=True)
+    meshtastic_channel_utilization = models.FloatField(null=True)
+    meshtastic_air_util_tx = models.FloatField(null=True)
     uptime_seconds = models.BigIntegerField(null=True)
 
     class Meta:
@@ -120,8 +120,8 @@ class LocalStatsPacket(BaseTelemetryPacket):
     """Meshtastic local stats telemetry row."""
 
     uptime_seconds = models.BigIntegerField(null=True)
-    channel_utilization = models.FloatField(null=True)
-    air_util_tx = models.FloatField(null=True)
+    meshtastic_channel_utilization = models.FloatField(null=True)
+    meshtastic_air_util_tx = models.FloatField(null=True)
     num_packets_tx = models.BigIntegerField(null=True)
     num_packets_rx = models.BigIntegerField(null=True)
     num_packets_rx_bad = models.BigIntegerField(null=True)

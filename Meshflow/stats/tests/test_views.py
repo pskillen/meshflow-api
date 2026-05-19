@@ -34,7 +34,7 @@ def test_node_neighbour_stats_uses_from_int_when_relay_node_null(create_managed_
     """When relay_node is null, source should be packet.from_int."""
     user = create_user()
     managed = create_managed_node(owner=user, meshtastic_node_id=111111111)
-    channel = managed.channel_0
+    channel = managed.meshtastic_channel_0
 
     packet = MessagePacket.objects.create(
         packet_id=1,
@@ -84,7 +84,7 @@ def test_node_neighbour_stats_uses_relay_node_when_set(create_managed_node, crea
     """When relay_node is set, source should be relay_node (last hop)."""
     user = create_user()
     managed = create_managed_node(owner=user, meshtastic_node_id=111111111)
-    channel = managed.channel_0
+    channel = managed.meshtastic_channel_0
 
     packet = MessagePacket.objects.create(
         packet_id=2,
@@ -134,7 +134,7 @@ def test_node_neighbour_stats_uses_from_int_when_relay_node_zero(create_managed_
     """When relay_node is 0, source should fall back to packet.from_int."""
     user = create_user()
     managed = create_managed_node(owner=user, meshtastic_node_id=555555555)
-    channel = managed.channel_0
+    channel = managed.meshtastic_channel_0
 
     packet = MessagePacket.objects.create(
         packet_id=3,
@@ -176,7 +176,7 @@ def test_node_neighbour_stats_aggregates_multiple_sources(create_managed_node, c
     """Multiple packets from different sources should be aggregated correctly."""
     user = create_user()
     managed = create_managed_node(owner=user, meshtastic_node_id=777777777)
-    channel = managed.channel_0
+    channel = managed.meshtastic_channel_0
 
     rx_time = timezone.make_aware(datetime(2025, 6, 15, 12, 0, 0))
     for i, (from_id, relay_id) in enumerate([(100, None), (100, None), (200, 300)]):
@@ -217,7 +217,7 @@ def test_node_neighbour_stats_lsb_returns_candidates(create_managed_node, create
     """When relay_node is LSB (<=255), source_type is lsb and candidates list all matching nodes."""
     user = create_user()
     managed = create_managed_node(owner=user, meshtastic_node_id=888888888)
-    channel = managed.channel_0
+    channel = managed.meshtastic_channel_0
 
     packet = MessagePacket.objects.create(
         packet_id=4,
@@ -272,7 +272,7 @@ def test_node_neighbour_stats_excludes_self_packets(create_managed_node, create_
     """Packets where the source is the node itself should be excluded."""
     user = create_user()
     managed = create_managed_node(owner=user, meshtastic_node_id=555555555)
-    channel = managed.channel_0
+    channel = managed.meshtastic_channel_0
 
     rx_time = timezone.make_aware(datetime(2025, 6, 15, 12, 0, 0))
 
@@ -332,7 +332,7 @@ def test_node_received_stats_excludes_self_device_metrics(create_managed_node, c
     """node_received_stats excludes observations of device metrics from self."""
     user = create_user()
     managed = create_managed_node(owner=user, meshtastic_node_id=111111111)
-    channel = managed.channel_0
+    channel = managed.meshtastic_channel_0
 
     rx_time = timezone.make_aware(datetime(2025, 6, 15, 12, 0, 0))
 
@@ -400,7 +400,7 @@ def test_node_packet_stats_excludes_self_only_device_metrics(create_managed_node
     """node_packet_stats excludes device metrics that were only self-observed for the node."""
     user = create_user()
     managed = create_managed_node(owner=user, meshtastic_node_id=111111111)
-    channel = managed.channel_0
+    channel = managed.meshtastic_channel_0
 
     # ObservedNode for the node (required by node_packet_stats)
     create_observed_node(meshtastic_node_id=111111111)

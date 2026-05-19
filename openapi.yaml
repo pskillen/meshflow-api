@@ -988,11 +988,11 @@ components:
         protocol:
           $ref: '#/components/schemas/MeshProtocol'
           description: Mesh protocol for this constellation and its channels
-        bot_default_ignore_portnums:
+        bot_default_ignore_meshtastic_portnums:
           type: string
           nullable: true
           description: Comma-separated portnums for IGNORE_PORTNUMS env var in generated docker-compose
-        bot_default_hop_limit:
+        bot_default_meshtastic_hop_limit:
           type: integer
           nullable: true
           minimum: 1
@@ -1068,7 +1068,7 @@ components:
           format: date-time
           description: The timestamp when the node was last heard from
           nullable: true
-        inferred_max_hops:
+        meshtastic_inferred_max_hops:
           type: integer
           nullable: true
           description: >
@@ -1518,11 +1518,11 @@ components:
         protocol:
           $ref: '#/components/schemas/MeshProtocol'
           description: Mesh protocol for this constellation
-        bot_default_ignore_portnums:
+        bot_default_ignore_meshtastic_portnums:
           type: string
           nullable: true
           description: Comma-separated portnums for IGNORE_PORTNUMS env var
-        bot_default_hop_limit:
+        bot_default_meshtastic_hop_limit:
           type: integer
           nullable: true
           minimum: 1
@@ -1729,11 +1729,11 @@ components:
             protocol:
               $ref: '#/components/schemas/MeshProtocol'
               description: Mesh protocol for this constellation
-            bot_default_ignore_portnums:
+            bot_default_ignore_meshtastic_portnums:
               type: string
               nullable: true
               description: Comma-separated portnums for IGNORE_PORTNUMS env var
-            bot_default_hop_limit:
+            bot_default_meshtastic_hop_limit:
               type: integer
               nullable: true
               minimum: 1
@@ -1813,21 +1813,21 @@ components:
         - type: object
           description: A managed node that is owned by the current user
           properties:
-            channel_0:
+            meshtastic_channel_0:
               $ref: '#/components/schemas/MessageChannel'
-            channel_1:
+            meshtastic_channel_1:
               $ref: '#/components/schemas/MessageChannel'
-            channel_2:
+            meshtastic_channel_2:
               $ref: '#/components/schemas/MessageChannel'
-            channel_3:
+            meshtastic_channel_3:
               $ref: '#/components/schemas/MessageChannel'
-            channel_4:
+            meshtastic_channel_4:
               $ref: '#/components/schemas/MessageChannel'
-            channel_5:
+            meshtastic_channel_5:
               $ref: '#/components/schemas/MessageChannel'
-            channel_6:
+            meshtastic_channel_6:
               $ref: '#/components/schemas/MessageChannel'
-            channel_7:
+            meshtastic_channel_7:
               $ref: '#/components/schemas/MessageChannel'
 
     PaginatedResponse:
@@ -1881,11 +1881,11 @@ components:
           type: number
           description: The heading of the node
           nullable: true
-        location_source:
+        meshtastic_location_source:
           type: string
           description: The source of the location data
           enum: [INTERNAL, EXTERNAL, MANUAL, UNKNOWN]
-        precision_bits:
+        meshtastic_precision_bits:
           type: integer
           description: The precision of the location data in bits
           nullable: true
@@ -1932,10 +1932,10 @@ components:
         voltage:
           type: number
           description: The battery voltage in volts
-        channel_utilization:
+        meshtastic_channel_utilization:
           type: number
           description: The channel utilization as a percentage
-        air_util_tx:
+        meshtastic_air_util_tx:
           type: number
           description: The air utilization for transmission
         uptime_seconds:
@@ -2473,7 +2473,7 @@ components:
               type: string
               description: The short name of the node
               nullable: true
-        recipient_node_id:
+        recipient_meshtastic_node_id:
           type: integer
           nullable: true
           description: The node ID of the recipient (null for broadcast)
@@ -2492,7 +2492,7 @@ components:
         is_emoji:
           type: boolean
           readOnly: true
-        reply_to_message_id:
+        reply_to_meshtastic_packet_id:
           type: integer
           nullable: true
           description: The packet_id of the message being replied to
@@ -4172,7 +4172,7 @@ paths:
     get:
       summary: Bulk device metrics for multiple nodes
       description: >
-        Meshtastic-only: ``node_ids`` are Meshtastic numeric node numbers (``ObservedNode.meshtastic_node_id``).
+        Meshtastic-only: ``node_ids`` are Meshtastic numeric node numbers (``ObservedNode.internal_id``).
         Get device metrics (battery, channel utilisation, uptime) for multiple nodes in one request.
         Returns flat list; frontend groups by node_id for per-node charts.
         Reusable by Infrastructure, Monitor, My Nodes pages.
@@ -4223,7 +4223,7 @@ paths:
                           format: date-time
                         battery_level:
                           type: number
-                        channel_utilization:
+                        meshtastic_channel_utilization:
                           type: number
                         voltage:
                           type: number
@@ -4381,22 +4381,23 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /nodes/observed-nodes/{node_id}/:
+  /nodes/observed-nodes/{internal_id}/:
     get:
       summary: Get observed node details
       description: >
-        Detail lookup by Meshtastic numeric id (``ObservedNode.meshtastic_node_id``). For MeshCore
-        nodes, use ``GET /nodes/observed-nodes/?protocol=meshcore`` (and search) until lookup by
-        ``internal_id`` is added ([#318](https://github.com/pskillen/meshflow-api/issues/318)).
+        Detail lookup by ``ObservedNode.internal_id`` (UUID). Works for Meshtastic and MeshCore.
+        Legacy Meshtastic numeric bookmarks: ``GET /nodes/observed-nodes/by-meshtastic-id/{meshtastic_node_id}/``
+        redirects to this URL.
       tags: [Nodes]
       security:
         - BearerAuth: []
       parameters:
-        - name: node_id
+        - name: internal_id
           in: path
           required: true
           schema:
-            type: integer
+            type: string
+            format: uuid
           description: Meshtastic numeric node id (detail routes); not MeshCore pubkey or ``internal_id``
       responses:
         '200':
@@ -4413,11 +4414,12 @@ paths:
       security:
         - BearerAuth: []
       parameters:
-        - name: node_id
+        - name: internal_id
           in: path
           required: true
           schema:
-            type: integer
+            type: string
+            format: uuid
           description: Meshtastic numeric node id (detail routes); not MeshCore pubkey or ``internal_id``
       requestBody:
         required: true
@@ -4440,17 +4442,18 @@ paths:
       security:
         - BearerAuth: []
       parameters:
-        - name: node_id
+        - name: internal_id
           in: path
           required: true
           schema:
-            type: integer
+            type: string
+            format: uuid
           description: Meshtastic numeric node id (detail routes); not MeshCore pubkey or ``internal_id``
       responses:
         '204':
           description: Node deleted successfully
 
-  /nodes/observed-nodes/{node_id}/positions/:
+  /nodes/observed-nodes/{internal_id}/positions/:
     get:
       summary: Get positions for a specific node
       description: Returns a list of positions for a specific node with optional date filtering
@@ -4458,7 +4461,7 @@ paths:
       security:
         - BearerAuth: []
       parameters:
-        - name: node_id
+        - name: internal_id
           in: path
           required: true
           schema:
@@ -4480,17 +4483,17 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /nodes/observed-nodes/{node_id}/device_metrics/:
+  /nodes/observed-nodes/{internal_id}/device_metrics/:
     get:
       summary: Get device metrics for a specific node
       description: >
-        Meshtastic-only: path ``node_id`` is the Meshtastic numeric node number (``ObservedNode.meshtastic_node_id``).
+        Meshtastic-only: path ``node_id`` is the Meshtastic numeric node number (``ObservedNode.internal_id``).
         Returns device metrics for that node with optional date filtering.
       tags: [Nodes]
       security:
         - BearerAuth: []
       parameters:
-        - name: node_id
+        - name: internal_id
           in: path
           required: true
           schema:
@@ -4512,17 +4515,17 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /nodes/observed-nodes/{node_id}/environment_metrics/:
+  /nodes/observed-nodes/{internal_id}/environment_metrics/:
     get:
       summary: Get environment metrics for a specific node
       description: >
-        Meshtastic-only: path ``node_id`` is the Meshtastic numeric node number (``ObservedNode.meshtastic_node_id``).
+        Meshtastic-only: path ``node_id`` is the Meshtastic numeric node number (``ObservedNode.internal_id``).
         Returns environment metrics for that node with optional date filtering.
       tags: [Nodes]
       security:
         - BearerAuth: []
       parameters:
-        - name: node_id
+        - name: internal_id
           in: path
           required: true
           schema:
@@ -4544,17 +4547,17 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /nodes/observed-nodes/{node_id}/power_metrics/:
+  /nodes/observed-nodes/{internal_id}/power_metrics/:
     get:
       summary: Get power metrics for a specific node
       description: >
-        Meshtastic-only: path ``node_id`` is the Meshtastic numeric node number (``ObservedNode.meshtastic_node_id``).
+        Meshtastic-only: path ``node_id`` is the Meshtastic numeric node number (``ObservedNode.internal_id``).
         Returns power metrics for that node with optional date filtering.
       tags: [Nodes]
       security:
         - BearerAuth: []
       parameters:
-        - name: node_id
+        - name: internal_id
           in: path
           required: true
           schema:
@@ -4576,7 +4579,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /nodes/observed-nodes/{node_id}/traceroute-links/:
+  /nodes/observed-nodes/{internal_id}/traceroute-links/:
     get:
       summary: Get traceroute links for a node
       description: >
@@ -4586,7 +4589,7 @@ paths:
       security:
         - BearerAuth: []
       parameters:
-        - name: node_id
+        - name: internal_id
           in: path
           required: true
           schema:
@@ -4682,7 +4685,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /nodes/observed-nodes/{node_id}/environment-settings/:
+  /nodes/observed-nodes/{internal_id}/environment-settings/:
     patch:
       summary: Update observed node environment / weather classification
       description: >
@@ -4691,7 +4694,7 @@ paths:
       security:
         - BearerAuth: []
       parameters:
-        - name: node_id
+        - name: internal_id
           in: path
           required: true
           schema:
@@ -4714,7 +4717,7 @@ paths:
         '403':
           description: Forbidden (not staff or claim owner)
 
-  /nodes/observed-nodes/{node_id}/rf-profile/:
+  /nodes/observed-nodes/{internal_id}/rf-profile/:
     get:
       summary: Get RF propagation profile for an observed node
       description: >
@@ -4724,7 +4727,7 @@ paths:
       security:
         - BearerAuth: []
       parameters:
-        - name: node_id
+        - name: internal_id
           in: path
           required: true
           schema:
@@ -4747,7 +4750,7 @@ paths:
       security:
         - BearerAuth: []
       parameters:
-        - name: node_id
+        - name: internal_id
           in: path
           required: true
           schema:
@@ -4772,7 +4775,7 @@ paths:
         '403':
           description: Forbidden (not staff or claim owner)
 
-  /nodes/observed-nodes/{node_id}/rf-propagation/:
+  /nodes/observed-nodes/{internal_id}/rf-propagation/:
     get:
       summary: Get latest RF propagation render for an observed node
       description: >
@@ -4781,7 +4784,7 @@ paths:
       security:
         - BearerAuth: []
       parameters:
-        - name: node_id
+        - name: internal_id
           in: path
           required: true
           schema:
@@ -4796,7 +4799,7 @@ paths:
                   - $ref: '#/components/schemas/RfPropagationRender'
                   - $ref: '#/components/schemas/RfPropagationStatusNone'
 
-  /nodes/observed-nodes/{node_id}/rf-propagation/recompute/:
+  /nodes/observed-nodes/{internal_id}/rf-propagation/recompute/:
     post:
       summary: Queue a new RF propagation render
       description: >
@@ -4806,7 +4809,7 @@ paths:
       security:
         - BearerAuth: []
       parameters:
-        - name: node_id
+        - name: internal_id
           in: path
           required: true
           schema:
@@ -4823,7 +4826,7 @@ paths:
         '403':
           description: Forbidden (not staff or claim owner)
 
-  /nodes/observed-nodes/{node_id}/rf-propagation/asset/{filename}:
+  /nodes/observed-nodes/{internal_id}/rf-propagation/asset/{filename}:
     get:
       summary: Download cached RF propagation map PNG
       description: >
@@ -4831,7 +4834,7 @@ paths:
         returns 404 until then. Filenames must be a single path segment ending in .png (no traversal).
       tags: [Nodes]
       parameters:
-        - name: node_id
+        - name: internal_id
           in: path
           required: true
           schema:
@@ -4962,12 +4965,12 @@ paths:
       summary: Get managed node details
       description: >-
         Returns full details. If the current user is the node owner or staff, the response includes
-        OwnedManagedNode fields (e.g. channel_0–channel_7 as nested MessageChannel). Other authenticated users receive ManagedNodeRead without channel mappings.
+        OwnedManagedNode fields (e.g. meshtastic_channel_0–meshtastic_channel_7 as nested MessageChannel). Other authenticated users receive ManagedNodeRead without channel mappings.
       tags: [Nodes]
       security:
         - BearerAuth: []
       parameters:
-        - name: node_id
+        - name: internal_id
           in: path
           required: true
           schema:
@@ -4999,7 +5002,7 @@ paths:
       security:
         - BearerAuth: []
       parameters:
-        - name: node_id
+        - name: internal_id
           in: path
           required: true
           schema:
@@ -5022,13 +5025,13 @@ paths:
     patch:
       summary: Partially update managed node
       description: >-
-        Owner or staff only. Typical body fields include channel_0–channel_7 (nullable MessageChannel IDs),
+        Owner or staff only. Typical body fields include meshtastic_channel_0–meshtastic_channel_7 (nullable MessageChannel IDs),
         name, allow_auto_traceroute, default location via position, etc. Non-owners receive 403.
       tags: [Nodes]
       security:
         - BearerAuth: []
       parameters:
-        - name: node_id
+        - name: internal_id
           in: path
           required: true
           schema:
@@ -5041,7 +5044,7 @@ paths:
               type: object
               additionalProperties: true
               description: >-
-                Any subset of OwnedManagedNode writable fields (e.g. channel_0–channel_7 as integer IDs or null).
+                Any subset of OwnedManagedNode writable fields (e.g. meshtastic_channel_0–meshtastic_channel_7 as integer IDs or null).
       responses:
         '200':
           description: Updated managed node
@@ -5065,7 +5068,7 @@ paths:
       security:
         - BearerAuth: []
       parameters:
-        - name: node_id
+        - name: internal_id
           in: path
           required: true
           schema:
@@ -5265,7 +5268,7 @@ paths:
       security:
         - BearerAuth: []
       parameters:
-        - name: node_id
+        - name: internal_id
           in: path
           required: true
           schema:
@@ -5311,7 +5314,7 @@ paths:
       security:
         - BearerAuth: []
       parameters:
-        - name: node_id
+        - name: internal_id
           in: path
           required: true
           schema:
@@ -5358,7 +5361,7 @@ paths:
       security:
         - BearerAuth: []
       parameters:
-        - name: node_id
+        - name: internal_id
           in: path
           required: true
           schema:
@@ -6544,7 +6547,7 @@ paths:
 
   /dx/nodes/by-node-id/{node_id}/exclusion/:
     parameters:
-      - name: node_id
+      - name: internal_id
         in: path
         required: true
         schema:
@@ -6660,7 +6663,7 @@ paths:
                 items:
                   $ref: '#/components/schemas/NodeOwnerClaim'
 
-  /nodes/observed-nodes/{node_id}/claim/:
+  /nodes/observed-nodes/{internal_id}/claim/:
     get:
       summary: Get claim for observed node
       description: Get the current user's claim for the specified observed node.
@@ -6668,7 +6671,7 @@ paths:
       security:
         - BearerAuth: []
       parameters:
-        - name: node_id
+        - name: internal_id
           in: path
           required: true
           schema:
@@ -6693,7 +6696,7 @@ paths:
       security:
         - BearerAuth: []
       parameters:
-        - name: node_id
+        - name: internal_id
           in: path
           required: true
           schema:
@@ -6721,7 +6724,7 @@ paths:
       security:
         - BearerAuth: []
       parameters:
-        - name: node_id
+        - name: internal_id
           in: path
           required: true
           schema:

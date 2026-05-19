@@ -18,7 +18,8 @@ from django.db.models import (
 )
 from django.db.models.functions import Coalesce
 from django.http import FileResponse, Http404
-from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404, redirect
+from django.urls import reverse
 from django.utils import timezone
 
 from rest_framework import permissions, status, viewsets
@@ -205,16 +206,15 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
     """Observed nodes across Meshtastic and MeshCore.
 
     List supports ``protocol`` (``meshtastic`` / ``meshcore``) and ``last_heard_after``.
-    Detail lookup uses Meshtastic numeric ``meshtastic_node_id`` (URL kwarg ``node_id``);
-    MeshCore clients should list or search with ``protocol=meshcore`` until lookup by
-    ``internal_id`` ([#318]).
+    Detail lookup uses ``internal_id`` (UUID). Meshtastic bookmarks may use
+    ``GET …/by-meshtastic-id/{meshtastic_node_id}/`` to resolve the canonical URL.
     """
 
     queryset = ObservedNode.objects.all().order_by("meshtastic_node_id")
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = ObservedNodeSerializer
-    lookup_field = "meshtastic_node_id"
-    lookup_url_kwarg = "node_id"
+    lookup_field = "internal_id"
+    lookup_url_kwarg = "internal_id"
 
     def get_queryset(self):
         """Filter nodes based on user permissions and prefetch latest status."""
@@ -343,8 +343,22 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
         serializer = ObservedNodeSearchSerializer(nodes, many=True)
         return Response(serializer.data)
 
+    @action(
+        detail=False,
+        methods=["get"],
+        url_path=r"by-meshtastic-id/(?P<meshtastic_node_id>[0-9]+)",
+    )
+    def by_meshtastic_id(self, request, meshtastic_node_id=None):
+        """Redirect legacy Meshtastic numeric bookmarks to the canonical ``internal_id`` detail URL."""
+        node = get_object_or_404(ObservedNode, meshtastic_node_id=meshtastic_node_id)
+        detail_url = reverse(
+            "observed-node-detail",
+            kwargs={"internal_id": node.internal_id},
+        )
+        return redirect(detail_url)
+
     @action(detail=True, methods=["get"])
-    def positions(self, request, node_id=None):
+    def positions(self, request, internal_id=None):
         """
         Get positions for a specific node with optional date filtering.
 
@@ -390,7 +404,7 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
     @action(detail=True, methods=["get"])
-    def device_metrics(self, request, node_id=None):
+    def device_metrics(self, request, internal_id=None):
         """
         Get device metrics for a specific node with optional date filtering.
 
@@ -434,7 +448,7 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
     @action(detail=True, methods=["get"], url_path="environment_metrics")
-    def environment_metrics(self, request, node_id=None):
+    def environment_metrics(self, request, internal_id=None):
         """
         Get environment metrics for a specific node with optional date filtering.
 
@@ -473,7 +487,7 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
     @action(detail=True, methods=["get"], url_path="power_metrics")
-    def power_metrics(self, request, node_id=None):
+    def power_metrics(self, request, internal_id=None):
         """
         Get power metrics for a specific node with optional date filtering.
 
@@ -512,7 +526,7 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
     @action(detail=True, methods=["get"], url_path="traceroute-links")
-    def traceroute_links(self, request, node_id=None):
+    def traceroute_links(self, request, internal_id=None):
         """
         Get traceroute links for this node from Neo4j.
         Returns edges (with avg SNR in/out), nodes, and snr_history per peer.
@@ -640,7 +654,7 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
     @action(detail=True, methods=["patch"], url_path="environment-settings")
-    def environment_settings(self, request, node_id=None):
+    def environment_settings(self, request, internal_id=None):
         """Update environment_exposure and/or weather_use (staff or claim owner only)."""
         node = self.get_object()
         if not user_can_edit_observed_node_environment_settings(request.user, node):
@@ -662,7 +676,7 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
         return Response(out.data)
 
     @action(detail=True, methods=["get", "patch"], url_path="rf-profile")
-    def rf_profile(self, request, node_id=None):
+    def rf_profile(self, request, internal_id=None):
         """Read or update RF propagation profile (coordinates owner/staff only in serializer)."""
         node = self.get_object()
         if request.method == "GET":
@@ -687,7 +701,7 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
         return Response(NodeRfProfileSerializer(profile, context=self.get_serializer_context()).data)
 
     @action(detail=True, methods=["get"], url_path="rf-propagation")
-    def rf_propagation(self, request, node_id=None):
+    def rf_propagation(self, request, internal_id=None):
         """Return latest RF propagation render row, or ``status: none`` when none exist."""
         node = self.get_object()
         render = node.latest_rf_render()
@@ -697,7 +711,7 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
         return Response(ser.data)
 
     @action(detail=True, methods=["post"], url_path="rf-propagation/dismiss")
-    def rf_propagation_dismiss(self, request, node_id=None):
+    def rf_propagation_dismiss(self, request, internal_id=None):
         """Delete every non-``ready`` render row for this node.
 
         Powers the UI "Cancel" (while ``pending``/``running``) and "Dismiss"
@@ -720,7 +734,7 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
         return Response({"deleted": deleted}, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=["post"], url_path="rf-propagation/cancel")
-    def rf_propagation_cancel(self, request, node_id=None):
+    def rf_propagation_cancel(self, request, internal_id=None):
         """Mark any in-flight (``pending``/``running``) renders for this node as failed.
 
         Lets the user abandon a stuck render so the next ``recompute`` starts
@@ -745,7 +759,7 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
         return Response({"cancelled": cancelled}, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=["post"], url_path="rf-propagation/recompute")
-    def rf_propagation_recompute(self, request, node_id=None):
+    def rf_propagation_recompute(self, request, internal_id=None):
         """Queue a new propagation render.
 
         Dedup strategy:
@@ -843,8 +857,8 @@ class RfPropagationAssetView(APIView):
 
     permission_classes = [permissions.AllowAny]
 
-    def get(self, request, node_id, filename):
-        _ = node_id  # reserved for future per-node asset validation
+    def get(self, request, internal_id, filename):
+        _ = internal_id  # reserved for future per-node asset validation
         if ".." in filename or "/" in filename or "\\" in filename:
             return Response(status=status.HTTP_400_BAD_REQUEST)
         if not re.fullmatch(r"[A-Za-z0-9_-]+\.png\Z", filename):
@@ -1031,8 +1045,8 @@ class ManagedNodeViewSet(viewsets.ModelViewSet):
             last_altitude=Subquery(latest_status_qs.values("altitude")[:1]),
             last_position_time=Subquery(latest_status_qs.values("position_reported_time")[:1]),
             last_heading=Subquery(latest_status_qs.values("heading")[:1]),
-            last_location_source=Subquery(latest_status_qs.values("location_source")[:1]),
-            last_precision_bits=Subquery(latest_status_qs.values("precision_bits")[:1]),
+            last_location_source=Subquery(latest_status_qs.values("meshtastic_location_source")[:1]),
+            last_precision_bits=Subquery(latest_status_qs.values("meshtastic_precision_bits")[:1]),
             last_ground_speed=Subquery(latest_status_qs.values("ground_speed")[:1]),
             last_ground_track=Subquery(latest_status_qs.values("ground_track")[:1]),
             last_sats_in_view=Subquery(latest_status_qs.values("sats_in_view")[:1]),
@@ -1040,8 +1054,8 @@ class ManagedNodeViewSet(viewsets.ModelViewSet):
             last_battery_level=Subquery(latest_status_qs.values("battery_level")[:1]),
             last_voltage=Subquery(latest_status_qs.values("voltage")[:1]),
             last_metrics_time=Subquery(latest_status_qs.values("metrics_reported_time")[:1]),
-            last_channel_utilization=Subquery(latest_status_qs.values("channel_utilization")[:1]),
-            last_air_util_tx=Subquery(latest_status_qs.values("air_util_tx")[:1]),
+            last_channel_utilization=Subquery(latest_status_qs.values("meshtastic_channel_utilization")[:1]),
+            last_air_util_tx=Subquery(latest_status_qs.values("meshtastic_air_util_tx")[:1]),
             last_uptime_seconds=Subquery(latest_status_qs.values("uptime_seconds")[:1]),
         )
 
@@ -1166,16 +1180,16 @@ class ManagedNodeViewSet(viewsets.ModelViewSet):
 class ObservedNodeClaimView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
-    def get(self, request, node_id):
-        node = get_object_or_404(ObservedNode, meshtastic_node_id=node_id)
+    def get(self, request, internal_id):
+        node = get_object_or_404(ObservedNode, internal_id=internal_id)
         claim = NodeOwnerClaim.objects.filter(node=node, user=request.user).first()
         if not claim:
             return Response({"detail": "No claim found."}, status=status.HTTP_404_NOT_FOUND)
         serializer = NodeOwnerClaimSerializer(claim)
         return Response(serializer.data)
 
-    def post(self, request, node_id):
-        node = get_object_or_404(ObservedNode, meshtastic_node_id=node_id)
+    def post(self, request, internal_id):
+        node = get_object_or_404(ObservedNode, internal_id=internal_id)
         if node.claimed_by_id and node.claimed_by_id != request.user.id:
             return Response(
                 {"detail": "Node is already claimed by another user."},
@@ -1188,8 +1202,8 @@ class ObservedNodeClaimView(APIView):
         serializer = NodeOwnerClaimSerializer(claim)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
-    def delete(self, request, node_id):
-        node = get_object_or_404(ObservedNode, meshtastic_node_id=node_id)
+    def delete(self, request, internal_id):
+        node = get_object_or_404(ObservedNode, internal_id=internal_id)
         claim = NodeOwnerClaim.objects.filter(node=node, user=request.user).first()
         if not claim:
             return Response({"detail": "No claim found."}, status=status.HTTP_404_NOT_FOUND)

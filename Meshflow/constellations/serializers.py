@@ -18,8 +18,8 @@ class ConstellationSerializer(serializers.ModelSerializer):
             "channels",
             "map_color",
             "protocol",
-            "bot_default_ignore_portnums",
-            "bot_default_hop_limit",
+            "bot_default_ignore_meshtastic_portnums",
+            "bot_default_meshtastic_hop_limit",
         ]
         read_only_fields = ["created_by"]
 

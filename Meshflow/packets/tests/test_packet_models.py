@@ -34,8 +34,8 @@ def test_position_packet_creation(create_position_packet):
     assert packet.longitude == 0.0
     assert packet.altitude == 0.0
     assert packet.heading == 0.0
-    assert packet.location_source == LocationSource.INTERNAL
-    assert packet.precision_bits == 32
+    assert packet.meshtastic_location_source == LocationSource.INTERNAL
+    assert packet.meshtastic_precision_bits == 32
     assert packet.ground_speed == 0.0
     assert packet.ground_track == 0.0
 
@@ -63,8 +63,8 @@ def test_device_metrics_packet_creation(create_device_metrics_packet):
     assert packet.packet_id == 123456789
     assert packet.battery_level == 95.5
     assert packet.voltage == 3.7
-    assert packet.channel_utilization == 0.1
-    assert packet.air_util_tx == 0.2
+    assert packet.meshtastic_channel_utilization == 0.1
+    assert packet.meshtastic_air_util_tx == 0.2
     assert packet.uptime_seconds == 3600
 
 
@@ -74,8 +74,8 @@ def test_local_stats_packet_creation(create_local_stats_packet):
     packet = create_local_stats_packet()
     assert packet.packet_id == 123456789
     assert packet.uptime_seconds == 3600
-    assert packet.channel_utilization == 0.1
-    assert packet.air_util_tx == 0.2
+    assert packet.meshtastic_channel_utilization == 0.1
+    assert packet.meshtastic_air_util_tx == 0.2
     assert packet.num_packets_tx == 1000
     assert packet.num_packets_rx == 2000
     assert packet.num_packets_rx_bad == 50

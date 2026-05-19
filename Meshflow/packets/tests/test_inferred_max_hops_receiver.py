@@ -1,4 +1,4 @@
-"""Tests for packet_received receiver that updates inferred_max_hops."""
+"""Tests for packet_received receiver that updates meshtastic_inferred_max_hops."""
 
 import pytest
 
@@ -10,7 +10,7 @@ from packets.signals import packet_received
 
 @pytest.mark.django_db
 def test_packet_received_sets_inferred_max_hops_for_message_packet(create_managed_node, create_message_packet):
-    """When packet_received fires for MessagePacket, NodeLatestStatus.inferred_max_hops is set."""
+    """When packet_received fires for MessagePacket, NodeLatestStatus.meshtastic_inferred_max_hops is set."""
     observer = create_managed_node()
     packet = create_message_packet(from_int=0x12345678, from_str="!12345678")
     channel = MessageChannel.objects.create(
@@ -32,12 +32,12 @@ def test_packet_received_sets_inferred_max_hops_for_message_packet(create_manage
 
     observed_node = ObservedNode.objects.get(meshtastic_node_id=0x12345678)
     node_status = NodeLatestStatus.objects.get(node=observed_node)
-    assert node_status.inferred_max_hops == 5
+    assert node_status.meshtastic_inferred_max_hops == 5
 
 
 @pytest.mark.django_db
 def test_packet_received_updates_inferred_max_hops_when_different(create_managed_node, create_message_packet):
-    """When hop_start differs from stored value, inferred_max_hops is updated."""
+    """When hop_start differs from stored value, meshtastic_inferred_max_hops is updated."""
     observer = create_managed_node()
     packet = create_message_packet(from_int=0xABCDEF12, from_str="!abcdef12")
     channel = MessageChannel.objects.create(
@@ -55,14 +55,14 @@ def test_packet_received_updates_inferred_max_hops_when_different(create_managed
 
     packet_received.send(sender=None, packet=packet, observer=observer, observation=observation)
     node_status = NodeLatestStatus.objects.get(node__meshtastic_node_id=0xABCDEF12)
-    assert node_status.inferred_max_hops == 3
+    assert node_status.meshtastic_inferred_max_hops == 3
 
     observation.hop_start = 7
     observation.save(update_fields=["hop_start"])
     packet_received.send(sender=None, packet=packet, observer=observer, observation=observation)
 
     node_status.refresh_from_db()
-    assert node_status.inferred_max_hops == 7
+    assert node_status.meshtastic_inferred_max_hops == 7
 
 
 @pytest.mark.django_db

@@ -9,15 +9,24 @@ Expects:
 """
 
 import os
+import re
 import time
 from pathlib import Path
 
 import pytest
 import requests
 
+_OBSERVED_NODE_UUID_RE = re.compile(
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+    re.IGNORECASE,
+)
+
 # Observer node_ids from seed_integration_tests
 OBSERVER_NODE_ID = 999999999
 OBSERVER_NODE_ID_2 = 999999998
+
+# device_metrics history can be large/slow on a long-lived local DB
+INTEGRATION_HTTP_TIMEOUT = int(os.environ.get("MESHFLOW_INTEGRATION_TIMEOUT", "45"))
 
 
 def get_api_url():
@@ -88,6 +97,32 @@ def api_client(api_base_url, wait_for_api, jwt_token):
             self.node_key = node_key
             self.jwt = jwt_token
 
+        def _auth_headers(self):
+            return {"Authorization": f"Bearer {self.jwt}"}
+
+        @staticmethod
+        def _is_meshtastic_node_id(node_id):
+            if isinstance(node_id, int):
+                return True
+            return isinstance(node_id, str) and node_id.isdigit()
+
+        @staticmethod
+        def _is_internal_id(node_id):
+            return isinstance(node_id, str) and bool(_OBSERVED_NODE_UUID_RE.match(node_id))
+
+        def resolve_internal_id(self, node_id):
+            """Map meshtastic_node_id (int) to ObservedNode.internal_id (UUID string)."""
+            if self._is_internal_id(node_id):
+                return node_id
+            if self._is_meshtastic_node_id(node_id):
+                r = self.get_observed_node(int(node_id))
+                if r.status_code != 200:
+                    raise AssertionError(
+                        f"Could not resolve meshtastic_node_id {node_id}: {r.status_code} {r.text}"
+                    )
+                return r.json()["internal_id"]
+            raise ValueError(f"Not a meshtastic_node_id or internal_id: {node_id!r}")
+
         def post_ingest(self, payload, observer_node_id=OBSERVER_NODE_ID):
             url = f"{self.base}/api/packets/{observer_node_id}/ingest/"
             return requests.post(
@@ -97,31 +132,41 @@ def api_client(api_base_url, wait_for_api, jwt_token):
                     "X-API-KEY": self.node_key,
                     "Content-Type": "application/json",
                 },
-                timeout=10,
+                timeout=INTEGRATION_HTTP_TIMEOUT,
             )
 
         def get_observed_node(self, node_id):
+            if self._is_meshtastic_node_id(node_id):
+                url = f"{self.base}/api/nodes/observed-nodes/by-meshtastic-id/{int(node_id)}/"
+                return requests.get(
+                    url,
+                    headers=self._auth_headers(),
+                    allow_redirects=True,
+                    timeout=INTEGRATION_HTTP_TIMEOUT,
+                )
             url = f"{self.base}/api/nodes/observed-nodes/{node_id}/"
             return requests.get(
                 url,
-                headers={"Authorization": f"Bearer {self.jwt}"},
-                timeout=10,
+                headers=self._auth_headers(),
+                timeout=INTEGRATION_HTTP_TIMEOUT,
             )
 
         def get_positions(self, node_id):
-            url = f"{self.base}/api/nodes/observed-nodes/{node_id}/positions/"
+            internal_id = self.resolve_internal_id(node_id)
+            url = f"{self.base}/api/nodes/observed-nodes/{internal_id}/positions/"
             return requests.get(
                 url,
-                headers={"Authorization": f"Bearer {self.jwt}"},
-                timeout=10,
+                headers=self._auth_headers(),
+                timeout=INTEGRATION_HTTP_TIMEOUT,
             )
 
         def get_device_metrics(self, node_id):
-            url = f"{self.base}/api/nodes/observed-nodes/{node_id}/device_metrics/"
+            internal_id = self.resolve_internal_id(node_id)
+            url = f"{self.base}/api/nodes/observed-nodes/{internal_id}/device_metrics/"
             return requests.get(
                 url,
-                headers={"Authorization": f"Bearer {self.jwt}"},
-                timeout=10,
+                headers=self._auth_headers(),
+                timeout=INTEGRATION_HTTP_TIMEOUT,
             )
 
         def search_nodes(self, q):
@@ -130,16 +175,17 @@ def api_client(api_base_url, wait_for_api, jwt_token):
                 url,
                 params={"q": q},
                 headers={"Authorization": f"Bearer {self.jwt}"},
-                timeout=10,
+                timeout=INTEGRATION_HTTP_TIMEOUT,
             )
 
         def post_claim(self, node_id):
             """Create a NodeOwnerClaim for the given node. Returns response with claim_key."""
-            url = f"{self.base}/api/nodes/observed-nodes/{node_id}/claim/"
+            internal_id = self.resolve_internal_id(node_id)
+            url = f"{self.base}/api/nodes/observed-nodes/{internal_id}/claim/"
             return requests.post(
                 url,
-                headers={"Authorization": f"Bearer {self.jwt}"},
-                timeout=10,
+                headers=self._auth_headers(),
+                timeout=INTEGRATION_HTTP_TIMEOUT,
             )
 
     return Client()

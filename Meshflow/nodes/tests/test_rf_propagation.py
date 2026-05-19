@@ -159,7 +159,7 @@ def test_rf_profile_get_empty_returns_204(create_observed_node, create_user):
     )
     client = APIClient()
     client.force_authenticate(user=user)
-    url = reverse("observed-node-rf-profile", kwargs={"node_id": node.meshtastic_node_id})
+    url = reverse("observed-node-rf-profile", kwargs={"internal_id": node.internal_id})
     response = client.get(url)
     assert response.status_code == status.HTTP_204_NO_CONTENT
 
@@ -174,7 +174,7 @@ def test_rf_profile_get_after_patch(create_observed_node, create_user):
     )
     client = APIClient()
     client.force_authenticate(user=owner)
-    url = reverse("observed-node-rf-profile", kwargs={"node_id": node.meshtastic_node_id})
+    url = reverse("observed-node-rf-profile", kwargs={"internal_id": node.internal_id})
     patch = client.patch(
         url,
         {
@@ -205,7 +205,7 @@ def test_rf_profile_patch_owner_staff_stranger_unauth(create_observed_node, crea
         node_id_str=meshtastic_id_to_hex(809_809_809),
         claimed_by=owner,
     )
-    url = reverse("observed-node-rf-profile", kwargs={"node_id": node.meshtastic_node_id})
+    url = reverse("observed-node-rf-profile", kwargs={"internal_id": node.internal_id})
 
     client = APIClient()
     response = client.patch(url, {"tx_power_dbm": 10.0}, format="json")
@@ -235,12 +235,12 @@ def test_rf_propagation_get_none_then_pending(create_observed_node, create_user,
     NodeRfProfile.objects.create(observed_node=node, **_rf_profile_fields())
     client = APIClient()
     client.force_authenticate(user=owner)
-    url = reverse("observed-node-rf-propagation", kwargs={"node_id": node.meshtastic_node_id})
+    url = reverse("observed-node-rf-propagation", kwargs={"internal_id": node.internal_id})
     r0 = client.get(url)
     assert r0.status_code == status.HTTP_200_OK
     assert r0.data == {"status": "none"}
 
-    rec_url = reverse("observed-node-rf-propagation-recompute", kwargs={"node_id": node.meshtastic_node_id})
+    rec_url = reverse("observed-node-rf-propagation-recompute", kwargs={"internal_id": node.internal_id})
     r1 = client.post(rec_url, {}, format="json")
     assert r1.status_code == status.HTTP_201_CREATED
     assert r1.data["status"] == "pending"
@@ -262,7 +262,7 @@ def test_rf_propagation_recompute_forbidden_stranger(create_observed_node, creat
     )
     client = APIClient()
     client.force_authenticate(user=stranger)
-    url = reverse("observed-node-rf-propagation-recompute", kwargs={"node_id": node.meshtastic_node_id})
+    url = reverse("observed-node-rf-propagation-recompute", kwargs={"internal_id": node.internal_id})
     response = client.post(url, {}, format="json")
     assert response.status_code == status.HTTP_403_FORBIDDEN
 
@@ -278,7 +278,7 @@ def test_rf_propagation_recompute_creates_row(create_observed_node, create_user,
     NodeRfProfile.objects.create(observed_node=node, **_rf_profile_fields())
     client = APIClient()
     client.force_authenticate(user=owner)
-    url = reverse("observed-node-rf-propagation-recompute", kwargs={"node_id": node.meshtastic_node_id})
+    url = reverse("observed-node-rf-propagation-recompute", kwargs={"internal_id": node.internal_id})
     response = client.post(url, {}, format="json")
     assert response.status_code == status.HTTP_201_CREATED
     assert NodeRfPropagationRender.objects.filter(observed_node=node).count() == 1
@@ -295,7 +295,7 @@ def test_rf_propagation_recompute_400_when_no_profile(create_observed_node, crea
     )
     client = APIClient()
     client.force_authenticate(user=owner)
-    url = reverse("observed-node-rf-propagation-recompute", kwargs={"node_id": node.meshtastic_node_id})
+    url = reverse("observed-node-rf-propagation-recompute", kwargs={"internal_id": node.internal_id})
     response = client.post(url, {}, format="json")
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     stub_render_task.assert_not_called()
@@ -312,7 +312,7 @@ def test_rf_propagation_recompute_dedup_returns_in_flight(create_observed_node, 
     NodeRfProfile.objects.create(observed_node=node, **_rf_profile_fields())
     client = APIClient()
     client.force_authenticate(user=owner)
-    url = reverse("observed-node-rf-propagation-recompute", kwargs={"node_id": node.meshtastic_node_id})
+    url = reverse("observed-node-rf-propagation-recompute", kwargs={"internal_id": node.internal_id})
 
     first = client.post(url, {}, format="json")
     assert first.status_code == status.HTTP_201_CREATED
@@ -358,7 +358,7 @@ def test_rf_propagation_recompute_cache_hit_reuses_asset(settings, create_observ
 
         client = APIClient()
         client.force_authenticate(user=owner)
-        url = reverse("observed-node-rf-propagation-recompute", kwargs={"node_id": node.meshtastic_node_id})
+        url = reverse("observed-node-rf-propagation-recompute", kwargs={"internal_id": node.internal_id})
         response = client.post(url, {}, format="json")
 
     assert response.status_code == status.HTTP_200_OK
@@ -380,8 +380,8 @@ def test_rf_propagation_cancel_marks_in_flight_as_failed(create_observed_node, c
     client = APIClient()
     client.force_authenticate(user=owner)
 
-    recompute_url = reverse("observed-node-rf-propagation-recompute", kwargs={"node_id": node.meshtastic_node_id})
-    cancel_url = reverse("observed-node-rf-propagation-cancel", kwargs={"node_id": node.meshtastic_node_id})
+    recompute_url = reverse("observed-node-rf-propagation-recompute", kwargs={"internal_id": node.internal_id})
+    cancel_url = reverse("observed-node-rf-propagation-cancel", kwargs={"internal_id": node.internal_id})
 
     client.post(recompute_url, {}, format="json")
     assert (
@@ -412,7 +412,7 @@ def test_rf_propagation_cancel_is_noop_when_nothing_in_flight(create_observed_no
     )
     client = APIClient()
     client.force_authenticate(user=owner)
-    cancel_url = reverse("observed-node-rf-propagation-cancel", kwargs={"node_id": node.meshtastic_node_id})
+    cancel_url = reverse("observed-node-rf-propagation-cancel", kwargs={"internal_id": node.internal_id})
 
     response = client.post(cancel_url, {}, format="json")
     assert response.status_code == status.HTTP_200_OK
@@ -430,8 +430,8 @@ def test_rf_propagation_cancel_allows_new_recompute(create_observed_node, create
     NodeRfProfile.objects.create(observed_node=node, **_rf_profile_fields())
     client = APIClient()
     client.force_authenticate(user=owner)
-    recompute_url = reverse("observed-node-rf-propagation-recompute", kwargs={"node_id": node.meshtastic_node_id})
-    cancel_url = reverse("observed-node-rf-propagation-cancel", kwargs={"node_id": node.meshtastic_node_id})
+    recompute_url = reverse("observed-node-rf-propagation-recompute", kwargs={"internal_id": node.internal_id})
+    cancel_url = reverse("observed-node-rf-propagation-cancel", kwargs={"internal_id": node.internal_id})
 
     first = client.post(recompute_url, {}, format="json")
     assert first.status_code == status.HTTP_201_CREATED
@@ -466,7 +466,7 @@ def test_rf_propagation_delete_removes_non_ready_rows(create_observed_node, crea
 
     client = APIClient()
     client.force_authenticate(user=owner)
-    url = reverse("observed-node-rf-propagation-dismiss", kwargs={"node_id": node.meshtastic_node_id})
+    url = reverse("observed-node-rf-propagation-dismiss", kwargs={"internal_id": node.internal_id})
     response = client.post(url)
 
     assert response.status_code == status.HTTP_200_OK
@@ -488,7 +488,7 @@ def test_rf_propagation_delete_requires_edit_permission(create_observed_node, cr
     NodeRfPropagationRender.objects.create(observed_node=node, status=NodeRfPropagationRender.Status.PENDING)
     client = APIClient()
     client.force_authenticate(user=stranger)
-    url = reverse("observed-node-rf-propagation-dismiss", kwargs={"node_id": node.meshtastic_node_id})
+    url = reverse("observed-node-rf-propagation-dismiss", kwargs={"internal_id": node.internal_id})
     response = client.post(url)
 
     assert response.status_code == status.HTTP_403_FORBIDDEN
@@ -511,7 +511,7 @@ def test_observed_node_detail_rf_flags(create_observed_node, create_user):
     )
     client = APIClient()
     client.force_authenticate(user=owner)
-    r = client.get(reverse("observed-node-detail", kwargs={"node_id": node.meshtastic_node_id}))
+    r = client.get(reverse("observed-node-detail", kwargs={"internal_id": node.internal_id}))
     assert r.status_code == status.HTTP_200_OK
     assert r.data["has_rf_profile"] is True
     assert r.data["has_ready_rf_render"] is True
@@ -529,7 +529,7 @@ def test_rf_propagation_asset_missing_file_404(settings, create_observed_node):
             node_id_str=meshtastic_id_to_hex(814_814_814),
         )
         client = APIClient()
-        url = reverse("rf-propagation-asset", kwargs={"node_id": node.meshtastic_node_id, "filename": "missing.png"})
+        url = reverse("rf-propagation-asset", kwargs={"internal_id": node.internal_id, "filename": "missing.png"})
         response = client.get(url)
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
@@ -547,7 +547,7 @@ def test_rf_propagation_asset_serves_png_and_cache_control(settings, create_obse
             node_id_str=meshtastic_id_to_hex(815_815_815),
         )
         client = APIClient()
-        url = reverse("rf-propagation-asset", kwargs={"node_id": node.meshtastic_node_id, "filename": "tile.png"})
+        url = reverse("rf-propagation-asset", kwargs={"internal_id": node.internal_id, "filename": "tile.png"})
         response = client.get(url)
         assert response.status_code == status.HTTP_200_OK
         assert response["Content-Type"] == "image/png"
@@ -561,6 +561,6 @@ def test_rf_propagation_asset_rejects_traversal(create_observed_node):
         node_id_str=meshtastic_id_to_hex(816_816_816),
     )
     client = APIClient()
-    url = reverse("rf-propagation-asset", kwargs={"node_id": node.meshtastic_node_id, "filename": "bad..name.png"})
+    url = reverse("rf-propagation-asset", kwargs={"internal_id": node.internal_id, "filename": "bad..name.png"})
     response = client.get(url)
     assert response.status_code == status.HTTP_400_BAD_REQUEST

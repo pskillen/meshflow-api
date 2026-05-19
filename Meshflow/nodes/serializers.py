@@ -151,7 +151,7 @@ class NodeRfPropagationRenderSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         path = reverse(
             "rf-propagation-asset",
-            kwargs={"node_id": obj.observed_node.meshtastic_node_id, "filename": obj.asset_filename},
+            kwargs={"internal_id": obj.observed_node.internal_id, "filename": obj.asset_filename},
         )
         if request:
             return request.build_absolute_uri(path)
@@ -197,10 +197,16 @@ class APIKeyConstellationSerializer(serializers.ModelSerializer):
             "name",
             "map_color",
             "protocol",
-            "bot_default_ignore_portnums",
-            "bot_default_hop_limit",
+            "bot_default_ignore_meshtastic_portnums",
+            "bot_default_meshtastic_hop_limit",
         ]
-        read_only_fields = ["name", "map_color", "protocol", "bot_default_ignore_portnums", "bot_default_hop_limit"]
+        read_only_fields = [
+            "name",
+            "map_color",
+            "protocol",
+            "bot_default_ignore_meshtastic_portnums",
+            "bot_default_meshtastic_hop_limit",
+        ]
 
 
 class APIKeySerializer(serializers.ModelSerializer):
@@ -333,10 +339,16 @@ class ManagedNodeSerializer(serializers.ModelSerializer):
                 "name",
                 "map_color",
                 "protocol",
-                "bot_default_ignore_portnums",
-                "bot_default_hop_limit",
+                "bot_default_ignore_meshtastic_portnums",
+                "bot_default_meshtastic_hop_limit",
             ]
-            read_only_fields = ["name", "map_color", "protocol", "bot_default_ignore_portnums", "bot_default_hop_limit"]
+            read_only_fields = [
+                "name",
+                "map_color",
+                "protocol",
+                "bot_default_ignore_meshtastic_portnums",
+                "bot_default_meshtastic_hop_limit",
+            ]
 
     owner_id = serializers.PrimaryKeyRelatedField(
         queryset=User.objects.all(), source="owner", write_only=True, required=True
@@ -644,28 +656,28 @@ class OwnedManagedNodeSerializer(ManagedNodeSerializer):
     """Serializer for managed nodes owned by the current user."""
 
     # For write
-    channel_0 = serializers.PrimaryKeyRelatedField(
+    meshtastic_channel_0 = serializers.PrimaryKeyRelatedField(
         queryset=MessageChannel.objects.all(), required=False, allow_null=True
     )
-    channel_1 = serializers.PrimaryKeyRelatedField(
+    meshtastic_channel_1 = serializers.PrimaryKeyRelatedField(
         queryset=MessageChannel.objects.all(), required=False, allow_null=True
     )
-    channel_2 = serializers.PrimaryKeyRelatedField(
+    meshtastic_channel_2 = serializers.PrimaryKeyRelatedField(
         queryset=MessageChannel.objects.all(), required=False, allow_null=True
     )
-    channel_3 = serializers.PrimaryKeyRelatedField(
+    meshtastic_channel_3 = serializers.PrimaryKeyRelatedField(
         queryset=MessageChannel.objects.all(), required=False, allow_null=True
     )
-    channel_4 = serializers.PrimaryKeyRelatedField(
+    meshtastic_channel_4 = serializers.PrimaryKeyRelatedField(
         queryset=MessageChannel.objects.all(), required=False, allow_null=True
     )
-    channel_5 = serializers.PrimaryKeyRelatedField(
+    meshtastic_channel_5 = serializers.PrimaryKeyRelatedField(
         queryset=MessageChannel.objects.all(), required=False, allow_null=True
     )
-    channel_6 = serializers.PrimaryKeyRelatedField(
+    meshtastic_channel_6 = serializers.PrimaryKeyRelatedField(
         queryset=MessageChannel.objects.all(), required=False, allow_null=True
     )
-    channel_7 = serializers.PrimaryKeyRelatedField(
+    meshtastic_channel_7 = serializers.PrimaryKeyRelatedField(
         queryset=MessageChannel.objects.all(), required=False, allow_null=True
     )
 
@@ -695,7 +707,7 @@ class OwnedManagedNodeSerializer(ManagedNodeSerializer):
 
         errors = {}
         for i in range(8):
-            key = f"channel_{i}"
+            key = f"meshtastic_channel_{i}"
             if key not in attrs:
                 continue
             ch = attrs[key]
@@ -719,67 +731,67 @@ class OwnedManagedNodeSerializer(ManagedNodeSerializer):
 
     def to_representation(self, instance):
         rep = super().to_representation(instance)
-        # Replace channel_0 with nested representation
-        if instance.channel_0_id:
-            rep["channel_0"] = NestedChannelSerializer(instance.channel_0).data
+        # Replace meshtastic_channel_0 with nested representation
+        if instance.meshtastic_channel_0_id:
+            rep["meshtastic_channel_0"] = NestedChannelSerializer(instance.meshtastic_channel_0).data
         else:
-            rep["channel_0"] = None
+            rep["meshtastic_channel_0"] = None
 
-        if instance.channel_1_id:
-            rep["channel_1"] = NestedChannelSerializer(instance.channel_1).data
+        if instance.meshtastic_channel_1_id:
+            rep["meshtastic_channel_1"] = NestedChannelSerializer(instance.meshtastic_channel_1).data
         else:
-            rep["channel_1"] = None
+            rep["meshtastic_channel_1"] = None
 
-        if instance.channel_2_id:
-            rep["channel_2"] = NestedChannelSerializer(instance.channel_2).data
+        if instance.meshtastic_channel_2_id:
+            rep["meshtastic_channel_2"] = NestedChannelSerializer(instance.meshtastic_channel_2).data
         else:
-            rep["channel_2"] = None
+            rep["meshtastic_channel_2"] = None
 
-        if instance.channel_3_id:
-            rep["channel_3"] = NestedChannelSerializer(instance.channel_3).data
+        if instance.meshtastic_channel_3_id:
+            rep["meshtastic_channel_3"] = NestedChannelSerializer(instance.meshtastic_channel_3).data
         else:
-            rep["channel_3"] = None
+            rep["meshtastic_channel_3"] = None
 
-        if instance.channel_4_id:
-            rep["channel_4"] = NestedChannelSerializer(instance.channel_4).data
+        if instance.meshtastic_channel_4_id:
+            rep["meshtastic_channel_4"] = NestedChannelSerializer(instance.meshtastic_channel_4).data
         else:
-            rep["channel_4"] = None
+            rep["meshtastic_channel_4"] = None
 
-        if instance.channel_5_id:
-            rep["channel_5"] = NestedChannelSerializer(instance.channel_5).data
+        if instance.meshtastic_channel_5_id:
+            rep["meshtastic_channel_5"] = NestedChannelSerializer(instance.meshtastic_channel_5).data
         else:
-            rep["channel_5"] = None
+            rep["meshtastic_channel_5"] = None
 
-        if instance.channel_6_id:
-            rep["channel_6"] = NestedChannelSerializer(instance.channel_6).data
+        if instance.meshtastic_channel_6_id:
+            rep["meshtastic_channel_6"] = NestedChannelSerializer(instance.meshtastic_channel_6).data
         else:
-            rep["channel_6"] = None
+            rep["meshtastic_channel_6"] = None
 
-        if instance.channel_7_id:
-            rep["channel_7"] = NestedChannelSerializer(instance.channel_7).data
+        if instance.meshtastic_channel_7_id:
+            rep["meshtastic_channel_7"] = NestedChannelSerializer(instance.meshtastic_channel_7).data
         else:
-            rep["channel_7"] = None
+            rep["meshtastic_channel_7"] = None
 
         return rep
 
     class Meta:
         model = ManagedNode
         fields = ManagedNodeSerializer.Meta.fields + [
-            "channel_0",
-            "channel_1",
-            "channel_2",
-            "channel_3",
-            "channel_4",
-            "channel_5",
-            "channel_6",
-            "channel_7",
+            "meshtastic_channel_0",
+            "meshtastic_channel_1",
+            "meshtastic_channel_2",
+            "meshtastic_channel_3",
+            "meshtastic_channel_4",
+            "meshtastic_channel_5",
+            "meshtastic_channel_6",
+            "meshtastic_channel_7",
         ]
 
 
 class PositionSerializer(serializers.ModelSerializer):
     """Serializer for position reports, supporting both model instances and dicts (from annotations)."""
 
-    location_source = serializers.CharField(source="get_location_source_display", read_only=True)
+    meshtastic_location_source = serializers.CharField(source="get_location_source_display", read_only=True)
 
     # Mapping from possible annotated keys to canonical field names
     ANNOTATION_MAP = {
@@ -789,8 +801,8 @@ class PositionSerializer(serializers.ModelSerializer):
         "latest_altitude": "altitude",
         "latest_position_time": "reported_time",
         "latest_heading": "heading",
-        "latest_location_source": "location_source",
-        "latest_precision_bits": "precision_bits",
+        "latest_location_source": "meshtastic_location_source",
+        "latest_precision_bits": "meshtastic_precision_bits",
         "latest_ground_speed": "ground_speed",
         "latest_ground_track": "ground_track",
         "latest_sats_in_view": "sats_in_view",
@@ -801,8 +813,8 @@ class PositionSerializer(serializers.ModelSerializer):
         "last_altitude": "altitude",
         "last_position_time": "reported_time",
         "last_heading": "heading",
-        "last_location_source": "location_source",
-        "last_precision_bits": "precision_bits",
+        "last_location_source": "meshtastic_location_source",
+        "last_precision_bits": "meshtastic_precision_bits",
         "last_ground_speed": "ground_speed",
         "last_ground_track": "ground_track",
         "last_sats_in_view": "sats_in_view",
@@ -820,8 +832,8 @@ class PositionSerializer(serializers.ModelSerializer):
             "longitude",
             "altitude",
             "heading",
-            "location_source",
-            "precision_bits",
+            "meshtastic_location_source",
+            "meshtastic_precision_bits",
             "ground_speed",
             "ground_track",
             "sats_in_view",
@@ -845,10 +857,10 @@ class PositionSerializer(serializers.ModelSerializer):
                             break
                     else:
                         data[field] = None
-            # location_source: try to get display value if possible
-            if "location_source" in data and data["location_source"] is not None:
+            # meshtastic_location_source: try to get display value if possible
+            if "meshtastic_location_source" in data and data["meshtastic_location_source"] is not None:
                 try:
-                    data["location_source"] = LocationSource(data["location_source"]).label
+                    data["meshtastic_location_source"] = LocationSource(data["meshtastic_location_source"]).label
                 except Exception:
                     pass
             return data
@@ -856,17 +868,17 @@ class PositionSerializer(serializers.ModelSerializer):
 
     def to_internal_value(self, data):
         validated_data = super().to_internal_value(data)
-        # Convert location_source from string to integer using LocationSource
-        if "location_source" in validated_data and validated_data["location_source"]:
+        # Convert meshtastic_location_source from string to integer using LocationSource
+        if "meshtastic_location_source" in validated_data and validated_data["meshtastic_location_source"]:
             try:
                 for source_choice in LocationSource:
-                    if source_choice.label == validated_data["location_source"]:
-                        validated_data["location_source"] = source_choice.value
+                    if source_choice.label == validated_data["meshtastic_location_source"]:
+                        validated_data["meshtastic_location_source"] = source_choice.value
                         break
                 else:
-                    validated_data["location_source"] = LocationSource.UNSET
+                    validated_data["meshtastic_location_source"] = LocationSource.UNSET
             except ValueError, TypeError:
-                validated_data["location_source"] = LocationSource.UNSET
+                validated_data["meshtastic_location_source"] = LocationSource.UNSET
         # Handle node field
         if "node" in data and isinstance(data["node"], ObservedNode):
             validated_data["node"] = data["node"]
@@ -893,8 +905,8 @@ class DeviceMetricsBulkSerializer(serializers.ModelSerializer):
             "logged_time",
             "battery_level",
             "voltage",
-            "channel_utilization",
-            "air_util_tx",
+            "meshtastic_channel_utilization",
+            "meshtastic_air_util_tx",
             "uptime_seconds",
         ]
 
@@ -907,15 +919,15 @@ class DeviceMetricsSerializer(serializers.ModelSerializer):
         "latest_battery_level": "battery_level",
         "latest_voltage": "voltage",
         "latest_metrics_time": "reported_time",
-        "latest_channel_utilization": "channel_utilization",
-        "latest_air_util_tx": "air_util_tx",
+        "latest_channel_utilization": "meshtastic_channel_utilization",
+        "latest_air_util_tx": "meshtastic_air_util_tx",
         "latest_uptime_seconds": "uptime_seconds",
         # For ManagedNode
         "last_battery_level": "battery_level",
         "last_voltage": "voltage",
         "last_metrics_time": "reported_time",
-        "last_channel_utilization": "channel_utilization",
-        "last_air_util_tx": "air_util_tx",
+        "last_channel_utilization": "meshtastic_channel_utilization",
+        "last_air_util_tx": "meshtastic_air_util_tx",
         "last_uptime_seconds": "uptime_seconds",
     }
 
@@ -928,8 +940,8 @@ class DeviceMetricsSerializer(serializers.ModelSerializer):
             "reported_time",
             "battery_level",
             "voltage",
-            "channel_utilization",
-            "air_util_tx",
+            "meshtastic_channel_utilization",
+            "meshtastic_air_util_tx",
             "uptime_seconds",
         ]
 
@@ -1063,7 +1075,7 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
 
     Nested ``latest_*`` fields expose Meshtastic protobuf-shaped telemetry from
     ``NodeLatestStatus`` when present; MeshCore nodes typically return null there.
-    ``inferred_max_hops`` is Meshtastic-only (hop_start inference).
+    ``meshtastic_inferred_max_hops`` is Meshtastic-only (hop_start inference).
     """
 
     class OwnerSerializer(serializers.ModelSerializer):
@@ -1079,7 +1091,7 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
     latest_air_quality_metrics = serializers.SerializerMethodField()
     latest_health_metrics = serializers.SerializerMethodField()
     latest_host_metrics = serializers.SerializerMethodField()
-    inferred_max_hops = serializers.SerializerMethodField()
+    meshtastic_inferred_max_hops = serializers.SerializerMethodField()
     environment_exposure = serializers.SerializerMethodField()
     weather_use = serializers.SerializerMethodField()
     environment_settings_editable = serializers.SerializerMethodField()
@@ -1121,7 +1133,7 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
             "latest_air_quality_metrics",
             "latest_health_metrics",
             "latest_host_metrics",
-            "inferred_max_hops",
+            "meshtastic_inferred_max_hops",
             "environment_exposure",
             "weather_use",
             "environment_settings_editable",
@@ -1146,7 +1158,7 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
             "latest_air_quality_metrics",
             "latest_health_metrics",
             "latest_host_metrics",
-            "inferred_max_hops",
+            "meshtastic_inferred_max_hops",
             "environment_exposure",
             "weather_use",
             "environment_settings_editable",
@@ -1199,9 +1211,9 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
             return None
         return rel.battery_alert_confirmed_at
 
-    def get_inferred_max_hops(self, obj):
+    def get_meshtastic_inferred_max_hops(self, obj):
         status = self._get_latest_status(obj)
-        return status.inferred_max_hops if status else None
+        return status.meshtastic_inferred_max_hops if status else None
 
     def get_claim(self, obj):
         """
@@ -1239,8 +1251,8 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
                 "latest_altitude": status.altitude,
                 "latest_position_time": status.position_reported_time,
                 "latest_heading": status.heading,
-                "latest_location_source": status.location_source,
-                "latest_precision_bits": status.precision_bits,
+                "latest_location_source": status.meshtastic_location_source,
+                "latest_precision_bits": status.meshtastic_precision_bits,
                 "latest_ground_speed": status.ground_speed,
                 "latest_ground_track": status.ground_track,
                 "latest_sats_in_view": status.sats_in_view,
@@ -1294,8 +1306,8 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
                 "latest_battery_level": status.battery_level,
                 "latest_voltage": status.voltage,
                 "latest_metrics_time": status.metrics_reported_time,
-                "latest_channel_utilization": status.channel_utilization,
-                "latest_air_util_tx": status.air_util_tx,
+                "latest_channel_utilization": status.meshtastic_channel_utilization,
+                "latest_air_util_tx": status.meshtastic_air_util_tx,
                 "latest_uptime_seconds": status.uptime_seconds,
                 "node": obj.internal_id,
             }

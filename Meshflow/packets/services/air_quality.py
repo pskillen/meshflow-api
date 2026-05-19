@@ -51,6 +51,6 @@ class AirQualityMetricsPacketService(BasePacketService):
                 "air_quality_pm25_standard": self.packet.pm25_standard,
                 "air_quality_co2": self.packet.co2,
                 "air_quality_reported_time": reported_time,
-                "inferred_max_hops": self.observation.hop_start,
+                "meshtastic_inferred_max_hops": self.observation.hop_start,
             },
         )

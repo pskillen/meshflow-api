@@ -77,13 +77,13 @@ def create_managed_node(managed_node_data, create_user, create_constellation):  
             data["constellation"] = create_constellation(created_by=data["owner"])
 
         # only add 2 channels, we don't need all 8
-        if "channel_0" not in data:
-            data["channel_0"] = MessageChannel.objects.create(
+        if "meshtastic_channel_0" not in data:
+            data["meshtastic_channel_0"] = MessageChannel.objects.create(
                 name="Channel 0",
                 constellation=data["constellation"],
             )
-        if "channel_1" not in data:
-            data["channel_1"] = MessageChannel.objects.create(
+        if "meshtastic_channel_1" not in data:
+            data["meshtastic_channel_1"] = MessageChannel.objects.create(
                 name="Channel 1",
                 constellation=data["constellation"],
             )

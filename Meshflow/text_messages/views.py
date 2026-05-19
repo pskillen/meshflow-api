@@ -29,8 +29,8 @@ class TextMessageViewSet(viewsets.ModelViewSet):
         if sender_node_id:
             queryset = queryset.filter(sender__meshtastic_node_id=int(sender_node_id))
 
-        # filter out any DMs (i.e. recipient_node_id must be '^all')
-        queryset = queryset.filter(recipient_node_id=MESHTASTIC_BROADCAST_ID)
+        # filter out any DMs (i.e. recipient_meshtastic_node_id must be '^all')
+        queryset = queryset.filter(recipient_meshtastic_node_id=MESHTASTIC_BROADCAST_ID)
 
         # Prefetch observations and their observer for each original_packet
         observation_qs = PacketObservation.objects.select_related("observer")

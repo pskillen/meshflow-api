@@ -34,12 +34,12 @@ class TextMessageSerializer(serializers.ModelSerializer):
             "original_packet_id",
             "packet_id",
             "sender",
-            "recipient_node_id",
+            "recipient_meshtastic_node_id",
             "channel",
             "sent_at",
             "message_text",
             "is_emoji",
-            "reply_to_message_id",
+            "reply_to_meshtastic_packet_id",
             "heard",
         ]
         # all fields are read-only (must be a list or tuple)
@@ -48,12 +48,12 @@ class TextMessageSerializer(serializers.ModelSerializer):
             "original_packet_id",
             "packet_id",
             "sender",
-            "recipient_node_id",
+            "recipient_meshtastic_node_id",
             "channel",
             "sent_at",
             "message_text",
             "is_emoji",
-            "reply_to_message_id",
+            "reply_to_meshtastic_packet_id",
             "heard",
         ]
 
