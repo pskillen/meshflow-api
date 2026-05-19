@@ -3420,6 +3420,38 @@ paths:
         '503':
           description: Discord API or bot token misconfiguration
 
+  /raw-packet/:
+    post:
+      deprecated: true
+      summary: Ingest a packet (legacy v1)
+      description: >
+        **Deprecated.** Meshtastic bots should use ``POST /packets/{node_id}/ingest/`` instead
+        (v2 ingest; observer nodenum in the path). This URL is still used by meshtastic-bot when
+        ``api_version`` is 1 (``/api/raw-packet/``). It is not registered in the current Django
+        urlconf; production stacks may proxy it to the v2 ingest route or run an older API build.
+      tags: [Meshtastic packets]
+      security:
+        - NodeApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IncomingPacket'
+      responses:
+        '201':
+          description: Packet ingested successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Success'
+        '400':
+          description: Invalid packet data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
   /packets/{node_id}/ingest/:
     post:
       summary: Ingest a Meshtastic packet
@@ -4314,6 +4346,10 @@ paths:
   /nodes/observed-nodes/{node_id}/:
     get:
       summary: Get observed node details
+      description: >
+        Detail lookup by Meshtastic numeric ``node_id`` (``ObservedNode.node_id``). For MeshCore
+        nodes, use ``GET /nodes/observed-nodes/?protocol=meshcore`` (and search) until lookup by
+        ``internal_id`` is added ([#318](https://github.com/pskillen/meshflow-api/issues/318)).
       tags: [Nodes]
       security:
         - BearerAuth: []
@@ -4323,6 +4359,7 @@ paths:
           required: true
           schema:
             type: integer
+          description: Meshtastic numeric node id (detail routes); not MeshCore pubkey or ``internal_id``
       responses:
         '200':
           description: Node details
@@ -4333,6 +4370,7 @@ paths:
 
     put:
       summary: Update observed node
+      description: Path ``node_id`` is the Meshtastic numeric id; see GET for MeshCore lookup limits.
       tags: [Nodes]
       security:
         - BearerAuth: []
@@ -4342,6 +4380,7 @@ paths:
           required: true
           schema:
             type: integer
+          description: Meshtastic numeric node id (detail routes); not MeshCore pubkey or ``internal_id``
       requestBody:
         required: true
         content:
@@ -4358,6 +4397,7 @@ paths:
 
     delete:
       summary: Delete observed node
+      description: Path ``node_id`` is the Meshtastic numeric id; see GET for MeshCore lookup limits.
       tags: [Nodes]
       security:
         - BearerAuth: []
@@ -4367,6 +4407,7 @@ paths:
           required: true
           schema:
             type: integer
+          description: Meshtastic numeric node id (detail routes); not MeshCore pubkey or ``internal_id``
       responses:
         '204':
           description: Node deleted successfully

@@ -39,7 +39,7 @@ Parent index: [meshcore-rename-index](file:///Users/patricks/IdeaProjects/MeshFl
 ### SP-01 — OpenAPI contract docs
 
 - **Merged:** —
-- **Notes:** OpenAPI drift fix (#308): `/packets/{node_id}/ingest|nodes/`; `ObservedNode.internal_id` UUID; Meshtastic-only notes on device-metrics bulk, nested observed-node metrics, `/stats/nodes/{node_id}/*`; legacy **Packets** tag points to **Meshtastic packets**.
+- **Notes:** OpenAPI drift fix (#308): `/packets/{node_id}/ingest|nodes/`; `ObservedNode.internal_id` UUID; Meshtastic-only notes on device-metrics bulk, nested observed-node metrics, `/stats/nodes/{node_id}/*`; legacy **Packets** tag; deprecated `POST /raw-packet/`; observed-node detail `node_id` Meshtastic-only (+ MeshCore via list until #318). Follow-up v1 retirement: API [#319](https://github.com/pskillen/meshflow-api/issues/319), bot [#95](https://github.com/pskillen/meshflow-bot/issues/95).
 
 ### SP-02 — Comment-only labelling
 
