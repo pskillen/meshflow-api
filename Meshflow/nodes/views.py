@@ -218,6 +218,19 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
         )
         # Apply last_heard_after filter only for list action
         if self.action == "list":
+            protocol_param = self.request.query_params.get("protocol")
+            if protocol_param:
+                from common.protocol import Protocol
+
+                protocol_map = {
+                    "meshtastic": Protocol.MESHTASTIC,
+                    "meshcore": Protocol.MESHCORE,
+                    "1": Protocol.MESHTASTIC,
+                    "2": Protocol.MESHCORE,
+                }
+                protocol_val = protocol_map.get(protocol_param.lower())
+                if protocol_val is not None:
+                    qs = qs.filter(protocol=protocol_val)
             last_heard_after = self.request.query_params.get("last_heard_after")
             if last_heard_after:
                 try:

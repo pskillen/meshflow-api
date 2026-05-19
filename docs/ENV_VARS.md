@@ -84,6 +84,8 @@ Discord **login** uses the OAuth pair above. **DM notifications** (test message 
 | Variable                      | Default | Description                                                       | Allowable Values         |
 |-------------------------------|---------|-------------------------------------------------------------------|-------------------------|
 | `PACKET_DEDUP_WINDOW_MINUTES` | `10`    | Time window (minutes) within which same sender+packet_id is treated as duplicate. | Integer (string)        |
+| `MESHCORE_PACKET_DEDUP_WINDOW_MINUTES` | `10` | MeshCore dedup window (minutes) for `(pkt_hash, rx_time)` per ADR-0004. | Integer (string) |
+| `MESHCORE_DECODED_TWIN_WINDOW_SECONDS` | `30` | Optional window to collapse decoded-twin MeshCore frames (ADR-0004). | Integer (string) |
 
 ---
 

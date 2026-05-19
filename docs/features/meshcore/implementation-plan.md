@@ -202,16 +202,26 @@ Turn Phase **0.4** capture evidence into **locked architecture decisions** (ADRs
 
 ## Phase 1.0 — API protocol prep + Meshtastic (MT) relabelling (meshflow-api)
 
-**Status:** Open PR **[#291](https://github.com/pskillen/meshflow-api/pull/291)** (branch `meshcore/phase-1-0/api-protocol-prep`). **Tracking:** GitHub `pskillen/meshflow-api` **[#290](https://github.com/pskillen/meshflow-api/issues/290)** (child of epic **[#265](https://github.com/pskillen/meshflow-api/issues/265)**).  
+**Status:** **Protocol prep:** merged or merge-ready via **[PR #291](https://github.com/pskillen/meshflow-api/pull/291)** (branch `meshcore/phase-1-0/api-protocol-prep`). **Meshtastic raw row rename + MTI migration:** **[PR #292](https://github.com/pskillen/meshflow-api/pull/292)** on the same branch (verify on `main` after merge). **Tracking:** **[#290](https://github.com/pskillen/meshflow-api/issues/290)** (child of epic **[#265](https://github.com/pskillen/meshflow-api/issues/265)**).  
 **Repos touched in this phase:** **meshflow-api only** (no meshflow-bot / meshflow-ui in this phase).
 
 ### Purpose of this phase
 
-Add **multi-protocol–ready schema defaults** (existing rows remain **Meshtastic**), **nullable `ObservedNode.node_id`** with a **CHECK** that Meshtastic rows keep a numeric id, and **Meshtastic-only labelling** (constants, URL names, OpenAPI tags) so Phase **1.3** can land MC identity and ingest without a single mega-migration. **No** `meshcore_packets` app, **no** `POST /api/meshcore/...`, **no** `mc_pubkey` wiring (issues **#279** / **#280** / **#278**).
+Add **multi-protocol–ready schema defaults** (existing rows remain **Meshtastic**), **nullable `ObservedNode.node_id`** with a **CHECK** that Meshtastic rows keep a numeric id, and **Meshtastic-only labelling** (constants, URL names, OpenAPI tags) so Phase **1.3** can land MC identity and ingest without a single mega-migration. Follow with an explicit **Meshtastic persistence rename**: the former generic `RawPacket` parent row becomes **`MtRawPacket`** with a dedicated **`packets_mt_raw_packet`** table so the name and storage clearly mean “Meshtastic wire packet,” leaving room for a future MeshCore raw model without overloading the old name. **No** `meshcore_packets` app, **no** `POST /api/meshcore/...`, **no** `mc_pubkey` wiring (issues **#279** / **#280** / **#278**).
+
+### Refactoring delivered in meshflow-api (cumulative — Phases 0.5 + 1.0)
+
+Use this subsection as the **single inventory** of api-repo refactors tied to MeshCore readiness; deeper evidence lives in the Phase **0.5** and **1.0** checklists below.
+
+| Track | What shipped | Where to read details |
+| --- | --- | --- |
+| **0.5 — design only** | Capture-derived field reference, trimmed JSON samples, four ADRs (identity, channels, broadcast, dedup). | **Phase 0.5** section above; PR **[#289](https://github.com/pskillen/meshflow-api/pull/289)**. |
+| **1.0 — protocol prep** | `Protocol` enum, nullable `ObservedNode.node_id` + CHECK, `protocol` / `mc_channel_idx` on shared models, OpenAPI `MeshProtocol`, Meshtastic ingest URL names + tags, `MESHTASTIC_BROADCAST_ID`, cross-app `TODO(meshcore)` / MT scoping notes. | **meshflow-api — done** below; PR **[#291](https://github.com/pskillen/meshflow-api/pull/291)**. |
+| **1.0 — Meshtastic raw rename** | `RawPacket` → **`MtRawPacket`**, `db_table` **`packets_mt_raw_packet`**, MTI-safe **`packets.0017`** migration + **`packets/migration_operations.py`**, Django admin for base row + observations, call-site and doc renames (`dx_monitoring`, `stats`, `packets` services/tests, nodes backfill management command, packet-ingestion / DX / recency docs). | Same checklist + **[PR #292](https://github.com/pskillen/meshflow-api/pull/292)**. |
 
 ### meshflow-api — done (concrete checklist)
 
-- **Canonical delivery:** **[PR #291](https://github.com/pskillen/meshflow-api/pull/291)** on branch **`meshcore/phase-1-0/api-protocol-prep`** (verify on `main` after merge).
+- **Canonical delivery:** **[PR #291](https://github.com/pskillen/meshflow-api/pull/291)** (protocol prep) and **[PR #292](https://github.com/pskillen/meshflow-api/pull/292)** (`MtRawPacket` rename + migration + admin + doc/callsite updates) on **`meshcore/phase-1-0/api-protocol-prep`** (verify on `main` after merge).
 - **`Meshflow/common/protocol.py`** — shared `Protocol` `IntegerChoices` (`MESHTASTIC=1`, `MESHCORE=2`).
 - **`Meshflow/common/meshcore_node_helpers.py`** — placeholder module for future MC-specific helpers.
 - **`Meshflow/common/mesh_node_helpers.py`** — `MESHTASTIC_BROADCAST_ID` + deprecated `BROADCAST_ID` alias; ADR pointer for MC broadcast semantics.
@@ -221,6 +231,11 @@ Add **multi-protocol–ready schema defaults** (existing rows remain **Meshtasti
 - **Cross-app** — traceroute / analytics / DX / stats / mesh monitoring: module notes + `TODO(meshcore …)` where MT coupling is real; `MESHTASTIC_BROADCAST_ID` for `0xFFFFFFFF` hop sentinels where applicable; `ObservedNode` lookups scoped to Meshtastic where easy.
 - **`openapi.yaml`** — `MeshProtocol` schema; `protocol` / `mc_channel_idx` on shared components; **Meshtastic packets** tag for `/api/packets/…`; `info.description` multi-protocol blurb + link to this file; **NodeApiKeyAuth** on packet ingest paths (fixes undefined `ApiKeyAuth` reference).
 - **Tests:** `Meshflow/common/tests/test_mesh_node_helpers.py` updated for `MESHTASTIC_BROADCAST_ID` and alias equality.
+- **`RawPacket` → `MtRawPacket` (Meshtastic raw parent row)** — `Meshflow/packets/models.py`: parent model rename, **`Meta.db_table = "packets_mt_raw_packet"`**, all MTI subclasses + `PacketObservation.packet` FK updated; verbose names adjusted for “Meshtastic raw packet.”
+- **Migration `packets.0017_rename_rawpacket_to_mtrawpacket`** — **`SeparateDatabaseAndState`**: (1) custom atomic state operation **`RenameMeshtasticRawPacketMtiState`** in **`Meshflow/packets/migration_operations.py`** (mirrors `ProjectState.rename_model` plus child `rawpacket_ptr` → `mtrawpacket_ptr` and `bases` update before reload — avoids Django **#26488 / #28243** `FieldError` / `InvalidBasesError` on MTI); (2) **`RunPython`** applies physical DDL without stepping through a broken `RenameModel` clone: **PostgreSQL** renames child pointer columns, renames parent table, renames four parent indexes; **SQLite** renames child pointer columns + parent table only (legacy physical index names may remain — ORM uses logical migration state).
+- **Admin** — **`Meshflow/packets/admin.py`**: `MtRawPacketAdmin`, `PacketObservationAdmin`.
+- **Cross-app renames from `RawPacket` → `MtRawPacket`** — e.g. `Meshflow/dx_monitoring/models.py` (`ForeignKey` string `packets.MtRawPacket`), `Meshflow/dx_monitoring/services.py`, `Meshflow/stats/tasks.py`, `Meshflow/stats/views.py`, `Meshflow/packets/services/base.py`, `Meshflow/packets/tests/conftest.py`, `Meshflow/nodes/management/commands/backfill_observednode_created_at.py` (runtime command; historical migration **`nodes/0026_…`** still uses `apps.get_model("packets", "RawPacket")` for replay at that revision).
+- **Docs** — Meshtastic wording updates where the old name implied a generic raw row: `docs/features/packet-ingestion/README.md`, `DEDUPLICATION.md`, `adr/0004-mc-dedup-key.md`, `docs/features/dx-monitoring/detection.md`, `docs/features/README.md`, `docs/RECENCY.md`; integration test docstring in `tests/integration/test_packet_deduplication.py`; **`stats/tests/test_tasks.py`** comment alignment.
 
 ### meshflow-api — not done *in this phase only* (deferred)
 
@@ -236,9 +251,35 @@ Add **multi-protocol–ready schema defaults** (existing rows remain **Meshtasti
 ### Verification checklist
 
 1. **Unit tests:** `source venv/bin/activate` (or project venv), `pip install -r Meshflow/requirements.txt` (+ dev deps if needed), `python -m pytest Meshflow/ -v`.
-2. **Migrations:** `python manage.py makemigrations --dry-run` — should be clean after `help_text`-only tweaks; if Django emits metadata migrations, commit with a note.
-3. **Import smoke:** `python -c "import django; …"` or `python -c "from packets.serializers import convert_location_source"` from `Meshflow/` with `DJANGO_SETTINGS_MODULE` set — confirms no syntax regressions in serializers.
-4. **OpenAPI:** spot-check `/packets/ingest/` and `/packets/nodes/` use **Meshtastic packets** + **NodeApiKeyAuth**; schemas include `MeshProtocol` and nullable `ObservedNode.node_id` where applicable.
+2. **Migrations:** `python manage.py makemigrations --dry-run` — should be clean after `help_text`-only tweaks; if Django emits metadata migrations, commit with a note. After pulling **`packets.0017`**, run **`python manage.py migrate`** against a copy of prod schema (PostgreSQL recommended for index DDL parity) before shipping.
+3. **`packets.0017` smoke:** `DJANGO_SETTINGS_MODULE=Meshflow.settings.test python manage.py migrate` (SQLite) and/or **`python -m pytest Meshflow/packets/tests/test_packet_models.py`** — confirms MTI rename migration applies without `InvalidBasesError`.
+4. **Import smoke:** `python -c "import django; …"` or `python -c "from packets.serializers import convert_location_source"` from `Meshflow/` with `DJANGO_SETTINGS_MODULE` set — confirms no syntax regressions in serializers.
+5. **OpenAPI:** spot-check `/packets/ingest/` and `/packets/nodes/` use **Meshtastic packets** + **NodeApiKeyAuth**; schemas include `MeshProtocol` and nullable `ObservedNode.node_id` where applicable.
+
+---
+
+## Phase 1 — MeshCore ingestion MVP (meshflow-api, meshflow-bot, meshflow-ui)
+
+**Status:** Complete (implementation). **Tracking:** epic [#265](https://github.com/pskillen/meshflow-api/issues/265).
+
+**Repos touched:** meshflow-api, meshflow-bot, meshflow-ui.
+
+### Done
+
+- **API:** `ObservedNode.mc_pubkey` / `mc_pubkey_prefix`, CHECK + partial unique index ([#279](https://github.com/pskillen/meshflow-api/issues/279)); `meshcore_packets` app with ingest + list + dedup + `ObservedNode` receiver ([#280](https://github.com/pskillen/meshflow-api/issues/280), [#278](https://github.com/pskillen/meshflow-api/issues/278)); `protocol` filter on observed-nodes ([#284](https://github.com/pskillen/meshflow-api/issues/284)); `openapi.yaml` + `docs/ENV_VARS.md`; `docs/features/meshcore/feeder-bootstrap.md`.
+- **Bot:** `MeshCorePacketSerializer`, `store_raw_meshcore_packet`, `MESHCORE_UPLOAD_ENABLED` ([#83](https://github.com/pskillen/meshflow-bot/issues/83)).
+- **UI:** MeshCore map + nodes list pages, sidebar, API hooks ([#250](https://github.com/pskillen/meshflow-ui/issues/250)).
+
+### Not done (deferred)
+
+- `TextMessage` normalisation for MC; telemetry/ack models; MT pages showing MC; automated 24h trial gate (operator checklist in feeder-bootstrap).
+
+### Verification
+
+1. `python -m pytest Meshflow/meshcore_packets/tests/ Meshflow/common/tests/test_meshcore_node_helpers.py -v`
+2. Bot: `pytest test/meshcore/ -v` (venv + requirements.dev.txt)
+3. UI: `npm run build`
+4. Integration: `MESHFLOW_MC_API_KEY=... pytest tests/integration/test_meshcore_ingest.py -v`
 
 ---
 

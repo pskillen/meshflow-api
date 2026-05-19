@@ -18,6 +18,8 @@ tags:
     description: JWT token management endpoints
   - name: Meshtastic packets
     description: Meshtastic packet ingestion and feeder node upsert (Node API key)
+  - name: MeshCore packets
+    description: MeshCore packet ingestion (Node API key) and read-only packet list
   - name: Packets
     description: Legacy tag name; prefer Meshtastic packets for /api/packets operations
   - name: Constellations
@@ -81,8 +83,64 @@ components:
       type: integer
       enum: [1, 2]
       description: >
-        Radio protocol discriminator stored on shared models: 1 = Meshtastic,
-        2 = MeshCore. MeshCore rows are not yet created by this API in Phase 1.0.
+        Radio protocol discriminator: 1 = Meshtastic, 2 = MeshCore.
+    MeshCorePacketIngest:
+      type: object
+      required: [event_type, payload_type, rx_time]
+      properties:
+        event_type:
+          type: string
+          description: MeshCore event type (advertisement, channel_message, contact_message, rx_log_data, ...)
+        payload_type:
+          type: string
+          enum: [advert, channel_text, contact_text, raw]
+        pkt_hash:
+          type: integer
+          nullable: true
+        rx_time:
+          description: Unix timestamp (seconds) or ISO 8601
+        rx_rssi:
+          type: number
+          nullable: true
+        rx_snr:
+          type: number
+          nullable: true
+        from_pubkey:
+          type: string
+          nullable: true
+        from_pubkey_prefix:
+          type: string
+          nullable: true
+        to_pubkey_prefix:
+          type: string
+          nullable: true
+        route_typename:
+          type: string
+          nullable: true
+        path_hashes:
+          type: array
+          items:
+            type: string
+        channel_idx:
+          type: integer
+          nullable: true
+        text:
+          type: string
+          nullable: true
+        adv_name:
+          type: string
+          nullable: true
+        adv_lat:
+          type: number
+          nullable: true
+        adv_lon:
+          type: number
+          nullable: true
+        raw:
+          type: object
+        encrypted:
+          type: boolean
+          description: When true, ingest returns 304 without storage
     FeederReach:
       type: object
       description: >
@@ -954,7 +1012,15 @@ components:
           description: The ID of the node in the mesh network (Meshtastic numeric id; null reserved for MeshCore)
         node_id_str:
           type: string
-          description: The ID of the node in Meshastic !hex format
+          description: Display id (!hex8 for Meshtastic, mc:prefix12 for MeshCore)
+        mc_pubkey:
+          type: string
+          nullable: true
+          description: MeshCore full Ed25519 public key (64 hex chars)
+        mc_pubkey_prefix:
+          type: string
+          nullable: true
+          description: MeshCore 6-byte pubkey prefix (12 hex chars)
         mac_addr:
           type: string
           description: The MAC address of the node
@@ -3380,6 +3446,68 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
+  /meshcore/packets/ingest/:
+    post:
+      summary: Ingest a MeshCore packet
+      description: >
+        MeshCore feeder bots POST captured frames here. Authenticated via Node API key
+        linked to a ManagedNode with protocol=meshcore. No URL node id (identity is in the body).
+      tags: [MeshCore packets]
+      security:
+        - NodeApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MeshCorePacketIngest'
+      responses:
+        '201':
+          description: Packet ingested
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  packet_id:
+                    type: string
+                    format: uuid
+        '304':
+          description: Encrypted packet skipped (no storage)
+        '400':
+          description: Invalid payload
+        '403':
+          description: API key not linked to a MeshCore feeder
+
+  /meshcore/packets/:
+    get:
+      summary: List ingested MeshCore packets
+      tags: [MeshCore packets]
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PaginationPage'
+        - $ref: '#/components/parameters/PaginationPageSize'
+        - name: payload_type
+          in: query
+          schema:
+            type: integer
+        - name: from_pubkey_prefix
+          in: query
+          schema:
+            type: string
+        - name: observer
+          in: query
+          schema:
+            type: string
+            format: uuid
+          description: ManagedNode internal_id
+      responses:
+        '200':
+          description: Paginated MeshCore raw packets
+
   /packets/nodes/:
     post:
       summary: Upsert node information
@@ -3790,6 +3918,19 @@ paths:
       parameters:
         - $ref: '#/components/parameters/PaginationPage'
         - $ref: '#/components/parameters/PaginationPageSize'
+        - name: protocol
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/MeshProtocol'
+          description: Filter by mesh protocol (meshtastic or meshcore). recent_counts remains Meshtastic-only.
+        - name: last_heard_after
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+          description: ISO 8601 timestamp; only nodes heard on or after this time
       responses:
         '200':
           description: List of observed nodes

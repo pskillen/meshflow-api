@@ -6,7 +6,21 @@ from django.db import transaction
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 
+from common.mesh_node_helpers import meshtastic_hex_to_int, meshtastic_id_to_hex
+from common.protocol import Protocol
+
 from .models import ManagedNode, ManagedNodeStatus, NodeAPIKey, NodeAuth, NodeLatestStatus, ObservedNode
+
+MANAGED_NODE_COMMON_FIELDS = (
+    "protocol",
+    "node_id",
+    "name",
+    "owner",
+    "constellation",
+    "allow_auto_traceroute",
+    "latlong",
+)
+MANAGED_NODE_CHANNEL_FIELDS = tuple(f"channel_{i}" for i in range(8))
 
 
 class CopyToClipboardWidget(forms.Widget):
@@ -237,19 +251,29 @@ class LatLongFormField(forms.Field):
 
 class ManagedNodeAdminForm(forms.ModelForm):
     node_id = forms.CharField(
-        label="Node ID",
+        label=_("Node ID"),
         widget=NodeIdDatalistWidget,
-        help_text="Select from observed nodes or enter a new node ID.",
+        help_text=_("Select from observed Meshtastic nodes or enter a decimal id or !hex8."),
     )
 
     latlong = LatLongFormField(
-        label="Default Location (lat/lng)",
-        help_text="Set the default latitude and longitude by dragging the marker on the map.",
+        label=_("Default Location (lat/lng)"),
+        help_text=_("Set the default latitude and longitude by dragging the marker on the map."),
     )
 
     class Meta:
         model = ManagedNode
         fields = "__all__"
+
+    def _submitted_protocol(self):
+        if not self.instance._state.adding:
+            return self.instance.protocol
+        if self.data:
+            try:
+                return int(self.data.get("protocol", Protocol.MESHTASTIC))
+            except TypeError, ValueError:
+                pass
+        return int(self.initial.get("protocol", Protocol.MESHTASTIC))
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -257,9 +281,63 @@ class ManagedNodeAdminForm(forms.ModelForm):
         lng = self.instance.default_location_longitude
         self.initial["latlong"] = [lat, lng]
 
+        self.fields["protocol"].help_text = _(
+            "MeshCore feeders use protocol MeshCore and node id 0; Meshtastic feeders use Meshtastic."
+        )
+
+        if self._submitted_protocol() == Protocol.MESHCORE:
+            initial = self.instance.node_id if not self.instance._state.adding else 0
+            self.fields["node_id"] = forms.IntegerField(
+                label=_("Node ID (placeholder)"),
+                required=False,
+                initial=initial,
+                min_value=0,
+                help_text=_(
+                    "Use 0 for MeshCore feeders (not used on the wire). "
+                    "Display id is mc:feeder:<internal id> after save."
+                ),
+            )
+        elif not self.instance._state.adding and self.instance.protocol == Protocol.MESHTASTIC:
+            self.fields["node_id"].initial = meshtastic_id_to_hex(self.instance.node_id)
+
+    def _protocol_from_form(self):
+        protocol = self.cleaned_data.get("protocol") if hasattr(self, "cleaned_data") else None
+        if protocol is not None:
+            return protocol
+        if self.data:
+            try:
+                return int(self.data.get("protocol", Protocol.MESHTASTIC))
+            except TypeError, ValueError:
+                pass
+        if not self.instance._state.adding:
+            return self.instance.protocol
+        return Protocol.MESHTASTIC
+
+    def clean_node_id(self):
+        raw = self.cleaned_data.get("node_id")
+        protocol = self._protocol_from_form()
+
+        if protocol == Protocol.MESHCORE:
+            if raw in (None, ""):
+                return 0
+            try:
+                return int(raw)
+            except TypeError, ValueError:
+                raise forms.ValidationError(_("Enter 0 for MeshCore feeders."))
+
+        text = str(raw).strip() if raw is not None else ""
+        if not text:
+            raise forms.ValidationError(_("Node ID is required."))
+        if text.startswith("!"):
+            return meshtastic_hex_to_int(text)
+        try:
+            return int(text)
+        except ValueError:
+            raise forms.ValidationError(_("Enter a decimal node ID or !hex8."))
+
     def clean(self):
         cleaned_data = super().clean()
-        latlong = self.cleaned_data.get("latlong")
+        latlong = cleaned_data.get("latlong")
         if latlong:
             cleaned_data["default_location_latitude"] = latlong[0]
             cleaned_data["default_location_longitude"] = latlong[1]
@@ -275,8 +353,9 @@ class ManagedNodeAdminForm(forms.ModelForm):
 class ManagedNodeAdmin(admin.ModelAdmin):
     form = ManagedNodeAdminForm
     list_display = (
+        "protocol",
         "node_id",
-        "node_id_str",
+        "display_id",
         "name",
         "owner",
         "constellation",
@@ -285,13 +364,13 @@ class ManagedNodeAdmin(admin.ModelAdmin):
         "status_last_packet_ingested_at",
     )
     list_filter = (
+        "protocol",
         "owner",
         "constellation",
         "allow_auto_traceroute",
     )
     search_fields = (
         "node_id",
-        "node_id_str",
         "name",
         "owner__username",
         "owner__email",
@@ -317,24 +396,28 @@ class ManagedNodeAdmin(admin.ModelAdmin):
     def get_queryset(self, request):
         return super().get_queryset(request).select_related("status")
 
-    def get_fields(self, request, obj=None):
-        fields = [
-            "node_id",
-            "name",
-            "owner",
-            "constellation",
-            "allow_auto_traceroute",
-            "latlong",
-            "channel_0",
-            "channel_1",
-            "channel_2",
-            "channel_3",
-            "channel_4",
-            "channel_5",
-            "channel_6",
-            "channel_7",
-        ]
-        return fields
+    @admin.display(description=_("Display ID"))
+    def display_id(self, obj):
+        return obj.node_id_str
+
+    def get_readonly_fields(self, request, obj=None):
+        if obj and obj.protocol == Protocol.MESHCORE:
+            return ("display_id",)
+        return ()
+
+    def get_fieldsets(self, request, obj=None):
+        common = (_("Feeder"), {"fields": MANAGED_NODE_COMMON_FIELDS})
+        channels = (
+            _("Meshtastic channels"),
+            {
+                "fields": MANAGED_NODE_CHANNEL_FIELDS,
+                "classes": ("collapse",),
+                "description": _("Not used for MeshCore feeders."),
+            },
+        )
+        if obj and obj.protocol == Protocol.MESHCORE:
+            return (common,)
+        return (common, channels)
 
 
 @admin.register(ManagedNodeStatus)
