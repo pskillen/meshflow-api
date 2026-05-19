@@ -18,6 +18,26 @@ def _coerce_meshtastic_node_id_kwargs(data: dict) -> dict:
     return data
 
 
+_LEGACY_OBSERVED_NODE_FIELD_ALIASES = {
+    "hw_model": "meshtastic_hw_model",
+    "public_key": "meshtastic_public_key",
+    "role": "meshtastic_role",
+    "is_licensed": "meshtastic_is_licensed",
+    "is_unmessagable": "meshtastic_is_unmessagable",
+}
+
+
+def _coerce_observed_node_legacy_kwargs(data: dict) -> dict:
+    """Map legacy test kwargs to ``meshtastic_*`` field names (SP-04)."""
+    _coerce_meshtastic_node_id_kwargs(data)
+    for old, new in _LEGACY_OBSERVED_NODE_FIELD_ALIASES.items():
+        if old in data:
+            if new in data:
+                raise ValueError(f"Pass only one of {old} or {new}")
+            data[new] = data.pop(old)
+    return data
+
+
 @pytest.fixture
 def constellation_data():
     return {
@@ -78,7 +98,7 @@ def create_observed_node(observed_node_data):
     def make_observed_node(**kwargs):
         data = observed_node_data.copy()
         data.update(kwargs)
-        _coerce_meshtastic_node_id_kwargs(data)
+        _coerce_observed_node_legacy_kwargs(data)
         if data.get("meshtastic_node_id") is not None and "node_id_str" not in data:
             data["node_id_str"] = meshtastic_id_to_hex(data["meshtastic_node_id"])
         return ObservedNode.objects.create(**data)
