@@ -246,7 +246,9 @@ class PositionPacketSerializer(BasePacketSerializer):
             altitude = serializers.FloatField(required=False, allow_null=True)
             heading = serializers.FloatField(required=False, allow_null=True)
             locationSource = serializers.CharField(source="meshtastic_location_source", required=False, allow_null=True)
-            precisionBits = serializers.IntegerField(source="meshtastic_precision_bits", required=False, allow_null=True)
+            precisionBits = serializers.IntegerField(
+                source="meshtastic_precision_bits", required=False, allow_null=True
+            )
             time = serializers.IntegerField(source="position_time", required=False, allow_null=True)
             groundSpeed = serializers.FloatField(source="ground_speed", required=False, allow_null=True)
             groundTrack = serializers.FloatField(source="ground_track", required=False, allow_null=True)
@@ -270,7 +272,9 @@ class PositionPacketSerializer(BasePacketSerializer):
 
         # Convert meshtastic_location_source from string to integer using LocationSource
         if "meshtastic_location_source" in validated_data and validated_data["meshtastic_location_source"]:
-            validated_data["meshtastic_location_source"] = convert_location_source(validated_data["meshtastic_location_source"])
+            validated_data["meshtastic_location_source"] = convert_location_source(
+                validated_data["meshtastic_location_source"]
+            )
 
         return validated_data
 
@@ -1275,7 +1279,9 @@ class PositionSerializer(serializers.Serializer):
 
         # Convert meshtastic_location_source from string to integer using LocationSource
         if "meshtastic_location_source" in validated_data and validated_data["meshtastic_location_source"]:
-            validated_data["meshtastic_location_source"] = convert_location_source(validated_data["meshtastic_location_source"])
+            validated_data["meshtastic_location_source"] = convert_location_source(
+                validated_data["meshtastic_location_source"]
+            )
 
         return validated_data
 

@@ -41,4 +41,6 @@ class TextMessage(models.Model):
         verbose_name_plural = _("Text messages")
 
     def __str__(self):
-        return f"{self.sender.node_id_str} -> {self.recipient_meshtastic_node_id or '^all'}: {self.message_text[:10]}..."
+        return (
+            f"{self.sender.node_id_str} -> {self.recipient_meshtastic_node_id or '^all'}: {self.message_text[:10]}..."
+        )

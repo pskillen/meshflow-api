@@ -100,7 +100,11 @@ def test_process_device_metrics_packet_with_null_values(
     """Test processing a device metrics packet with null values."""
     service = DeviceMetricsPacketService()
     packet = create_device_metrics_packet(
-        battery_level=None, voltage=None, meshtastic_channel_utilization=None, meshtastic_air_util_tx=None, uptime_seconds=None
+        battery_level=None,
+        voltage=None,
+        meshtastic_channel_utilization=None,
+        meshtastic_air_util_tx=None,
+        uptime_seconds=None,
     )
     observer = create_managed_node()
     observation = create_packet_observation(packet=packet, observer=observer)
