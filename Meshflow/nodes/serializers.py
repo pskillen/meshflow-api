@@ -151,7 +151,7 @@ class NodeRfPropagationRenderSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         path = reverse(
             "rf-propagation-asset",
-            kwargs={"node_id": obj.observed_node.meshtastic_node_id, "filename": obj.asset_filename},
+            kwargs={"internal_id": obj.observed_node.internal_id, "filename": obj.asset_filename},
         )
         if request:
             return request.build_absolute_uri(path)
@@ -1211,7 +1211,7 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
             return None
         return rel.battery_alert_confirmed_at
 
-    def get_inferred_max_hops(self, obj):
+    def get_meshtastic_inferred_max_hops(self, obj):
         status = self._get_latest_status(obj)
         return status.meshtastic_inferred_max_hops if status else None
 

@@ -20,7 +20,7 @@ def test_observed_node_detail_includes_weather_fields(create_observed_node, crea
         weather_use=WeatherUse.INCLUDE,
         environment_exposure=EnvironmentExposure.OUTDOOR,
     )
-    response = client.get(reverse("observed-node-detail", kwargs={"node_id": node.meshtastic_node_id}))
+    response = client.get(reverse("observed-node-detail", kwargs={"internal_id": node.internal_id}))
     assert response.status_code == status.HTTP_200_OK
     assert response.data["environment_exposure"] == "outdoor"
     assert response.data["weather_use"] == "include"
@@ -37,7 +37,7 @@ def test_environment_settings_editable_for_claim_owner(create_observed_node, cre
     )
     client = APIClient()
     client.force_authenticate(user=owner)
-    response = client.get(reverse("observed-node-detail", kwargs={"node_id": node.meshtastic_node_id}))
+    response = client.get(reverse("observed-node-detail", kwargs={"internal_id": node.internal_id}))
     assert response.status_code == status.HTTP_200_OK
     assert response.data["environment_settings_editable"] is True
 
@@ -51,7 +51,7 @@ def test_environment_settings_editable_for_staff(create_observed_node, create_us
     )
     client = APIClient()
     client.force_authenticate(user=staff)
-    response = client.get(reverse("observed-node-detail", kwargs={"node_id": node.meshtastic_node_id}))
+    response = client.get(reverse("observed-node-detail", kwargs={"internal_id": node.internal_id}))
     assert response.status_code == status.HTTP_200_OK
     assert response.data["environment_settings_editable"] is True
 
@@ -66,7 +66,7 @@ def test_environment_settings_patch_claim_owner(create_observed_node, create_use
     )
     client = APIClient()
     client.force_authenticate(user=owner)
-    url = reverse("observed-node-environment-settings", kwargs={"node_id": node.meshtastic_node_id})
+    url = reverse("observed-node-environment-settings", kwargs={"internal_id": node.internal_id})
     response = client.patch(
         url,
         {"environment_exposure": "indoor", "weather_use": "exclude"},
@@ -89,7 +89,7 @@ def test_environment_settings_patch_staff(create_observed_node, create_user):
     )
     client = APIClient()
     client.force_authenticate(user=staff)
-    url = reverse("observed-node-environment-settings", kwargs={"node_id": node.meshtastic_node_id})
+    url = reverse("observed-node-environment-settings", kwargs={"internal_id": node.internal_id})
     response = client.patch(url, {"weather_use": "include"}, format="json")
     assert response.status_code == status.HTTP_200_OK
     assert response.data["weather_use"] == "include"
@@ -106,7 +106,7 @@ def test_environment_settings_patch_forbidden(create_observed_node, create_user)
     )
     client = APIClient()
     client.force_authenticate(user=other)
-    url = reverse("observed-node-environment-settings", kwargs={"node_id": node.meshtastic_node_id})
+    url = reverse("observed-node-environment-settings", kwargs={"internal_id": node.internal_id})
     response = client.patch(url, {"weather_use": "exclude"}, format="json")
     assert response.status_code == status.HTTP_403_FORBIDDEN
 
@@ -120,7 +120,7 @@ def test_environment_settings_patch_empty_body(create_observed_node, create_user
     )
     client = APIClient()
     client.force_authenticate(user=staff)
-    url = reverse("observed-node-environment-settings", kwargs={"node_id": node.meshtastic_node_id})
+    url = reverse("observed-node-environment-settings", kwargs={"internal_id": node.internal_id})
     response = client.patch(url, {}, format="json")
     assert response.status_code == status.HTTP_400_BAD_REQUEST
 

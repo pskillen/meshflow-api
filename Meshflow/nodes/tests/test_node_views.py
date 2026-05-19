@@ -125,7 +125,7 @@ def test_observed_node_detail_view(create_observed_node, create_user):
     node = create_observed_node()
 
     # Test GET request
-    response = client.get(reverse("observed-node-detail", kwargs={"node_id": node.meshtastic_node_id}))
+    response = client.get(reverse("observed-node-detail", kwargs={"internal_id": node.internal_id}))
     assert response.status_code == status.HTTP_200_OK
     assert response.data["meshtastic_node_id"] == node.meshtastic_node_id
 
@@ -179,7 +179,7 @@ def test_claim_post_rejected_when_node_owned_by_another_user(create_observed_nod
     client.force_authenticate(user=other_user)
 
     response = client.post(
-        reverse("observed-node-claim", kwargs={"node_id": node.meshtastic_node_id}),
+        reverse("observed-node-claim", kwargs={"internal_id": node.internal_id}),
     )
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert "already claimed" in response.data["detail"].lower()
@@ -198,7 +198,7 @@ def test_claim_delete_clears_claimed_by_when_owner(create_observed_node, create_
 
     client = APIClient()
     client.force_authenticate(user=owner)
-    response = client.delete(reverse("observed-node-claim", kwargs={"node_id": node.meshtastic_node_id}))
+    response = client.delete(reverse("observed-node-claim", kwargs={"internal_id": node.internal_id}))
     assert response.status_code == status.HTTP_204_NO_CONTENT
 
     node.refresh_from_db()
@@ -219,7 +219,7 @@ def test_claim_delete_pending_does_not_require_claimed_by(create_observed_node, 
 
     client = APIClient()
     client.force_authenticate(user=owner)
-    response = client.delete(reverse("observed-node-claim", kwargs={"node_id": node.meshtastic_node_id}))
+    response = client.delete(reverse("observed-node-claim", kwargs={"internal_id": node.internal_id}))
     assert response.status_code == status.HTTP_204_NO_CONTENT
     node.refresh_from_db()
     assert node.claimed_by_id is None
@@ -239,7 +239,7 @@ def test_claim_delete_does_not_clear_other_users_claimed_by(create_observed_node
 
     client = APIClient()
     client.force_authenticate(user=owner)
-    response = client.delete(reverse("observed-node-claim", kwargs={"node_id": node.meshtastic_node_id}))
+    response = client.delete(reverse("observed-node-claim", kwargs={"internal_id": node.internal_id}))
     assert response.status_code == status.HTTP_204_NO_CONTENT
 
     node.refresh_from_db()
@@ -260,7 +260,7 @@ def test_claim_delete_non_owner_no_claim_returns_404(create_observed_node, creat
 
     client = APIClient()
     client.force_authenticate(user=other)
-    response = client.delete(reverse("observed-node-claim", kwargs={"node_id": node.meshtastic_node_id}))
+    response = client.delete(reverse("observed-node-claim", kwargs={"internal_id": node.internal_id}))
     assert response.status_code == status.HTTP_404_NOT_FOUND
     assert NodeOwnerClaim.objects.filter(node=node, user=owner).exists()
     node.refresh_from_db()
@@ -281,7 +281,7 @@ def test_claim_delete_staff_without_own_claim_returns_404(create_observed_node, 
 
     client = APIClient()
     client.force_authenticate(user=staff)
-    response = client.delete(reverse("observed-node-claim", kwargs={"node_id": node.meshtastic_node_id}))
+    response = client.delete(reverse("observed-node-claim", kwargs={"internal_id": node.internal_id}))
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 

@@ -21,14 +21,14 @@ Living tracker for the [rename audit index](file:///Users/patricks/IdeaProjects/
 | SP-01 | OpenAPI contract docs | api | 1 | merged | [#308](https://github.com/pskillen/meshflow-api/issues/308) | [#320](https://github.com/pskillen/meshflow-api/pull/320) |
 | SP-02 | Comment-only labelling | api, bot, ui | 1–3 | merged | [#309](https://github.com/pskillen/meshflow-api/issues/309) | [#321](https://github.com/pskillen/meshflow-api/pull/321) · [bot#96](https://github.com/pskillen/meshflow-bot/pull/96) · [ui#267](https://github.com/pskillen/meshflow-ui/pull/267) |
 | SP-03 | `node_id` → `meshtastic_node_id` | api, bot, ui | 1 (coordinated) | merged | [#310](https://github.com/pskillen/meshflow-api/issues/310) | [#322](https://github.com/pskillen/meshflow-api/pull/322) · [ui#268](https://github.com/pskillen/meshflow-ui/pull/268) |
-| SP-04 | ObservedNode MT identity fields | api, ui | 1 | in_progress | [#312](https://github.com/pskillen/meshflow-api/issues/312) | [#323](https://github.com/pskillen/meshflow-api/pull/323) · [ui#270](https://github.com/pskillen/meshflow-ui/pull/270) |
+| SP-04 | ObservedNode MT identity fields | api, ui | 1 | merged | [#312](https://github.com/pskillen/meshflow-api/issues/312) | [#323](https://github.com/pskillen/meshflow-api/pull/323) · [ui#270](https://github.com/pskillen/meshflow-ui/pull/270) |
 | SP-05 | MtRawPacket wire + observations | api | — | skipped | [#311](https://github.com/pskillen/meshflow-api/issues/311) | — |
-| SP-06 | ManagedNode channels + constellation bot defaults | api, ui | 1 | not_started | [#313](https://github.com/pskillen/meshflow-api/issues/313) | |
-| SP-07 | TextMessage MT fields | api, ui | 1 | not_started | [#314](https://github.com/pskillen/meshflow-api/issues/314) | |
-| SP-08 | NodeLatestStatus / metrics MT columns | api | 1 | not_started | [#315](https://github.com/pskillen/meshflow-api/issues/315) | |
-| SP-09 | UI client branding | ui | 1 | not_started | [#316](https://github.com/pskillen/meshflow-api/issues/316) | |
-| SP-10 | Bot local naming | bot | 1 | not_started | [#317](https://github.com/pskillen/meshflow-api/issues/317) | |
-| SP-11 | ObservedNode lookup by `internal_id` | api, ui | 1 | deferred | [#318](https://github.com/pskillen/meshflow-api/issues/318) | |
+| SP-06 | ManagedNode channels + constellation bot defaults | api, ui | 1 | in_progress | [#313](https://github.com/pskillen/meshflow-api/issues/313) | |
+| SP-07 | TextMessage MT fields | api, ui | 1 | in_progress | [#314](https://github.com/pskillen/meshflow-api/issues/314) | |
+| SP-08 | NodeLatestStatus / metrics MT columns | api | 1 | in_progress | [#315](https://github.com/pskillen/meshflow-api/issues/315) | |
+| SP-09 | UI client branding | ui | 1 | in_progress | [#316](https://github.com/pskillen/meshflow-api/issues/316) | |
+| SP-10 | Bot local naming | bot | 1 | in_progress | [#317](https://github.com/pskillen/meshflow-api/issues/317) | |
+| SP-11 | ObservedNode lookup by `internal_id` | api, ui | 1 | in_progress | [#318](https://github.com/pskillen/meshflow-api/issues/318) | |
 
 Parent index: [meshcore-rename-index](file:///Users/patricks/IdeaProjects/MeshFlow/.cursor/plans/meshcore-rename-index.plan.md) · Phase context: [implementation-plan.md](./implementation-plan.md)
 
@@ -74,7 +74,7 @@ Parent index: [meshcore-rename-index](file:///Users/patricks/IdeaProjects/MeshFl
 
 ### SP-04 — ObservedNode MT identity fields
 
-- **Merged:** —
+- **Merged:** 2026-05-19 ([#323](https://github.com/pskillen/meshflow-api/pull/323) · [ui#270](https://github.com/pskillen/meshflow-ui/pull/270))
 - **Branch:** `api-312/pskillen/meshcore-rename-sp04-observed-node-mt` (api, ui)
 - **Delivered:**
   - **api ([#323](https://github.com/pskillen/meshflow-api/pull/323)):** `RenameField` migration `0039_rename_observednode_meshtastic_identity_fields`; model, `ObservedNodeSerializer`, admin, infrastructure filter (`meshtastic_role__in`), mesh monitoring eligibility/summary; `NodeInfoPacketService` copies `NodeInfoPacket.*` onto `ObservedNode.meshtastic_*`; `NodeSerializer` (feeder upsert) exposes `meshtastic_*` in responses and accepts legacy `hw_model` / `public_key` on request; `openapi.yaml` `ObservedNode`, `ObservedNodeSearch`, `ObservedNodeUpdate`; unit + integration test JSON keys; follow-up `8488fae` — `create_observed_node` legacy kwargs + two mesh_monitoring tests
@@ -92,32 +92,37 @@ Parent index: [meshcore-rename-index](file:///Users/patricks/IdeaProjects/MeshFl
 ### SP-06 — Channels + constellation
 
 - **Merged:** —
-- **Notes:**
+- **Branch:** `api-307/pskillen/meshcore-rename-sp06-sp11` (api)
+- **Delivered (api):** `ManagedNode.meshtastic_channel_0..7`; `Constellation.bot_default_ignore_meshtastic_portnums` / `bot_default_meshtastic_hop_limit`; migrations `nodes/0040`, `constellations/0008`; serializers, admin, openapi, tests
+- **Notes:** ui PR pending on same branch name
 
 ### SP-07 — Text messages
 
 - **Merged:** —
-- **Notes:**
+- **Delivered (api):** `recipient_meshtastic_node_id`, `reply_to_meshtastic_packet_id`; migration `text_messages/0007`; ingest service, serializers, openapi
+- **Notes:** ui PR pending
 
 ### SP-08 — Metrics columns
 
 - **Merged:** —
-- **Notes:**
+- **Delivered (api):** `meshtastic_location_source`, `meshtastic_precision_bits`, `meshtastic_channel_utilization`, `meshtastic_air_util_tx`, `meshtastic_inferred_max_hops` on `NodeLatestStatus`, `Position`, `DeviceMetrics`, and packet payload tables; migrations `nodes/0041`, `packets/0018`
+- **Notes:** Nested API JSON uses `meshtastic_*` on serializers; annotation aliases `latest_*` / `last_*` unchanged internally
 
 ### SP-09 — UI branding
 
 - **Merged:** —
-- **Notes:**
+- **Notes:** ui-only; tracked in api progress doc
 
 ### SP-10 — Bot local naming
 
 - **Merged:** —
-- **Notes:**
+- **Notes:** bot PR pending (`api-317/...`)
 
-### SP-11 — Lookup `internal_id` (deferred)
+### SP-11 — Lookup `internal_id`
 
 - **Merged:** —
-- **Notes:**
+- **Delivered (api):** `ObservedNodeViewSet.lookup_field = internal_id`; claim + RF asset paths use `<uuid:internal_id>`; `GET …/by-meshtastic-id/{meshtastic_node_id}/` redirect; openapi path rename; tests updated
+- **Notes:** Breaking API for observed-node detail and nested routes; managed nodes still use `meshtastic_node_id` in URL; ui PR pending
 
 ---
 

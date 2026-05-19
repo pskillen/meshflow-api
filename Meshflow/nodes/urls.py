@@ -32,9 +32,13 @@ urlpatterns = [
         EnvironmentMetricsBulkView.as_view(),
         name="environment-metrics-bulk",
     ),
-    path("observed-nodes/<int:node_id>/claim/", ObservedNodeClaimView.as_view(), name="observed-node-claim"),
     path(
-        "observed-nodes/<int:node_id>/rf-propagation/asset/<str:filename>",
+        "observed-nodes/<uuid:internal_id>/claim/",
+        ObservedNodeClaimView.as_view(),
+        name="observed-node-claim",
+    ),
+    path(
+        "observed-nodes/<uuid:internal_id>/rf-propagation/asset/<str:filename>",
         RfPropagationAssetView.as_view(),
         name="rf-propagation-asset",
     ),
