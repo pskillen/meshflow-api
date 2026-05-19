@@ -20,6 +20,7 @@ class ConstellationAdmin(admin.ModelAdmin):
     form = ConstellationAdminForm
     list_display = (
         "name",
+        "protocol",
         "created_by",
         "get_member_count",
         "get_admin_count",
@@ -28,12 +29,12 @@ class ConstellationAdmin(admin.ModelAdmin):
         "bot_default_ignore_portnums",
         "bot_default_hop_limit",
     )
-    list_filter = ("created_by",)
+    list_filter = (("protocol", admin.ChoicesFieldListFilter), "created_by")
     search_fields = ("name", "description", "created_by__username", "created_by__email")
     ordering = ("name",)
     readonly_fields = ("created_by",)
     fieldsets = (
-        (None, {"fields": ("name", "description", "created_by", "map_color")}),
+        (None, {"fields": ("name", "description", "protocol", "created_by", "map_color")}),
         (
             _("Bot setup defaults"),
             {
@@ -125,7 +126,11 @@ class ConstellationUserMembershipAdmin(admin.ModelAdmin):
 
 @admin.register(MessageChannel)
 class MessageChannelAdmin(admin.ModelAdmin):
-    list_display = ("id", "name", "constellation")
-    list_filter = ("constellation",)
+    list_display = ("id", "name", "protocol", "mc_channel_idx", "constellation")
+    list_filter = (
+        ("protocol", admin.ChoicesFieldListFilter),
+        "constellation",
+        ("mc_channel_idx", admin.EmptyFieldListFilter),
+    )
     search_fields = ("name", "id")
     ordering = ("name",)
