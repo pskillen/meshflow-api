@@ -12,7 +12,11 @@ from constellations.models import MessageChannel
 
 
 class LocationSource(models.IntegerChoices):
-    """Location source types for position reports."""
+    """Meshtastic position metadata (protobuf ``LocSource``).
+
+    Used on ``Position`` / ``NodeLatestStatus`` today; MeshCore position ingest may
+    introduce parallel semantics later without reusing these integer values.
+    """
 
     UNSET = 0, "UNSET"
     MANUAL = 1, "LOC_MANUAL"
@@ -21,7 +25,10 @@ class LocationSource(models.IntegerChoices):
 
 
 class RoleSource(models.IntegerChoices):
-    """Role source types for node roles."""
+    """Meshtastic ``Config.DeviceConfig.Role`` values (protobuf).
+
+    Stored on ``ObservedNode.role`` for Meshtastic nodes; null for MeshCore observed nodes.
+    """
 
     # Updated per https://github.com/meshtastic/protobufs/blob/master/meshtastic/config.proto
     # on 5 March 2026
@@ -258,13 +265,34 @@ class ObservedNode(models.Model):
         db_index=True,
         help_text=_("MeshCore 6-byte pubkey prefix (12 hex chars); from contact_message or derived from full key."),
     )
-    mac_addr = models.CharField(max_length=20, null=True, blank=True)
-    long_name = models.CharField(max_length=50)
-    short_name = models.CharField(max_length=5)
+    mac_addr = models.CharField(
+        max_length=20,
+        null=True,
+        blank=True,
+        help_text=_("Meshtastic nodeinfo MAC when protocol is Meshtastic; usually null for MeshCore."),
+    )
+    long_name = models.CharField(
+        max_length=50,
+        help_text=_("Display name (long); populated for both Meshtastic and MeshCore from ingest."),
+    )
+    short_name = models.CharField(
+        max_length=5,
+        help_text=_("Display name (short); populated for both Meshtastic and MeshCore from ingest."),
+    )
 
     hw_model = models.CharField(max_length=50, null=True, blank=True)
-    public_key = models.CharField(max_length=64, null=True, blank=True)
-    role = models.IntegerField(choices=RoleSource.choices, null=True, blank=True)
+    public_key = models.CharField(
+        max_length=64,
+        null=True,
+        blank=True,
+        help_text=_("Meshtastic device public key (PKI hex); null for MeshCore."),
+    )
+    role = models.IntegerField(
+        choices=RoleSource.choices,
+        null=True,
+        blank=True,
+        help_text=_("Meshtastic role (RoleSource); null for MeshCore."),
+    )
     is_licensed = models.BooleanField(null=True, blank=True)
     is_unmessagable = models.BooleanField(null=True, blank=True)
 
@@ -405,7 +433,7 @@ class NodeLatestStatus(models.Model):
     inferred_max_hops = models.SmallIntegerField(
         null=True,
         blank=True,
-        help_text=_("Inferred from packet hop_start when received; the node's max hops setting."),
+        help_text=_("Meshtastic-only: inferred from packet hop_start when received; the node's max hops setting."),
     )
 
     class Meta:

@@ -19,7 +19,7 @@ Living tracker for the [rename audit index](file:///Users/patricks/IdeaProjects/
 | ID | Sub-plan | Repos | PRs | Status | Issue | PR |
 |----|----------|-------|-----|--------|-------|-----|
 | SP-01 | OpenAPI contract docs | api | 1 | in_progress | [#308](https://github.com/pskillen/meshflow-api/issues/308) | [#320](https://github.com/pskillen/meshflow-api/pull/320) |
-| SP-02 | Comment-only labelling | api, bot, ui | 1–3 | not_started | [#309](https://github.com/pskillen/meshflow-api/issues/309) | |
+| SP-02 | Comment-only labelling | api, bot, ui | 1–3 | in_progress | [#309](https://github.com/pskillen/meshflow-api/issues/309) | api / bot / ui (see notes) |
 | SP-03 | `node_id` → `meshtastic_node_id` | api, bot, ui | 1 (coordinated) | not_started | [#310](https://github.com/pskillen/meshflow-api/issues/310) | |
 | SP-04 | ObservedNode MT identity fields | api, ui | 1 | not_started | [#312](https://github.com/pskillen/meshflow-api/issues/312) | |
 | SP-05 | MtRawPacket wire + observations | api | 1 | not_started | [#311](https://github.com/pskillen/meshflow-api/issues/311) | |
@@ -38,13 +38,27 @@ Parent index: [meshcore-rename-index](file:///Users/patricks/IdeaProjects/MeshFl
 
 ### SP-01 — OpenAPI contract docs
 
-- **Merged:** —
-- **Notes:** OpenAPI drift fix (#308): `/packets/{node_id}/ingest|nodes/`; `ObservedNode.internal_id` UUID; Meshtastic-only notes on device-metrics bulk, nested observed-node metrics, `/stats/nodes/{node_id}/*`; legacy **Packets** tag; deprecated `POST /raw-packet/`; observed-node detail `node_id` Meshtastic-only (+ MeshCore via list until #318). Follow-up v1 retirement: API [#319](https://github.com/pskillen/meshflow-api/issues/319), bot [#95](https://github.com/pskillen/meshflow-bot/issues/95).
+- **Merged:** — (awaiting [#320](https://github.com/pskillen/meshflow-api/pull/320); head `918f7f8`)
+- **Branch:** `api-308/pskillen/meshcore-rename-sp01-openapi`
+- **Delivered in #320:**
+  - `POST /packets/{node_id}/ingest/` and `/packets/{node_id}/nodes/` (was unscoped paths)
+  - `ObservedNode.internal_id` → `string` / `uuid` in schema
+  - Meshtastic-only descriptions: `device-metrics-bulk`, nested `device_metrics` / `environment_metrics` / `power_metrics`, `/stats/nodes/{node_id}/*`
+  - Legacy **Packets** tag definition → points at **Meshtastic packets**
+  - Deprecated `POST /raw-packet/` (v1 bot URL; not in current Django urlconf)
+  - Observed-node detail `GET|PUT|DELETE /nodes/observed-nodes/{node_id}/` — MT nodenum; MeshCore via list + `protocol` until #318
+- **Notes:** Doc-only; no migrations. Closes #308 when #320 merges.
 
 ### SP-02 — Comment-only labelling
 
 - **Merged:** —
-- **Notes:**
+- **Branch:** `api-309/{author}/meshcore-rename-sp02-comments` (api, bot, ui)
+- **Delivered (doc-only, no migrations / JSON renames):**
+  - **api:** `ObservedNode` help_text (`mac_addr`, names, `public_key`, `role`); `NodeLatestStatus.inferred_max_hops`; `RoleSource` / `LocationSource` module docstrings; `BaseNodeItem` (unchanged, already labelled); `TextMessage.original_packet` help_text; serializer/view docstrings; OpenAPI `ObservedNode`, nested `latest_*`, `TextMessage`, list `GET /nodes/observed-nodes/`
+  - **bot:** `src/radio/events.py` (`portnum`, `from_id`/`to_id` with `mc:` examples, hops); `interface.py` (`local_nodenum`, `send_traceroute` MT-only); `StorageAPI.py` v2 Meshtastic ingest vs `/api/meshcore/packets/ingest/`
+  - **ui:** `src/lib/models.ts` JSDoc on `ObservedNode` + MT-only nested metrics; `meshtastic-api.ts` list/detail comments for mixed resource + `protocol` filter
+- **PRs:** meshflow-api (this tracker), meshflow-bot, meshflow-ui — link here when opened
+- **Notes:** Closes #309 when all three PRs merge. Detail route remains Meshtastic `node_id` ([#318](https://github.com/pskillen/meshflow-api/issues/318)).
 
 ### SP-03 — `meshtastic_node_id`
 
@@ -90,3 +104,31 @@ Parent index: [meshcore-rename-index](file:///Users/patricks/IdeaProjects/MeshFl
 
 - **Merged:** —
 - **Notes:**
+
+---
+
+## Outstanding and observations
+
+_Capture follow-ups so they are not lost between sub-plans. Remove or strike through items when resolved._
+
+### SP-01 / #320 (in flight)
+
+- [ ] Merge [#320](https://github.com/pskillen/meshflow-api/pull/320); then set SP-01 status to `merged`, record merge commit SHA, and confirm #308 closed.
+- [ ] PR was **open** / merge blocked at last check (2026-05-19) — confirm CI/review before merge.
+
+### Deferred to other tickets (from SP-01)
+
+- [ ] **API v1 ingest retirement** — [#319](https://github.com/pskillen/meshflow-api/issues/319); bot [#95](https://github.com/pskillen/meshflow-bot/issues/95) (`StorageAPIWrapper._get_url()` `api_version == 1`). After bot defaults to v2, consider removing deprecated `POST /raw-packet/` from OpenAPI unless a compat redirect remains.
+- [ ] **ObservedNode detail by `internal_id`** — SP-11 [#318](https://github.com/pskillen/meshflow-api/issues/318); until then MeshCore clients use `GET /nodes/observed-nodes/?protocol=meshcore` (documented on detail route).
+
+### Doc drift spotted during SP-01 (not fixed in #320)
+
+- [ ] **`/nodes/environment-metrics-bulk/`** — same Meshtastic `node_ids` semantics as `device-metrics-bulk`, but SP-01 did not add an MT-only description there (optional small OpenAPI follow-up).
+- [ ] **Nested `positions/`** (and other observed-node sub-routes using `{node_id}`) — same MT path param as metrics; only metrics routes got explicit MT notes in #320.
+- [ ] **`ObservedNodeSearch` schema** — `ObservedNodeSearchSerializer` returns `internal_id` (UUID); OpenAPI search response schema still omits it.
+- [ ] **meshflow-ui** — `ObservedNode.internal_id` typed as `number` in `src/lib/models.ts`; should be `string` when UI picks up OpenAPI contract (likely SP-02+ or a UI pass, out of api-only SP-01).
+
+### Conventions / process
+
+- No operation in `openapi.yaml` uses `tags: [Packets]`; only the global tag definition was clarified — legacy name is documentation-only.
+- OpenAPI operation descriptions link to GitHub issues (e.g. #318); fine for repo readers, may not render in all Swagger UIs.

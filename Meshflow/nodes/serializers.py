@@ -888,7 +888,7 @@ class DeviceMetricsBulkSerializer(serializers.ModelSerializer):
 
 
 class DeviceMetricsSerializer(serializers.ModelSerializer):
-    """Serializer for device metrics, supporting both model instances and dicts (from annotations)."""
+    """Meshtastic device telemetry (protobuf DeviceMetrics), keyed by ``ObservedNode.protocol``."""
 
     ANNOTATION_MAP = {
         # For ObservedNode
@@ -1047,7 +1047,12 @@ class PowerMetricsSerializer(serializers.ModelSerializer):
 
 
 class ObservedNodeSerializer(serializers.ModelSerializer):
-    """Serializer for observed nodes."""
+    """Observed node (Meshtastic or MeshCore).
+
+    Nested ``latest_*`` fields expose Meshtastic protobuf-shaped telemetry from
+    ``NodeLatestStatus`` when present; MeshCore nodes typically return null there.
+    ``inferred_max_hops`` is Meshtastic-only (hop_start inference).
+    """
 
     class OwnerSerializer(serializers.ModelSerializer):
         class Meta:
