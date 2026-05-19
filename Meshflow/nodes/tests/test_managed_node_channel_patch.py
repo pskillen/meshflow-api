@@ -26,7 +26,7 @@ def test_managed_node_patch_channels_owner_success(create_user, create_constella
 
     client = APIClient()
     client.force_authenticate(user=owner)
-    url = reverse("managed-nodes-detail", kwargs={"node_id": node.node_id})
+    url = reverse("managed-nodes-detail", kwargs={"node_id": node.meshtastic_node_id})
 
     response = client.patch(url, {"channel_0": ch_ok.id}, format="json")
     assert response.status_code == status.HTTP_200_OK
@@ -54,7 +54,7 @@ def test_managed_node_patch_channel_wrong_constellation_returns_400(
 
     client = APIClient()
     client.force_authenticate(user=owner)
-    url = reverse("managed-nodes-detail", kwargs={"node_id": node.node_id})
+    url = reverse("managed-nodes-detail", kwargs={"node_id": node.meshtastic_node_id})
 
     response = client.patch(url, {"channel_0": ch_wrong.id}, format="json")
     assert response.status_code == status.HTTP_400_BAD_REQUEST
@@ -77,7 +77,7 @@ def test_managed_node_patch_channels_non_owner_forbidden(create_user, create_con
 
     client = APIClient()
     client.force_authenticate(user=other)
-    url = reverse("managed-nodes-detail", kwargs={"node_id": node.node_id})
+    url = reverse("managed-nodes-detail", kwargs={"node_id": node.meshtastic_node_id})
 
     response = client.patch(url, {"channel_0": ch.id}, format="json")
     assert response.status_code == status.HTTP_403_FORBIDDEN
@@ -98,7 +98,7 @@ def test_managed_node_retrieve_owner_includes_channels(create_user, create_const
 
     client = APIClient()
     client.force_authenticate(user=owner)
-    url = reverse("managed-nodes-detail", kwargs={"node_id": node.node_id})
+    url = reverse("managed-nodes-detail", kwargs={"node_id": node.meshtastic_node_id})
 
     response = client.get(url)
     assert response.status_code == status.HTTP_200_OK
@@ -121,7 +121,7 @@ def test_managed_node_retrieve_non_owner_omits_channels(create_user, create_cons
 
     client = APIClient()
     client.force_authenticate(user=viewer)
-    url = reverse("managed-nodes-detail", kwargs={"node_id": node.node_id})
+    url = reverse("managed-nodes-detail", kwargs={"node_id": node.meshtastic_node_id})
 
     response = client.get(url)
     assert response.status_code == status.HTTP_200_OK

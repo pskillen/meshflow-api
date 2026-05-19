@@ -11,7 +11,7 @@ def test_managed_node_admin_form_meshcore_node_id_defaults_to_zero(create_user, 
     form = ManagedNodeAdminForm(
         data={
             "protocol": str(Protocol.MESHCORE),
-            "node_id": "",
+            "meshtastic_node_id": "",
             "name": "MC Feeder",
             "owner": owner.pk,
             "constellation": constellation.pk,
@@ -21,4 +21,4 @@ def test_managed_node_admin_form_meshcore_node_id_defaults_to_zero(create_user, 
         }
     )
     assert form.is_valid(), form.errors
-    assert form.cleaned_data["node_id"] == 0
+    assert form.cleaned_data["meshtastic_node_id"] == 0

@@ -20,7 +20,7 @@ def constellation_data():
 @pytest.fixture
 def managed_node_data():
     return {
-        "node_id": 123456789,
+        "meshtastic_node_id": 123456789,
         "name": "Test Managed Node",
     }
 
@@ -28,7 +28,7 @@ def managed_node_data():
 @pytest.fixture
 def observed_node_data():
     return {
-        "node_id": 987654321,
+        "meshtastic_node_id": 987654321,
         "long_name": "Test Observed Node",
         "short_name": "TEST",
         "mac_addr": "00:11:22:33:44:55",
@@ -67,7 +67,7 @@ def create_managed_node(managed_node_data, create_user, create_constellation):  
 def create_observed_node(observed_node_data):
     def make_observed_node(**kwargs):
         data = observed_node_data.copy()
-        data["node_id_str"] = meshtastic_id_to_hex(data["node_id"])
+        data["node_id_str"] = meshtastic_id_to_hex(data["meshtastic_node_id"])
         data.update(kwargs)
         return ObservedNode.objects.create(**data)
 

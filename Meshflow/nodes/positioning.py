@@ -12,7 +12,11 @@ def managed_node_lat_lon(managed_node: ManagedNode) -> tuple[float, float] | Non
             managed_node.default_location_latitude,
             managed_node.default_location_longitude,
         )
-    obs = ObservedNode.objects.filter(node_id=managed_node.node_id).select_related("latest_status").first()
+    obs = (
+        ObservedNode.objects.filter(meshtastic_node_id=managed_node.meshtastic_node_id)
+        .select_related("latest_status")
+        .first()
+    )
     if obs and obs.latest_status and obs.latest_status.latitude is not None:
         return obs.latest_status.latitude, obs.latest_status.longitude
     return None

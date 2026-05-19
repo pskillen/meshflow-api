@@ -15,16 +15,16 @@ def test_eligible_sources_requires_sending_status_and_allow_auto(
     create_managed_node,
     mark_managed_node_feeding,
 ):
-    mn_ok = create_managed_node(allow_auto_traceroute=True, node_id=0xA1000001)
+    mn_ok = create_managed_node(allow_auto_traceroute=True, meshtastic_node_id=0xA1000001)
     mark_managed_node_feeding(mn_ok, sending=True)
 
-    mn_disallowed = create_managed_node(allow_auto_traceroute=False, node_id=0xA1000002)
+    mn_disallowed = create_managed_node(allow_auto_traceroute=False, meshtastic_node_id=0xA1000002)
     mark_managed_node_feeding(mn_disallowed, sending=True)
 
-    mn_stale = create_managed_node(allow_auto_traceroute=True, node_id=0xA1000003)
+    mn_stale = create_managed_node(allow_auto_traceroute=True, meshtastic_node_id=0xA1000003)
     mark_managed_node_feeding(mn_stale, sending=False)
 
-    mn_no_row = create_managed_node(allow_auto_traceroute=True, node_id=0xA1000004)
+    mn_no_row = create_managed_node(allow_auto_traceroute=True, meshtastic_node_id=0xA1000004)
 
     ids = set(eligible_auto_traceroute_sources_queryset().values_list("pk", flat=True))
     assert ids == {mn_ok.pk}

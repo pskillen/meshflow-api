@@ -83,7 +83,7 @@ class Command(BaseCommand):
         )
 
         managed_node, mn_created = ManagedNode.objects.get_or_create(
-            node_id=INTEGRATION_TEST_NODE_ID,
+            meshtastic_node_id=INTEGRATION_TEST_NODE_ID,
             defaults={
                 "owner": user,
                 "constellation": constellation,
@@ -102,7 +102,7 @@ class Command(BaseCommand):
             managed_node.save()
 
         managed_node_2, mn2_created = ManagedNode.objects.get_or_create(
-            node_id=INTEGRATION_TEST_NODE_ID_2,
+            meshtastic_node_id=INTEGRATION_TEST_NODE_ID_2,
             defaults={
                 "owner": user,
                 "constellation": constellation,

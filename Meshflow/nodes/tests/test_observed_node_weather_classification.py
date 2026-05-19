@@ -15,12 +15,12 @@ def test_observed_node_detail_includes_weather_fields(create_observed_node, crea
     user = create_user()
     client.force_authenticate(user=user)
     node = create_observed_node(
-        node_id=100100100,
+        meshtastic_node_id=100100100,
         node_id_str=meshtastic_id_to_hex(100100100),
         weather_use=WeatherUse.INCLUDE,
         environment_exposure=EnvironmentExposure.OUTDOOR,
     )
-    response = client.get(reverse("observed-node-detail", kwargs={"node_id": node.node_id}))
+    response = client.get(reverse("observed-node-detail", kwargs={"node_id": node.meshtastic_node_id}))
     assert response.status_code == status.HTTP_200_OK
     assert response.data["environment_exposure"] == "outdoor"
     assert response.data["weather_use"] == "include"
@@ -31,13 +31,13 @@ def test_observed_node_detail_includes_weather_fields(create_observed_node, crea
 def test_environment_settings_editable_for_claim_owner(create_observed_node, create_user):
     owner = create_user()
     node = create_observed_node(
-        node_id=200200200,
+        meshtastic_node_id=200200200,
         node_id_str=meshtastic_id_to_hex(200200200),
         claimed_by=owner,
     )
     client = APIClient()
     client.force_authenticate(user=owner)
-    response = client.get(reverse("observed-node-detail", kwargs={"node_id": node.node_id}))
+    response = client.get(reverse("observed-node-detail", kwargs={"node_id": node.meshtastic_node_id}))
     assert response.status_code == status.HTTP_200_OK
     assert response.data["environment_settings_editable"] is True
 
@@ -46,12 +46,12 @@ def test_environment_settings_editable_for_claim_owner(create_observed_node, cre
 def test_environment_settings_editable_for_staff(create_observed_node, create_user):
     staff = create_user(is_staff=True)
     node = create_observed_node(
-        node_id=300300300,
+        meshtastic_node_id=300300300,
         node_id_str=meshtastic_id_to_hex(300300300),
     )
     client = APIClient()
     client.force_authenticate(user=staff)
-    response = client.get(reverse("observed-node-detail", kwargs={"node_id": node.node_id}))
+    response = client.get(reverse("observed-node-detail", kwargs={"node_id": node.meshtastic_node_id}))
     assert response.status_code == status.HTTP_200_OK
     assert response.data["environment_settings_editable"] is True
 
@@ -60,13 +60,13 @@ def test_environment_settings_editable_for_staff(create_observed_node, create_us
 def test_environment_settings_patch_claim_owner(create_observed_node, create_user):
     owner = create_user()
     node = create_observed_node(
-        node_id=400400400,
+        meshtastic_node_id=400400400,
         node_id_str=meshtastic_id_to_hex(400400400),
         claimed_by=owner,
     )
     client = APIClient()
     client.force_authenticate(user=owner)
-    url = reverse("observed-node-environment-settings", kwargs={"node_id": node.node_id})
+    url = reverse("observed-node-environment-settings", kwargs={"node_id": node.meshtastic_node_id})
     response = client.patch(
         url,
         {"environment_exposure": "indoor", "weather_use": "exclude"},
@@ -84,12 +84,12 @@ def test_environment_settings_patch_claim_owner(create_observed_node, create_use
 def test_environment_settings_patch_staff(create_observed_node, create_user):
     staff = create_user(is_staff=True)
     node = create_observed_node(
-        node_id=500500500,
+        meshtastic_node_id=500500500,
         node_id_str=meshtastic_id_to_hex(500500500),
     )
     client = APIClient()
     client.force_authenticate(user=staff)
-    url = reverse("observed-node-environment-settings", kwargs={"node_id": node.node_id})
+    url = reverse("observed-node-environment-settings", kwargs={"node_id": node.meshtastic_node_id})
     response = client.patch(url, {"weather_use": "include"}, format="json")
     assert response.status_code == status.HTTP_200_OK
     assert response.data["weather_use"] == "include"
@@ -100,13 +100,13 @@ def test_environment_settings_patch_forbidden(create_observed_node, create_user)
     owner = create_user()
     other = create_user()
     node = create_observed_node(
-        node_id=600600600,
+        meshtastic_node_id=600600600,
         node_id_str=meshtastic_id_to_hex(600600600),
         claimed_by=owner,
     )
     client = APIClient()
     client.force_authenticate(user=other)
-    url = reverse("observed-node-environment-settings", kwargs={"node_id": node.node_id})
+    url = reverse("observed-node-environment-settings", kwargs={"node_id": node.meshtastic_node_id})
     response = client.patch(url, {"weather_use": "exclude"}, format="json")
     assert response.status_code == status.HTTP_403_FORBIDDEN
 
@@ -115,12 +115,12 @@ def test_environment_settings_patch_forbidden(create_observed_node, create_user)
 def test_environment_settings_patch_empty_body(create_observed_node, create_user):
     staff = create_user(is_staff=True)
     node = create_observed_node(
-        node_id=700700700,
+        meshtastic_node_id=700700700,
         node_id_str=meshtastic_id_to_hex(700700700),
     )
     client = APIClient()
     client.force_authenticate(user=staff)
-    url = reverse("observed-node-environment-settings", kwargs={"node_id": node.node_id})
+    url = reverse("observed-node-environment-settings", kwargs={"node_id": node.meshtastic_node_id})
     response = client.patch(url, {}, format="json")
     assert response.status_code == status.HTTP_400_BAD_REQUEST
 
@@ -132,7 +132,7 @@ def test_weather_list_filter_weather_use(create_observed_node, create_user):
 
     def make_with_env(node_id, wu):
         n = create_observed_node(
-            node_id=node_id,
+            meshtastic_node_id=node_id,
             node_id_str=meshtastic_id_to_hex(node_id),
             weather_use=wu,
         )
@@ -155,7 +155,7 @@ def test_weather_list_filter_weather_use(create_observed_node, create_user):
         {"weather_use": "include"},
     )
     assert response.status_code == status.HTTP_200_OK
-    ids = {r["node_id"] for r in response.data["results"]}
+    ids = {r["meshtastic_node_id"] for r in response.data["results"]}
     assert 800800801 in ids
     assert 800800802 not in ids
 

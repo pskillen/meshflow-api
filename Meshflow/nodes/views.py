@@ -132,16 +132,19 @@ class APIKeyViewSet(viewsets.ModelViewSet):
     def add_node(self, request, pk=None):
         """Add a node to an API key."""
         api_key = self.get_object()
-        node_id = request.data.get("node_id")
+        meshtastic_node_id = request.data.get("meshtastic_node_id")
 
-        if not node_id:
-            return Response({"error": "node_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+        if not meshtastic_node_id:
+            return Response(
+                {"error": "meshtastic_node_id is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         try:
-            node = ManagedNode.objects.get(node_id=node_id, deleted_at__isnull=True)
+            node = ManagedNode.objects.get(meshtastic_node_id=meshtastic_node_id, deleted_at__isnull=True)
         except ManagedNode.DoesNotExist:
             return Response(
-                {"error": f"Node with ID {node_id} does not exist"},
+                {"error": f"Node with ID {meshtastic_node_id} does not exist"},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
@@ -168,16 +171,19 @@ class APIKeyViewSet(viewsets.ModelViewSet):
     def remove_node(self, request, pk=None):
         """Remove a node from an API key."""
         api_key = self.get_object()
-        node_id = request.data.get("node_id")
+        meshtastic_node_id = request.data.get("meshtastic_node_id")
 
-        if not node_id:
-            return Response({"error": "node_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+        if not meshtastic_node_id:
+            return Response(
+                {"error": "meshtastic_node_id is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         try:
-            node = ManagedNode.objects.get(node_id=node_id, deleted_at__isnull=True)
+            node = ManagedNode.objects.get(meshtastic_node_id=meshtastic_node_id, deleted_at__isnull=True)
         except ManagedNode.DoesNotExist:
             return Response(
-                {"error": f"Node with ID {node_id} does not exist"},
+                {"error": f"Node with ID {meshtastic_node_id} does not exist"},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
@@ -199,20 +205,22 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
     """Observed nodes across Meshtastic and MeshCore.
 
     List supports ``protocol`` (``meshtastic`` / ``meshcore``) and ``last_heard_after``.
-    Detail lookup uses Meshtastic numeric ``node_id``; MeshCore clients should list or
-    search with ``protocol=meshcore`` until lookup by ``internal_id`` ([#318]).
+    Detail lookup uses Meshtastic numeric ``meshtastic_node_id`` (URL kwarg ``node_id``);
+    MeshCore clients should list or search with ``protocol=meshcore`` until lookup by
+    ``internal_id`` ([#318]).
     """
 
-    queryset = ObservedNode.objects.all().order_by("node_id")
+    queryset = ObservedNode.objects.all().order_by("meshtastic_node_id")
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = ObservedNodeSerializer
-    lookup_field = "node_id"
+    lookup_field = "meshtastic_node_id"
+    lookup_url_kwarg = "node_id"
 
     def get_queryset(self):
         """Filter nodes based on user permissions and prefetch latest status."""
         qs = (
             ObservedNode.objects.all()
-            .order_by("-last_heard", "node_id")
+            .order_by("-last_heard", "meshtastic_node_id")
             .select_related(
                 "latest_status",
                 "monitoring_config",
@@ -254,7 +262,11 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
         """
         Get all observed nodes claimed by the current user.
         """
-        nodes = ObservedNode.objects.filter(claimed_by=request.user).order_by("node_id").select_related("latest_status")
+        nodes = (
+            ObservedNode.objects.filter(claimed_by=request.user)
+            .order_by("meshtastic_node_id")
+            .select_related("latest_status")
+        )
 
         page = self.paginate_queryset(nodes)
         if page is not None:
@@ -307,7 +319,7 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
             try:
                 # Convert hex node_id_str to integer node_id
                 node_id = meshtastic_hex_to_int(query)
-                conditions |= Q(node_id=node_id)
+                conditions |= Q(meshtastic_node_id=node_id)
             except ValueError:
                 # If conversion fails, just continue with other search methods
                 pass
@@ -317,7 +329,7 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
         # Try to convert query to integer for node_id search if it's numeric
         try:
             node_id_query = int(query)
-            conditions |= Q(node_id=node_id_query)
+            conditions |= Q(meshtastic_node_id=node_id_query)
         except ValueError, TypeError:
             pass
 
@@ -326,7 +338,7 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
         conditions |= Q(long_name__icontains=query)
 
         # Search for nodes matching the query
-        nodes = ObservedNode.objects.filter(conditions).order_by("node_id")
+        nodes = ObservedNode.objects.filter(conditions).order_by("meshtastic_node_id")
 
         serializer = ObservedNodeSearchSerializer(nodes, many=True)
         return Response(serializer.data)
@@ -513,7 +525,7 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
         from traceroute_analytics.neo4j_service import run_node_links_query
 
         node = self.get_object()
-        nid = node.node_id
+        nid = node.meshtastic_node_id
 
         triggered_at_after = None
         if request.query_params.get("triggered_at_after"):
@@ -547,7 +559,7 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
 
         qs = (
             ObservedNode.objects.filter(role__in=roles)
-            .order_by("-last_heard", "node_id")
+            .order_by("-last_heard", "meshtastic_node_id")
             .select_related("latest_status", "monitoring_config", "mesh_presence")
         )
 
@@ -592,7 +604,7 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
                 latest_status__environment_reported_time__isnull=False,
                 latest_status__environment_reported_time__gte=cutoff,
             )
-            .order_by("-latest_status__environment_reported_time", "node_id")
+            .order_by("-latest_status__environment_reported_time", "meshtastic_node_id")
             .select_related("latest_status")
         )
 
@@ -993,10 +1005,11 @@ class ManagedNodeViewSet(viewsets.ModelViewSet):
     ViewSet for managing managed nodes.
     """
 
-    queryset = ManagedNode.objects.filter(deleted_at__isnull=True).order_by("node_id")
+    queryset = ManagedNode.objects.filter(deleted_at__isnull=True).order_by("meshtastic_node_id")
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = ManagedNodeSerializer
-    lookup_field = "node_id"
+    lookup_field = "meshtastic_node_id"
+    lookup_url_kwarg = "node_id"
 
     def _status_requested(self):
         include_values = _multi_query_strings(self.request, "include")
@@ -1007,8 +1020,8 @@ class ManagedNodeViewSet(viewsets.ModelViewSet):
         return "geo_classification" in {value.lower() for value in include_values}
 
     def _annotate_common_fields(self, queryset):
-        observed_node_qs = ObservedNode.objects.filter(node_id=OuterRef("node_id"))
-        latest_status_qs = NodeLatestStatus.objects.filter(node__node_id=OuterRef("node_id"))
+        observed_node_qs = ObservedNode.objects.filter(meshtastic_node_id=OuterRef("meshtastic_node_id"))
+        latest_status_qs = NodeLatestStatus.objects.filter(node__meshtastic_node_id=OuterRef("meshtastic_node_id"))
         return queryset.annotate(
             long_name=Subquery(observed_node_qs.values("long_name")[:1]),
             short_name=Subquery(observed_node_qs.values("short_name")[:1]),
@@ -1038,7 +1051,7 @@ class ManagedNodeViewSet(viewsets.ModelViewSet):
         day_cutoff = now - timedelta(hours=24)
 
         packet_observation_qs = PacketObservation.objects.filter(observer_id=OuterRef("pk"))
-        observed_node_qs = ObservedNode.objects.filter(node_id=OuterRef("node_id"))
+        observed_node_qs = ObservedNode.objects.filter(meshtastic_node_id=OuterRef("meshtastic_node_id"))
 
         status_qs = ManagedNodeStatus.objects.filter(node_id=OuterRef("pk"))
         last_packet_subquery = status_qs.values("last_packet_ingested_at")[:1]
@@ -1078,7 +1091,7 @@ class ManagedNodeViewSet(viewsets.ModelViewSet):
         )
 
     def _managed_nodes_queryset(self, owner=None):
-        queryset = ManagedNode.objects.filter(deleted_at__isnull=True).order_by("node_id")
+        queryset = ManagedNode.objects.filter(deleted_at__isnull=True).order_by("meshtastic_node_id")
         if owner is not None:
             queryset = queryset.filter(owner=owner)
         queryset = self._annotate_common_fields(queryset)
@@ -1154,7 +1167,7 @@ class ObservedNodeClaimView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request, node_id):
-        node = get_object_or_404(ObservedNode, node_id=node_id)
+        node = get_object_or_404(ObservedNode, meshtastic_node_id=node_id)
         claim = NodeOwnerClaim.objects.filter(node=node, user=request.user).first()
         if not claim:
             return Response({"detail": "No claim found."}, status=status.HTTP_404_NOT_FOUND)
@@ -1162,7 +1175,7 @@ class ObservedNodeClaimView(APIView):
         return Response(serializer.data)
 
     def post(self, request, node_id):
-        node = get_object_or_404(ObservedNode, node_id=node_id)
+        node = get_object_or_404(ObservedNode, meshtastic_node_id=node_id)
         if node.claimed_by_id and node.claimed_by_id != request.user.id:
             return Response(
                 {"detail": "Node is already claimed by another user."},
@@ -1176,7 +1189,7 @@ class ObservedNodeClaimView(APIView):
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     def delete(self, request, node_id):
-        node = get_object_or_404(ObservedNode, node_id=node_id)
+        node = get_object_or_404(ObservedNode, meshtastic_node_id=node_id)
         claim = NodeOwnerClaim.objects.filter(node=node, user=request.user).first()
         if not claim:
             return Response({"detail": "No claim found."}, status=status.HTTP_404_NOT_FOUND)

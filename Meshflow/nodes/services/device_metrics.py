@@ -20,17 +20,17 @@ def get_device_metrics_bulk(
     monitored nodes, my nodes, etc.).
 
     Args:
-        node_ids: List of ObservedNode.node_id values to filter by.
+        node_ids: List of ObservedNode.meshtastic_node_id values to filter by.
         start_date: Optional start of date range (inclusive).
         end_date: Optional end of date range (inclusive).
 
     Returns:
-        QuerySet of DeviceMetrics ordered by node_id, reported_time.
+        QuerySet of DeviceMetrics ordered by meshtastic_node_id, reported_time.
     """
     if not node_ids:
         return DeviceMetrics.objects.none()
 
-    qs = DeviceMetrics.objects.filter(node__node_id__in=node_ids).select_related("node")
+    qs = DeviceMetrics.objects.filter(node__meshtastic_node_id__in=node_ids).select_related("node")
 
     if start_date:
         if timezone.is_naive(start_date):
@@ -41,4 +41,4 @@ def get_device_metrics_bulk(
             end_date = timezone.make_aware(end_date)
         qs = qs.filter(reported_time__lte=end_date)
 
-    return qs.order_by("node__node_id", "reported_time")
+    return qs.order_by("node__meshtastic_node_id", "reported_time")

@@ -164,6 +164,6 @@ def test_node_authorization_permission_denies_soft_deleted_managed_node(create_m
     mn.save(update_fields=["deleted_at"])
 
     request = SimpleNamespace(auth=api_key)
-    view = SimpleNamespace(kwargs={"node_id": mn.node_id})
+    view = SimpleNamespace(kwargs={"node_id": mn.meshtastic_node_id})
     perm = NodeAuthorizationPermission()
     assert perm.has_permission(request, view) is False
