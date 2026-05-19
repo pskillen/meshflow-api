@@ -24,12 +24,12 @@ class TextMessageWSSerializer(serializers.ModelSerializer):
             "id",
             "original_packet_id",
             "sender",
-            "recipient_node_id",
+            "recipient_meshtastic_node_id",
             "channel",
             "sent_at",
             "message_text",
             "is_emoji",
-            "reply_to_message_id",
+            "reply_to_meshtastic_packet_id",
             "heard",
         ]
 

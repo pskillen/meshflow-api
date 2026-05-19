@@ -42,7 +42,7 @@ def test_process_packet_already_processed(
     TextMessage.objects.create(
         sender=ObservedNode.objects.get_or_create(meshtastic_node_id=packet.from_int)[0],
         original_packet=packet,
-        recipient_node_id=packet.to_int,
+        recipient_meshtastic_node_id=packet.to_int,
         message_text=packet.message_text,
         is_emoji=packet.emoji,
     )
@@ -69,10 +69,10 @@ def test_create_message(create_message_packet, create_managed_node, create_packe
     message = TextMessage.objects.latest("id")
     assert message.sender.meshtastic_node_id == packet.from_int
     assert message.original_packet == packet
-    assert message.recipient_node_id == packet.to_int
+    assert message.recipient_meshtastic_node_id == packet.to_int
     assert message.message_text == packet.message_text
     assert message.is_emoji == packet.emoji
-    assert message.reply_to_message_id == packet.reply_packet_id
+    assert message.reply_to_meshtastic_packet_id == packet.reply_packet_id
 
 
 @pytest.mark.django_db

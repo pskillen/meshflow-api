@@ -40,10 +40,10 @@ class TextMessagePacketService(BasePacketService):
         message = TextMessage.objects.create(
             sender=self.from_node,
             original_packet=self.packet,
-            recipient_node_id=self.packet.to_int,
+            recipient_meshtastic_node_id=self.packet.to_int,
             message_text=self.packet.message_text,
             is_emoji=self.packet.emoji,
-            reply_to_message_id=self.packet.reply_packet_id,
+            reply_to_meshtastic_packet_id=self.packet.reply_packet_id,
             # the channel is based on the observer's channel mapping
             channel=self.observation.channel,
         )
