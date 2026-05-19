@@ -149,15 +149,13 @@ class BasePacketSerializer(serializers.Serializer):
             if isinstance(channel_value, MessageChannel):
                 channel_instance = channel_value
             else:
-                # Channel is the index of the observer's channel_x field
-                try:
-                    # Get the observer's channel_x field
-                    channel_field = f"channel_{channel_value}"
-                    channel_instance = getattr(observer, channel_field)
-                except AttributeError:
-                    raise serializers.ValidationError(
-                        {"channel": f"MessageChannel with id {channel_value} does not exist"}
-                    )
+                # Channel index maps to observer ManagedNode.meshtastic_channel_{0..7}
+                if not 0 <= channel_value <= 7:
+                    raise serializers.ValidationError({"channel": f"Channel index must be 0–7, got {channel_value}"})
+                channel_field = f"meshtastic_channel_{channel_value}"
+                if not hasattr(observer, channel_field):
+                    raise serializers.ValidationError({"channel": f"Observer has no {channel_field} mapping"})
+                channel_instance = getattr(observer, channel_field)
 
         # Create new observation
         self.observation = PacketObservation.objects.create(
