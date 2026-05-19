@@ -11,6 +11,25 @@ from common.protocol import Protocol
 
 from .models import ManagedNode, ManagedNodeStatus, NodeAPIKey, NodeAuth, NodeLatestStatus, ObservedNode
 
+
+class ManagedNodeActiveFilter(admin.SimpleListFilter):
+    title = _("Feeder status")
+    parameter_name = "feeder_active"
+
+    def lookups(self, request, model_admin):
+        return (
+            ("active", _("Active")),
+            ("deleted", _("Soft-deleted")),
+        )
+
+    def queryset(self, request, queryset):
+        if self.value() == "active":
+            return queryset.filter(deleted_at__isnull=True)
+        if self.value() == "deleted":
+            return queryset.filter(deleted_at__isnull=False)
+        return queryset
+
+
 MANAGED_NODE_COMMON_FIELDS = (
     "protocol",
     "node_id",
@@ -21,6 +40,64 @@ MANAGED_NODE_COMMON_FIELDS = (
     "latlong",
 )
 MANAGED_NODE_CHANNEL_FIELDS = tuple(f"channel_{i}" for i in range(8))
+
+
+class ProtocolListFilter(admin.SimpleListFilter):
+    """Filter rows by mesh protocol (Meshtastic / MeshCore)."""
+
+    title = _("Protocol")
+    parameter_name = "protocol"
+
+    def lookups(self, request, model_admin):
+        return Protocol.choices
+
+    def queryset(self, request, queryset):
+        if self.value():
+            return queryset.filter(protocol=int(self.value()))
+        return queryset
+
+
+class MeshCoreObservedIdentityFilter(admin.SimpleListFilter):
+    """MeshCore ObservedNode rows by identity completeness (ADR-0001)."""
+
+    title = _("MeshCore identity")
+    parameter_name = "mc_identity"
+
+    def lookups(self, request, model_admin):
+        return (
+            ("full", _("Full pubkey")),
+            ("prefix_stub", _("Prefix stub only")),
+            ("no_identity", _("Missing pubkey and prefix")),
+        )
+
+    def queryset(self, request, queryset):
+        mc = queryset.filter(protocol=Protocol.MESHCORE)
+        if self.value() == "full":
+            return mc.filter(mc_pubkey__isnull=False)
+        if self.value() == "prefix_stub":
+            return mc.filter(mc_pubkey__isnull=True, mc_pubkey_prefix__isnull=False)
+        if self.value() == "no_identity":
+            return mc.filter(mc_pubkey__isnull=True, mc_pubkey_prefix__isnull=True)
+        return queryset
+
+
+class ApiKeyLinkedProtocolFilter(admin.SimpleListFilter):
+    """Node API keys that have at least one linked ManagedNode of a protocol."""
+
+    title = _("Linked feeder protocol")
+    parameter_name = "linked_protocol"
+
+    def lookups(self, request, model_admin):
+        return Protocol.choices
+
+    def queryset(self, request, queryset):
+        if not self.value():
+            return queryset
+        protocol = int(self.value())
+        return queryset.filter(
+            node_links__node__protocol=protocol,
+            node_links__node__deleted_at__isnull=True,
+        ).distinct()
 
 
 class CopyToClipboardWidget(forms.Widget):
@@ -364,7 +441,9 @@ class ManagedNodeAdmin(admin.ModelAdmin):
         "status_last_packet_ingested_at",
     )
     list_filter = (
-        "protocol",
+        ProtocolListFilter,
+        ("constellation__protocol", admin.ChoicesFieldListFilter),
+        ManagedNodeActiveFilter,
         "owner",
         "constellation",
         "allow_auto_traceroute",
@@ -428,9 +507,13 @@ class ManagedNodeStatusAdmin(admin.ModelAdmin):
         "is_sending_data",
         "updated_at",
     )
-    list_select_related = ("node", "node__owner")
-    list_filter = ("is_sending_data",)
-    search_fields = ("node__name", "node__node_id")
+    list_select_related = ("node", "node__owner", "node__constellation")
+    list_filter = (
+        "is_sending_data",
+        ("node__protocol", admin.ChoicesFieldListFilter),
+        "node__constellation",
+    )
+    search_fields = ("node__name", "node__node_id", "node__owner__username")
     readonly_fields = (
         "node",
         "last_packet_ingested_at",
@@ -461,6 +544,7 @@ class NodeAPIKeyAdmin(admin.ModelAdmin):
     )
     list_filter = (
         "constellation",
+        ApiKeyLinkedProtocolFilter,
         "owner",
         "is_active",
     )
@@ -531,12 +615,15 @@ class NodeLatestStatusInline(admin.StackedInline):
 class ObservedNodeAdmin(admin.ModelAdmin):
     inlines = [NodeLatestStatusInline]
     list_display = (
+        "protocol",
         "short_name",
         "long_name",
         "node_id",
         "node_id_str",
+        "mc_pubkey_prefix",
         "hw_model",
         "get_inferred_max_hops",
+        "last_heard",
         "environment_exposure",
         "weather_use",
         "claimed_by",
@@ -548,17 +635,22 @@ class ObservedNodeAdmin(admin.ModelAdmin):
 
     get_inferred_max_hops.short_description = "Inferred max hops"
     list_filter = (
+        ProtocolListFilter,
+        MeshCoreObservedIdentityFilter,
         "hw_model",
         "environment_exposure",
         "weather_use",
         "claimed_by",
         "role",
+        ("last_heard", admin.EmptyFieldListFilter),
     )
     search_fields = (
         "short_name",
         "long_name",
         "node_id",
         "node_id_str",
+        "mc_pubkey",
+        "mc_pubkey_prefix",
         "mac_addr",
         "hw_model",
         "public_key",
@@ -566,28 +658,38 @@ class ObservedNodeAdmin(admin.ModelAdmin):
     )
     readonly_fields = (
         "internal_id",
+        "protocol",
         "node_id",
         "node_id_str",
         "mac_addr",
         "public_key",
         "role",
+        "last_heard",
     )
 
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related("claimed_by", "latest_status")
+
     def get_fields(self, request, obj=None):
-        """Show all fields for observed nodes."""
-        fields = [
+        common = [
+            "protocol",
             "node_id",
-            "mac_addr",
+            "node_id_str",
             "long_name",
             "short_name",
-            "hw_model",
-            "public_key",
+            "last_heard",
             "environment_exposure",
             "weather_use",
             "claimed_by",
             "role",
         ]
-        return fields
+        if obj and obj.protocol == Protocol.MESHCORE:
+            return common + ["mc_pubkey", "mc_pubkey_prefix"]
+        return common + [
+            "mac_addr",
+            "hw_model",
+            "public_key",
+        ]
 
 
 # NOTE: You need to create the template file for NodeIdDatalistWidget at:
