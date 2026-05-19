@@ -112,7 +112,9 @@ def test_traceroute_receiver_inferred_creation(
     )
     observation = create_packet_observation_for_tr(packet=packet, observer=source_node)
 
-    assert not AutoTraceRoute.objects.filter(source_node=source_node, target_node__meshtastic_node_id=target_node_id).exists()
+    assert not AutoTraceRoute.objects.filter(
+        source_node=source_node, target_node__meshtastic_node_id=target_node_id
+    ).exists()
     assert not ObservedNode.objects.filter(meshtastic_node_id=target_node_id).exists()
 
     with patch("traceroute.tasks.push_traceroute_to_neo4j") as mock_push:

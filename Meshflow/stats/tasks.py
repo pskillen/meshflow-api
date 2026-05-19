@@ -152,7 +152,9 @@ def _collect_packet_volume(
     base_qs = base_qs.exclude(
         Q(devicemetricspacket__isnull=False)
         & ~Exists(
-            PacketObservation.objects.filter(packet_id=OuterRef("id")).exclude(observer__meshtastic_node_id=OuterRef("from_int"))
+            PacketObservation.objects.filter(packet_id=OuterRef("id")).exclude(
+                observer__meshtastic_node_id=OuterRef("from_int")
+            )
         )
     )
 
