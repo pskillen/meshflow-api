@@ -27,7 +27,7 @@ class TextMessageViewSet(viewsets.ModelViewSet):
         if channel_id:
             queryset = queryset.filter(channel_id=channel_id)
         if sender_node_id:
-            queryset = queryset.filter(sender__node_id=int(sender_node_id))
+            queryset = queryset.filter(sender__meshtastic_node_id=int(sender_node_id))
 
         # filter out any DMs (i.e. recipient_node_id must be '^all')
         queryset = queryset.filter(recipient_node_id=MESHTASTIC_BROADCAST_ID)
@@ -42,7 +42,7 @@ class TextMessageViewSet(viewsets.ModelViewSet):
         #     It also doesn't work because ManagedNode doesn't have a formal FK to ObservedNode
         # # Prefetch ObservedNode for all observer nodes referenced by PacketObservation
         # observer_node_ids = PacketObservation.objects.values_list("observer_id", flat=True).distinct()
-        # observed_nodes = ObservedNode.objects.filter(node_id__in=observer_node_ids)
+        # observed_nodes = ObservedNode.objects.filter(meshtastic_node_id__in=observer_node_ids)
         # queryset = queryset.prefetch_related(
         #     models.Prefetch("original_packet__observations__observer__observednode_set",
         #                     queryset=observed_nodes, to_attr="prefetched_observed_nodes")
@@ -54,8 +54,8 @@ class TextMessageViewSet(viewsets.ModelViewSet):
         context = super().get_serializer_context()
         # Build a mapping of node_id -> ObservedNode for all relevant nodes
         observer_node_ids = (
-            ManagedNode.objects.filter(deleted_at__isnull=True).values_list("node_id", flat=True).distinct()
+            ManagedNode.objects.filter(deleted_at__isnull=True).values_list("meshtastic_node_id", flat=True).distinct()
         )
-        observed_nodes = ObservedNode.objects.filter(node_id__in=observer_node_ids)
-        context["observer_nodes_map"] = {n.node_id: n for n in observed_nodes}
+        observed_nodes = ObservedNode.objects.filter(meshtastic_node_id__in=observer_node_ids)
+        context["observer_nodes_map"] = {n.meshtastic_node_id: n for n in observed_nodes}
         return context

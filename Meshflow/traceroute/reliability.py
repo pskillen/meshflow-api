@@ -87,13 +87,13 @@ def load_source_target_reliability(
             triggered_at__gte=cutoff,
             status__in=(AutoTraceRoute.STATUS_COMPLETED, AutoTraceRoute.STATUS_FAILED),
         )
-        .order_by("target_node__node_id", "-triggered_at")
-        .values("target_node__node_id", "status")
+        .order_by("target_node__meshtastic_node_id", "-triggered_at")
+        .values("target_node__meshtastic_node_id", "status")
     )
 
     by_target: dict[int, list[str]] = defaultdict(list)
     for r in rows:
-        by_target[r["target_node__node_id"]].append(r["status"])
+        by_target[r["target_node__meshtastic_node_id"]].append(r["status"])
 
     hard: set[int] = set()
     soft: dict[int, float] = {}

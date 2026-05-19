@@ -180,7 +180,7 @@ def feeder_reach(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    feeder = ManagedNode.objects.filter(node_id=feeder_id, deleted_at__isnull=True).first()
+    feeder = ManagedNode.objects.filter(meshtastic_node_id=feeder_id, deleted_at__isnull=True).first()
     if feeder is None:
         return Response({"detail": "Feeder not found."}, status=status.HTTP_404_NOT_FOUND)
 
@@ -197,7 +197,7 @@ def feeder_reach(request):
     if rows:
         feeder_meta = {
             "managed_node_id": rows[0].feeder_managed_node_id,
-            "node_id": rows[0].feeder_node_id,
+            "meshtastic_node_id": rows[0].feeder_node_id,
             "node_id_str": rows[0].feeder_node_id_str,
             "short_name": rows[0].feeder_short_name,
             "long_name": rows[0].feeder_long_name,
@@ -207,11 +207,11 @@ def feeder_reach(request):
     else:
         from common.mesh_node_helpers import meshtastic_id_to_hex
 
-        observed = ObservedNode.objects.filter(node_id=feeder.node_id).first()
+        observed = ObservedNode.objects.filter(meshtastic_node_id=feeder.meshtastic_node_id).first()
         feeder_meta = {
             "managed_node_id": str(feeder.internal_id),
-            "node_id": feeder.node_id,
-            "node_id_str": meshtastic_id_to_hex(feeder.node_id),
+            "meshtastic_node_id": feeder.meshtastic_node_id,
+            "node_id_str": meshtastic_id_to_hex(feeder.meshtastic_node_id),
             "short_name": (observed.short_name if observed else None) or feeder.name,
             "long_name": observed.long_name if observed else None,
             "lat": feeder.default_location_latitude,
@@ -220,7 +220,7 @@ def feeder_reach(request):
 
     targets = [
         {
-            "node_id": r.target_node_id,
+            "meshtastic_node_id": r.target_node_id,
             "node_id_str": r.target_node_id_str,
             "short_name": r.target_short_name,
             "long_name": r.target_long_name,
@@ -372,7 +372,7 @@ def traceroute_stats(request):
     source_node = request.query_params.get("source_node")
     if source_node:
         try:
-            mn = ManagedNode.objects.get(node_id=int(source_node), deleted_at__isnull=True)
+            mn = ManagedNode.objects.get(meshtastic_node_id=int(source_node), deleted_at__isnull=True)
             qs = qs.filter(source_node=mn)
         except ValueError, ManagedNode.DoesNotExist:
             pass
@@ -398,8 +398,8 @@ def traceroute_stats(request):
     router_counts = Counter()
     completed_qs = qs.filter(status=AutoTraceRoute.STATUS_COMPLETED).select_related("source_node", "target_node")
     for tr in completed_qs:
-        src_id = tr.source_node.node_id if tr.source_node else None
-        tgt_id = tr.target_node.node_id if tr.target_node else None
+        src_id = tr.source_node.meshtastic_node_id if tr.source_node else None
+        tgt_id = tr.target_node.meshtastic_node_id if tr.target_node else None
         exclude_ids = {src_id, tgt_id, UNKNOWN_NODE_ID}
         for item in (tr.route or []) + (tr.route_back or []):
             nid = item.get("node_id")
@@ -409,12 +409,14 @@ def traceroute_stats(request):
     top_router_node_ids = [nid for nid, _ in router_counts.most_common(15)]
     observed_by_id = {}
     if top_router_node_ids:
-        for o in ObservedNode.objects.filter(node_id__in=top_router_node_ids).values("node_id", "short_name"):
-            observed_by_id[o["node_id"]] = o
+        for o in ObservedNode.objects.filter(meshtastic_node_id__in=top_router_node_ids).values(
+            "meshtastic_node_id", "short_name"
+        ):
+            observed_by_id[o["meshtastic_node_id"]] = o
 
     top_routers = [
         {
-            "node_id": nid,
+            "meshtastic_node_id": nid,
             "node_id_str": meshtastic_id_to_hex(nid),
             "short_name": observed_by_id.get(nid, {}).get("short_name") or meshtastic_id_to_hex(nid),
             "count": router_counts[nid],
@@ -435,11 +437,13 @@ def traceroute_stats(request):
         m.internal_id: m
         for m in ManagedNode.objects.filter(internal_id__in=source_internal_ids, deleted_at__isnull=True)
     }
-    mesh_node_ids = [m.node_id for m in managed_by_internal_id.values()]
+    mesh_node_ids = [m.meshtastic_node_id for m in managed_by_internal_id.values()]
     observed_short_by_mesh_id = {}
     if mesh_node_ids:
-        for o in ObservedNode.objects.filter(node_id__in=mesh_node_ids).values("node_id", "short_name"):
-            observed_short_by_mesh_id[o["node_id"]] = o["short_name"]
+        for o in ObservedNode.objects.filter(meshtastic_node_id__in=mesh_node_ids).values(
+            "meshtastic_node_id", "short_name"
+        ):
+            observed_short_by_mesh_id[o["meshtastic_node_id"]] = o["short_name"]
 
     by_source = []
     for row in by_source_rows:
@@ -450,12 +454,12 @@ def traceroute_stats(request):
         failed_n = row["failed"]
         finished = completed_n + failed_n
         success_rate = None if finished == 0 else completed_n / finished
-        short_name = observed_short_by_mesh_id.get(mn.node_id) or mn.name
+        short_name = observed_short_by_mesh_id.get(mn.meshtastic_node_id) or mn.name
         by_source.append(
             {
                 "managed_node_id": str(mn.internal_id),
-                "node_id": mn.node_id,
-                "node_id_str": meshtastic_id_to_hex(mn.node_id),
+                "meshtastic_node_id": mn.meshtastic_node_id,
+                "node_id_str": meshtastic_id_to_hex(mn.meshtastic_node_id),
                 "name": mn.name,
                 "short_name": short_name,
                 "total": row["total"],
@@ -490,8 +494,8 @@ def traceroute_stats(request):
         success_rate = None if finished == 0 else completed_n / finished
         by_target.append(
             {
-                "node_id": on.node_id,
-                "node_id_str": meshtastic_id_to_hex(on.node_id),
+                "meshtastic_node_id": on.meshtastic_node_id,
+                "node_id_str": meshtastic_id_to_hex(on.meshtastic_node_id),
                 "short_name": on.short_name,
                 "long_name": on.long_name,
                 "total": row["total"],

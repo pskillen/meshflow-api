@@ -152,7 +152,9 @@ def _collect_packet_volume(
     base_qs = base_qs.exclude(
         Q(devicemetricspacket__isnull=False)
         & ~Exists(
-            PacketObservation.objects.filter(packet_id=OuterRef("id")).exclude(observer__node_id=OuterRef("from_int"))
+            PacketObservation.objects.filter(packet_id=OuterRef("id")).exclude(
+                observer__meshtastic_node_id=OuterRef("from_int")
+            )
         )
     )
 
@@ -197,7 +199,7 @@ def _collect_new_nodes(
 
         def per_constellation_filter(obs_node_ids):
             return ObservedNode.objects.filter(
-                node_id__in=obs_node_ids,
+                meshtastic_node_id__in=obs_node_ids,
                 created_at__gte=recorded_at,
                 created_at__lt=hour_end,
             )
@@ -209,7 +211,7 @@ def _collect_new_nodes(
 
             def per_constellation_filter(obs_node_ids):
                 return ObservedNode.objects.filter(
-                    node_id__in=obs_node_ids,
+                    meshtastic_node_id__in=obs_node_ids,
                     created_at__gte=last_run_started_at,
                 )
 
@@ -218,7 +220,7 @@ def _collect_new_nodes(
 
             def per_constellation_filter(obs_node_ids):
                 return ObservedNode.objects.filter(
-                    node_id__in=obs_node_ids,
+                    meshtastic_node_id__in=obs_node_ids,
                     created_at__isnull=False,
                 )
 

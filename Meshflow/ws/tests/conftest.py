@@ -12,6 +12,6 @@ def node_auth_data(create_node_auth):
 
     def _get():
         node_auth = create_node_auth()
-        return {"api_key": node_auth.api_key.key, "node_id": node_auth.node.node_id}
+        return {"api_key": node_auth.api_key.key, "node_id": node_auth.node.meshtastic_node_id}
 
     return _get

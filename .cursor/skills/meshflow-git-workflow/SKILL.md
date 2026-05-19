@@ -110,11 +110,30 @@ fix(api): correct timezone handling in packet ingestion
 refactor(storage): extract packet parsing into service
 ```
 
-Note: `git commit` does not work in the sandbox, so skip the sandbox attempt
+---
+
+## 5. Running git in Cursor agents
+
+When the agent **Shell** tool runs `git` (or other commands) in a Meshflow repo:
+
+1. **Always set `working_directory`** to the repository root (absolute path), e.g. `/Users/you/git_personal/meshflow-api`. Commands that only `cd` inside the command string often return **empty output** even when they succeed (exit code 0).
+
+2. **Good pattern**
+
+   ```text
+   working_directory: /Users/you/git_personal/meshflow-api
+   command:            git fetch origin && git status -sb
+   ```
+
+3. **Permissions**: use `required_permissions: ["git_write"]` for checkout/commit; add `"network"` for `fetch` / `push`.
+
+4. **PRs and issues**: use the `github-personal` MCP. The `gh` CLI is not available on Meshflow dev machines.
+
+5. **Long pre-commit hooks**: meshflow-ui runs eslint + vitest on commit; use `block_until_ms` of 60–90s when committing there.
 
 ---
 
-## 5. Pull Requests
+## 6. Pull Requests
 
 When the work is done:
 
@@ -133,5 +152,5 @@ When the work is done:
 | Plan | Issue in relevant repo(s); parent in meshflow-api if multi-repo |
 | Branch | `{issue-repo-prefix}-{num}/{author}/{description}` (prefix = repo where the issue lives) |
 | Pre-commit | meshflow-api/meshtastic-bot: venv + black, isort, flake8; meshtastic-bot-ui: `npm run format` |
-| Commit | Conventional commits, no "enhance" |
+| Commit | Conventional commits, no "enhance"; Shell `working_directory` = repo root |
 | PR | Open in all affected repos, link issues and related PRs |

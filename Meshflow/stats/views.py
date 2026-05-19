@@ -141,7 +141,7 @@ def node_packet_stats(request, node_id: int):
     """
     try:
         # Validate node exists
-        ObservedNode.objects.get(node_id=node_id, protocol=Protocol.MESHTASTIC)
+        ObservedNode.objects.get(meshtastic_node_id=node_id, protocol=Protocol.MESHTASTIC)
     except ObservedNode.DoesNotExist:
         return Response({"status": "error", "message": "Node not found"}, status=status.HTTP_404_NOT_FOUND)
 
@@ -156,7 +156,9 @@ def node_packet_stats(request, node_id: int):
     packets = packets.exclude(
         Q(devicemetricspacket__isnull=False)
         & ~Exists(
-            PacketObservation.objects.filter(packet_id=OuterRef("id")).exclude(observer__node_id=OuterRef("from_int"))
+            PacketObservation.objects.filter(packet_id=OuterRef("id")).exclude(
+                observer__meshtastic_node_id=OuterRef("from_int")
+            )
         )
     )
 
@@ -229,7 +231,7 @@ def node_received_stats(request, node_id: int):
     """
     try:
         # Check if this is a managed node
-        managed_node = ManagedNode.objects.get(node_id=node_id, deleted_at__isnull=True)
+        managed_node = ManagedNode.objects.get(meshtastic_node_id=node_id, deleted_at__isnull=True)
     except ManagedNode.DoesNotExist:
         # If not a managed node, return empty result
         return Response({"start_date": None, "end_date": None, "intervals": []}, status=status.HTTP_200_OK)
@@ -241,7 +243,7 @@ def node_received_stats(request, node_id: int):
 
     # Build base query for packet observations (exclude self device metrics)
     observations = PacketObservation.objects.filter(observer=managed_node).exclude(
-        Q(packet__devicemetricspacket__isnull=False) & Q(packet__from_int=F("observer__node_id"))
+        Q(packet__devicemetricspacket__isnull=False) & Q(packet__from_int=F("observer__meshtastic_node_id"))
     )
 
     # Apply date filters if provided
@@ -311,7 +313,7 @@ def node_neighbour_stats(request, node_id: int):
         Response containing packet counts by source node
     """
     try:
-        managed_node = ManagedNode.objects.get(node_id=node_id, deleted_at__isnull=True)
+        managed_node = ManagedNode.objects.get(meshtastic_node_id=node_id, deleted_at__isnull=True)
     except ManagedNode.DoesNotExist:
         return Response(
             {"start_date": None, "end_date": None, "by_source": [], "total_packets": 0},
@@ -326,7 +328,9 @@ def node_neighbour_stats(request, node_id: int):
     try:
         observations = (
             PacketObservation.objects.filter(observer=managed_node)
-            .exclude(Q(packet__devicemetricspacket__isnull=False) & Q(packet__from_int=F("observer__node_id")))
+            .exclude(
+                Q(packet__devicemetricspacket__isnull=False) & Q(packet__from_int=F("observer__meshtastic_node_id"))
+            )
             .select_related("packet")
             .annotate(
                 source_node_id=Case(
@@ -360,23 +364,27 @@ def node_neighbour_stats(request, node_id: int):
             if source_val <= 255:
                 source_type = "lsb"
                 candidates_qs = (
-                    ObservedNode.objects.annotate(lsb=Mod(F("node_id"), 256))
+                    ObservedNode.objects.annotate(lsb=Mod(F("meshtastic_node_id"), 256))
                     .filter(lsb=source_val, protocol=Protocol.MESHTASTIC)
-                    .only("node_id", "node_id_str", "short_name")
+                    .only("meshtastic_node_id", "node_id_str", "short_name")
                 )
                 candidates = [
-                    {"node_id": n.node_id, "node_id_str": n.node_id_str, "short_name": n.short_name}
+                    {
+                        "meshtastic_node_id": n.meshtastic_node_id,
+                        "node_id_str": n.node_id_str,
+                        "short_name": n.short_name,
+                    }
                     for n in candidates_qs
                 ]
             else:
                 source_type = "full"
                 try:
-                    obs = ObservedNode.objects.only("node_id", "node_id_str", "short_name").get(
-                        node_id=source_val, protocol=Protocol.MESHTASTIC
+                    obs = ObservedNode.objects.only("meshtastic_node_id", "node_id_str", "short_name").get(
+                        meshtastic_node_id=source_val, protocol=Protocol.MESHTASTIC
                     )
                     candidates = [
                         {
-                            "node_id": obs.node_id,
+                            "meshtastic_node_id": obs.meshtastic_node_id,
                             "node_id_str": obs.node_id_str,
                             "short_name": obs.short_name,
                         }
@@ -384,7 +392,7 @@ def node_neighbour_stats(request, node_id: int):
                 except ObservedNode.DoesNotExist:
                     candidates = [
                         {
-                            "node_id": source_val,
+                            "meshtastic_node_id": source_val,
                             "node_id_str": meshtastic_id_to_hex(source_val),
                             "short_name": None,
                         }

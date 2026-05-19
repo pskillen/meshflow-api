@@ -29,7 +29,7 @@ def test_enqueue_creates_pending_new_node_baseline(
 ):
     observer = create_managed_node(allow_auto_traceroute=True)
     mark_managed_node_feeding(observer, sending=True)
-    target = create_observed_node(node_id=0xAAAABEEF)
+    target = create_observed_node(meshtastic_node_id=0xAAAABEEF)
 
     r = enqueue_new_node_baseline(target, observer)
     assert r == RESULT_QUEUED
@@ -51,7 +51,7 @@ def test_enqueue_duplicate_second_call(
 ):
     observer = create_managed_node(allow_auto_traceroute=True)
     mark_managed_node_feeding(observer, sending=True)
-    target = create_observed_node(node_id=0xAAAABEEF)
+    target = create_observed_node(meshtastic_node_id=0xAAAABEEF)
 
     assert enqueue_new_node_baseline(target, observer) == RESULT_QUEUED
     assert enqueue_new_node_baseline(target, observer) == RESULT_DUPLICATE
@@ -60,7 +60,7 @@ def test_enqueue_duplicate_second_call(
 @pytest.mark.django_db
 def test_enqueue_no_eligible_source(create_managed_node, create_observed_node):
     observer = create_managed_node(allow_auto_traceroute=False)
-    target = create_observed_node(node_id=0xBAD00001)
+    target = create_observed_node(meshtastic_node_id=0xBAD00001)
 
     assert enqueue_new_node_baseline(target, observer) == RESULT_NO_ELIGIBLE_SOURCE
     assert not AutoTraceRoute.objects.filter(target_node=target).exists()
@@ -75,7 +75,7 @@ def test_enqueue_source_queue_full(
     observer = create_managed_node(allow_auto_traceroute=True)
     mark_managed_node_feeding(observer, sending=True)
     for i in range(TRACEROUTE_MAX_PENDING_PER_SOURCE):
-        t = create_observed_node(node_id=0x60000000 + i)
+        t = create_observed_node(meshtastic_node_id=0x60000000 + i)
         AutoTraceRoute.objects.create(
             source_node=observer,
             target_node=t,
@@ -84,7 +84,7 @@ def test_enqueue_source_queue_full(
             status=AutoTraceRoute.STATUS_PENDING,
         )
 
-    new_target = create_observed_node(node_id=0x70000001)
+    new_target = create_observed_node(meshtastic_node_id=0x70000001)
     assert enqueue_new_node_baseline(new_target, observer) == RESULT_SOURCE_QUEUE_FULL
 
 
@@ -97,11 +97,11 @@ def test_enqueue_prefers_other_source_when_observer_ineligible_but_cluster_has_f
     """
     Observer may not be auto-traceroute-eligible; another eligible feeder can still run the TR.
     """
-    other = create_managed_node(node_id=222222222, allow_auto_traceroute=True)
+    other = create_managed_node(meshtastic_node_id=222222222, allow_auto_traceroute=True)
     mark_managed_node_feeding(other, sending=True)
 
-    bad_observer = create_managed_node(node_id=333333333, allow_auto_traceroute=False)
-    target = create_observed_node(node_id=0xCAFE0001)
+    bad_observer = create_managed_node(meshtastic_node_id=333333333, allow_auto_traceroute=False)
+    target = create_observed_node(meshtastic_node_id=0xCAFE0001)
 
     r = enqueue_new_node_baseline(target, bad_observer)
     assert r == RESULT_QUEUED
@@ -140,7 +140,7 @@ def test_packet_received_inferred_path_queues_baseline(
 
     row = AutoTraceRoute.objects.get(trigger_type=AutoTraceRoute.TRIGGER_TYPE_NEW_NODE_BASELINE)
     assert row.source_node_id == observer.pk
-    assert row.target_node.node_id == 0x12345678
+    assert row.target_node.meshtastic_node_id == 0x12345678
 
 
 @pytest.mark.django_db
@@ -153,7 +153,7 @@ def test_new_node_observed_signal_queues_once(
 
     observer = create_managed_node(allow_auto_traceroute=True)
     mark_managed_node_feeding(observer, sending=True)
-    target = create_observed_node(node_id=0x51000001)
+    target = create_observed_node(meshtastic_node_id=0x51000001)
 
     new_node_observed.send(sender=None, node=target, observer=observer)
 
@@ -168,7 +168,7 @@ def test_enqueue_integrity_error_returns_duplicate(
 ):
     observer = create_managed_node(allow_auto_traceroute=True)
     mark_managed_node_feeding(observer, sending=True)
-    target = create_observed_node(node_id=0x71000002)
+    target = create_observed_node(meshtastic_node_id=0x71000002)
 
     with patch(
         "traceroute.lifecycle.AutoTraceRoute.objects.create",

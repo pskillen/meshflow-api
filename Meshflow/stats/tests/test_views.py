@@ -33,7 +33,7 @@ def test_node_neighbour_stats_returns_empty_for_non_managed_node(create_user):
 def test_node_neighbour_stats_uses_from_int_when_relay_node_null(create_managed_node, create_user):
     """When relay_node is null, source should be packet.from_int."""
     user = create_user()
-    managed = create_managed_node(owner=user, node_id=111111111)
+    managed = create_managed_node(owner=user, meshtastic_node_id=111111111)
     channel = managed.channel_0
 
     packet = MessagePacket.objects.create(
@@ -57,7 +57,7 @@ def test_node_neighbour_stats_uses_from_int_when_relay_node_null(create_managed_
     )
 
     ObservedNode.objects.get_or_create(
-        node_id=222222222,
+        meshtastic_node_id=222222222,
         defaults={"node_id_str": "!0d3b6cde", "short_name": "SRC", "long_name": "Source Node"},
     )
 
@@ -65,7 +65,7 @@ def test_node_neighbour_stats_uses_from_int_when_relay_node_null(create_managed_
     client.force_authenticate(user=user)
 
     response = client.get(
-        reverse("stats:node-neighbour-stats", kwargs={"node_id": managed.node_id}),
+        reverse("stats:node-neighbour-stats", kwargs={"node_id": managed.meshtastic_node_id}),
         {"start_date": "2025-01-01", "end_date": "2025-12-31"},
     )
     assert response.status_code == status.HTTP_200_OK
@@ -75,7 +75,7 @@ def test_node_neighbour_stats_uses_from_int_when_relay_node_null(create_managed_
     assert item["source_type"] == "full"
     assert item["count"] == 1
     assert len(item["candidates"]) == 1
-    assert item["candidates"][0]["node_id"] == 222222222
+    assert item["candidates"][0]["meshtastic_node_id"] == 222222222
     assert response.data["total_packets"] == 1
 
 
@@ -83,7 +83,7 @@ def test_node_neighbour_stats_uses_from_int_when_relay_node_null(create_managed_
 def test_node_neighbour_stats_uses_relay_node_when_set(create_managed_node, create_user):
     """When relay_node is set, source should be relay_node (last hop)."""
     user = create_user()
-    managed = create_managed_node(owner=user, node_id=111111111)
+    managed = create_managed_node(owner=user, meshtastic_node_id=111111111)
     channel = managed.channel_0
 
     packet = MessagePacket.objects.create(
@@ -107,7 +107,7 @@ def test_node_neighbour_stats_uses_relay_node_when_set(create_managed_node, crea
     )
 
     ObservedNode.objects.get_or_create(
-        node_id=444444444,
+        meshtastic_node_id=444444444,
         defaults={"node_id_str": "!1a7a8b90", "short_name": "RLY", "long_name": "Relay Node"},
     )
 
@@ -115,7 +115,7 @@ def test_node_neighbour_stats_uses_relay_node_when_set(create_managed_node, crea
     client.force_authenticate(user=user)
 
     response = client.get(
-        reverse("stats:node-neighbour-stats", kwargs={"node_id": managed.node_id}),
+        reverse("stats:node-neighbour-stats", kwargs={"node_id": managed.meshtastic_node_id}),
         {"start_date": "2025-01-01", "end_date": "2025-12-31"},
     )
     assert response.status_code == status.HTTP_200_OK
@@ -125,7 +125,7 @@ def test_node_neighbour_stats_uses_relay_node_when_set(create_managed_node, crea
     assert item["source_type"] == "full"
     assert item["count"] == 1
     assert len(item["candidates"]) == 1
-    assert item["candidates"][0]["node_id"] == 444444444
+    assert item["candidates"][0]["meshtastic_node_id"] == 444444444
     assert response.data["total_packets"] == 1
 
 
@@ -133,7 +133,7 @@ def test_node_neighbour_stats_uses_relay_node_when_set(create_managed_node, crea
 def test_node_neighbour_stats_uses_from_int_when_relay_node_zero(create_managed_node, create_user):
     """When relay_node is 0, source should fall back to packet.from_int."""
     user = create_user()
-    managed = create_managed_node(owner=user, node_id=555555555)
+    managed = create_managed_node(owner=user, meshtastic_node_id=555555555)
     channel = managed.channel_0
 
     packet = MessagePacket.objects.create(
@@ -160,7 +160,7 @@ def test_node_neighbour_stats_uses_from_int_when_relay_node_zero(create_managed_
     client.force_authenticate(user=user)
 
     response = client.get(
-        reverse("stats:node-neighbour-stats", kwargs={"node_id": managed.node_id}),
+        reverse("stats:node-neighbour-stats", kwargs={"node_id": managed.meshtastic_node_id}),
         {"start_date": "2025-01-01", "end_date": "2025-12-31"},
     )
     assert response.status_code == status.HTTP_200_OK
@@ -175,7 +175,7 @@ def test_node_neighbour_stats_uses_from_int_when_relay_node_zero(create_managed_
 def test_node_neighbour_stats_aggregates_multiple_sources(create_managed_node, create_user):
     """Multiple packets from different sources should be aggregated correctly."""
     user = create_user()
-    managed = create_managed_node(owner=user, node_id=777777777)
+    managed = create_managed_node(owner=user, meshtastic_node_id=777777777)
     channel = managed.channel_0
 
     rx_time = timezone.make_aware(datetime(2025, 6, 15, 12, 0, 0))
@@ -202,7 +202,7 @@ def test_node_neighbour_stats_aggregates_multiple_sources(create_managed_node, c
     client.force_authenticate(user=user)
 
     response = client.get(
-        reverse("stats:node-neighbour-stats", kwargs={"node_id": managed.node_id}),
+        reverse("stats:node-neighbour-stats", kwargs={"node_id": managed.meshtastic_node_id}),
         {"start_date": "2025-01-01", "end_date": "2025-12-31"},
     )
     assert response.status_code == status.HTTP_200_OK
@@ -216,7 +216,7 @@ def test_node_neighbour_stats_aggregates_multiple_sources(create_managed_node, c
 def test_node_neighbour_stats_lsb_returns_candidates(create_managed_node, create_user):
     """When relay_node is LSB (<=255), source_type is lsb and candidates list all matching nodes."""
     user = create_user()
-    managed = create_managed_node(owner=user, node_id=888888888)
+    managed = create_managed_node(owner=user, meshtastic_node_id=888888888)
     channel = managed.channel_0
 
     packet = MessagePacket.objects.create(
@@ -240,11 +240,11 @@ def test_node_neighbour_stats_lsb_returns_candidates(create_managed_node, create
     )
 
     ObservedNode.objects.get_or_create(
-        node_id=1129933592,
+        meshtastic_node_id=1129933592,
         defaults={"node_id_str": "!43596b18", "short_name": "NodeA", "long_name": "Node A"},
     )
     ObservedNode.objects.get_or_create(
-        node_id=3456789016,
+        meshtastic_node_id=3456789016,
         defaults={"node_id_str": "!ce0e3418", "short_name": "NodeB", "long_name": "Node B"},
     )
 
@@ -252,7 +252,7 @@ def test_node_neighbour_stats_lsb_returns_candidates(create_managed_node, create
     client.force_authenticate(user=user)
 
     response = client.get(
-        reverse("stats:node-neighbour-stats", kwargs={"node_id": managed.node_id}),
+        reverse("stats:node-neighbour-stats", kwargs={"node_id": managed.meshtastic_node_id}),
         {"start_date": "2025-01-01", "end_date": "2025-12-31"},
     )
     assert response.status_code == status.HTTP_200_OK
@@ -262,7 +262,7 @@ def test_node_neighbour_stats_lsb_returns_candidates(create_managed_node, create
     assert item["source_type"] == "lsb"
     assert item["count"] == 1
     assert len(item["candidates"]) == 2
-    candidate_ids = {c["node_id"] for c in item["candidates"]}
+    candidate_ids = {c["meshtastic_node_id"] for c in item["candidates"]}
     assert 1129933592 in candidate_ids
     assert 3456789016 in candidate_ids
 
@@ -271,7 +271,7 @@ def test_node_neighbour_stats_lsb_returns_candidates(create_managed_node, create
 def test_node_neighbour_stats_excludes_self_packets(create_managed_node, create_user):
     """Packets where the source is the node itself should be excluded."""
     user = create_user()
-    managed = create_managed_node(owner=user, node_id=555555555)
+    managed = create_managed_node(owner=user, meshtastic_node_id=555555555)
     channel = managed.channel_0
 
     rx_time = timezone.make_aware(datetime(2025, 6, 15, 12, 0, 0))
@@ -318,7 +318,7 @@ def test_node_neighbour_stats_excludes_self_packets(create_managed_node, create_
     client.force_authenticate(user=user)
 
     response = client.get(
-        reverse("stats:node-neighbour-stats", kwargs={"node_id": managed.node_id}),
+        reverse("stats:node-neighbour-stats", kwargs={"node_id": managed.meshtastic_node_id}),
         {"start_date": "2025-01-01", "end_date": "2025-12-31"},
     )
     assert response.status_code == status.HTTP_200_OK
@@ -331,12 +331,12 @@ def test_node_neighbour_stats_excludes_self_packets(create_managed_node, create_
 def test_node_received_stats_excludes_self_device_metrics(create_managed_node, create_user):
     """node_received_stats excludes observations of device metrics from self."""
     user = create_user()
-    managed = create_managed_node(owner=user, node_id=111111111)
+    managed = create_managed_node(owner=user, meshtastic_node_id=111111111)
     channel = managed.channel_0
 
     rx_time = timezone.make_aware(datetime(2025, 6, 15, 12, 0, 0))
 
-    # Self device metrics: from_int == managed.node_id, observed by managed
+    # Self device metrics: from_int == managed.meshtastic_node_id, observed by managed
     dm_self = DeviceMetricsPacket.objects.create(
         packet_id=1,
         from_int=111111111,
@@ -384,7 +384,7 @@ def test_node_received_stats_excludes_self_device_metrics(create_managed_node, c
     client.force_authenticate(user=user)
 
     response = client.get(
-        reverse("stats:node-received-stats", kwargs={"node_id": managed.node_id}),
+        reverse("stats:node-received-stats", kwargs={"node_id": managed.meshtastic_node_id}),
         {"start_date": "2025-01-01", "end_date": "2025-12-31"},
     )
     assert response.status_code == status.HTTP_200_OK
@@ -399,11 +399,11 @@ def test_node_received_stats_excludes_self_device_metrics(create_managed_node, c
 def test_node_packet_stats_excludes_self_only_device_metrics(create_managed_node, create_observed_node, create_user):
     """node_packet_stats excludes device metrics that were only self-observed for the node."""
     user = create_user()
-    managed = create_managed_node(owner=user, node_id=111111111)
+    managed = create_managed_node(owner=user, meshtastic_node_id=111111111)
     channel = managed.channel_0
 
     # ObservedNode for the node (required by node_packet_stats)
-    create_observed_node(node_id=111111111)
+    create_observed_node(meshtastic_node_id=111111111)
 
     rx_time = timezone.make_aware(datetime(2025, 6, 15, 12, 0, 0))
 

@@ -75,7 +75,7 @@ def on_packet_received_update_inferred_max_hops(sender, packet, observer, observ
         return
     node_id_str = getattr(packet, "from_str", None) or meshtastic_id_to_hex(sender_node_id)
     observed_node, created = ObservedNode.objects.get_or_create(
-        node_id=sender_node_id,
+        meshtastic_node_id=sender_node_id,
         defaults={
             "node_id_str": node_id_str,
             "long_name": "Unknown Node " + node_id_str,

@@ -17,7 +17,7 @@ def test_offline_dm_includes_short_name_and_deep_link(create_user, create_observ
     user = create_user()
     node_id = 0x11223344
     obs = create_observed_node(
-        node_id=node_id,
+        meshtastic_node_id=node_id,
         node_id_str=meshtastic_id_to_hex(node_id),
         long_name="My Long Node Name",
         short_name="MLNN",
@@ -36,7 +36,7 @@ def test_offline_dm_includes_short_name_and_deep_link(create_user, create_observ
     assert obs.node_id_str in body
     assert "MLNN" in body
     assert "My Long Node Name" in body
-    assert f"https://mesh.example/nodes/{obs.node_id}" in body
+    assert f"https://mesh.example/nodes/{obs.meshtastic_node_id}" in body
     assert "appears offline" in body
 
 
@@ -45,7 +45,7 @@ def test_offline_dm_omits_url_when_frontend_unset(create_user, create_observed_n
     user = create_user()
     node_id = 0x22334455
     obs = create_observed_node(
-        node_id=node_id,
+        meshtastic_node_id=node_id,
         node_id_str=meshtastic_id_to_hex(node_id),
         long_name="Another Node",
         short_name="ANOD",
@@ -68,7 +68,7 @@ def test_verification_start_dm_includes_short_name_and_deep_link(create_user, cr
     user = create_user()
     node_id = 0x33445566
     obs = create_observed_node(
-        node_id=node_id,
+        meshtastic_node_id=node_id,
         node_id_str=meshtastic_id_to_hex(node_id),
         long_name="Verify Me",
         short_name="VFYM",
@@ -87,4 +87,4 @@ def test_verification_start_dm_includes_short_name_and_deep_link(create_user, cr
     assert "VFYM" in body
     assert "Verify Me" in body
     assert "90" in body
-    assert f"https://mesh.example/nodes/{obs.node_id}" in body
+    assert f"https://mesh.example/nodes/{obs.meshtastic_node_id}" in body

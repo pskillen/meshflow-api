@@ -56,14 +56,14 @@ class BasePacketSerializerTestCase(TestCase):
         # Create a test observer node
         cls.observer = ManagedNode.objects.create(
             internal_id=uuid4(),
-            node_id=123456789,
+            meshtastic_node_id=123456789,
             name="Test Node",
             constellation_id=cls.constellation.id,
             owner=cls.user,
         )
 
         cls.from_node = ObservedNode.objects.create(
-            node_id=456789,
+            meshtastic_node_id=456789,
             node_id_str=meshtastic_id_to_hex(456789),
             long_name="From Node",
             short_name="FRM",
@@ -81,7 +81,7 @@ class BasePacketSerializerTest(BasePacketSerializerTestCase):
         """Test basic packet serialization."""
         data = {
             "id": 123,
-            "from": self.from_node.node_id,
+            "from": self.from_node.meshtastic_node_id,
             "fromId": self.from_node.node_id_str,
             "to": 789,
             "toId": "!789012",
@@ -104,7 +104,7 @@ class BasePacketSerializerTest(BasePacketSerializerTestCase):
 
         # Test field mapping
         self.assertEqual(validated_data["packet_id"], 123)
-        self.assertEqual(validated_data["from_int"], self.from_node.node_id)
+        self.assertEqual(validated_data["from_int"], self.from_node.meshtastic_node_id)
         self.assertEqual(validated_data["from_str"], self.from_node.node_id_str)
         self.assertEqual(validated_data["to_int"], 789)
         self.assertEqual(validated_data["to_str"], "!789012")
@@ -129,7 +129,7 @@ class BasePacketSerializerTest(BasePacketSerializerTestCase):
         """Test handling of invalid timestamps."""
         data = {
             "id": 123,
-            "from": self.from_node.node_id,
+            "from": self.from_node.meshtastic_node_id,
             "fromId": self.from_node.node_id_str,
             "decoded": {"portnum": "TEXT_MESSAGE_APP"},
             "rxTime": "invalid",
@@ -147,7 +147,7 @@ class MessagePacketSerializerTest(BasePacketSerializerTestCase):
         """Test message packet serialization."""
         data = {
             "id": 123,
-            "from": self.from_node.node_id,
+            "from": self.from_node.meshtastic_node_id,
             "fromId": self.from_node.node_id_str,
             "decoded": {
                 "portnum": "TEXT_MESSAGE_APP",
@@ -171,7 +171,7 @@ class MessagePacketSerializerTest(BasePacketSerializerTestCase):
         """Test creating a message packet."""
         data = {
             "id": 123456789,
-            "from": self.from_node.node_id,
+            "from": self.from_node.meshtastic_node_id,
             "fromId": self.from_node.node_id_str,
             "decoded": {
                 "portnum": "TEXT_MESSAGE_APP",
@@ -208,7 +208,7 @@ class MessagePacketSerializerTest(BasePacketSerializerTestCase):
 
         data = {
             "id": 987654321,
-            "from": self.from_node.node_id,
+            "from": self.from_node.meshtastic_node_id,
             "fromId": self.from_node.node_id_str,
             "decoded": {
                 "portnum": "TEXT_MESSAGE_APP",
@@ -242,7 +242,7 @@ class PositionPacketSerializerTest(BasePacketSerializerTestCase):
         """Test position packet serialization."""
         data = {
             "id": 123,
-            "from": self.from_node.node_id,
+            "from": self.from_node.meshtastic_node_id,
             "fromId": self.from_node.node_id_str,
             "decoded": {
                 "portnum": "POSITION_APP",
@@ -279,7 +279,7 @@ class PositionPacketSerializerTest(BasePacketSerializerTestCase):
         """Test creating a position packet."""
         data = {
             "id": 123,
-            "from": self.from_node.node_id,
+            "from": self.from_node.meshtastic_node_id,
             "fromId": self.from_node.node_id_str,
             "decoded": {
                 "portnum": "POSITION_APP",
@@ -311,7 +311,7 @@ class NodeInfoPacketSerializerTest(BasePacketSerializerTestCase):
         """Test node info packet serialization."""
         data = {
             "id": 123,
-            "from": self.from_node.node_id,
+            "from": self.from_node.meshtastic_node_id,
             "fromId": self.from_node.node_id_str,
             "decoded": {
                 "portnum": "NODEINFO_APP",
@@ -350,7 +350,7 @@ class NodeInfoPacketSerializerTest(BasePacketSerializerTestCase):
         # Meshtastic sends macaddr as base64 (protobuf bytes). AAECAwQFBg== decodes to 00:01:02:03:04:05:06
         data = {
             "id": 456,
-            "from": self.from_node.node_id,
+            "from": self.from_node.meshtastic_node_id,
             "fromId": self.from_node.node_id_str,
             "decoded": {
                 "portnum": "NODEINFO_APP",
@@ -370,7 +370,7 @@ class NodeInfoPacketSerializerTest(BasePacketSerializerTestCase):
         """Test creating a node info packet."""
         data = {
             "id": 123,
-            "from": self.from_node.node_id,
+            "from": self.from_node.meshtastic_node_id,
             "fromId": self.from_node.node_id_str,
             "decoded": {
                 "portnum": "NODEINFO_APP",
@@ -402,7 +402,7 @@ class DeviceMetricsPacketSerializerTest(BasePacketSerializerTestCase):
         """Test device metrics packet serialization."""
         data = {
             "id": 123,
-            "from": self.from_node.node_id,
+            "from": self.from_node.meshtastic_node_id,
             "fromId": self.from_node.node_id_str,
             "decoded": {
                 "portnum": "TELEMETRY_APP",
@@ -435,7 +435,7 @@ class DeviceMetricsPacketSerializerTest(BasePacketSerializerTestCase):
         """Test creating a device metrics packet."""
         data = {
             "id": 123,
-            "from": self.from_node.node_id,
+            "from": self.from_node.meshtastic_node_id,
             "fromId": self.from_node.node_id_str,
             "decoded": {
                 "portnum": "TELEMETRY_APP",
@@ -468,7 +468,7 @@ class LocalStatsPacketSerializerTest(BasePacketSerializerTestCase):
         """Test local stats packet serialization."""
         data = {
             "id": 123,
-            "from": self.from_node.node_id,
+            "from": self.from_node.meshtastic_node_id,
             "fromId": self.from_node.node_id_str,
             "decoded": {
                 "portnum": "TELEMETRY_APP",
@@ -509,7 +509,7 @@ class LocalStatsPacketSerializerTest(BasePacketSerializerTestCase):
         """Test creating a local stats packet."""
         data = {
             "id": 123,
-            "from": self.from_node.node_id,
+            "from": self.from_node.meshtastic_node_id,
             "fromId": self.from_node.node_id_str,
             "decoded": {
                 "portnum": "TELEMETRY_APP",
@@ -542,7 +542,7 @@ class PacketIngestSerializerTest(BasePacketSerializerTestCase):
         """Test ingesting a message packet."""
         data = {
             "id": 123456789,
-            "from": self.from_node.node_id,
+            "from": self.from_node.meshtastic_node_id,
             "fromId": self.from_node.node_id_str,
             "decoded": {
                 "portnum": "TEXT_MESSAGE_APP",
@@ -563,7 +563,7 @@ class PacketIngestSerializerTest(BasePacketSerializerTestCase):
         """Test ingesting a position packet."""
         data = {
             "id": 123,
-            "from": self.from_node.node_id,
+            "from": self.from_node.meshtastic_node_id,
             "fromId": self.from_node.node_id_str,
             "decoded": {
                 "portnum": "POSITION_APP",
@@ -708,7 +708,7 @@ class PacketIngestSerializerTest(BasePacketSerializerTestCase):
         """Test handling of invalid packet type."""
         data = {
             "id": 123,
-            "from": self.from_node.node_id,
+            "from": self.from_node.meshtastic_node_id,
             "fromId": self.from_node.node_id_str,
             "decoded": {
                 "portnum": "INVALID_TYPE",
@@ -729,7 +729,7 @@ class NodeSerializerTest(BasePacketSerializerTestCase):
         from django.utils import timezone
 
         data = {
-            "id": self.from_node.node_id,
+            "id": self.from_node.meshtastic_node_id,
             "id_str": self.from_node.node_id_str,
             "long_name": "Updated Node",
             "short_name": "UPD",
@@ -758,7 +758,7 @@ class NodeSerializerTest(BasePacketSerializerTestCase):
         from django.utils import timezone
 
         data = {
-            "id": self.from_node.node_id,
+            "id": self.from_node.meshtastic_node_id,
             "id_str": self.from_node.node_id_str,
             "long_name": "Updated Node",
             "short_name": "UPD",
@@ -795,14 +795,14 @@ class PacketDeduplicationTest(BasePacketSerializerTestCase):
         # Second observer for multi-observer tests
         cls.observer2 = ManagedNode.objects.create(
             internal_id=uuid4(),
-            node_id=999888777,
+            meshtastic_node_id=999888777,
             name="Test Node 2",
             constellation_id=cls.constellation.id,
             owner=cls.user,
         )
         # Second sender (different node) for cross-sender test
         cls.from_node_b = ObservedNode.objects.create(
-            node_id=111222333,
+            meshtastic_node_id=111222333,
             node_id_str=meshtastic_id_to_hex(111222333),
             long_name="From Node B",
             short_name="FRB",
@@ -815,14 +815,14 @@ class PacketDeduplicationTest(BasePacketSerializerTestCase):
         base_time = int(django_tz.now().timestamp())
         data_a = {
             "id": 123,
-            "from": self.from_node.node_id,
+            "from": self.from_node.meshtastic_node_id,
             "fromId": self.from_node.node_id_str,
             "decoded": {"portnum": "TEXT_MESSAGE_APP", "text": "From A"},
             "rxTime": base_time,
         }
         data_b = {
             "id": 123,
-            "from": self.from_node_b.node_id,
+            "from": self.from_node_b.meshtastic_node_id,
             "fromId": self.from_node_b.node_id_str,
             "decoded": {"portnum": "TEXT_MESSAGE_APP", "text": "From B"},
             "rxTime": base_time,
@@ -839,8 +839,8 @@ class PacketDeduplicationTest(BasePacketSerializerTestCase):
         self.assertNotEqual(packet_a.id, packet_b.id)
         self.assertEqual(packet_a.packet_id, 123)
         self.assertEqual(packet_b.packet_id, 123)
-        self.assertEqual(packet_a.from_int, self.from_node.node_id)
-        self.assertEqual(packet_b.from_int, self.from_node_b.node_id)
+        self.assertEqual(packet_a.from_int, self.from_node.meshtastic_node_id)
+        self.assertEqual(packet_b.from_int, self.from_node_b.meshtastic_node_id)
         self.assertEqual(packet_a.message_text, "From A")
         self.assertEqual(packet_b.message_text, "From B")
 
@@ -851,14 +851,14 @@ class PacketDeduplicationTest(BasePacketSerializerTestCase):
         base_time = int(django_tz.now().timestamp())
         data = {
             "id": 456,
-            "from": self.from_node.node_id,
+            "from": self.from_node.meshtastic_node_id,
             "fromId": self.from_node.node_id_str,
             "decoded": {"portnum": "TEXT_MESSAGE_APP", "text": "Hello"},
             "rxTime": base_time,
         }
         data_observer2 = {
             "id": 456,
-            "from": self.from_node.node_id,
+            "from": self.from_node.meshtastic_node_id,
             "fromId": self.from_node.node_id_str,
             "decoded": {"portnum": "TEXT_MESSAGE_APP", "text": "Hello"},
             "rxTime": base_time + 300,  # 5 min later
@@ -887,7 +887,7 @@ class PacketDeduplicationTest(BasePacketSerializerTestCase):
         base_time = int(django_tz.now().timestamp())
         data_first = {
             "id": 789,
-            "from": self.from_node.node_id,
+            "from": self.from_node.meshtastic_node_id,
             "fromId": self.from_node.node_id_str,
             "decoded": {"portnum": "TEXT_MESSAGE_APP", "text": "First"},
             "rxTime": base_time,
@@ -901,7 +901,7 @@ class PacketDeduplicationTest(BasePacketSerializerTestCase):
         first_reported_ts = int(packet1.first_reported_time.timestamp())
         data_second = {
             "id": 789,
-            "from": self.from_node.node_id,
+            "from": self.from_node.meshtastic_node_id,
             "fromId": self.from_node.node_id_str,
             "decoded": {"portnum": "TEXT_MESSAGE_APP", "text": "Second"},
             "rxTime": first_reported_ts + 660,  # 11 min later
@@ -924,7 +924,7 @@ class PacketDeduplicationTest(BasePacketSerializerTestCase):
         base_time = int(django_tz.now().timestamp())
         data = {
             "id": 321,
-            "from": self.from_node.node_id,
+            "from": self.from_node.meshtastic_node_id,
             "fromId": self.from_node.node_id_str,
             "decoded": {"portnum": "TEXT_MESSAGE_APP", "text": "Once"},
             "rxTime": base_time,

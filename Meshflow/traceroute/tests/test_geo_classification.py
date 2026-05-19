@@ -28,28 +28,28 @@ def test_geo_classification_envelope_and_selector_params_perimeter_feeder(
     user = create_user()
     c1 = create_managed_node(
         owner=user,
-        node_id=1001,
+        meshtastic_node_id=1001,
         default_location_latitude=55.0,
         default_location_longitude=-4.25,
     ).constellation
     create_managed_node(
         owner=user,
         constellation=c1,
-        node_id=1002,
+        meshtastic_node_id=1002,
         default_location_latitude=55.03,
         default_location_longitude=-4.25,
     )
     create_managed_node(
         owner=user,
         constellation=c1,
-        node_id=1003,
+        meshtastic_node_id=1003,
         default_location_latitude=55.015,
         default_location_longitude=-4.22,
     )
     feeder = create_managed_node(
         owner=user,
         constellation=c1,
-        node_id=1004,
+        meshtastic_node_id=1004,
         default_location_latitude=55.25,
         default_location_longitude=-4.25,
     )
@@ -81,21 +81,21 @@ def test_geo_classification_internal_feeder_still_has_envelope(
     user = create_user()
     c1 = create_managed_node(
         owner=user,
-        node_id=2001,
+        meshtastic_node_id=2001,
         default_location_latitude=55.0,
         default_location_longitude=-4.25,
     ).constellation
     create_managed_node(
         owner=user,
         constellation=c1,
-        node_id=2002,
+        meshtastic_node_id=2002,
         default_location_latitude=55.03,
         default_location_longitude=-4.25,
     )
     create_managed_node(
         owner=user,
         constellation=c1,
-        node_id=2003,
+        meshtastic_node_id=2003,
         default_location_latitude=55.015,
         default_location_longitude=-4.22,
     )
@@ -103,7 +103,7 @@ def test_geo_classification_internal_feeder_still_has_envelope(
     feeder = create_managed_node(
         owner=user,
         constellation=c1,
-        node_id=2004,
+        meshtastic_node_id=2004,
         default_location_latitude=55.015,
         default_location_longitude=-4.24,
     )
@@ -123,14 +123,14 @@ def test_geo_classification_no_envelope_two_nodes_source_bearing_from_centroid(
     user = create_user()
     c1 = create_managed_node(
         owner=user,
-        node_id=3001,
+        meshtastic_node_id=3001,
         default_location_latitude=55.0,
         default_location_longitude=-4.25,
     ).constellation
     feeder = create_managed_node(
         owner=user,
         constellation=c1,
-        node_id=3002,
+        meshtastic_node_id=3002,
         default_location_latitude=55.02,
         default_location_longitude=-4.25,
     )

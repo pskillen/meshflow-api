@@ -21,7 +21,7 @@ def test_first_strategy_wins_records_strategy(
     monkeypatch.setenv("SCHEDULE_TRACEROUTE_SOURCE_RECENCY_SECONDS", "600")
     mn = create_managed_node(allow_auto_traceroute=True)
     create_packet_observation(observer=mn)
-    target = create_observed_node(node_id=999888777)
+    target = create_observed_node(meshtastic_node_id=999888777)
 
     channel_layer = MagicMock()
 
@@ -58,7 +58,7 @@ def test_strategy_cascade_then_legacy_skips_record_strategy_run(
     monkeypatch.setenv("SCHEDULE_TRACEROUTE_SOURCE_RECENCY_SECONDS", "600")
     mn = create_managed_node(allow_auto_traceroute=True)
     create_packet_observation(observer=mn)
-    target = create_observed_node(node_id=444555666)
+    target = create_observed_node(meshtastic_node_id=444555666)
 
     channel_layer = MagicMock()
 
@@ -98,8 +98,8 @@ def test_total_failure_logs_attempts(
     caplog,
 ):
     monkeypatch.setenv("SCHEDULE_TRACEROUTE_SOURCE_RECENCY_SECONDS", "600")
-    mn1 = create_managed_node(allow_auto_traceroute=True, node_id=101010101)
-    mn2 = create_managed_node(allow_auto_traceroute=True, node_id=202020202)
+    mn1 = create_managed_node(allow_auto_traceroute=True, meshtastic_node_id=101010101)
+    mn2 = create_managed_node(allow_auto_traceroute=True, meshtastic_node_id=202020202)
     create_packet_observation(observer=mn1)
     create_packet_observation(observer=mn2)
 
@@ -125,11 +125,11 @@ def test_second_source_after_first_exhausts_including_legacy(
 ):
     """First source: hypothesis miss + legacy miss; second source wins on first strategy."""
     monkeypatch.setenv("SCHEDULE_TRACEROUTE_SOURCE_RECENCY_SECONDS", "600")
-    mn1 = create_managed_node(allow_auto_traceroute=True, node_id=301301301)
-    mn2 = create_managed_node(allow_auto_traceroute=True, node_id=302302302)
+    mn1 = create_managed_node(allow_auto_traceroute=True, meshtastic_node_id=301301301)
+    mn2 = create_managed_node(allow_auto_traceroute=True, meshtastic_node_id=302302302)
     create_packet_observation(observer=mn1)
     create_packet_observation(observer=mn2)
-    target = create_observed_node(node_id=888777666)
+    target = create_observed_node(meshtastic_node_id=888777666)
 
     channel_layer = MagicMock()
 

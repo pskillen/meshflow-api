@@ -32,7 +32,7 @@ class ManagedNodeActiveFilter(admin.SimpleListFilter):
 
 MANAGED_NODE_COMMON_FIELDS = (
     "protocol",
-    "node_id",
+    "meshtastic_node_id",
     "name",
     "owner",
     "constellation",
@@ -267,8 +267,8 @@ class NodeIdDatalistWidget(forms.TextInput):
         # Add all ObservedNodes to the context for the datalist
         context["datalist"] = [
             {
-                "node_id": node.node_id,
-                "display": f"{node.long_name or node.short_name or node.node_id_str} ({node.node_id})",
+                "meshtastic_node_id": node.meshtastic_node_id,
+                "display": (f"{node.long_name or node.short_name or node.node_id_str} ({node.meshtastic_node_id})"),
             }
             for node in ObservedNode.objects.all()
         ]
@@ -327,7 +327,7 @@ class LatLongFormField(forms.Field):
 
 
 class ManagedNodeAdminForm(forms.ModelForm):
-    node_id = forms.CharField(
+    meshtastic_node_id = forms.CharField(
         label=_("Node ID"),
         widget=NodeIdDatalistWidget,
         help_text=_("Select from observed Meshtastic nodes or enter a decimal id or !hex8."),
@@ -363,8 +363,8 @@ class ManagedNodeAdminForm(forms.ModelForm):
         )
 
         if self._submitted_protocol() == Protocol.MESHCORE:
-            initial = self.instance.node_id if not self.instance._state.adding else 0
-            self.fields["node_id"] = forms.IntegerField(
+            initial = self.instance.meshtastic_node_id if not self.instance._state.adding else 0
+            self.fields["meshtastic_node_id"] = forms.IntegerField(
                 label=_("Node ID (placeholder)"),
                 required=False,
                 initial=initial,
@@ -375,7 +375,7 @@ class ManagedNodeAdminForm(forms.ModelForm):
                 ),
             )
         elif not self.instance._state.adding and self.instance.protocol == Protocol.MESHTASTIC:
-            self.fields["node_id"].initial = meshtastic_id_to_hex(self.instance.node_id)
+            self.fields["meshtastic_node_id"].initial = meshtastic_id_to_hex(self.instance.meshtastic_node_id)
 
     def _protocol_from_form(self):
         protocol = self.cleaned_data.get("protocol") if hasattr(self, "cleaned_data") else None
@@ -390,8 +390,8 @@ class ManagedNodeAdminForm(forms.ModelForm):
             return self.instance.protocol
         return Protocol.MESHTASTIC
 
-    def clean_node_id(self):
-        raw = self.cleaned_data.get("node_id")
+    def clean_meshtastic_node_id(self):
+        raw = self.cleaned_data.get("meshtastic_node_id")
         protocol = self._protocol_from_form()
 
         if protocol == Protocol.MESHCORE:
@@ -431,7 +431,7 @@ class ManagedNodeAdmin(admin.ModelAdmin):
     form = ManagedNodeAdminForm
     list_display = (
         "protocol",
-        "node_id",
+        "meshtastic_node_id",
         "display_id",
         "name",
         "owner",
@@ -449,7 +449,7 @@ class ManagedNodeAdmin(admin.ModelAdmin):
         "allow_auto_traceroute",
     )
     search_fields = (
-        "node_id",
+        "meshtastic_node_id",
         "name",
         "owner__username",
         "owner__email",
@@ -513,7 +513,7 @@ class ManagedNodeStatusAdmin(admin.ModelAdmin):
         ("node__protocol", admin.ChoicesFieldListFilter),
         "node__constellation",
     )
-    search_fields = ("node__name", "node__node_id", "node__owner__username")
+    search_fields = ("node__name", "node__meshtastic_node_id", "node__owner__username")
     readonly_fields = (
         "node",
         "last_packet_ingested_at",
@@ -618,7 +618,7 @@ class ObservedNodeAdmin(admin.ModelAdmin):
         "protocol",
         "short_name",
         "long_name",
-        "node_id",
+        "meshtastic_node_id",
         "node_id_str",
         "mc_pubkey_prefix",
         "hw_model",
@@ -647,7 +647,7 @@ class ObservedNodeAdmin(admin.ModelAdmin):
     search_fields = (
         "short_name",
         "long_name",
-        "node_id",
+        "meshtastic_node_id",
         "node_id_str",
         "mc_pubkey",
         "mc_pubkey_prefix",
@@ -659,7 +659,7 @@ class ObservedNodeAdmin(admin.ModelAdmin):
     readonly_fields = (
         "internal_id",
         "protocol",
-        "node_id",
+        "meshtastic_node_id",
         "node_id_str",
         "mac_addr",
         "public_key",
@@ -673,7 +673,7 @@ class ObservedNodeAdmin(admin.ModelAdmin):
     def get_fields(self, request, obj=None):
         common = [
             "protocol",
-            "node_id",
+            "meshtastic_node_id",
             "node_id_str",
             "long_name",
             "short_name",

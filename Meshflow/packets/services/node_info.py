@@ -14,7 +14,7 @@ class NodeInfoPacketService(BasePacketService):
         sender = self.from_node
 
         # check if the node info packet is for the current node
-        if sender.node_id == self.packet.node_id:
+        if sender.meshtastic_node_id == self.packet.node_id:
             return
 
         # update the ObservedNode

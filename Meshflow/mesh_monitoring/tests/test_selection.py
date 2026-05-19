@@ -15,18 +15,18 @@ def test_select_monitoring_sources_orders_by_distance(
     create_managed_node,
     mark_managed_node_feeding,
 ):
-    target = create_observed_node(node_id=0xE1000001)
+    target = create_observed_node(meshtastic_node_id=0xE1000001)
     NodeLatestStatus.objects.create(node=target, latitude=48.0, longitude=2.0)
 
     far = create_managed_node(
         allow_auto_traceroute=True,
-        node_id=0xE1000010,
+        meshtastic_node_id=0xE1000010,
         default_location_latitude=48.9,
         default_location_longitude=2.0,
     )
     near = create_managed_node(
         allow_auto_traceroute=True,
-        node_id=0xE1000011,
+        meshtastic_node_id=0xE1000011,
         default_location_latitude=48.02,
         default_location_longitude=2.02,
     )
@@ -34,7 +34,7 @@ def test_select_monitoring_sources_orders_by_distance(
     mark_managed_node_feeding(near, sending=True)
 
     picks = select_monitoring_sources(target, max_sources=3)
-    assert [mn.node_id for mn in picks[:2]] == [near.node_id, far.node_id]
+    assert [mn.meshtastic_node_id for mn in picks[:2]] == [near.meshtastic_node_id, far.meshtastic_node_id]
 
 
 @pytest.mark.django_db
@@ -44,18 +44,18 @@ def test_select_monitoring_sources_excludes_managed_node_same_mesh_id_as_target(
     mark_managed_node_feeding,
 ):
     mesh_id = 0xE2000001
-    target = create_observed_node(node_id=mesh_id)
+    target = create_observed_node(meshtastic_node_id=mesh_id)
     NodeLatestStatus.objects.create(node=target, latitude=50.0, longitude=0.0)
 
     same_radio = create_managed_node(
         allow_auto_traceroute=True,
-        node_id=mesh_id,
+        meshtastic_node_id=mesh_id,
         default_location_latitude=50.01,
         default_location_longitude=0.01,
     )
     helper = create_managed_node(
         allow_auto_traceroute=True,
-        node_id=0xE2000099,
+        meshtastic_node_id=0xE2000099,
         default_location_latitude=50.5,
         default_location_longitude=0.5,
     )
@@ -63,8 +63,8 @@ def test_select_monitoring_sources_excludes_managed_node_same_mesh_id_as_target(
     mark_managed_node_feeding(helper, sending=True)
 
     picks = select_monitoring_sources(target, max_sources=3)
-    assert all(mn.node_id != mesh_id for mn in picks)
-    assert picks[0].node_id == helper.node_id
+    assert all(mn.meshtastic_node_id != mesh_id for mn in picks)
+    assert picks[0].meshtastic_node_id == helper.meshtastic_node_id
 
 
 @pytest.mark.django_db
@@ -73,12 +73,12 @@ def test_select_monitoring_sources_omits_non_feeding_managed_nodes(
     create_managed_node,
     mark_managed_node_feeding,
 ):
-    target = create_observed_node(node_id=0xE3000001)
+    target = create_observed_node(meshtastic_node_id=0xE3000001)
     NodeLatestStatus.objects.create(node=target, latitude=51.0, longitude=1.0)
 
     stale = create_managed_node(
         allow_auto_traceroute=True,
-        node_id=0xE3000010,
+        meshtastic_node_id=0xE3000010,
         default_location_latitude=51.01,
         default_location_longitude=1.01,
     )
@@ -86,7 +86,7 @@ def test_select_monitoring_sources_omits_non_feeding_managed_nodes(
 
     fresh = create_managed_node(
         allow_auto_traceroute=True,
-        node_id=0xE3000011,
+        meshtastic_node_id=0xE3000011,
         default_location_latitude=51.02,
         default_location_longitude=1.02,
     )
@@ -104,12 +104,12 @@ def test_select_monitoring_sources_respects_spacing_cooldown(
 ):
     from traceroute.models import AutoTraceRoute
 
-    target = create_observed_node(node_id=0xE4000001)
+    target = create_observed_node(meshtastic_node_id=0xE4000001)
     NodeLatestStatus.objects.create(node=target, latitude=49.0, longitude=1.5)
 
     mn = create_managed_node(
         allow_auto_traceroute=True,
-        node_id=0xE4000010,
+        meshtastic_node_id=0xE4000010,
         default_location_latitude=49.01,
         default_location_longitude=1.51,
     )

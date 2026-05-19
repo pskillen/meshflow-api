@@ -37,7 +37,7 @@ def test_dx_events_list_forbidden_for_non_staff(api_client, create_user, create_
     user = create_user(is_staff=False)
     api_client.force_authenticate(user=user)
     c = create_constellation()
-    dest = create_observed_node(node_id=0xABCD0001)
+    dest = create_observed_node(meshtastic_node_id=0xABCD0001)
     now = timezone.now()
     DxEvent.objects.create(
         constellation=c,
@@ -58,7 +58,7 @@ def test_dx_events_list_staff_ok(api_client, create_user, create_constellation, 
     staff = create_user(is_staff=True)
     api_client.force_authenticate(user=staff)
     c = create_constellation()
-    dest = create_observed_node(node_id=0xABCD0002)
+    dest = create_observed_node(meshtastic_node_id=0xABCD0002)
     now = timezone.now()
     ev = DxEvent.objects.create(
         constellation=c,
@@ -76,7 +76,7 @@ def test_dx_events_list_staff_ok(api_client, create_user, create_constellation, 
     row = r.data["results"][0]
     assert row["id"] == str(ev.id)
     assert row["reason_code"] == DxReasonCode.NEW_DISTANT_NODE
-    assert row["destination"]["node_id"] == dest.node_id
+    assert row["destination"]["meshtastic_node_id"] == dest.meshtastic_node_id
     assert row["destination"]["dx_metadata"]["exclude_from_detection"] is False
     assert row["evidence_count"] == 0
     assert row["exploration_attempt_count"] == 0
@@ -87,8 +87,8 @@ def test_dx_events_filter_reason_and_destination(api_client, create_user, create
     staff = create_user(is_staff=True)
     api_client.force_authenticate(user=staff)
     c = create_constellation()
-    d1 = create_observed_node(node_id=0x11111101)
-    d2 = create_observed_node(node_id=0x22222202)
+    d1 = create_observed_node(meshtastic_node_id=0x11111101)
+    d2 = create_observed_node(meshtastic_node_id=0x22222202)
     now = timezone.now()
     DxEvent.objects.create(
         constellation=c,
@@ -111,9 +111,9 @@ def test_dx_events_filter_reason_and_destination(api_client, create_user, create
     url = reverse("dxevent-list")
     r = api_client.get(url, {"reason_code": DxReasonCode.RETURNED_DX_NODE})
     assert r.data["count"] == 1
-    assert r.data["results"][0]["destination"]["node_id"] == d2.node_id
+    assert r.data["results"][0]["destination"]["meshtastic_node_id"] == d2.meshtastic_node_id
 
-    r2 = api_client.get(url, {"destination_node_id": d1.node_id})
+    r2 = api_client.get(url, {"destination_node_id": d1.meshtastic_node_id})
     assert r2.data["count"] == 1
     assert r2.data["results"][0]["reason_code"] == DxReasonCode.NEW_DISTANT_NODE
 
@@ -132,7 +132,7 @@ def test_dx_event_detail_includes_observations(
     api_client.force_authenticate(user=staff)
     observer = create_managed_node()
     c = create_constellation()
-    dest = create_observed_node(node_id=0x33333303)
+    dest = create_observed_node(meshtastic_node_id=0x33333303)
     now = timezone.now()
     ev = DxEvent.objects.create(
         constellation=c,
@@ -144,7 +144,7 @@ def test_dx_event_detail_includes_observations(
         active_until=now + timedelta(hours=1),
         last_observer=observer,
     )
-    pkt = create_node_info_packet(packet_id=42, from_int=dest.node_id, from_str=dest.node_id_str)
+    pkt = create_node_info_packet(packet_id=42, from_int=dest.meshtastic_node_id, from_str=dest.node_id_str)
     obs_po = create_packet_observation(packet=pkt, observer=observer)
     DxEventObservation.objects.create(
         event=ev,
@@ -163,7 +163,7 @@ def test_dx_event_detail_includes_observations(
     o0 = r.data["observations"][0]
     assert o0["distance_km"] == 123.4
     assert str(o0["raw_packet"]) == str(pkt.id)
-    assert o0["observer"]["node_id"] == observer.node_id
+    assert o0["observer"]["meshtastic_node_id"] == observer.meshtastic_node_id
 
 
 @pytest.mark.django_db
@@ -179,7 +179,7 @@ def test_dx_event_detail_includes_traceroute_explorations(
     api_client.force_authenticate(user=staff)
     source = create_managed_node()
     c = create_constellation()
-    dest = create_observed_node(node_id=0x77777707)
+    dest = create_observed_node(meshtastic_node_id=0x77777707)
     now = timezone.now()
     ev = DxEvent.objects.create(
         constellation=c,
@@ -240,7 +240,7 @@ def test_dx_event_detail_includes_traceroute_explorations(
     ex = {row["outcome"]: row for row in r.data["traceroute_explorations"]}
     assert ex["pending"]["link_kind"] == "dx_watch"
     assert ex["pending"]["auto_traceroute"]["trigger_type"] == AutoTraceRoute.TRIGGER_TYPE_DX_WATCH
-    assert ex["pending"]["destination"]["node_id"] == dest.node_id
+    assert ex["pending"]["destination"]["meshtastic_node_id"] == dest.meshtastic_node_id
     assert ex["skipped"]["skip_reason"] == DxEventTracerouteSkipReason.NO_ELIGIBLE_SOURCE
     assert ex["skipped"]["auto_traceroute"] is None
     assert ex["completed"]["auto_traceroute"]["trigger_type"] == AutoTraceRoute.TRIGGER_TYPE_NEW_NODE_BASELINE
@@ -254,11 +254,11 @@ def test_dx_event_detail_includes_traceroute_explorations(
 def test_dx_node_exclusion_post_staff(api_client, create_user, create_observed_node):
     staff = create_user(is_staff=True)
     api_client.force_authenticate(user=staff)
-    dest = create_observed_node(node_id=0x44444404)
+    dest = create_observed_node(meshtastic_node_id=0x44444404)
     url = reverse("dx-node-exclusion")
     r = api_client.post(
         url,
-        {"node_id": dest.node_id, "exclude_from_detection": True, "exclude_notes": "test mobile"},
+        {"meshtastic_node_id": dest.meshtastic_node_id, "exclude_from_detection": True, "exclude_notes": "test mobile"},
         format="json",
     )
     assert r.status_code == status.HTTP_200_OK
@@ -272,11 +272,11 @@ def test_dx_node_exclusion_post_staff(api_client, create_user, create_observed_n
 def test_dx_node_exclusion_forbidden_non_staff(api_client, create_user, create_observed_node):
     user = create_user(is_staff=False)
     api_client.force_authenticate(user=user)
-    dest = create_observed_node(node_id=0x55555505)
+    dest = create_observed_node(meshtastic_node_id=0x55555505)
     url = reverse("dx-node-exclusion")
     r = api_client.post(
         url,
-        {"node_id": dest.node_id, "exclude_from_detection": True},
+        {"meshtastic_node_id": dest.meshtastic_node_id, "exclude_from_detection": True},
         format="json",
     )
     assert r.status_code == status.HTTP_403_FORBIDDEN
@@ -289,7 +289,7 @@ def test_dx_node_exclusion_unknown_node(api_client, create_user):
     url = reverse("dx-node-exclusion")
     r = api_client.post(
         url,
-        {"node_id": 999999999999, "exclude_from_detection": True},
+        {"meshtastic_node_id": 999999999999, "exclude_from_detection": True},
         format="json",
     )
     assert r.status_code == status.HTTP_404_NOT_FOUND
@@ -302,7 +302,7 @@ def test_dx_event_list_shows_exclusion_on_destination(
     staff = create_user(is_staff=True)
     api_client.force_authenticate(user=staff)
     c = create_constellation()
-    dest = create_observed_node(node_id=0x66666606)
+    dest = create_observed_node(meshtastic_node_id=0x66666606)
     DxNodeMetadata.objects.create(observed_node=dest, exclude_from_detection=True, exclude_notes="n")
     now = timezone.now()
     DxEvent.objects.create(

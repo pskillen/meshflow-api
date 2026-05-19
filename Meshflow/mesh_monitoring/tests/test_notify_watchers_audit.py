@@ -17,7 +17,7 @@ from push_notifications.models import DiscordNotificationAudit
 def test_offline_notify_writes_sent_audit(create_user, create_observed_node):
     user = create_user()
     obs = create_observed_node(
-        node_id=0x10101010,
+        meshtastic_node_id=0x10101010,
         node_id_str=meshtastic_id_to_hex(0x10101010),
         long_name="N",
         short_name="SN",
@@ -36,7 +36,7 @@ def test_offline_notify_writes_sent_audit(create_user, create_observed_node):
 def test_offline_notify_writes_skipped_audit_when_discord_unverified(create_user, create_observed_node):
     user = create_user()
     obs = create_observed_node(
-        node_id=0x20202020,
+        meshtastic_node_id=0x20202020,
         node_id_str=meshtastic_id_to_hex(0x20202020),
         claimed_by=user,
     )
@@ -56,7 +56,7 @@ def test_offline_notify_writes_failed_audit_on_discord_error(create_user, create
 
     user = create_user()
     obs = create_observed_node(
-        node_id=0x30303030,
+        meshtastic_node_id=0x30303030,
         node_id_str=meshtastic_id_to_hex(0x30303030),
         claimed_by=user,
     )
@@ -77,7 +77,7 @@ def test_verification_started_writes_sent_and_skipped_audits(create_user, create
     u_send = create_user(username="watcher_send")
     u_skip = create_user(username="watcher_skip")
     obs = create_observed_node(
-        node_id=0x40404040,
+        meshtastic_node_id=0x40404040,
         node_id_str=meshtastic_id_to_hex(0x40404040),
         role=RoleSource.ROUTER,
     )

@@ -27,12 +27,12 @@ def test_select_lru_prefers_never_used_feeder(
     monkeypatch.setenv("SCHEDULE_TRACEROUTE_SOURCE_RECENCY_SECONDS", "600")
     monkeypatch.setenv("AUTO_TR_SOURCE_SELECTION_ALGO", "least_recently_used")
 
-    a = create_managed_node(allow_auto_traceroute=True, node_id=0xA0000001)
-    b = create_managed_node(allow_auto_traceroute=True, node_id=0xA0000002)
+    a = create_managed_node(allow_auto_traceroute=True, meshtastic_node_id=0xA0000001)
+    b = create_managed_node(allow_auto_traceroute=True, meshtastic_node_id=0xA0000002)
     create_packet_observation(observer=a)
     create_packet_observation(observer=b)
     update_managed_node_statuses()
-    tgt = create_observed_node(node_id=501)
+    tgt = create_observed_node(meshtastic_node_id=501)
     AutoTraceRoute.objects.create(
         source_node=a,
         target_node=tgt,
@@ -42,10 +42,10 @@ def test_select_lru_prefers_never_used_feeder(
     )
 
     picked = select_traceroute_source()
-    assert picked.node_id == b.node_id
+    assert picked.meshtastic_node_id == b.meshtastic_node_id
 
     ordered = eligible_traceroute_sources_ordered()
-    assert [n.node_id for n in ordered] == [b.node_id, a.node_id]
+    assert [n.meshtastic_node_id for n in ordered] == [b.meshtastic_node_id, a.meshtastic_node_id]
 
 
 @pytest.mark.django_db

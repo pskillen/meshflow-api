@@ -35,7 +35,7 @@ def test_node_info_then_position_emits_new_distant_node(
     create_position_packet,
 ):
     observer = create_managed_node(
-        node_id=0xE2000001,
+        meshtastic_node_id=0xE2000001,
         default_location_latitude=55.95,
         default_location_longitude=-3.19,
     )
@@ -68,7 +68,7 @@ def test_node_info_then_position_emits_new_distant_node(
 
     ev = DxEvent.objects.get(reason_code=DxReasonCode.NEW_DISTANT_NODE)
     assert ev.constellation_id == observer.constellation_id
-    assert ev.destination.node_id == remote_id
+    assert ev.destination.meshtastic_node_id == remote_id
     assert ev.observation_count == 1
     assert DxEventObservation.objects.filter(event=ev).count() == 1
 
@@ -86,7 +86,7 @@ def test_position_packet_deduplicates_new_distant_within_active_window(
     create_position_packet,
 ):
     observer = create_managed_node(
-        node_id=0xE2000002,
+        meshtastic_node_id=0xE2000002,
         default_location_latitude=55.95,
         default_location_longitude=-3.19,
     )
@@ -129,7 +129,7 @@ def test_returned_dx_node_after_quiet_period(
     create_position_packet,
 ):
     observer = create_managed_node(
-        node_id=0xE2000003,
+        meshtastic_node_id=0xE2000003,
         default_location_latitude=55.95,
         default_location_longitude=-3.19,
     )
@@ -152,7 +152,7 @@ def test_returned_dx_node_after_quiet_period(
 
     assert DxEvent.objects.filter(reason_code=DxReasonCode.NEW_DISTANT_NODE).count() == 1
 
-    dest = ObservedNode.objects.get(node_id=remote_id)
+    dest = ObservedNode.objects.get(meshtastic_node_id=remote_id)
     dest.last_heard = t0 - timedelta(days=40)
     dest.save(update_fields=["last_heard"])
 
@@ -184,7 +184,7 @@ def test_distant_observation_direct_threshold(
     create_position_packet,
 ):
     observer = create_managed_node(
-        node_id=0xE2000004,
+        meshtastic_node_id=0xE2000004,
         default_location_latitude=55.95,
         default_location_longitude=-3.19,
     )
@@ -221,7 +221,7 @@ def test_exclude_from_detection_skips_events(
     create_position_packet,
 ):
     observer = create_managed_node(
-        node_id=0xE2000005,
+        meshtastic_node_id=0xE2000005,
         default_location_latitude=55.95,
         default_location_longitude=-3.19,
     )
@@ -238,7 +238,7 @@ def test_exclude_from_detection_skips_events(
     )
     pos.first_reported_time = timezone.now()
     pos.save(update_fields=["first_reported_time"])
-    dest = create_observed_node(node_id=remote_id)
+    dest = create_observed_node(meshtastic_node_id=remote_id)
     DxNodeMetadata.objects.create(observed_node=dest, exclude_from_detection=True)
 
     obs = create_packet_observation(packet=pos, observer=observer)
@@ -261,7 +261,7 @@ def test_self_observer_packet_skipped(
 ):
     nid = 0xE2000006
     observer = create_managed_node(
-        node_id=nid,
+        meshtastic_node_id=nid,
         default_location_latitude=55.95,
         default_location_longitude=-3.19,
     )
@@ -297,7 +297,7 @@ def test_multihop_packet_does_not_emit_packet_ingest_dx(
 ):
     """Non-direct observations (relay hops remaining) must not open packet-ingest DX."""
     observer = create_managed_node(
-        node_id=0xE2000011,
+        meshtastic_node_id=0xE2000011,
         default_location_latitude=55.95,
         default_location_longitude=-3.19,
     )
@@ -333,7 +333,7 @@ def test_missing_hop_metadata_does_not_emit_packet_ingest_dx(
     create_position_packet,
 ):
     observer = create_managed_node(
-        node_id=0xE2000012,
+        meshtastic_node_id=0xE2000012,
         default_location_latitude=55.95,
         default_location_longitude=-3.19,
     )
@@ -371,11 +371,11 @@ def test_observer_node_suppressed_skips_dx_events(
 ):
     """When the observer's mesh id is excluded via DxNodeMetadata, skip packet-ingest DX."""
     observer = create_managed_node(
-        node_id=0xE2000013,
+        meshtastic_node_id=0xE2000013,
         default_location_latitude=55.95,
         default_location_longitude=-3.19,
     )
-    obs_row = create_observed_node(node_id=observer.node_id)
+    obs_row = create_observed_node(meshtastic_node_id=observer.meshtastic_node_id)
     DxNodeMetadata.objects.create(observed_node=obs_row, exclude_from_detection=True)
 
     user = create_user()
@@ -417,17 +417,17 @@ def test_traceroute_empty_route_far_hop_emits_traceroute_distant_hop(
     create_packet_observation_for_tr,
 ):
     source = create_managed_node(
-        node_id=0xE2000020,
+        meshtastic_node_id=0xE2000020,
         default_location_latitude=55.95,
         default_location_longitude=-3.19,
     )
     user = create_user()
-    target = create_observed_node(node_id=0xBEEF0220)
+    target = create_observed_node(meshtastic_node_id=0xBEEF0220)
     _set_node_coords(target, 51.5, -0.12)
 
     packet = create_traceroute_packet(
         observer=source,
-        from_int=target.node_id,
+        from_int=target.meshtastic_node_id,
         route=[],
         route_back=[],
         snr_towards=[],
@@ -443,8 +443,8 @@ def test_traceroute_empty_route_far_hop_emits_traceroute_distant_hop(
     assert ev.destination_id == target.pk
     meta = ev.observations.first().metadata
     assert meta["path_direction"] == "forward"
-    assert meta["from_node_id"] == int(source.node_id)
-    assert meta["to_node_id"] == int(target.node_id)
+    assert meta["from_node_id"] == int(source.meshtastic_node_id)
+    assert meta["to_node_id"] == int(target.meshtastic_node_id)
 
 
 @pytest.mark.django_db
@@ -460,17 +460,17 @@ def test_traceroute_near_hop_does_not_emit(
     create_packet_observation_for_tr,
 ):
     source = create_managed_node(
-        node_id=0xE2000021,
+        meshtastic_node_id=0xE2000021,
         default_location_latitude=55.95,
         default_location_longitude=-3.19,
     )
     user = create_user()
-    target = create_observed_node(node_id=0xBEEF0221)
+    target = create_observed_node(meshtastic_node_id=0xBEEF0221)
     _set_node_coords(target, 55.96, -3.18)
 
     packet = create_traceroute_packet(
         observer=source,
-        from_int=target.node_id,
+        from_int=target.meshtastic_node_id,
         route=[],
         route_back=[],
         snr_towards=[],
@@ -498,18 +498,18 @@ def test_traceroute_suppressed_endpoint_skips(
     create_packet_observation_for_tr,
 ):
     source = create_managed_node(
-        node_id=0xE2000022,
+        meshtastic_node_id=0xE2000022,
         default_location_latitude=55.95,
         default_location_longitude=-3.19,
     )
     user = create_user()
-    target = create_observed_node(node_id=0xBEEF0222)
+    target = create_observed_node(meshtastic_node_id=0xBEEF0222)
     _set_node_coords(target, 51.5, -0.12)
     DxNodeMetadata.objects.create(observed_node=target, exclude_from_detection=True)
 
     packet = create_traceroute_packet(
         observer=source,
-        from_int=target.node_id,
+        from_int=target.meshtastic_node_id,
         route=[],
         route_back=[],
         snr_towards=[],
@@ -538,21 +538,21 @@ def test_traceroute_forward_and_return_paths_evaluated(
 ):
     """Return path includes a long hop to an intermediate observed node."""
     source = create_managed_node(
-        node_id=0xE2000023,
+        meshtastic_node_id=0xE2000023,
         default_location_latitude=55.95,
         default_location_longitude=-3.19,
     )
     user = create_user()
-    target = create_observed_node(node_id=0xBEEF0223)
-    relay = create_observed_node(node_id=0xCAFE0223)
+    target = create_observed_node(meshtastic_node_id=0xBEEF0223)
+    relay = create_observed_node(meshtastic_node_id=0xCAFE0223)
     _set_node_coords(target, 51.5, -0.12)
     _set_node_coords(relay, 53.48, -2.24)
 
     packet = create_traceroute_packet(
         observer=source,
-        from_int=target.node_id,
+        from_int=target.meshtastic_node_id,
         route=[],
-        route_back=[relay.node_id],
+        route_back=[relay.meshtastic_node_id],
         snr_towards=[],
         snr_back=[-4.0],
     )
@@ -585,22 +585,22 @@ def test_traceroute_skips_hop_when_relay_has_no_position(
 ):
     """Pairs involving a relay without coordinates are skipped; a later hop can still match."""
     source = create_managed_node(
-        node_id=0xE2000024,
+        meshtastic_node_id=0xE2000024,
         default_location_latitude=55.95,
         default_location_longitude=-3.19,
     )
     user = create_user()
-    target = create_observed_node(node_id=0xBEEF0224)
-    relay_no_pos = create_observed_node(node_id=0xCAFE0224)
-    relay_pos = create_observed_node(node_id=0xCAFE0225)
+    target = create_observed_node(meshtastic_node_id=0xBEEF0224)
+    relay_no_pos = create_observed_node(meshtastic_node_id=0xCAFE0224)
+    relay_pos = create_observed_node(meshtastic_node_id=0xCAFE0225)
     _set_node_coords(target, 51.5, -0.12)
     _set_node_coords(relay_pos, 53.4, -2.98)
 
     packet = create_traceroute_packet(
         observer=source,
-        from_int=target.node_id,
-        route=[relay_no_pos.node_id, relay_pos.node_id],
-        route_back=[relay_pos.node_id, relay_no_pos.node_id],
+        from_int=target.meshtastic_node_id,
+        route=[relay_no_pos.meshtastic_node_id, relay_pos.meshtastic_node_id],
+        route_back=[relay_pos.meshtastic_node_id, relay_no_pos.meshtastic_node_id],
         snr_towards=[-5.0, -3.0],
         snr_back=[-4.0, -2.0],
     )

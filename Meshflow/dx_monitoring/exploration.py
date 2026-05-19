@@ -82,7 +82,11 @@ def ordered_exploration_sources(event: DxEvent) -> list[ManagedNode]:
     out: list[ManagedNode] = []
 
     lo = event.last_observer
-    if lo is not None and is_managed_node_eligible_traceroute_source(lo) and int(lo.node_id) != int(dest.node_id):
+    if (
+        lo is not None
+        and is_managed_node_eligible_traceroute_source(lo)
+        and int(lo.meshtastic_node_id) != int(dest.meshtastic_node_id)
+    ):
         out.append(lo)
         seen.add(lo.pk)
 
@@ -91,8 +95,8 @@ def ordered_exploration_sources(event: DxEvent) -> list[ManagedNode]:
             constellation_id=event.constellation_id,
         )
     )
-    same_c = [m for m in same_c if m.pk not in seen and int(m.node_id) != int(dest.node_id)]
-    same_c.sort(key=lambda mn: (_distance_km(mn, target_lat, target_lon), mn.node_id))
+    same_c = [m for m in same_c if m.pk not in seen and int(m.meshtastic_node_id) != int(dest.meshtastic_node_id)]
+    same_c.sort(key=lambda mn: (_distance_km(mn, target_lat, target_lon), mn.meshtastic_node_id))
     for m in same_c:
         out.append(m)
         seen.add(m.pk)
@@ -100,7 +104,7 @@ def ordered_exploration_sources(event: DxEvent) -> list[ManagedNode]:
     for m in eligible_traceroute_sources_ordered():
         if m.pk in seen:
             continue
-        if int(m.node_id) == int(dest.node_id):
+        if int(m.meshtastic_node_id) == int(dest.meshtastic_node_id):
             continue
         out.append(m)
         seen.add(m.pk)
@@ -440,5 +444,5 @@ def exploration_links_auto_traceroute_to_destination(auto_tr: AutoTraceRoute, de
     dest_id = int(destination_node_id)
     return DxEventTraceroute.objects.filter(
         auto_traceroute=auto_tr,
-        event__destination__node_id=dest_id,
+        event__destination__meshtastic_node_id=dest_id,
     ).exists()

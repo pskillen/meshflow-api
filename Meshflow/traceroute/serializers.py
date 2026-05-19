@@ -37,15 +37,22 @@ class TracerouteListSourceNodeSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ManagedNode
-        fields = ["node_id", "name", "short_name", "node_id_str", "constellation", "allow_auto_traceroute"]
+        fields = [
+            "meshtastic_node_id",
+            "name",
+            "short_name",
+            "node_id_str",
+            "constellation",
+            "allow_auto_traceroute",
+        ]
         read_only_fields = fields
 
     def get_short_name(self, obj):
         observed = self.context.get("observed_short_names") if self.context else {}
-        return observed.get(obj.node_id, obj.name)
+        return observed.get(obj.meshtastic_node_id, obj.name)
 
     def get_node_id_str(self, obj):
-        return meshtastic_id_to_hex(obj.node_id)
+        return meshtastic_id_to_hex(obj.meshtastic_node_id)
 
 
 class TracerouteTargetNodeSerializer(serializers.ModelSerializer):
@@ -58,7 +65,7 @@ class TracerouteTargetNodeSerializer(serializers.ModelSerializer):
         model = ObservedNode
         fields = [
             "internal_id",
-            "node_id",
+            "meshtastic_node_id",
             "node_id_str",
             "long_name",
             "short_name",
@@ -104,7 +111,11 @@ class TracerouteSourceNodeSerializer(ManagedNodeSerializer):
     short_name = serializers.SerializerMethodField()
 
     def get_short_name(self, obj):
-        obs = ObservedNode.objects.filter(node_id=obj.node_id).values_list("short_name", flat=True).first()
+        obs = (
+            ObservedNode.objects.filter(meshtastic_node_id=obj.meshtastic_node_id)
+            .values_list("short_name", flat=True)
+            .first()
+        )
         return obs if obs is not None else obj.name
 
 
@@ -118,7 +129,8 @@ def _enrich_route_nodes(route_data, observed_by_id=None):
     node_ids = [item["node_id"] for item in route_data]
     if observed_by_id is None:
         observed_by_id = {
-            o.node_id: o for o in ObservedNode.objects.filter(node_id__in=node_ids).select_related("latest_status")
+            o.meshtastic_node_id: o
+            for o in ObservedNode.objects.filter(meshtastic_node_id__in=node_ids).select_related("latest_status")
         }
     result = []
     for item in route_data:
@@ -127,7 +139,7 @@ def _enrich_route_nodes(route_data, observed_by_id=None):
         if nid == UNKNOWN_NODE_ID:
             result.append(
                 {
-                    "node_id": nid,
+                    "meshtastic_node_id": nid,
                     "node_id_str": "!ffffffff",
                     "short_name": "unknown",
                     "position": None,
@@ -142,7 +154,7 @@ def _enrich_route_nodes(route_data, observed_by_id=None):
                 pos = {"latitude": obs.latest_status.latitude, "longitude": obs.latest_status.longitude}
             result.append(
                 {
-                    "node_id": obs.node_id,
+                    "meshtastic_node_id": obs.meshtastic_node_id,
                     "node_id_str": obs.node_id_str,
                     "short_name": obs.short_name,
                     "position": pos,
@@ -152,7 +164,7 @@ def _enrich_route_nodes(route_data, observed_by_id=None):
         else:
             result.append(
                 {
-                    "node_id": nid,
+                    "meshtastic_node_id": nid,
                     "node_id_str": meshtastic_id_to_hex(nid),
                     "short_name": None,
                     "position": None,
@@ -274,7 +286,7 @@ class TriggerableNodeSerializer(serializers.ModelSerializer):
     class Meta:
         model = ManagedNode
         fields = [
-            "node_id",
+            "meshtastic_node_id",
             "node_id_str",
             "short_name",
             "long_name",
@@ -285,7 +297,7 @@ class TriggerableNodeSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
     def get_node_id_str(self, obj):
-        return meshtastic_id_to_hex(obj.node_id)
+        return meshtastic_id_to_hex(obj.meshtastic_node_id)
 
     def get_short_name(self, obj):
         return getattr(obj, "observed_short_name", None) or obj.name
@@ -310,7 +322,7 @@ class TriggerTracerouteSerializer(serializers.Serializer):
 
     managed_node_id = serializers.IntegerField(help_text="Node ID of the ManagedNode (source/bot)")
     target_node_id = serializers.IntegerField(
-        required=False, allow_null=True, help_text="Target ObservedNode node_id (optional for auto)"
+        required=False, allow_null=True, help_text="Target ObservedNode meshtastic_node_id (optional for auto)"
     )
     target_strategy = serializers.ChoiceField(
         choices=[

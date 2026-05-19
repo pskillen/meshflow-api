@@ -187,7 +187,7 @@ class NodeUpsertView(APIView):
                 {"status": "error", "message": "Node ID is required"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        if not request.auth.node.node_id == node_id:
+        if not request.auth.node.meshtastic_node_id == node_id:
             return Response(
                 {"status": "error", "message": "Node ID does not match authenticated node"},
                 status=status.HTTP_403_FORBIDDEN,
@@ -228,7 +228,7 @@ class NodeUpsertView(APIView):
                         status=status.HTTP_400_BAD_REQUEST,
                     )
 
-        q = ObservedNode.objects.filter(node_id=observed_node_id, protocol=Protocol.MESHTASTIC)
+        q = ObservedNode.objects.filter(meshtastic_node_id=observed_node_id, protocol=Protocol.MESHTASTIC)
         if q.exists():
             node = q.first()
             serializer = NodeSerializer(instance=node, data=request.data, partial=True)

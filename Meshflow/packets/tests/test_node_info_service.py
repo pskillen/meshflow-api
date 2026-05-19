@@ -40,7 +40,7 @@ def test_process_node_info_packet_same_node(
     user = create_user()
 
     # Create the from_node with different attributes, matching node_id as integer
-    from_node = ObservedNode.objects.get_or_create(node_id=packet.from_int)[0]
+    from_node = ObservedNode.objects.get_or_create(meshtastic_node_id=packet.from_int)[0]
     from_node.short_name = "OLD_NAME"
     from_node.long_name = "Old Name"
     from_node.hw_model = "Old Model"
@@ -76,7 +76,7 @@ def test_process_node_info_packet_different_node(
     user = create_user()
 
     # Create the from_node with different attributes
-    from_node = ObservedNode.objects.get_or_create(node_id=packet.from_int)[0]
+    from_node = ObservedNode.objects.get_or_create(meshtastic_node_id=packet.from_int)[0]
     from_node.short_name = "OLD_NAME"
     from_node.long_name = "Old Name"
     from_node.hw_model = "Old Model"

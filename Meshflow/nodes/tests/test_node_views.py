@@ -38,9 +38,9 @@ def test_managed_node_detail_view(create_managed_node, create_user):
     node = create_managed_node(owner=user)
 
     # Test GET request
-    response = client.get(reverse("managed-nodes-detail", kwargs={"node_id": node.node_id}))
+    response = client.get(reverse("managed-nodes-detail", kwargs={"node_id": node.meshtastic_node_id}))
     assert response.status_code == status.HTTP_200_OK
-    assert response.data["node_id"] == node.node_id
+    assert response.data["meshtastic_node_id"] == node.meshtastic_node_id
 
 
 @pytest.mark.django_db
@@ -55,9 +55,11 @@ def test_managed_nodes_status_fields_only_returned_with_include_status(
     client.force_authenticate(user=user)
 
     now = timezone.now()
-    managed = create_managed_node(owner=user, node_id=123450001, allow_auto_traceroute=True)
+    managed = create_managed_node(owner=user, meshtastic_node_id=123450001, allow_auto_traceroute=True)
     observed = create_observed_node(
-        node_id=managed.node_id, node_id_str=meshtastic_id_to_hex(managed.node_id), last_heard=now
+        meshtastic_node_id=managed.meshtastic_node_id,
+        node_id_str=meshtastic_id_to_hex(managed.meshtastic_node_id),
+        last_heard=now,
     )
     NodeLatestStatus.objects.create(node=observed)
     observation = create_packet_observation(observer=managed)
@@ -84,7 +86,7 @@ def test_managed_nodes_status_fields_only_returned_with_include_status(
     assert first_with_status["radio_last_heard"] is not None
     assert first_with_status["is_eligible_traceroute_source"] is True
 
-    detail_url = reverse("managed-nodes-detail", kwargs={"node_id": managed.node_id})
+    detail_url = reverse("managed-nodes-detail", kwargs={"node_id": managed.meshtastic_node_id})
     detail_response = client.get(detail_url, {"include": "status"})
     assert detail_response.status_code == status.HTTP_200_OK
     assert detail_response.data["packets_last_hour"] == 1
@@ -123,9 +125,9 @@ def test_observed_node_detail_view(create_observed_node, create_user):
     node = create_observed_node()
 
     # Test GET request
-    response = client.get(reverse("observed-node-detail", kwargs={"node_id": node.node_id}))
+    response = client.get(reverse("observed-node-detail", kwargs={"node_id": node.meshtastic_node_id}))
     assert response.status_code == status.HTTP_200_OK
-    assert response.data["node_id"] == node.node_id
+    assert response.data["meshtastic_node_id"] == node.meshtastic_node_id
 
 
 @pytest.mark.django_db
@@ -168,7 +170,7 @@ def test_claim_post_rejected_when_node_owned_by_another_user(create_observed_nod
     other_user = create_user()
     node_id = 111222333444
     node = create_observed_node(
-        node_id=node_id,
+        meshtastic_node_id=node_id,
         node_id_str=meshtastic_id_to_hex(node_id),
         claimed_by=owner,
     )
@@ -177,7 +179,7 @@ def test_claim_post_rejected_when_node_owned_by_another_user(create_observed_nod
     client.force_authenticate(user=other_user)
 
     response = client.post(
-        reverse("observed-node-claim", kwargs={"node_id": node.node_id}),
+        reverse("observed-node-claim", kwargs={"node_id": node.meshtastic_node_id}),
     )
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert "already claimed" in response.data["detail"].lower()
@@ -188,7 +190,7 @@ def test_claim_delete_clears_claimed_by_when_owner(create_observed_node, create_
     owner = create_user()
     node_id = 555001001
     node = create_observed_node(
-        node_id=node_id,
+        meshtastic_node_id=node_id,
         node_id_str=meshtastic_id_to_hex(node_id),
         claimed_by=owner,
     )
@@ -196,7 +198,7 @@ def test_claim_delete_clears_claimed_by_when_owner(create_observed_node, create_
 
     client = APIClient()
     client.force_authenticate(user=owner)
-    response = client.delete(reverse("observed-node-claim", kwargs={"node_id": node.node_id}))
+    response = client.delete(reverse("observed-node-claim", kwargs={"node_id": node.meshtastic_node_id}))
     assert response.status_code == status.HTTP_204_NO_CONTENT
 
     node.refresh_from_db()
@@ -209,7 +211,7 @@ def test_claim_delete_pending_does_not_require_claimed_by(create_observed_node, 
     owner = create_user()
     node_id = 555001002
     node = create_observed_node(
-        node_id=node_id,
+        meshtastic_node_id=node_id,
         node_id_str=meshtastic_id_to_hex(node_id),
         claimed_by=None,
     )
@@ -217,7 +219,7 @@ def test_claim_delete_pending_does_not_require_claimed_by(create_observed_node, 
 
     client = APIClient()
     client.force_authenticate(user=owner)
-    response = client.delete(reverse("observed-node-claim", kwargs={"node_id": node.node_id}))
+    response = client.delete(reverse("observed-node-claim", kwargs={"node_id": node.meshtastic_node_id}))
     assert response.status_code == status.HTTP_204_NO_CONTENT
     node.refresh_from_db()
     assert node.claimed_by_id is None
@@ -229,7 +231,7 @@ def test_claim_delete_does_not_clear_other_users_claimed_by(create_observed_node
     other = create_user()
     node_id = 555001003
     node = create_observed_node(
-        node_id=node_id,
+        meshtastic_node_id=node_id,
         node_id_str=meshtastic_id_to_hex(node_id),
         claimed_by=other,
     )
@@ -237,7 +239,7 @@ def test_claim_delete_does_not_clear_other_users_claimed_by(create_observed_node
 
     client = APIClient()
     client.force_authenticate(user=owner)
-    response = client.delete(reverse("observed-node-claim", kwargs={"node_id": node.node_id}))
+    response = client.delete(reverse("observed-node-claim", kwargs={"node_id": node.meshtastic_node_id}))
     assert response.status_code == status.HTTP_204_NO_CONTENT
 
     node.refresh_from_db()
@@ -250,7 +252,7 @@ def test_claim_delete_non_owner_no_claim_returns_404(create_observed_node, creat
     other = create_user()
     node_id = 555001004
     node = create_observed_node(
-        node_id=node_id,
+        meshtastic_node_id=node_id,
         node_id_str=meshtastic_id_to_hex(node_id),
         claimed_by=owner,
     )
@@ -258,7 +260,7 @@ def test_claim_delete_non_owner_no_claim_returns_404(create_observed_node, creat
 
     client = APIClient()
     client.force_authenticate(user=other)
-    response = client.delete(reverse("observed-node-claim", kwargs={"node_id": node.node_id}))
+    response = client.delete(reverse("observed-node-claim", kwargs={"node_id": node.meshtastic_node_id}))
     assert response.status_code == status.HTTP_404_NOT_FOUND
     assert NodeOwnerClaim.objects.filter(node=node, user=owner).exists()
     node.refresh_from_db()
@@ -271,7 +273,7 @@ def test_claim_delete_staff_without_own_claim_returns_404(create_observed_node, 
     staff = create_user(is_staff=True)
     node_id = 555001005
     node = create_observed_node(
-        node_id=node_id,
+        meshtastic_node_id=node_id,
         node_id_str=meshtastic_id_to_hex(node_id),
         claimed_by=owner,
     )
@@ -279,13 +281,13 @@ def test_claim_delete_staff_without_own_claim_returns_404(create_observed_node, 
 
     client = APIClient()
     client.force_authenticate(user=staff)
-    response = client.delete(reverse("observed-node-claim", kwargs={"node_id": node.node_id}))
+    response = client.delete(reverse("observed-node-claim", kwargs={"node_id": node.meshtastic_node_id}))
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
-def _managed_node_json_payload(*, node_id, owner, constellation, ch0, ch1):
+def _managed_node_json_payload(*, meshtastic_node_id, owner, constellation, ch0, ch1):
     return {
-        "node_id": node_id,
+        "meshtastic_node_id": meshtastic_node_id,
         "name": "Test MN",
         "owner_id": owner.id,
         "constellation_id": constellation.id,
@@ -308,7 +310,7 @@ def test_managed_node_soft_delete_owner_removes_node_auth_and_excludes_from_list
     mn = create_managed_node(
         owner=owner,
         constellation=constellation,
-        node_id=node_id,
+        meshtastic_node_id=node_id,
         channel_0=ch0,
         channel_1=ch1,
     )
@@ -317,7 +319,7 @@ def test_managed_node_soft_delete_owner_removes_node_auth_and_excludes_from_list
 
     client = APIClient()
     client.force_authenticate(user=owner)
-    url = reverse("managed-nodes-detail", kwargs={"node_id": mn.node_id})
+    url = reverse("managed-nodes-detail", kwargs={"node_id": mn.meshtastic_node_id})
     assert client.delete(url).status_code == status.HTTP_204_NO_CONTENT
 
     assert not NodeAuth.objects.filter(node=mn).exists()
@@ -326,7 +328,7 @@ def test_managed_node_soft_delete_owner_removes_node_auth_and_excludes_from_list
 
     list_resp = client.get(reverse("managed-nodes-list"))
     assert list_resp.status_code == status.HTTP_200_OK
-    ids = {row["node_id"] for row in list_resp.data["results"]}
+    ids = {row["meshtastic_node_id"] for row in list_resp.data["results"]}
     assert node_id not in ids
 
     detail_resp = client.get(url)
@@ -345,7 +347,7 @@ def test_managed_node_soft_delete_staff(create_user, create_constellation, creat
     mn = create_managed_node(
         owner=owner,
         constellation=constellation,
-        node_id=777001002,
+        meshtastic_node_id=777001002,
         channel_0=ch0,
         channel_1=ch1,
     )
@@ -354,7 +356,7 @@ def test_managed_node_soft_delete_staff(create_user, create_constellation, creat
 
     client = APIClient()
     client.force_authenticate(user=staff)
-    url = reverse("managed-nodes-detail", kwargs={"node_id": mn.node_id})
+    url = reverse("managed-nodes-detail", kwargs={"node_id": mn.meshtastic_node_id})
     assert client.delete(url).status_code == status.HTTP_204_NO_CONTENT
     mn.refresh_from_db()
     assert mn.deleted_at is not None
@@ -372,14 +374,14 @@ def test_managed_node_delete_forbidden_for_non_owner_non_staff(create_user, crea
     mn = create_managed_node(
         owner=owner,
         constellation=constellation,
-        node_id=777001003,
+        meshtastic_node_id=777001003,
         channel_0=ch0,
         channel_1=ch1,
     )
 
     client = APIClient()
     client.force_authenticate(user=other)
-    url = reverse("managed-nodes-detail", kwargs={"node_id": mn.node_id})
+    url = reverse("managed-nodes-detail", kwargs={"node_id": mn.meshtastic_node_id})
     assert client.delete(url).status_code == status.HTTP_403_FORBIDDEN
     mn.refresh_from_db()
     assert mn.deleted_at is None
@@ -399,7 +401,7 @@ def test_managed_node_create_rejected_when_soft_deleted_row_exists(
     mn = create_managed_node(
         owner=owner,
         constellation=constellation,
-        node_id=node_id,
+        meshtastic_node_id=node_id,
         channel_0=ch0,
         channel_1=ch1,
     )
@@ -410,7 +412,9 @@ def test_managed_node_create_rejected_when_soft_deleted_row_exists(
     client.force_authenticate(user=owner)
     response = client.post(
         reverse("managed-nodes-list"),
-        _managed_node_json_payload(node_id=node_id, owner=owner, constellation=constellation, ch0=ch0, ch1=ch1),
+        _managed_node_json_payload(
+            meshtastic_node_id=node_id, owner=owner, constellation=constellation, ch0=ch0, ch1=ch1
+        ),
         format="json",
     )
     assert response.status_code == status.HTTP_400_BAD_REQUEST
@@ -429,7 +433,7 @@ def test_managed_node_create_rejected_when_active_row_exists(create_user, create
     create_managed_node(
         owner=owner,
         constellation=constellation,
-        node_id=node_id,
+        meshtastic_node_id=node_id,
         channel_0=ch0,
         channel_1=ch1,
     )
@@ -438,7 +442,9 @@ def test_managed_node_create_rejected_when_active_row_exists(create_user, create
     client.force_authenticate(user=owner)
     response = client.post(
         reverse("managed-nodes-list"),
-        _managed_node_json_payload(node_id=node_id, owner=owner, constellation=constellation, ch0=ch0, ch1=ch1),
+        _managed_node_json_payload(
+            meshtastic_node_id=node_id, owner=owner, constellation=constellation, ch0=ch0, ch1=ch1
+        ),
         format="json",
     )
     assert response.status_code == status.HTTP_400_BAD_REQUEST

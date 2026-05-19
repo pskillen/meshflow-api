@@ -43,7 +43,7 @@ def is_direct_packet_observation(observation: PacketObservation) -> bool:
 def is_node_suppressed_for_dx(node_id: int) -> bool:
     """True when an ObservedNode with this mesh node_id is excluded from DX detection."""
     return DxNodeMetadata.objects.filter(
-        observed_node__node_id=node_id,
+        observed_node__meshtastic_node_id=node_id,
         exclude_from_detection=True,
     ).exists()
 
@@ -52,7 +52,7 @@ def is_packet_ingest_suppressed(packet: MtRawPacket, observer: ManagedNode) -> b
     """Bidirectional suppression: sender or managed observer/receiver."""
     if is_node_suppressed_for_dx(int(packet.from_int)):
         return True
-    if is_node_suppressed_for_dx(int(observer.node_id)):
+    if is_node_suppressed_for_dx(int(observer.meshtastic_node_id)):
         return True
     return False
 
@@ -88,9 +88,9 @@ def _observer_coords(observer: ManagedNode) -> tuple[float | None, float | None]
 
 
 def _coords_for_mesh_node(node_id: int, source_managed: ManagedNode) -> tuple[float | None, float | None]:
-    if int(node_id) == int(source_managed.node_id):
+    if int(node_id) == int(source_managed.meshtastic_node_id):
         return _observer_coords(source_managed)
-    observed = ObservedNode.objects.filter(node_id=node_id, protocol=Protocol.MESHTASTIC).first()
+    observed = ObservedNode.objects.filter(meshtastic_node_id=node_id, protocol=Protocol.MESHTASTIC).first()
     if observed is None:
         return None, None
     return _destination_coords(observed)
@@ -275,7 +275,7 @@ def maybe_detect_dx_candidate(packet_service: BasePacketService) -> None:
 
     if not packet.from_int or packet.first_reported_time is None:
         return
-    if observer.node_id == packet.from_int:
+    if observer.meshtastic_node_id == packet.from_int:
         return
 
     if is_packet_ingest_suppressed(packet, observer):
@@ -399,8 +399,8 @@ def maybe_detect_dx_from_completed_traceroute(
     active_extension = timedelta(minutes=active_minutes)
     hop_km = float(getattr(settings, "DX_MONITORING_TRACEROUTE_HOP_DISTANCE_KM", 150.0))
 
-    src_id = int(source.node_id)
-    tgt_id = int(target.node_id)
+    src_id = int(source.meshtastic_node_id)
+    tgt_id = int(target.meshtastic_node_id)
     forward = _tr_forward_hop_pairs(src_id, tgt_id, auto_tr.route)
     backward = _tr_return_hop_pairs(tgt_id, src_id, auto_tr.route_back)
 
@@ -415,7 +415,7 @@ def maybe_detect_dx_from_completed_traceroute(
             dist = haversine_km(la, loa, lb, lob)
             if dist <= hop_km:
                 continue
-            dest_node = ObservedNode.objects.filter(node_id=b_id, protocol=Protocol.MESHTASTIC).first()
+            dest_node = ObservedNode.objects.filter(meshtastic_node_id=b_id, protocol=Protocol.MESHTASTIC).first()
             if dest_node is None:
                 continue
             if exploration_links_auto_traceroute_to_destination(auto_tr, b_id):

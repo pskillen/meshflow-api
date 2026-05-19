@@ -26,11 +26,11 @@ def test_packet_received_sets_inferred_max_hops_for_message_packet(create_manage
         rx_time=packet.first_reported_time,
     )
 
-    assert not ObservedNode.objects.filter(node_id=0x12345678).exists()
+    assert not ObservedNode.objects.filter(meshtastic_node_id=0x12345678).exists()
 
     packet_received.send(sender=None, packet=packet, observer=observer, observation=observation)
 
-    observed_node = ObservedNode.objects.get(node_id=0x12345678)
+    observed_node = ObservedNode.objects.get(meshtastic_node_id=0x12345678)
     node_status = NodeLatestStatus.objects.get(node=observed_node)
     assert node_status.inferred_max_hops == 5
 
@@ -54,7 +54,7 @@ def test_packet_received_updates_inferred_max_hops_when_different(create_managed
     )
 
     packet_received.send(sender=None, packet=packet, observer=observer, observation=observation)
-    node_status = NodeLatestStatus.objects.get(node__node_id=0xABCDEF12)
+    node_status = NodeLatestStatus.objects.get(node__meshtastic_node_id=0xABCDEF12)
     assert node_status.inferred_max_hops == 3
 
     observation.hop_start = 7
@@ -86,4 +86,4 @@ def test_packet_received_skips_when_hop_start_is_none(create_managed_node, creat
     packet_received.send(sender=None, packet=packet, observer=observer, observation=observation)
 
     # Receiver returns early when hop_start is None, so NodeLatestStatus is never created
-    assert not NodeLatestStatus.objects.filter(node__node_id=0x99999999).exists()
+    assert not NodeLatestStatus.objects.filter(node__meshtastic_node_id=0x99999999).exists()

@@ -63,11 +63,11 @@ class Command(BaseCommand):
             from_int = row["from_int"]
             earliest_time = row["earliest_time"]
 
-            if not ObservedNode.objects.filter(node_id=from_int).exists():
+            if not ObservedNode.objects.filter(meshtastic_node_id=from_int).exists():
                 no_observed_node += 1
                 continue
 
-            qs = ObservedNode.objects.filter(node_id=from_int)
+            qs = ObservedNode.objects.filter(meshtastic_node_id=from_int)
             if not overwrite:
                 qs = qs.filter(created_at__isnull=True)
 

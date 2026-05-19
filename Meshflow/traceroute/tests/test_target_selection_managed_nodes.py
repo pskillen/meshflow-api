@@ -20,19 +20,19 @@ def test_pick_traceroute_target_excludes_observed_node_whose_mesh_id_is_managed(
         allow_auto_traceroute=True,
         default_location_latitude=51.0,
         default_location_longitude=-0.1,
-        node_id=0xD1000001,
+        meshtastic_node_id=0xD1000001,
     )
-    other_mn = create_managed_node(node_id=0xD1000002)
-    on_mesh_id = other_mn.node_id
+    other_mn = create_managed_node(meshtastic_node_id=0xD1000002)
+    on_mesh_id = other_mn.meshtastic_node_id
     victim = create_observed_node(
-        node_id=on_mesh_id,
+        meshtastic_node_id=on_mesh_id,
         node_id_str=meshtastic_id_to_hex(on_mesh_id),
         last_heard=timezone.now(),
     )
     NodeLatestStatus.objects.create(node=victim, latitude=51.01, longitude=-0.11)
 
     free = create_observed_node(
-        node_id=0xD1000099,
+        meshtastic_node_id=0xD1000099,
         node_id_str=meshtastic_id_to_hex(0xD1000099),
         last_heard=timezone.now(),
     )
@@ -40,8 +40,8 @@ def test_pick_traceroute_target_excludes_observed_node_whose_mesh_id_is_managed(
 
     picked = pick_traceroute_target(source)
     assert picked is not None
-    assert picked.node_id != victim.node_id
-    assert picked.node_id == free.node_id
+    assert picked.meshtastic_node_id != victim.meshtastic_node_id
+    assert picked.meshtastic_node_id == free.meshtastic_node_id
 
 
 @pytest.mark.django_db
@@ -51,19 +51,19 @@ def test_managed_node_mesh_id_excluded_even_without_managednodestatus_row(create
         allow_auto_traceroute=True,
         default_location_latitude=52.0,
         default_location_longitude=1.0,
-        node_id=0xD2000001,
+        meshtastic_node_id=0xD2000001,
     )
-    create_managed_node(node_id=0xD2000002)
+    create_managed_node(meshtastic_node_id=0xD2000002)
 
     victim = create_observed_node(
-        node_id=0xD2000002,
+        meshtastic_node_id=0xD2000002,
         node_id_str=meshtastic_id_to_hex(0xD2000002),
         last_heard=timezone.now(),
     )
     NodeLatestStatus.objects.create(node=victim, latitude=52.01, longitude=1.01)
 
     free = create_observed_node(
-        node_id=0xD2000099,
+        meshtastic_node_id=0xD2000099,
         node_id_str=meshtastic_id_to_hex(0xD2000099),
         last_heard=timezone.now(),
     )
@@ -71,4 +71,4 @@ def test_managed_node_mesh_id_excluded_even_without_managednodestatus_row(create
 
     picked = pick_traceroute_target(source)
     assert picked is not None
-    assert picked.node_id == free.node_id
+    assert picked.meshtastic_node_id == free.meshtastic_node_id

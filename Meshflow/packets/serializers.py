@@ -1297,7 +1297,7 @@ class NodeSerializer(serializers.ModelSerializer):
         long_name = serializers.CharField(required=False, allow_null=True)
         short_name = serializers.CharField(required=False, allow_null=True)
 
-    id = serializers.IntegerField(source="node_id")
+    id = serializers.IntegerField(source="meshtastic_node_id")
     id_str = serializers.CharField(source="node_id_str")
     macaddr = serializers.CharField(source="mac_addr", allow_null=True, allow_blank=True)
     hw_model = serializers.CharField(required=False, allow_null=True, allow_blank=True)
@@ -1471,7 +1471,7 @@ class PrefetchedPacketObservationSerializer(serializers.ModelSerializer):
 
         class Meta:
             model = ManagedNode
-            fields = ["node_id", "node_id_str", "long_name", "short_name"]
+            fields = ["meshtastic_node_id", "node_id_str", "long_name", "short_name"]
 
         def __init__(self, *args, **kwargs):
             # Always pass parent context to this serializer
@@ -1503,15 +1503,17 @@ class PrefetchedPacketObservationSerializer(serializers.ModelSerializer):
 
         def _get_observed_node(self, obj):
             # Use pre-fetched observed nodes if available
-            # The parent serializer context should have a mapping: node_id -> ObservedNode
+            # The parent serializer context should have a mapping: meshtastic_node_id -> ObservedNode
             observer_nodes_map = self.context.get("observer_nodes_map")
             if observer_nodes_map:
-                return observer_nodes_map.get(obj.node_id)
+                return observer_nodes_map.get(obj.meshtastic_node_id)
             # Fallback: try to use prefetch cache (if using prefetch_related)
             if hasattr(obj, "prefetched_observed_nodes") and obj.prefetched_observed_nodes:
                 return obj.prefetched_observed_nodes[0]
             # Fallback: DB hit (should be rare)
-            return ObservedNode.objects.filter(node_id=obj.node_id, protocol=Protocol.MESHTASTIC).first()
+            return ObservedNode.objects.filter(
+                meshtastic_node_id=obj.meshtastic_node_id, protocol=Protocol.MESHTASTIC
+            ).first()
 
     # observer = serializers.SerializerMethodField()
     observer = ObserverSerializer(read_only=True)

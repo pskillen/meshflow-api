@@ -172,7 +172,11 @@ def render_rf_propagation(self, render_id: int) -> dict:
         return {"status": str(render.status), "render_id": render_id, "skipped": True}
 
     observed_node = render.observed_node
-    logger.info("render_rf_propagation.render_start render_id=%s node_id=%s", render_id, observed_node.node_id)
+    logger.info(
+        "render_rf_propagation.render_start render_id=%s meshtastic_node_id=%s",
+        render_id,
+        observed_node.meshtastic_node_id,
+    )
 
     try:
         profile = observed_node.rf_profile

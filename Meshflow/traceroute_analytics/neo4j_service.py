@@ -56,7 +56,7 @@ def _assign_heatmap_roles(nodes, last_heard_by_id, now):
         delta = now - lh
         return delta.total_seconds() > offline_sec
 
-    active = [n for n in nodes if not is_offline(n["node_id"])]
+    active = [n for n in nodes if not is_offline(n["meshtastic_node_id"])]
     if active:
         sorted_c = sorted(n["centrality"] for n in active)
         last_i = len(sorted_c) - 1
@@ -66,7 +66,7 @@ def _assign_heatmap_roles(nodes, last_heard_by_id, now):
         c75 = 0.0
 
     for n in nodes:
-        nid = n["node_id"]
+        nid = n["meshtastic_node_id"]
         if is_offline(nid):
             n["role"] = "offline"
         elif n["degree"] <= 2:
@@ -80,15 +80,15 @@ def _assign_heatmap_roles(nodes, last_heard_by_id, now):
 def _enrich_heatmap_nodes(nodes, edges):
     """Add centrality, degree, last_seen (ISO), and role using NetworkX + ObservedNode."""
     betweenness, degree = _heatmap_graph_metrics(edges)
-    ids = [n["node_id"] for n in nodes]
+    ids = [n["meshtastic_node_id"] for n in nodes]
     last_heard_by_id = {}
     if ids:
-        for row in ObservedNode.objects.filter(node_id__in=ids).values("node_id", "last_heard"):
-            last_heard_by_id[row["node_id"]] = row["last_heard"]
+        for row in ObservedNode.objects.filter(meshtastic_node_id__in=ids).values("meshtastic_node_id", "last_heard"):
+            last_heard_by_id[row["meshtastic_node_id"]] = row["last_heard"]
 
     now = timezone.now()
     for n in nodes:
-        nid = n["node_id"]
+        nid = n["meshtastic_node_id"]
         n["centrality"] = float(betweenness.get(nid, 0.0))
         n["degree"] = int(degree.get(nid, 0))
         lh = last_heard_by_id.get(nid)
@@ -170,7 +170,7 @@ def _get_node_coords(
         return None
 
     # Source node: ManagedNode default_location or ObservedNode.latest_status
-    if node_id == source_node.node_id:
+    if node_id == source_node.meshtastic_node_id:
         if source_node.default_location_latitude is not None and source_node.default_location_longitude is not None:
             return (
                 source_node.default_location_latitude,
@@ -182,7 +182,7 @@ def _get_node_coords(
         return None
 
     # Target node: ObservedNode.latest_status
-    if node_id == target_node.node_id:
+    if node_id == target_node.meshtastic_node_id:
         status = _safe_latest_status(target_node)
         if status is not None and status.latitude is not None:
             return status.latitude, status.longitude
@@ -207,7 +207,7 @@ def _get_node_names(
         return ("unknown", "unknown")
 
     # Source node: ObservedNode if exists, else ManagedNode.name
-    if node_id == source_node.node_id:
+    if node_id == source_node.meshtastic_node_id:
         obs = observed_by_id.get(node_id)
         if obs:
             return (obs.short_name or fallback, obs.long_name or fallback)
@@ -268,11 +268,12 @@ def add_traceroute_edges(auto_traceroute: AutoTraceRoute, driver=None, *, quiet:
         nid = item["node_id"]
         if nid != UNKNOWN_NODE_ID:
             node_ids.add(nid)
-    node_ids.add(auto_tr.source_node.node_id)
-    node_ids.add(auto_tr.target_node.node_id)
+    node_ids.add(auto_tr.source_node.meshtastic_node_id)
+    node_ids.add(auto_tr.target_node.meshtastic_node_id)
 
     observed_by_id = {
-        o.node_id: o for o in ObservedNode.objects.filter(node_id__in=node_ids).select_related("latest_status")
+        o.meshtastic_node_id: o
+        for o in ObservedNode.objects.filter(meshtastic_node_id__in=node_ids).select_related("latest_status")
     }
 
     # Build coords and names maps
@@ -299,8 +300,8 @@ def add_traceroute_edges(auto_traceroute: AutoTraceRoute, driver=None, *, quiet:
         if len(snr_back) > len(route_back):
             return_source_snr = snr_back[len(route_back)]
 
-    source_id = auto_tr.source_node.node_id
-    target_id = auto_tr.target_node.node_id
+    source_id = auto_tr.source_node.meshtastic_node_id
+    target_id = auto_tr.target_node.meshtastic_node_id
 
     # Build full chains (source/target are not in route); reuse _extract_edges which
     # filters UNKNOWN_NODE_ID and picks SNR from the receiving end of each hop.
@@ -530,7 +531,7 @@ def run_heatmap_query(
 
         try:
             constellation = Constellation.objects.get(pk=constellation_id)
-            constellation_node_ids = list(constellation.nodes.values_list("node_id", flat=True))
+            constellation_node_ids = list(constellation.nodes.values_list("meshtastic_node_id", flat=True))
         except Constellation.DoesNotExist:
             constellation_node_ids = []
         if not constellation_node_ids:
@@ -598,7 +599,7 @@ def run_heatmap_query(
             edges.append(edge_data)
             if from_id not in nodes_by_id:
                 nodes_by_id[from_id] = {
-                    "node_id": from_id,
+                    "meshtastic_node_id": from_id,
                     "node_id_str": record["from_node_id_str"] or meshtastic_id_to_hex(from_id),
                     "lat": record["from_lat"],
                     "lng": record["from_lng"],
@@ -607,7 +608,7 @@ def run_heatmap_query(
                 }
             if to_id not in nodes_by_id:
                 nodes_by_id[to_id] = {
-                    "node_id": to_id,
+                    "meshtastic_node_id": to_id,
                     "node_id_str": record["to_node_id_str"] or meshtastic_id_to_hex(to_id),
                     "lat": record["to_lat"],
                     "lng": record["to_lng"],
@@ -626,7 +627,7 @@ def run_heatmap_query(
     if triggered_at_after:
         tr_q = tr_q.filter(triggered_at__gte=triggered_at_after)
     if source_node_id is not None:
-        tr_q = tr_q.filter(source_node__node_id=source_node_id)
+        tr_q = tr_q.filter(source_node__meshtastic_node_id=source_node_id)
     if target_strategy_tokens:
         tok = [t.strip() for t in target_strategy_tokens if t and str(t).strip()]
         strat_q = Q()
@@ -713,7 +714,7 @@ def run_node_links_query(node_id: int, triggered_at_after=None, driver=None):
             return {"edges": [], "nodes": [], "snr_history": []}
 
         focus_node = {
-            "node_id": focus_record["node_id"],
+            "meshtastic_node_id": focus_record["node_id"],
             "lat": focus_record["lat"],
             "lng": focus_record["lng"],
             "node_id_str": focus_record["node_id_str"] or meshtastic_id_to_hex(node_id),
@@ -768,7 +769,7 @@ def run_node_links_query(node_id: int, triggered_at_after=None, driver=None):
 
     for pid, p in peers.items():
         nodes_by_id[pid] = {
-            "node_id": pid,
+            "meshtastic_node_id": pid,
             "lat": p["peer_lat"],
             "lng": p["peer_lng"],
             "node_id_str": p["peer_node_id_str"],

@@ -33,8 +33,8 @@ class TestTracerouteStats:
         create_auto_traceroute,
     ):
         user = create_user()
-        mn_a = create_managed_node(node_id=111_111_111)
-        mn_b = create_managed_node(node_id=222_222_222)
+        mn_a = create_managed_node(meshtastic_node_id=111_111_111)
+        mn_b = create_managed_node(meshtastic_node_id=222_222_222)
         on = create_observed_node()
         api_client.force_authenticate(user=user)
 
@@ -61,7 +61,7 @@ class TestTracerouteStats:
         assert row_a["completed"] == 2
         assert row_a["failed"] == 1
         assert row_a["success_rate"] == pytest.approx(2 / 3)
-        assert row_a["node_id"] == mn_a.node_id
+        assert row_a["meshtastic_node_id"] == mn_a.meshtastic_node_id
         assert row_a["name"] == mn_a.name
 
         row_b = by_internal_id[str(mn_b.internal_id)]
@@ -79,7 +79,7 @@ class TestTracerouteStats:
         create_auto_traceroute,
     ):
         user = create_user()
-        mn = create_managed_node(node_id=333_333_333)
+        mn = create_managed_node(meshtastic_node_id=333_333_333)
         on = create_observed_node()
         api_client.force_authenticate(user=user)
 
@@ -133,9 +133,9 @@ class TestTracerouteStats:
         create_auto_traceroute,
     ):
         user = create_user()
-        mn = create_managed_node(node_id=444_444_444)
-        on_a = create_observed_node(node_id=100_000_001, short_name="AAAA", long_name="Target A")
-        on_b = create_observed_node(node_id=100_000_002, short_name="BBBB", long_name="Target B")
+        mn = create_managed_node(meshtastic_node_id=444_444_444)
+        on_a = create_observed_node(meshtastic_node_id=100_000_001, short_name="AAAA", long_name="Target A")
+        on_b = create_observed_node(meshtastic_node_id=100_000_002, short_name="BBBB", long_name="Target B")
         api_client.force_authenticate(user=user)
 
         # Target A: 2 completed, 1 failed -> success_rate 2/3
@@ -156,9 +156,9 @@ class TestTracerouteStats:
         assert resp.status_code == 200
         data = resp.json()
         assert "by_target" in data
-        by_node_id = {row["node_id"]: row for row in data["by_target"]}
+        by_node_id = {row["meshtastic_node_id"]: row for row in data["by_target"]}
 
-        row_a = by_node_id[on_a.node_id]
+        row_a = by_node_id[on_a.meshtastic_node_id]
         assert row_a["total"] == 3
         assert row_a["completed"] == 2
         assert row_a["failed"] == 1
@@ -167,7 +167,7 @@ class TestTracerouteStats:
         assert row_a["long_name"] == on_a.long_name
         assert "node_id_str" in row_a
 
-        row_b = by_node_id[on_b.node_id]
+        row_b = by_node_id[on_b.meshtastic_node_id]
         assert row_b["total"] == 2
         assert row_b["completed"] == 0
         assert row_b["failed"] == 0
@@ -182,8 +182,8 @@ class TestTracerouteStats:
         create_auto_traceroute,
     ):
         user = create_user()
-        mn = create_managed_node(node_id=555_555_555)
-        on = create_observed_node(node_id=200_000_001)
+        mn = create_managed_node(meshtastic_node_id=555_555_555)
+        on = create_observed_node(meshtastic_node_id=200_000_001)
         api_client.force_authenticate(user=user)
 
         old_time = timezone.now() - timedelta(days=30)
@@ -203,17 +203,17 @@ class TestTracerouteStats:
         )
 
         resp_all = api_client.get("/api/traceroutes/stats/")
-        rows_all = {r["node_id"]: r for r in resp_all.json()["by_target"]}
-        assert rows_all[on.node_id]["total"] == 2
-        assert rows_all[on.node_id]["completed"] == 1
-        assert rows_all[on.node_id]["failed"] == 1
+        rows_all = {r["meshtastic_node_id"]: r for r in resp_all.json()["by_target"]}
+        assert rows_all[on.meshtastic_node_id]["total"] == 2
+        assert rows_all[on.meshtastic_node_id]["completed"] == 1
+        assert rows_all[on.meshtastic_node_id]["failed"] == 1
 
         since = (timezone.now() - timedelta(days=7)).isoformat()
         resp_filtered = api_client.get("/api/traceroutes/stats/", {"triggered_at_after": since})
-        rows_f = {r["node_id"]: r for r in resp_filtered.json()["by_target"]}
-        assert rows_f[on.node_id]["total"] == 1
-        assert rows_f[on.node_id]["completed"] == 0
-        assert rows_f[on.node_id]["failed"] == 1
+        rows_f = {r["meshtastic_node_id"]: r for r in resp_filtered.json()["by_target"]}
+        assert rows_f[on.meshtastic_node_id]["total"] == 1
+        assert rows_f[on.meshtastic_node_id]["completed"] == 0
+        assert rows_f[on.meshtastic_node_id]["failed"] == 1
 
     def test_stats_respects_source_node(
         self,
@@ -224,8 +224,8 @@ class TestTracerouteStats:
         create_auto_traceroute,
     ):
         user = create_user()
-        mn_a = create_managed_node(node_id=666_666_601)
-        mn_b = create_managed_node(node_id=666_666_602)
+        mn_a = create_managed_node(meshtastic_node_id=666_666_601)
+        mn_b = create_managed_node(meshtastic_node_id=666_666_602)
         on = create_observed_node()
         api_client.force_authenticate(user=user)
 
@@ -262,11 +262,11 @@ class TestTracerouteStats:
         assert dx_all["completed"] == 1
         assert dx_all["failed"] == 0
 
-        resp_a = api_client.get("/api/traceroutes/stats/", {"source_node": str(mn_a.node_id)})
+        resp_a = api_client.get("/api/traceroutes/stats/", {"source_node": str(mn_a.meshtastic_node_id)})
         assert resp_a.status_code == 200
         data_a = resp_a.json()
         assert len(data_a["by_source"]) == 1
-        assert data_a["by_source"][0]["node_id"] == mn_a.node_id
+        assert data_a["by_source"][0]["meshtastic_node_id"] == mn_a.meshtastic_node_id
         intra_a = data_a["by_strategy"][AutoTraceRoute.TARGET_STRATEGY_INTRA_ZONE]
         assert intra_a["completed"] == 1
         assert intra_a["failed"] == 1
@@ -281,8 +281,8 @@ class TestTracerouteStats:
         create_auto_traceroute,
     ):
         user = create_user()
-        mn_a = create_managed_node(node_id=888_888_801)
-        mn_b = create_managed_node(node_id=888_888_802)
+        mn_a = create_managed_node(meshtastic_node_id=888_888_801)
+        mn_b = create_managed_node(meshtastic_node_id=888_888_802)
         on = create_observed_node()
         api_client.force_authenticate(user=user)
 
@@ -307,12 +307,12 @@ class TestTracerouteStats:
         assert today_all["completed"] >= 1
         assert today_all["failed"] >= 1
 
-        resp_a = api_client.get("/api/traceroutes/stats/", {"source_node": str(mn_a.node_id)})
+        resp_a = api_client.get("/api/traceroutes/stats/", {"source_node": str(mn_a.meshtastic_node_id)})
         row_a = next(r for r in resp_a.json()["success_over_time"] if r["date"] == today.isoformat())
         assert row_a["completed"] == 1
         assert row_a["failed"] == 0
 
-        resp_b = api_client.get("/api/traceroutes/stats/", {"source_node": str(mn_b.node_id)})
+        resp_b = api_client.get("/api/traceroutes/stats/", {"source_node": str(mn_b.meshtastic_node_id)})
         row_b = next(r for r in resp_b.json()["success_over_time"] if r["date"] == today.isoformat())
         assert row_b["completed"] == 0
         assert row_b["failed"] == 1
@@ -326,7 +326,7 @@ class TestTracerouteStats:
         create_auto_traceroute,
     ):
         user = create_user()
-        mn = create_managed_node(node_id=777_777_701)
+        mn = create_managed_node(meshtastic_node_id=777_777_701)
         on = create_observed_node()
         api_client.force_authenticate(user=user)
 
@@ -386,14 +386,14 @@ class TestFeederReach:
     def test_empty_targets_when_no_traceroutes(self, api_client, create_user, create_managed_node):
         api_client.force_authenticate(user=create_user())
         feeder = create_managed_node(
-            node_id=0xAAAA_AA01,
+            meshtastic_node_id=0xAAAA_AA01,
             default_location_latitude=55.86,
             default_location_longitude=-4.25,
         )
-        resp = api_client.get("/api/traceroutes/feeder-reach/", {"feeder_id": str(feeder.node_id)})
+        resp = api_client.get("/api/traceroutes/feeder-reach/", {"feeder_id": str(feeder.meshtastic_node_id)})
         assert resp.status_code == 200
         body = resp.json()
-        assert body["feeder"]["node_id"] == feeder.node_id
+        assert body["feeder"]["meshtastic_node_id"] == feeder.meshtastic_node_id
         assert body["feeder"]["lat"] == pytest.approx(55.86)
         assert body["targets"] == []
         assert body["meta"]["window"] == {"start": None, "end": None}
@@ -410,11 +410,11 @@ class TestFeederReach:
 
         api_client.force_authenticate(user=create_user())
         feeder = create_managed_node(
-            node_id=0xAAAA_AA02,
+            meshtastic_node_id=0xAAAA_AA02,
             default_location_latitude=55.86,
             default_location_longitude=-4.25,
         )
-        target = create_observed_node(node_id=0xCCCC_CC02)
+        target = create_observed_node(meshtastic_node_id=0xCCCC_CC02)
         NodeLatestStatus.objects.create(node=target, latitude=55.86, longitude=-4.20)
 
         for _ in range(7):
@@ -430,12 +430,12 @@ class TestFeederReach:
                 status=AutoTraceRoute.STATUS_FAILED,
             )
 
-        resp = api_client.get("/api/traceroutes/feeder-reach/", {"feeder_id": str(feeder.node_id)})
+        resp = api_client.get("/api/traceroutes/feeder-reach/", {"feeder_id": str(feeder.meshtastic_node_id)})
         assert resp.status_code == 200
         body = resp.json()
         assert len(body["targets"]) == 1
         row = body["targets"][0]
-        assert row["node_id"] == target.node_id
+        assert row["meshtastic_node_id"] == target.meshtastic_node_id
         assert row["attempts"] == 10
         assert row["successes"] == 7
 
@@ -451,11 +451,11 @@ class TestFeederReach:
 
         api_client.force_authenticate(user=create_user())
         feeder = create_managed_node(
-            node_id=0xAAAA_AA20,
+            meshtastic_node_id=0xAAAA_AA20,
             default_location_latitude=55.86,
             default_location_longitude=-4.25,
         )
-        target = create_observed_node(node_id=0xCCCC_CC20)
+        target = create_observed_node(meshtastic_node_id=0xCCCC_CC20)
         NodeLatestStatus.objects.create(node=target, latitude=55.86, longitude=-4.20)
 
         create_auto_traceroute(
@@ -473,7 +473,7 @@ class TestFeederReach:
 
         resp = api_client.get(
             "/api/traceroutes/feeder-reach/",
-            {"feeder_id": str(feeder.node_id), "target_strategy": "intra_zone"},
+            {"feeder_id": str(feeder.meshtastic_node_id), "target_strategy": "intra_zone"},
         )
         assert resp.status_code == 200
         body = resp.json()
@@ -530,12 +530,12 @@ class TestConstellationCoverage:
         feeder = create_managed_node(
             owner=owner,
             constellation=constellation,
-            node_id=0xAAAA_AA03,
+            meshtastic_node_id=0xAAAA_AA03,
             default_location_latitude=55.86,
             default_location_longitude=-4.25,
         )
-        target_a = create_observed_node(node_id=0xCCCC_CC03)
-        target_b = create_observed_node(node_id=0xCCCC_CC04)
+        target_a = create_observed_node(meshtastic_node_id=0xCCCC_CC03)
+        target_b = create_observed_node(meshtastic_node_id=0xCCCC_CC04)
         NodeLatestStatus.objects.create(node=target_a, latitude=55.860, longitude=-4.200)
         NodeLatestStatus.objects.create(node=target_b, latitude=55.860010, longitude=-4.200010)
 
@@ -589,11 +589,11 @@ class TestConstellationCoverage:
         feeder = create_managed_node(
             owner=owner,
             constellation=constellation,
-            node_id=0xAAAA_AA04,
+            meshtastic_node_id=0xAAAA_AA04,
             default_location_latitude=55.86,
             default_location_longitude=-4.25,
         )
-        target = create_observed_node(node_id=0xCCCC_CC05)
+        target = create_observed_node(meshtastic_node_id=0xCCCC_CC05)
         NodeLatestStatus.objects.create(node=target, latitude=55.86, longitude=-4.20)
         create_auto_traceroute(
             source_node=feeder,
@@ -626,18 +626,18 @@ class TestConstellationCoverage:
         feeder_a = create_managed_node(
             owner=owner,
             constellation=constellation,
-            node_id=0xAAAA_AA10,
+            meshtastic_node_id=0xAAAA_AA10,
             default_location_latitude=55.86,
             default_location_longitude=-4.25,
         )
         feeder_b = create_managed_node(
             owner=owner,
             constellation=constellation,
-            node_id=0xAAAA_AA11,
+            meshtastic_node_id=0xAAAA_AA11,
             default_location_latitude=55.90,
             default_location_longitude=-4.30,
         )
-        target = create_observed_node(node_id=0xCCCC_CC10)
+        target = create_observed_node(meshtastic_node_id=0xCCCC_CC10)
         NodeLatestStatus.objects.create(node=target, latitude=55.87, longitude=-4.22)
 
         create_auto_traceroute(
@@ -666,9 +666,9 @@ class TestConstellationCoverage:
         assert body["targets"][0]["attempts"] == 2
         assert body["targets"][0]["successes"] == 1
         assert body["targets"][0]["contributing_feeders"] == 2
-        feeder_ids = {f["node_id"] for f in body["feeders"]}
-        assert feeder_a.node_id in feeder_ids
-        assert feeder_b.node_id in feeder_ids
+        feeder_ids = {f["meshtastic_node_id"] for f in body["feeders"]}
+        assert feeder_a.meshtastic_node_id in feeder_ids
+        assert feeder_b.meshtastic_node_id in feeder_ids
 
     def test_omit_include_targets_has_no_targets_key(
         self,
@@ -705,11 +705,11 @@ class TestConstellationCoverage:
         feeder = create_managed_node(
             owner=owner,
             constellation=constellation,
-            node_id=0xAAAA_AA12,
+            meshtastic_node_id=0xAAAA_AA12,
             default_location_latitude=55.86,
             default_location_longitude=-4.25,
         )
-        target = create_observed_node(node_id=0xCCCC_CC11)
+        target = create_observed_node(meshtastic_node_id=0xCCCC_CC11)
         NodeLatestStatus.objects.create(node=target, latitude=55.86, longitude=-4.20)
 
         create_auto_traceroute(

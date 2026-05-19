@@ -29,7 +29,7 @@ def _profile(**overrides):
         antenna_pattern="omni",
         antenna_azimuth_deg=None,
         antenna_beamwidth_deg=None,
-        observed_node=SimpleNamespace(node_id=12345),
+        observed_node=SimpleNamespace(meshtastic_node_id=12345),
     )
     base.update(overrides)
     return SimpleNamespace(**base)

@@ -43,17 +43,17 @@ class Command(BaseCommand):
             if not node_auth:
                 self.stderr.write(self.style.ERROR("No NodeAuth found for API key (key may be invalid)"))
                 return
-            managed_node_id = node_auth.node.node_id
+            managed_node_id = node_auth.node.meshtastic_node_id
             self.stdout.write(f"Resolved managed_node_id={managed_node_id} from API key")
 
         if managed_node_id is None:
             self.stderr.write(self.style.ERROR("Provide --managed-node-id or --by-api-key to identify the bot"))
             return
 
-        if not ManagedNode.objects.filter(node_id=managed_node_id, deleted_at__isnull=True).exists():
+        if not ManagedNode.objects.filter(meshtastic_node_id=managed_node_id, deleted_at__isnull=True).exists():
             self.stderr.write(
                 self.style.ERROR(
-                    f"ManagedNode with node_id={managed_node_id} not found. "
+                    f"ManagedNode with meshtastic_node_id={managed_node_id} not found. "
                     "Ensure the node exists and is linked to a NodeAPIKey."
                 )
             )
@@ -70,6 +70,6 @@ class Command(BaseCommand):
         )
         self.stdout.write(
             "Tip: If the bot did not receive it, ensure managed_node_id matches the "
-            "ManagedNode.node_id linked to the bot's API key. Check API logs when the "
+            "ManagedNode.meshtastic_node_id linked to the bot's API key. Check API logs when the "
             "bot connects for 'bot connected for node X'."
         )

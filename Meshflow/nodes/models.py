@@ -51,7 +51,7 @@ class ManagedNode(models.Model):
     """User-owned feeder / infrastructure node (Meshtastic today; MeshCore in a later phase)."""
 
     internal_id = models.UUIDField(primary_key=True, null=False, default=uuid.uuid4, editable=False)
-    node_id = models.BigIntegerField(null=False, db_index=True)
+    meshtastic_node_id = models.BigIntegerField(null=False, db_index=True)
     protocol = models.PositiveSmallIntegerField(
         choices=Protocol.choices,
         default=Protocol.MESHTASTIC,
@@ -158,7 +158,7 @@ class ManagedNode(models.Model):
         """Protocol-aware display id (not a DB column)."""
         if self.protocol == Protocol.MESHCORE:
             return f"mc:feeder:{self.internal_id.hex[:12]}"
-        return meshtastic_id_to_hex(self.node_id)
+        return meshtastic_id_to_hex(self.meshtastic_node_id)
 
     @property
     def is_deleted(self) -> bool:
@@ -238,7 +238,7 @@ class ObservedNode(models.Model):
         db_index=True,
         help_text=_("Mesh protocol for this observed node."),
     )
-    node_id = models.BigIntegerField(
+    meshtastic_node_id = models.BigIntegerField(
         null=True,
         blank=True,
         db_index=True,
@@ -329,7 +329,7 @@ class ObservedNode(models.Model):
         constraints = [
             models.CheckConstraint(
                 condition=(
-                    models.Q(protocol=Protocol.MESHTASTIC, node_id__isnull=False)
+                    models.Q(protocol=Protocol.MESHTASTIC, meshtastic_node_id__isnull=False)
                     | (
                         models.Q(protocol=Protocol.MESHCORE)
                         & (models.Q(mc_pubkey__isnull=False) | models.Q(mc_pubkey_prefix__isnull=False))

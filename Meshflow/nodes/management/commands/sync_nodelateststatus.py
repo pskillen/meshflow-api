@@ -32,7 +32,7 @@ class Command(BaseCommand):
         nodes_with_metrics = set(DeviceMetrics.objects.values_list("node_id", flat=True).distinct())
         node_ids = nodes_with_position | nodes_with_metrics
 
-        nodes = ObservedNode.objects.filter(internal_id__in=node_ids).order_by("node_id")
+        nodes = ObservedNode.objects.filter(internal_id__in=node_ids).order_by("meshtastic_node_id")
         total = nodes.count()
 
         if total == 0:

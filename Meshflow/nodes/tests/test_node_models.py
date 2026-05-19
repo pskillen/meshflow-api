@@ -7,7 +7,7 @@ from common.protocol import Protocol
 def test_managed_node_creation(create_managed_node):
     """Test managed node creation with valid data."""
     node = create_managed_node()
-    assert node.node_id == 123456789
+    assert node.meshtastic_node_id == 123456789
     assert node.name == "Test Managed Node"
     assert node.owner is not None
     assert node.constellation is not None
@@ -16,7 +16,7 @@ def test_managed_node_creation(create_managed_node):
 
 @pytest.mark.django_db
 def test_managed_meshcore_feeder_node_id_str(create_managed_node):
-    node = create_managed_node(protocol=Protocol.MESHCORE, node_id=0)
+    node = create_managed_node(protocol=Protocol.MESHCORE, meshtastic_node_id=0)
     assert node.node_id_str == f"mc:feeder:{node.internal_id.hex[:12]}"
 
 
@@ -32,7 +32,7 @@ def test_managed_node_str_representation(create_managed_node):
 def test_observed_node_creation(create_observed_node):
     """Test observed node creation with valid data."""
     node = create_observed_node()
-    assert node.node_id == 987654321
+    assert node.meshtastic_node_id == 987654321
     assert node.long_name == "Test Observed Node"
     assert node.short_name == "TEST"
     assert node.mac_addr == "00:11:22:33:44:55"

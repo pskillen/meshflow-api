@@ -53,15 +53,19 @@ def get_triggerable_nodes_queryset(user):
             user=user, role__in=["admin", "editor"]
         ).values_list("constellation_id", flat=True)
         qs = eligible.filter(Q(owner=user) | Q(constellation_id__in=constellation_ids)).distinct()
-    obs_short = ObservedNode.objects.filter(node_id=OuterRef("node_id")).values("short_name")[:1]
-    obs_long = ObservedNode.objects.filter(node_id=OuterRef("node_id")).values("long_name")[:1]
+    obs_short = ObservedNode.objects.filter(meshtastic_node_id=OuterRef("meshtastic_node_id")).values("short_name")[:1]
+    obs_long = ObservedNode.objects.filter(meshtastic_node_id=OuterRef("meshtastic_node_id")).values("long_name")[:1]
     # Latest known position of the node's ObservedNode counterpart. Used by the UI
     # to render triggerable sources on a map alongside the traceroute target.
-    latest_lat = NodeLatestStatus.objects.filter(node__node_id=OuterRef("node_id")).values("latitude")[:1]
-    latest_lng = NodeLatestStatus.objects.filter(node__node_id=OuterRef("node_id")).values("longitude")[:1]
+    latest_lat = NodeLatestStatus.objects.filter(node__meshtastic_node_id=OuterRef("meshtastic_node_id")).values(
+        "latitude"
+    )[:1]
+    latest_lng = NodeLatestStatus.objects.filter(node__meshtastic_node_id=OuterRef("meshtastic_node_id")).values(
+        "longitude"
+    )[:1]
     return qs.annotate(
         observed_short_name=Subquery(obs_short),
         observed_long_name=Subquery(obs_long),
         observed_latitude=Subquery(latest_lat),
         observed_longitude=Subquery(latest_lng),
-    ).order_by("node_id")
+    ).order_by("meshtastic_node_id")

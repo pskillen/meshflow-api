@@ -151,7 +151,7 @@ class NodeRfPropagationRenderSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         path = reverse(
             "rf-propagation-asset",
-            kwargs={"node_id": obj.observed_node.node_id, "filename": obj.asset_filename},
+            kwargs={"node_id": obj.observed_node.meshtastic_node_id, "filename": obj.asset_filename},
         )
         if request:
             return request.build_absolute_uri(path)
@@ -176,8 +176,8 @@ class NodeOwnerClaimSerializer(serializers.ModelSerializer):
 
         class Meta:
             model = ObservedNode
-            fields = ["node_id", "node_id_str", "long_name", "short_name", "last_heard"]
-            read_only_fields = ["node_id", "node_id_str", "long_name", "short_name", "last_heard"]
+            fields = ["meshtastic_node_id", "node_id_str", "long_name", "short_name", "last_heard"]
+            read_only_fields = ["meshtastic_node_id", "node_id_str", "long_name", "short_name", "last_heard"]
 
     node = NodeSerializer(read_only=True)
 
@@ -255,7 +255,7 @@ class APIKeyDetailSerializer(APIKeySerializer):
 
     def get_nodes(self, obj):
         """Get the nodes linked to this API key."""
-        return [link.node.node_id for link in obj.node_links.all()]
+        return [link.node.meshtastic_node_id for link in obj.node_links.all()]
 
 
 class APIKeyCreateSerializer(serializers.ModelSerializer):
@@ -302,9 +302,9 @@ class APIKeyCreateSerializer(serializers.ModelSerializer):
         api_key = NodeAPIKey.objects.create(**validated_data)
 
         # Link the API key to nodes
-        for node_id in nodes:
+        for meshtastic_node_id in nodes:
             try:
-                node = ManagedNode.objects.get(node_id=node_id, deleted_at__isnull=True)
+                node = ManagedNode.objects.get(meshtastic_node_id=meshtastic_node_id, deleted_at__isnull=True)
                 NodeAuth.objects.create(api_key=api_key, node=node)
             except ManagedNode.DoesNotExist:
                 # Skip nodes that don't exist
@@ -369,7 +369,7 @@ class ManagedNodeSerializer(serializers.ModelSerializer):
     class Meta:
         model = ManagedNode
         fields = [
-            "node_id",
+            "meshtastic_node_id",
             "protocol",
             "name",
             "long_name",
@@ -433,7 +433,7 @@ class ManagedNodeSerializer(serializers.ModelSerializer):
     def get_node_id_str(self, obj):
         if hasattr(obj, "node_id_str") and obj.node_id_str:
             return obj.node_id_str
-        return meshtastic_id_to_hex(obj.node_id)
+        return meshtastic_id_to_hex(obj.meshtastic_node_id)
 
     def get_long_name(self, obj):
         if hasattr(obj, "long_name") and obj.long_name:
@@ -481,7 +481,9 @@ class ManagedNodeSerializer(serializers.ModelSerializer):
                 return None
             return PositionSerializer(data).data
         # Fallback to latest Position instance
-        latest = Position.objects.filter(node__node_id=obj.node_id).order_by("-reported_time").first()
+        latest = (
+            Position.objects.filter(node__meshtastic_node_id=obj.meshtastic_node_id).order_by("-reported_time").first()
+        )
         return PositionSerializer(latest).data if latest else None
 
     def get_device_metrics(self, obj):
@@ -500,14 +502,18 @@ class ManagedNodeSerializer(serializers.ModelSerializer):
             if data.get("last_metrics_time") is None:
                 return None
             return DeviceMetricsSerializer(data).data
-        latest = DeviceMetrics.objects.filter(node__node_id=obj.node_id).order_by("-reported_time").first()
+        latest = (
+            DeviceMetrics.objects.filter(node__meshtastic_node_id=obj.meshtastic_node_id)
+            .order_by("-reported_time")
+            .first()
+        )
         return DeviceMetricsSerializer(latest).data if latest else None
 
     def _get_managed_node_latest_status(self, obj):
         """Get NodeLatestStatus for ManagedNode via ObservedNode lookup."""
         observed = (
             ObservedNode.objects.filter(
-                node_id=obj.node_id,
+                meshtastic_node_id=obj.meshtastic_node_id,
                 protocol=Protocol.MESHTASTIC,
             )
             .select_related("latest_status")
@@ -556,7 +562,11 @@ class ManagedNodeSerializer(serializers.ModelSerializer):
                 "ch8_current": status.ch8_current,
                 "reported_time": status.power_reported_time,
             }
-        latest = PowerMetrics.objects.filter(node__node_id=obj.node_id).order_by("-reported_time").first()
+        latest = (
+            PowerMetrics.objects.filter(node__meshtastic_node_id=obj.meshtastic_node_id)
+            .order_by("-reported_time")
+            .first()
+        )
         if latest is None:
             return None
         return {
@@ -662,14 +672,16 @@ class OwnedManagedNodeSerializer(ManagedNodeSerializer):
     def validate(self, attrs):
         attrs = super().validate(attrs)
         if self.instance is None:
-            node_id = attrs.get("node_id")
-            if node_id is not None:
-                if ManagedNode.objects.filter(node_id=node_id, deleted_at__isnull=True).exists():
-                    raise serializers.ValidationError({"node_id": "A managed node already exists for this mesh node."})
-                if ManagedNode.objects.filter(node_id=node_id, deleted_at__isnull=False).exists():
+            meshtastic_node_id = attrs.get("meshtastic_node_id")
+            if meshtastic_node_id is not None:
+                if ManagedNode.objects.filter(meshtastic_node_id=meshtastic_node_id, deleted_at__isnull=True).exists():
+                    raise serializers.ValidationError(
+                        {"meshtastic_node_id": "A managed node already exists for this mesh node."}
+                    )
+                if ManagedNode.objects.filter(meshtastic_node_id=meshtastic_node_id, deleted_at__isnull=False).exists():
                     raise serializers.ValidationError(
                         {
-                            "node_id": (
+                            "meshtastic_node_id": (
                                 "This node was previously removed from managed service. "
                                 "Contact a system administrator to re-enable management."
                             )
@@ -867,14 +879,14 @@ class DeviceMetricsBulkSerializer(serializers.ModelSerializer):
     Includes node_id, node_id_str, short_name for frontend grouping by node.
     """
 
-    node_id = serializers.IntegerField(source="node.node_id", read_only=True)
+    meshtastic_node_id = serializers.IntegerField(source="node.meshtastic_node_id", read_only=True)
     node_id_str = serializers.CharField(source="node.node_id_str", read_only=True)
     short_name = serializers.CharField(source="node.short_name", read_only=True, allow_null=True)
 
     class Meta:
         model = DeviceMetrics
         fields = [
-            "node_id",
+            "meshtastic_node_id",
             "node_id_str",
             "short_name",
             "reported_time",
@@ -945,14 +957,14 @@ class EnvironmentMetricsBulkSerializer(serializers.ModelSerializer):
     Includes node_id, node_id_str, short_name for frontend grouping by node.
     """
 
-    node_id = serializers.IntegerField(source="node.node_id", read_only=True)
+    meshtastic_node_id = serializers.IntegerField(source="node.meshtastic_node_id", read_only=True)
     node_id_str = serializers.CharField(source="node.node_id_str", read_only=True)
     short_name = serializers.CharField(source="node.short_name", read_only=True, allow_null=True)
 
     class Meta:
         model = EnvironmentMetrics
         fields = [
-            "node_id",
+            "meshtastic_node_id",
             "node_id_str",
             "short_name",
             "reported_time",
@@ -1080,8 +1092,8 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
     claim = serializers.SerializerMethodField()
 
     def to_internal_value(self, data):
-        if "node_id" in data:
-            data["node_id_str"] = meshtastic_id_to_hex(data["node_id"])
+        if "meshtastic_node_id" in data:
+            data["node_id_str"] = meshtastic_id_to_hex(data["meshtastic_node_id"])
         return super().to_internal_value(data)
 
     class Meta:
@@ -1089,7 +1101,7 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
         fields = [
             "internal_id",
             "protocol",
-            "node_id",
+            "meshtastic_node_id",
             "node_id_str",
             "mc_pubkey",
             "mc_pubkey_prefix",
@@ -1409,7 +1421,7 @@ class ObservedNodeSearchSerializer(ObservedNodeSerializer):
         model = ObservedNode
         fields = [
             "internal_id",
-            "node_id",
+            "meshtastic_node_id",
             "node_id_str",
             "long_name",
             "short_name",

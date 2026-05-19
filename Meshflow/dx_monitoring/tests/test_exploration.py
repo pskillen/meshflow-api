@@ -64,7 +64,7 @@ def test_ordered_exploration_sources_prefers_last_observer(
     mark_managed_node_feeding,
 ):
     lo = create_managed_node(
-        node_id=0xAA000001,
+        meshtastic_node_id=0xAA000001,
         allow_auto_traceroute=True,
         default_location_latitude=55.0,
         default_location_longitude=-3.0,
@@ -74,7 +74,7 @@ def test_ordered_exploration_sources_prefers_last_observer(
     other = create_managed_node(
         owner=owner,
         constellation=c,
-        node_id=0xAA000002,
+        meshtastic_node_id=0xAA000002,
         allow_auto_traceroute=True,
         default_location_latitude=55.1,
         default_location_longitude=-3.1,
@@ -82,7 +82,7 @@ def test_ordered_exploration_sources_prefers_last_observer(
     for mn in (lo, other):
         mark_managed_node_feeding(mn, sending=True)
 
-    dest = create_observed_node(node_id=0xBB000099)
+    dest = create_observed_node(meshtastic_node_id=0xBB000099)
     _coords(dest, 51.5, -0.12)
     ev = _dx_event(constellation=c, destination=dest, last_observer=lo)
 
@@ -104,13 +104,13 @@ def test_plan_links_pending_baseline_instead_of_duplicate_dx_watch(
 ):
     create_user()
     source = create_managed_node(
-        node_id=0xCC000001,
+        meshtastic_node_id=0xCC000001,
         allow_auto_traceroute=True,
         default_location_latitude=55.95,
         default_location_longitude=-3.19,
     )
     mark_managed_node_feeding(source, sending=True)
-    dest = create_observed_node(node_id=0xCC000099)
+    dest = create_observed_node(meshtastic_node_id=0xCC000099)
     _coords(dest, 51.5, -0.12)
 
     baseline = AutoTraceRoute.objects.create(
@@ -154,13 +154,13 @@ def test_plan_records_completed_baseline_as_exploration_evidence(
 ):
     create_user()
     source = create_managed_node(
-        node_id=0xCC000002,
+        meshtastic_node_id=0xCC000002,
         allow_auto_traceroute=True,
         default_location_latitude=55.95,
         default_location_longitude=-3.19,
     )
     mark_managed_node_feeding(source, sending=True)
-    dest = create_observed_node(node_id=0xCC000098)
+    dest = create_observed_node(meshtastic_node_id=0xCC000098)
     _coords(dest, 51.5, -0.12)
 
     AutoTraceRoute.objects.create(
@@ -172,7 +172,7 @@ def test_plan_records_completed_baseline_as_exploration_evidence(
         status=AutoTraceRoute.STATUS_COMPLETED,
         earliest_send_at=timezone.now(),
         completed_at=timezone.now(),
-        route=[{"node_id": int(source.node_id), "snr": -1.0}],
+        route=[{"node_id": int(source.meshtastic_node_id), "snr": -1.0}],
     )
 
     ev = _dx_event(
@@ -200,13 +200,13 @@ def test_plan_queues_dx_watch_with_expected_fields(
 ):
     create_user()
     source = create_managed_node(
-        node_id=0xDD000001,
+        meshtastic_node_id=0xDD000001,
         allow_auto_traceroute=True,
         default_location_latitude=55.95,
         default_location_longitude=-3.19,
     )
     mark_managed_node_feeding(source, sending=True)
-    dest = create_observed_node(node_id=0xDD000099)
+    dest = create_observed_node(meshtastic_node_id=0xDD000099)
     _coords(dest, 51.5, -0.12)
 
     assert baseline_row_for_target(dest) is None
@@ -247,13 +247,13 @@ def test_completion_marks_dx_event_traceroute_completed(
 ):
     user = create_user()
     source = create_managed_node(
-        node_id=0xEE000001,
+        meshtastic_node_id=0xEE000001,
         allow_auto_traceroute=True,
         default_location_latitude=55.95,
         default_location_longitude=-3.19,
     )
     mark_managed_node_feeding(source, sending=True)
-    dest = create_observed_node(node_id=0xEE000099)
+    dest = create_observed_node(meshtastic_node_id=0xEE000099)
     _coords(dest, 51.5, -0.12)
 
     auto_tr = AutoTraceRoute.objects.create(
@@ -278,7 +278,7 @@ def test_completion_marks_dx_event_traceroute_completed(
 
     packet = create_traceroute_packet(
         observer=source,
-        from_int=dest.node_id,
+        from_int=dest.meshtastic_node_id,
         route=[],
         route_back=[],
         snr_towards=[],
@@ -310,12 +310,12 @@ def test_maybe_detect_skips_distant_hop_for_exploration_destination(
 ):
     """Linked exploration TR should not also create traceroute_distant_hop evidence for the same hop."""
     source = create_managed_node(
-        node_id=0xEE000010,
+        meshtastic_node_id=0xEE000010,
         default_location_latitude=55.95,
         default_location_longitude=-3.19,
     )
     create_user()
-    target = create_observed_node(node_id=0xEE0000AA)
+    target = create_observed_node(meshtastic_node_id=0xEE0000AA)
     _coords(target, 51.5, -0.12)
 
     auto_tr = AutoTraceRoute.objects.create(
@@ -342,7 +342,7 @@ def test_maybe_detect_skips_distant_hop_for_exploration_destination(
 
     packet = create_traceroute_packet(
         observer=source,
-        from_int=target.node_id,
+        from_int=target.meshtastic_node_id,
         route=[],
         route_back=[],
         snr_towards=[],
@@ -375,13 +375,13 @@ def test_active_events_not_due_immediately_after_plan_attempt(
 ):
     create_user()
     source = create_managed_node(
-        node_id=0xFF000001,
+        meshtastic_node_id=0xFF000001,
         allow_auto_traceroute=True,
         default_location_latitude=55.95,
         default_location_longitude=-3.19,
     )
     mark_managed_node_feeding(source, sending=True)
-    dest = create_observed_node(node_id=0xFF000099)
+    dest = create_observed_node(meshtastic_node_id=0xFF000099)
     _coords(dest, 51.5, -0.12)
     ev = _dx_event(constellation=source.constellation, destination=dest, last_observer=source)
 
@@ -406,13 +406,13 @@ def test_plan_skips_when_destination_metadata_excludes_detection(
 ):
     create_user()
     source = create_managed_node(
-        node_id=0xAB000501,
+        meshtastic_node_id=0xAB000501,
         allow_auto_traceroute=True,
         default_location_latitude=55.95,
         default_location_longitude=-3.19,
     )
     mark_managed_node_feeding(source, sending=True)
-    dest = create_observed_node(node_id=0xAB000599)
+    dest = create_observed_node(meshtastic_node_id=0xAB000599)
     _coords(dest, 51.5, -0.12)
     DxNodeMetadata.objects.create(observed_node=dest, exclude_from_detection=True)
 
@@ -437,13 +437,13 @@ def test_on_auto_marks_linked_rows_failed_for_baseline(
 ):
     create_user()
     source = create_managed_node(
-        node_id=0xAB000601,
+        meshtastic_node_id=0xAB000601,
         allow_auto_traceroute=True,
         default_location_latitude=55.95,
         default_location_longitude=-3.19,
     )
     mark_managed_node_feeding(source, sending=True)
-    dest = create_observed_node(node_id=0xAB000699)
+    dest = create_observed_node(meshtastic_node_id=0xAB000699)
     _coords(dest, 51.5, -0.12)
 
     baseline = AutoTraceRoute.objects.create(

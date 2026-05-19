@@ -70,7 +70,7 @@ def _bulk_target_positions_by_node_id(target_internal_ids: Iterable) -> dict:
         "node_id",
         "latitude",
         "longitude",
-        "node__node_id",
+        "node__meshtastic_node_id",
         "node__short_name",
         "node__long_name",
     )
@@ -78,7 +78,7 @@ def _bulk_target_positions_by_node_id(target_internal_ids: Iterable) -> dict:
         r["node_id"]: (
             r["latitude"],
             r["longitude"],
-            r["node__node_id"],
+            r["node__meshtastic_node_id"],
             r["node__short_name"],
             r["node__long_name"],
         )
@@ -104,17 +104,17 @@ def _bulk_feeder_positions(feeders: list[ManagedNode]) -> dict:
             needs_observed.append(mn)
 
     if needs_observed:
-        node_ids = {mn.node_id for mn in needs_observed}
+        node_ids = {mn.meshtastic_node_id for mn in needs_observed}
         observed_pos = {
-            row["node_id"]: (row["latest_status__latitude"], row["latest_status__longitude"])
+            row["meshtastic_node_id"]: (row["latest_status__latitude"], row["latest_status__longitude"])
             for row in ObservedNode.objects.filter(
-                node_id__in=node_ids,
+                meshtastic_node_id__in=node_ids,
                 latest_status__latitude__isnull=False,
                 latest_status__longitude__isnull=False,
-            ).values("node_id", "latest_status__latitude", "latest_status__longitude")
+            ).values("meshtastic_node_id", "latest_status__latitude", "latest_status__longitude")
         }
         for mn in needs_observed:
-            pos = observed_pos.get(mn.node_id)
+            pos = observed_pos.get(mn.meshtastic_node_id)
             if pos is not None:
                 positions[mn.internal_id] = pos
     return positions
@@ -151,7 +151,7 @@ def compute_reach(
     if constellation_id is not None:
         qs = qs.filter(source_node__constellation_id=constellation_id)
     if feeder_id is not None:
-        qs = qs.filter(source_node__node_id=feeder_id)
+        qs = qs.filter(source_node__meshtastic_node_id=feeder_id)
     qs = qs.filter(source_node__isnull=False, target_node__isnull=False)
 
     if target_strategy_tokens:
@@ -174,10 +174,12 @@ def compute_reach(
     feeders = list(ManagedNode.objects.filter(internal_id__in=feeder_internal_ids, deleted_at__isnull=True))
     feeder_positions = _bulk_feeder_positions(feeders)
 
-    feeder_node_ids = {mn.node_id for mn in feeders}
+    feeder_node_ids = {mn.meshtastic_node_id for mn in feeders}
     feeder_display = {
-        row["node_id"]: row
-        for row in ObservedNode.objects.filter(node_id__in=feeder_node_ids).values("node_id", "short_name", "long_name")
+        row["meshtastic_node_id"]: row
+        for row in ObservedNode.objects.filter(meshtastic_node_id__in=feeder_node_ids).values(
+            "meshtastic_node_id", "short_name", "long_name"
+        )
     }
 
     feeder_meta_by_internal: dict = {}
@@ -185,11 +187,11 @@ def compute_reach(
         pos = feeder_positions.get(mn.internal_id)
         if pos is None:
             continue
-        display = feeder_display.get(mn.node_id) or {}
+        display = feeder_display.get(mn.meshtastic_node_id) or {}
         feeder_meta_by_internal[mn.internal_id] = {
             "managed_node_id": str(mn.internal_id),
-            "node_id": mn.node_id,
-            "node_id_str": meshtastic_id_to_hex(mn.node_id),
+            "meshtastic_node_id": mn.meshtastic_node_id,
+            "node_id_str": meshtastic_id_to_hex(mn.meshtastic_node_id),
             "short_name": display.get("short_name") or mn.name,
             "long_name": display.get("long_name"),
             "lat": pos[0],
@@ -210,7 +212,7 @@ def compute_reach(
         out.append(
             ReachRow(
                 feeder_managed_node_id=feeder_meta["managed_node_id"],
-                feeder_node_id=feeder_meta["node_id"],
+                feeder_node_id=feeder_meta["meshtastic_node_id"],
                 feeder_node_id_str=feeder_meta["node_id_str"],
                 feeder_short_name=feeder_meta["short_name"],
                 feeder_long_name=feeder_meta["long_name"],
@@ -236,7 +238,7 @@ def aggregate_reach_rows_to_constellation_targets(rows: list[ReachRow]) -> list[
         tid = r.target_node_id
         if tid not in by_target:
             by_target[tid] = {
-                "node_id": tid,
+                "meshtastic_node_id": tid,
                 "node_id_str": r.target_node_id_str,
                 "short_name": r.target_short_name,
                 "long_name": r.target_long_name,
@@ -255,7 +257,7 @@ def aggregate_reach_rows_to_constellation_targets(rows: list[ReachRow]) -> list[
     for agg in by_target.values():
         feeder_ids = agg.pop("feeder_node_ids")
         targets.append({**agg, "contributing_feeders": len(feeder_ids)})
-    targets.sort(key=lambda t: t["node_id"])
+    targets.sort(key=lambda t: t["meshtastic_node_id"])
     return targets
 
 
@@ -266,10 +268,12 @@ def constellation_feeder_markers(constellation_id: int) -> list[dict]:
         return []
 
     positions = _bulk_feeder_positions(feeders)
-    node_ids = {mn.node_id for mn in feeders}
+    node_ids = {mn.meshtastic_node_id for mn in feeders}
     feeder_display = {
-        row["node_id"]: row
-        for row in ObservedNode.objects.filter(node_id__in=node_ids).values("node_id", "short_name", "long_name")
+        row["meshtastic_node_id"]: row
+        for row in ObservedNode.objects.filter(meshtastic_node_id__in=node_ids).values(
+            "meshtastic_node_id", "short_name", "long_name"
+        )
     }
 
     out: list[dict] = []
@@ -277,17 +281,17 @@ def constellation_feeder_markers(constellation_id: int) -> list[dict]:
         pos = positions.get(mn.internal_id)
         if pos is None:
             continue
-        display = feeder_display.get(mn.node_id) or {}
+        display = feeder_display.get(mn.meshtastic_node_id) or {}
         out.append(
             {
                 "managed_node_id": str(mn.internal_id),
-                "node_id": mn.node_id,
-                "node_id_str": meshtastic_id_to_hex(mn.node_id),
+                "meshtastic_node_id": mn.meshtastic_node_id,
+                "node_id_str": meshtastic_id_to_hex(mn.meshtastic_node_id),
                 "short_name": display.get("short_name") or mn.name,
                 "long_name": display.get("long_name"),
                 "lat": pos[0],
                 "lng": pos[1],
             }
         )
-    out.sort(key=lambda x: x["node_id"])
+    out.sort(key=lambda x: x["meshtastic_node_id"])
     return out
