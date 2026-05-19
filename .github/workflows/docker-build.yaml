@@ -34,7 +34,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and Push API Image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: Dockerfile
@@ -48,7 +48,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Build and Push Docs Image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: Dockerfile-redocly
@@ -122,7 +122,7 @@ jobs:
     if: always() && !cancelled() && needs.build-and-push.result == 'success'
     steps:
       - name: Delete untagged images
-        uses: Chizkiyahu/delete-untagged-ghcr-action@v6.1.0
+        uses: Chizkiyahu/delete-untagged-ghcr-action@v6.1.1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           repository_owner: ${{ github.repository_owner }}

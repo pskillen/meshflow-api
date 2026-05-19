@@ -41,7 +41,7 @@ jobs:
           python -m pytest Meshflow/ -v --junit-xml=reports/junit.xml
 
       - name: Test Report
-        uses: dorny/test-reporter@v2
+        uses: dorny/test-reporter@v3
         with:
           name: pytest
           path: reports/junit.xml
@@ -97,7 +97,7 @@ jobs:
           pytest tests/integration/ -v --junit-xml=reports/integration-tests.xml
 
       - name: Integration Test Report
-        uses: dorny/test-reporter@v2
+        uses: dorny/test-reporter@v3
         with:
           name: integration-tests
           path: reports/integration-tests.xml
