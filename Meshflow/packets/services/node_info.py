@@ -20,10 +20,10 @@ class NodeInfoPacketService(BasePacketService):
         # update the ObservedNode
         sender.short_name = self.packet.short_name
         sender.long_name = self.packet.long_name
-        sender.hw_model = self.packet.hw_model
-        sender.role = self.packet.role
-        sender.public_key = self.packet.public_key
+        sender.meshtastic_hw_model = self.packet.hw_model
+        sender.meshtastic_role = self.packet.role
+        sender.meshtastic_public_key = self.packet.public_key
         sender.mac_addr = self.packet.mac_address
-        sender.is_licensed = self.packet.is_licensed
-        sender.is_unmessagable = self.packet.is_unmessagable
+        sender.meshtastic_is_licensed = self.packet.is_licensed
+        sender.meshtastic_is_unmessagable = self.packet.is_unmessagable
         sender.save()

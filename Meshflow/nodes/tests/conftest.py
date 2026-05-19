@@ -41,7 +41,7 @@ def observed_node_data():
         "long_name": "Test Observed Node",
         "short_name": "TEST",
         "mac_addr": "00:11:22:33:44:55",
-        "hw_model": "T-Beam",
+        "meshtastic_hw_model": "T-Beam",
     }
 
 

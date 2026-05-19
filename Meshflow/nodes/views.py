@@ -558,7 +558,7 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
         roles = INFRASTRUCTURE_ROLES + ([RoleSource.CLIENT_BASE] if include_client_base else [])
 
         qs = (
-            ObservedNode.objects.filter(role__in=roles)
+            ObservedNode.objects.filter(meshtastic_role__in=roles)
             .order_by("-last_heard", "meshtastic_node_id")
             .select_related("latest_status", "monitoring_config", "mesh_presence")
         )

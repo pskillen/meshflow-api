@@ -12,7 +12,7 @@ def mesh_infra_monitoring_alert_counts():
 
     ``alerting_nodes_count`` is the distinct union of offline, active battery alert, and verifying nodes.
     """
-    qs = ObservedNode.objects.filter(role__in=INFRASTRUCTURE_ROLES)
+    qs = ObservedNode.objects.filter(meshtastic_role__in=INFRASTRUCTURE_ROLES)
 
     offline_q = Q(mesh_presence__is_offline=True) | Q(mesh_presence__offline_confirmed_at__isnull=False)
     battery_q = Q(monitoring_config__battery_alert_enabled=True) & Q(

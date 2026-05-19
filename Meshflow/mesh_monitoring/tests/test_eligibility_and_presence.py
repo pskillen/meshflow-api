@@ -25,14 +25,14 @@ def test_user_can_watch_claimed(create_user, create_observed_node):
 @pytest.mark.django_db
 def test_user_can_watch_infrastructure_role(create_user, create_observed_node):
     user = create_user()
-    obs = create_observed_node(role=INFRASTRUCTURE_ROLES[0], claimed_by=None)
+    obs = create_observed_node(meshtastic_role=INFRASTRUCTURE_ROLES[0], claimed_by=None)
     assert user_can_watch(user, obs) is True
 
 
 @pytest.mark.django_db
 def test_user_cannot_watch_other_client(create_user, create_observed_node):
     user = create_user()
-    obs = create_observed_node(role=RoleSource.CLIENT, claimed_by=None)
+    obs = create_observed_node(meshtastic_role=RoleSource.CLIENT, claimed_by=None)
     assert user_can_watch(user, obs) is False
 
 
@@ -99,6 +99,6 @@ def test_suppressed_observed_node_ids(create_observed_node):
 @pytest.mark.django_db
 def test_nodewatch_save_validates_eligibility(create_user, create_observed_node):
     user = create_user()
-    obs = create_observed_node(role=RoleSource.CLIENT, claimed_by=None)
+    obs = create_observed_node(meshtastic_role=RoleSource.CLIENT, claimed_by=None)
     with pytest.raises(ValidationError):
         create_watch_with_offline_threshold(user=user, observed_node=obs, offline_after=60)
