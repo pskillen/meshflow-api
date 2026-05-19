@@ -2,6 +2,8 @@
 
 This file is the **single cross-repo index** for the MeshCore and related multi-protocol work. **Each epic or phase should add its own dated section** below; do not rewrite prior sections except to fix factual errors.
 
+**Rename / relabelling track:** Sub-plans in `IdeaProjects/MeshFlow/.cursor/plans/` ([index](file:///Users/patricks/IdeaProjects/MeshFlow/.cursor/plans/meshcore-rename-index.plan.md)). GitHub: sub-epic [#307](https://github.com/pskillen/meshflow-api/issues/307) under [#266](https://github.com/pskillen/meshflow-api/issues/266). Progress: [`refactoring-progress.md`](./refactoring-progress.md).
+
 **Convention for contributors**
 
 - Add a new `##` section with a clear phase name, **completion date (or “in progress”)**, and **repos touched**.

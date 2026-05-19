@@ -21,7 +21,9 @@ tags:
   - name: MeshCore packets
     description: MeshCore packet ingestion (Node API key) and read-only packet list
   - name: Packets
-    description: Legacy tag name; prefer Meshtastic packets for /api/packets operations
+    description: >
+      Legacy tag name retained for compatibility. All Meshtastic packet ingestion and feeder
+      node upsert operations use the **Meshtastic packets** tag and live under ``/api/packets/{node_id}/``.
   - name: Constellations
     description: Constellation management endpoints
   - name: Nodes
@@ -1001,8 +1003,9 @@ components:
         but may also be manually added by a listener system.
       properties:
         internal_id:
-          type: integer
-          description: The internal ID of the observed node
+          type: string
+          format: uuid
+          description: Stable primary key (UUID) for this observed node
         protocol:
           $ref: '#/components/schemas/MeshProtocol'
           description: Mesh protocol for this observed node
@@ -3417,15 +3420,23 @@ paths:
         '503':
           description: Discord API or bot token misconfiguration
 
-  /packets/ingest/:
+  /packets/{node_id}/ingest/:
     post:
-      summary: Ingest a packet
+      summary: Ingest a Meshtastic packet
       description: >
-        Node bots should send incoming packets to this endpoint. The endpoint will automatically
-        identify the packet type and process it accordingly.
+        Meshtastic feeder bots POST incoming packets here. The path ``node_id`` is the observer's
+        Meshtastic numeric node number and must match the authenticated ManagedNode. The endpoint
+        identifies the packet type and processes it accordingly.
       tags: [Meshtastic packets]
       security:
         - NodeApiKeyAuth: []
+      parameters:
+        - name: node_id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Meshtastic numeric node id of the observer (feeder)
       requestBody:
         required: true
         content:
@@ -3508,18 +3519,23 @@ paths:
         '200':
           description: Paginated MeshCore raw packets
 
-  /packets/nodes/:
+  /packets/{node_id}/nodes/:
     post:
-      summary: Upsert node information
+      summary: Upsert observed node (feeder)
       description: >
-        Node bots should send node information updates to this endpoint. The endpoint will automatically
-        match the node information to an existing node, or create a new node if it doesn't exist.
-
-        This endpoint is similar to the /nodes/observed-nodes endpoint, but is specifically used by
-        node bots, and is authenticated with a Node API Key.
+        Meshtastic feeder bots upsert observed-node rows via this endpoint. The path ``node_id`` is
+        the observer's Meshtastic numeric node number and must match the authenticated ManagedNode.
+        Similar to ``/nodes/observed-nodes/`` but scoped to Node API key auth for bots.
       tags: [Meshtastic packets]
       security:
         - NodeApiKeyAuth: []
+      parameters:
+        - name: node_id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Meshtastic numeric node id of the observer (feeder)
       requestBody:
         required: true
         content:
@@ -4086,6 +4102,7 @@ paths:
     get:
       summary: Bulk device metrics for multiple nodes
       description: >
+        Meshtastic-only: ``node_ids`` are Meshtastic numeric node numbers (``ObservedNode.node_id``).
         Get device metrics (battery, channel utilisation, uptime) for multiple nodes in one request.
         Returns flat list; frontend groups by node_id for per-node charts.
         Reusable by Infrastructure, Monitor, My Nodes pages.
@@ -4146,7 +4163,8 @@ paths:
           description: Invalid request (e.g. missing node_ids)
     post:
       summary: Bulk device metrics (POST)
-      description: Same as GET but with node_ids, start_date, end_date in request body
+      description: >
+        Meshtastic-only: same as GET; ``node_ids`` in the body are Meshtastic numeric node numbers.
       tags: [Nodes]
       security:
         - BearerAuth: []
@@ -4160,6 +4178,7 @@ paths:
                   type: array
                   items:
                     type: integer
+                  description: Meshtastic numeric node ids
                 start_date:
                   type: string
                   format: date-time
@@ -4385,7 +4404,9 @@ paths:
   /nodes/observed-nodes/{node_id}/device_metrics/:
     get:
       summary: Get device metrics for a specific node
-      description: Returns a list of device metrics for a specific node with optional date filtering
+      description: >
+        Meshtastic-only: path ``node_id`` is the Meshtastic numeric node number (``ObservedNode.node_id``).
+        Returns device metrics for that node with optional date filtering.
       tags: [Nodes]
       security:
         - BearerAuth: []
@@ -4415,7 +4436,9 @@ paths:
   /nodes/observed-nodes/{node_id}/environment_metrics/:
     get:
       summary: Get environment metrics for a specific node
-      description: Returns a list of environment metrics for a specific node with optional date filtering
+      description: >
+        Meshtastic-only: path ``node_id`` is the Meshtastic numeric node number (``ObservedNode.node_id``).
+        Returns environment metrics for that node with optional date filtering.
       tags: [Nodes]
       security:
         - BearerAuth: []
@@ -4445,7 +4468,9 @@ paths:
   /nodes/observed-nodes/{node_id}/power_metrics/:
     get:
       summary: Get power metrics for a specific node
-      description: Returns a list of power metrics for a specific node with optional date filtering
+      description: >
+        Meshtastic-only: path ``node_id`` is the Meshtastic numeric node number (``ObservedNode.node_id``).
+        Returns power metrics for that node with optional date filtering.
       tags: [Nodes]
       security:
         - BearerAuth: []
@@ -5152,7 +5177,9 @@ paths:
   /stats/nodes/{node_id}/packets/:
     get:
       summary: Get packet stats for a specific node
-      description: Returns the packet stats for a specific node with optional date filtering
+      description: >
+        Meshtastic-only: ``node_id`` is the Meshtastic numeric node number. Aggregates
+        ``MtRawPacket`` traffic sent by that node (excludes self-only device-metric observations).
       tags: [Nodes]
       security:
         - BearerAuth: []
@@ -5196,7 +5223,9 @@ paths:
   /stats/nodes/{node_id}/received/:
     get:
       summary: Get received packet stats for a specific node
-      description: Returns statistics for packets received/heard by a specific node over time intervals
+      description: >
+        Meshtastic-only: ``node_id`` is the Meshtastic numeric node number. Statistics for
+        packets heard by that node (via ``PacketObservation``) over time intervals.
       tags: [Nodes]
       security:
         - BearerAuth: []
@@ -5241,8 +5270,9 @@ paths:
     get:
       summary: Get neighbour stats for a managed node
       description: >
-        Returns packet counts grouped by source node (direct sender or last-hop relay)
-        for packets received by the specified managed node.
+        Meshtastic-only: ``node_id`` is the Meshtastic numeric node number of the managed/observed
+        node. Returns packet counts grouped by source (direct sender or last-hop relay) for
+        Meshtastic packets received by that node.
       tags: [Nodes]
       security:
         - BearerAuth: []
