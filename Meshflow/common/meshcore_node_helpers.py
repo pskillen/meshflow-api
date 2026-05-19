@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING, Optional
 
 from django.db import transaction
 from django.db.models import Q
-from django.utils import timezone
 
 from common.protocol import Protocol
 

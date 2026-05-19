@@ -7,7 +7,7 @@ import pytest
 from rest_framework.test import APIClient
 
 from common.protocol import Protocol
-from meshcore_packets.models import MeshCorePayloadType, MeshCoreRawPacket
+from meshcore_packets.models import MeshCoreRawPacket
 from nodes.models import NodeAuth, ObservedNode
 
 FULL_PUBKEY = "b" * 64

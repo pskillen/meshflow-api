@@ -6,7 +6,6 @@ import hashlib
 from datetime import timedelta
 
 from django.conf import settings
-from django.utils import timezone as django_timezone
 
 from meshcore_packets.models import MeshCoreRawPacket
 

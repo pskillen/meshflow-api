@@ -4,7 +4,7 @@ from django.dispatch import receiver
 from django.utils import timezone
 
 from common.meshcore_node_helpers import resolve_or_create_mc_observed_node
-from meshcore_packets.models import MeshCorePayloadType, MeshCoreTextPacket
+from meshcore_packets.models import MeshCorePayloadType
 from meshcore_packets.signals import meshcore_packet_received
 from nodes.models import NodeLatestStatus
 

@@ -2,8 +2,6 @@
 
 from datetime import datetime, timezone
 
-from django.utils import timezone as django_timezone
-
 from rest_framework import serializers
 
 from common.meshcore_node_helpers import normalize_mc_pubkey, normalize_mc_pubkey_prefix

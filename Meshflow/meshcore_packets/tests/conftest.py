@@ -1,7 +1,7 @@
 import pytest
 
 from common.protocol import Protocol
-from nodes.models import NodeAPIKey, NodeAuth
+from nodes.models import NodeAuth
 
 
 @pytest.fixture

@@ -8,7 +8,6 @@ from common.meshcore_node_helpers import (
     mc_node_id_str,
     merge_prefix_stub_into_full,
     normalize_mc_pubkey,
-    pubkey_to_prefix,
     resolve_or_create_mc_observed_node,
 )
 from common.protocol import Protocol
@@ -54,10 +53,9 @@ def test_prefix_stub_then_full_pubkey_merge():
 def test_prefix_unique_match_updates_last_heard():
     full = resolve_or_create_mc_observed_node(mc_pubkey=FULL_PUBKEY)
     t1 = timezone.now()
-    t2 = timezone.now()
-    updated = resolve_or_create_mc_observed_node(mc_pubkey_prefix=PREFIX, last_heard=t2)
+    updated = resolve_or_create_mc_observed_node(mc_pubkey_prefix=PREFIX, last_heard=t1)
     assert updated.pk == full.pk
-    assert updated.last_heard == t2
+    assert updated.last_heard == t1
 
 
 @pytest.mark.django_db
