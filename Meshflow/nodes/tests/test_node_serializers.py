@@ -111,4 +111,4 @@ def test_position_serializer_valid_data(create_observed_node):
     assert position.longitude == 0.0
     assert position.altitude == 0
     assert position.heading == 0
-    assert position.location_source == 0  # UNSET
+    assert position.meshtastic_location_source == 0  # UNSET

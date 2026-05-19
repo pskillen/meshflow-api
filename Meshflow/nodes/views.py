@@ -1031,8 +1031,8 @@ class ManagedNodeViewSet(viewsets.ModelViewSet):
             last_altitude=Subquery(latest_status_qs.values("altitude")[:1]),
             last_position_time=Subquery(latest_status_qs.values("position_reported_time")[:1]),
             last_heading=Subquery(latest_status_qs.values("heading")[:1]),
-            last_location_source=Subquery(latest_status_qs.values("location_source")[:1]),
-            last_precision_bits=Subquery(latest_status_qs.values("precision_bits")[:1]),
+            last_location_source=Subquery(latest_status_qs.values("meshtastic_location_source")[:1]),
+            last_precision_bits=Subquery(latest_status_qs.values("meshtastic_precision_bits")[:1]),
             last_ground_speed=Subquery(latest_status_qs.values("ground_speed")[:1]),
             last_ground_track=Subquery(latest_status_qs.values("ground_track")[:1]),
             last_sats_in_view=Subquery(latest_status_qs.values("sats_in_view")[:1]),
@@ -1040,8 +1040,8 @@ class ManagedNodeViewSet(viewsets.ModelViewSet):
             last_battery_level=Subquery(latest_status_qs.values("battery_level")[:1]),
             last_voltage=Subquery(latest_status_qs.values("voltage")[:1]),
             last_metrics_time=Subquery(latest_status_qs.values("metrics_reported_time")[:1]),
-            last_channel_utilization=Subquery(latest_status_qs.values("channel_utilization")[:1]),
-            last_air_util_tx=Subquery(latest_status_qs.values("air_util_tx")[:1]),
+            last_channel_utilization=Subquery(latest_status_qs.values("meshtastic_channel_utilization")[:1]),
+            last_air_util_tx=Subquery(latest_status_qs.values("meshtastic_air_util_tx")[:1]),
             last_uptime_seconds=Subquery(latest_status_qs.values("uptime_seconds")[:1]),
         )
 

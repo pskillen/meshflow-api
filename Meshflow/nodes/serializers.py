@@ -791,7 +791,7 @@ class OwnedManagedNodeSerializer(ManagedNodeSerializer):
 class PositionSerializer(serializers.ModelSerializer):
     """Serializer for position reports, supporting both model instances and dicts (from annotations)."""
 
-    location_source = serializers.CharField(source="get_location_source_display", read_only=True)
+    meshtastic_location_source = serializers.CharField(source="get_location_source_display", read_only=True)
 
     # Mapping from possible annotated keys to canonical field names
     ANNOTATION_MAP = {
@@ -801,8 +801,8 @@ class PositionSerializer(serializers.ModelSerializer):
         "latest_altitude": "altitude",
         "latest_position_time": "reported_time",
         "latest_heading": "heading",
-        "latest_location_source": "location_source",
-        "latest_precision_bits": "precision_bits",
+        "latest_location_source": "meshtastic_location_source",
+        "latest_precision_bits": "meshtastic_precision_bits",
         "latest_ground_speed": "ground_speed",
         "latest_ground_track": "ground_track",
         "latest_sats_in_view": "sats_in_view",
@@ -813,8 +813,8 @@ class PositionSerializer(serializers.ModelSerializer):
         "last_altitude": "altitude",
         "last_position_time": "reported_time",
         "last_heading": "heading",
-        "last_location_source": "location_source",
-        "last_precision_bits": "precision_bits",
+        "last_location_source": "meshtastic_location_source",
+        "last_precision_bits": "meshtastic_precision_bits",
         "last_ground_speed": "ground_speed",
         "last_ground_track": "ground_track",
         "last_sats_in_view": "sats_in_view",
@@ -832,8 +832,8 @@ class PositionSerializer(serializers.ModelSerializer):
             "longitude",
             "altitude",
             "heading",
-            "location_source",
-            "precision_bits",
+            "meshtastic_location_source",
+            "meshtastic_precision_bits",
             "ground_speed",
             "ground_track",
             "sats_in_view",
@@ -857,10 +857,10 @@ class PositionSerializer(serializers.ModelSerializer):
                             break
                     else:
                         data[field] = None
-            # location_source: try to get display value if possible
-            if "location_source" in data and data["location_source"] is not None:
+            # meshtastic_location_source: try to get display value if possible
+            if "meshtastic_location_source" in data and data["meshtastic_location_source"] is not None:
                 try:
-                    data["location_source"] = LocationSource(data["location_source"]).label
+                    data["meshtastic_location_source"] = LocationSource(data["meshtastic_location_source"]).label
                 except Exception:
                     pass
             return data
@@ -868,17 +868,17 @@ class PositionSerializer(serializers.ModelSerializer):
 
     def to_internal_value(self, data):
         validated_data = super().to_internal_value(data)
-        # Convert location_source from string to integer using LocationSource
-        if "location_source" in validated_data and validated_data["location_source"]:
+        # Convert meshtastic_location_source from string to integer using LocationSource
+        if "meshtastic_location_source" in validated_data and validated_data["meshtastic_location_source"]:
             try:
                 for source_choice in LocationSource:
-                    if source_choice.label == validated_data["location_source"]:
-                        validated_data["location_source"] = source_choice.value
+                    if source_choice.label == validated_data["meshtastic_location_source"]:
+                        validated_data["meshtastic_location_source"] = source_choice.value
                         break
                 else:
-                    validated_data["location_source"] = LocationSource.UNSET
+                    validated_data["meshtastic_location_source"] = LocationSource.UNSET
             except ValueError, TypeError:
-                validated_data["location_source"] = LocationSource.UNSET
+                validated_data["meshtastic_location_source"] = LocationSource.UNSET
         # Handle node field
         if "node" in data and isinstance(data["node"], ObservedNode):
             validated_data["node"] = data["node"]
@@ -905,8 +905,8 @@ class DeviceMetricsBulkSerializer(serializers.ModelSerializer):
             "logged_time",
             "battery_level",
             "voltage",
-            "channel_utilization",
-            "air_util_tx",
+            "meshtastic_channel_utilization",
+            "meshtastic_air_util_tx",
             "uptime_seconds",
         ]
 
@@ -919,15 +919,15 @@ class DeviceMetricsSerializer(serializers.ModelSerializer):
         "latest_battery_level": "battery_level",
         "latest_voltage": "voltage",
         "latest_metrics_time": "reported_time",
-        "latest_channel_utilization": "channel_utilization",
-        "latest_air_util_tx": "air_util_tx",
+        "latest_channel_utilization": "meshtastic_channel_utilization",
+        "latest_air_util_tx": "meshtastic_air_util_tx",
         "latest_uptime_seconds": "uptime_seconds",
         # For ManagedNode
         "last_battery_level": "battery_level",
         "last_voltage": "voltage",
         "last_metrics_time": "reported_time",
-        "last_channel_utilization": "channel_utilization",
-        "last_air_util_tx": "air_util_tx",
+        "last_channel_utilization": "meshtastic_channel_utilization",
+        "last_air_util_tx": "meshtastic_air_util_tx",
         "last_uptime_seconds": "uptime_seconds",
     }
 
@@ -940,8 +940,8 @@ class DeviceMetricsSerializer(serializers.ModelSerializer):
             "reported_time",
             "battery_level",
             "voltage",
-            "channel_utilization",
-            "air_util_tx",
+            "meshtastic_channel_utilization",
+            "meshtastic_air_util_tx",
             "uptime_seconds",
         ]
 
@@ -1075,7 +1075,7 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
 
     Nested ``latest_*`` fields expose Meshtastic protobuf-shaped telemetry from
     ``NodeLatestStatus`` when present; MeshCore nodes typically return null there.
-    ``inferred_max_hops`` is Meshtastic-only (hop_start inference).
+    ``meshtastic_inferred_max_hops`` is Meshtastic-only (hop_start inference).
     """
 
     class OwnerSerializer(serializers.ModelSerializer):
@@ -1091,7 +1091,7 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
     latest_air_quality_metrics = serializers.SerializerMethodField()
     latest_health_metrics = serializers.SerializerMethodField()
     latest_host_metrics = serializers.SerializerMethodField()
-    inferred_max_hops = serializers.SerializerMethodField()
+    meshtastic_inferred_max_hops = serializers.SerializerMethodField()
     environment_exposure = serializers.SerializerMethodField()
     weather_use = serializers.SerializerMethodField()
     environment_settings_editable = serializers.SerializerMethodField()
@@ -1133,7 +1133,7 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
             "latest_air_quality_metrics",
             "latest_health_metrics",
             "latest_host_metrics",
-            "inferred_max_hops",
+            "meshtastic_inferred_max_hops",
             "environment_exposure",
             "weather_use",
             "environment_settings_editable",
@@ -1158,7 +1158,7 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
             "latest_air_quality_metrics",
             "latest_health_metrics",
             "latest_host_metrics",
-            "inferred_max_hops",
+            "meshtastic_inferred_max_hops",
             "environment_exposure",
             "weather_use",
             "environment_settings_editable",
@@ -1213,7 +1213,7 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
 
     def get_inferred_max_hops(self, obj):
         status = self._get_latest_status(obj)
-        return status.inferred_max_hops if status else None
+        return status.meshtastic_inferred_max_hops if status else None
 
     def get_claim(self, obj):
         """
@@ -1251,8 +1251,8 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
                 "latest_altitude": status.altitude,
                 "latest_position_time": status.position_reported_time,
                 "latest_heading": status.heading,
-                "latest_location_source": status.location_source,
-                "latest_precision_bits": status.precision_bits,
+                "latest_location_source": status.meshtastic_location_source,
+                "latest_precision_bits": status.meshtastic_precision_bits,
                 "latest_ground_speed": status.ground_speed,
                 "latest_ground_track": status.ground_track,
                 "latest_sats_in_view": status.sats_in_view,
@@ -1306,8 +1306,8 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
                 "latest_battery_level": status.battery_level,
                 "latest_voltage": status.voltage,
                 "latest_metrics_time": status.metrics_reported_time,
-                "latest_channel_utilization": status.channel_utilization,
-                "latest_air_util_tx": status.air_util_tx,
+                "latest_channel_utilization": status.meshtastic_channel_utilization,
+                "latest_air_util_tx": status.meshtastic_air_util_tx,
                 "latest_uptime_seconds": status.uptime_seconds,
                 "node": obj.internal_id,
             }

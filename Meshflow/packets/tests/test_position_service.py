@@ -45,8 +45,8 @@ def test_process_position_packet(create_position_packet, create_managed_node, cr
     assert position.longitude == packet.longitude
     assert position.altitude == packet.altitude
     assert position.heading == packet.heading
-    assert position.location_source == packet.location_source
-    assert position.precision_bits == packet.precision_bits
+    assert position.meshtastic_location_source == packet.meshtastic_location_source
+    assert position.meshtastic_precision_bits == packet.meshtastic_precision_bits
     assert position.ground_speed == packet.ground_speed
     assert position.ground_track == packet.ground_track
 
@@ -97,7 +97,7 @@ def test_process_position_packet_without_location_source(
 ):
     """Test processing a position packet without a location source."""
     service = PositionPacketService()
-    packet = create_position_packet(location_source=None)
+    packet = create_position_packet(meshtastic_location_source=None)
     observer = create_managed_node()
     observation = create_packet_observation(packet=packet, observer=observer)
     user = create_user()
@@ -105,7 +105,7 @@ def test_process_position_packet_without_location_source(
     service.process_packet(packet, observer, observation, user)
 
     position = Position.objects.latest("id")
-    assert position.location_source == LocationSource.UNSET
+    assert position.meshtastic_location_source == LocationSource.UNSET
 
 
 @pytest.mark.django_db

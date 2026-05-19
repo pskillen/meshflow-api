@@ -591,8 +591,8 @@ class NodeLatestStatusInline(admin.StackedInline):
         "longitude",
         "altitude",
         "heading",
-        "location_source",
-        "precision_bits",
+        "meshtastic_location_source",
+        "meshtastic_precision_bits",
         "ground_speed",
         "ground_track",
         "sats_in_view",
@@ -600,11 +600,11 @@ class NodeLatestStatusInline(admin.StackedInline):
         "position_reported_time",
         "battery_level",
         "voltage",
-        "channel_utilization",
-        "air_util_tx",
+        "meshtastic_channel_utilization",
+        "meshtastic_air_util_tx",
         "uptime_seconds",
         "metrics_reported_time",
-        "inferred_max_hops",
+        "meshtastic_inferred_max_hops",
     )
 
     def has_add_permission(self, request, obj=None):
@@ -631,7 +631,7 @@ class ObservedNodeAdmin(admin.ModelAdmin):
     )
 
     def get_inferred_max_hops(self, obj):
-        return obj.latest_status.inferred_max_hops if obj.latest_status else None
+        return obj.latest_status.meshtastic_inferred_max_hops if obj.latest_status else None
 
     get_inferred_max_hops.short_description = "Inferred max hops"
     list_filter = (

@@ -47,8 +47,8 @@ def test_process_device_metrics_packet(
     assert metrics.node.meshtastic_node_id == packet.from_int
     assert metrics.battery_level == packet.battery_level
     assert metrics.voltage == packet.voltage
-    assert metrics.channel_utilization == packet.channel_utilization
-    assert metrics.air_util_tx == packet.air_util_tx
+    assert metrics.meshtastic_channel_utilization == packet.meshtastic_channel_utilization
+    assert metrics.meshtastic_air_util_tx == packet.meshtastic_air_util_tx
     assert metrics.uptime_seconds == packet.uptime_seconds
 
 
@@ -100,7 +100,7 @@ def test_process_device_metrics_packet_with_null_values(
     """Test processing a device metrics packet with null values."""
     service = DeviceMetricsPacketService()
     packet = create_device_metrics_packet(
-        battery_level=None, voltage=None, channel_utilization=None, air_util_tx=None, uptime_seconds=None
+        battery_level=None, voltage=None, meshtastic_channel_utilization=None, meshtastic_air_util_tx=None, uptime_seconds=None
     )
     observer = create_managed_node()
     observation = create_packet_observation(packet=packet, observer=observer)
@@ -111,8 +111,8 @@ def test_process_device_metrics_packet_with_null_values(
     metrics = DeviceMetrics.objects.latest("id")
     assert metrics.battery_level == 0.0
     assert metrics.voltage == 0.0
-    assert metrics.channel_utilization == 0.0
-    assert metrics.air_util_tx == 0.0
+    assert metrics.meshtastic_channel_utilization == 0.0
+    assert metrics.meshtastic_air_util_tx == 0.0
     assert metrics.uptime_seconds == 0
 
 
@@ -153,8 +153,8 @@ def test_process_device_metrics_packet_updates_nodelateststatus(
     packet = create_device_metrics_packet(
         battery_level=88.0,
         voltage=4.1,
-        channel_utilization=0.15,
-        air_util_tx=0.25,
+        meshtastic_channel_utilization=0.15,
+        meshtastic_air_util_tx=0.25,
         uptime_seconds=7200,
     )
     observer = create_managed_node()
@@ -169,8 +169,8 @@ def test_process_device_metrics_packet_updates_nodelateststatus(
     latest_status = NodeLatestStatus.objects.get(node=observed_node)
     assert latest_status.battery_level == 88.0
     assert latest_status.voltage == 4.1
-    assert latest_status.channel_utilization == 0.15
-    assert latest_status.air_util_tx == 0.25
+    assert latest_status.meshtastic_channel_utilization == 0.15
+    assert latest_status.meshtastic_air_util_tx == 0.25
     assert latest_status.uptime_seconds == 7200
     assert latest_status.metrics_reported_time is not None
-    assert latest_status.inferred_max_hops == observation.hop_start
+    assert latest_status.meshtastic_inferred_max_hops == observation.hop_start

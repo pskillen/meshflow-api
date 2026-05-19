@@ -23,8 +23,8 @@ class DeviceMetricsPacketService(BasePacketService):
             reported_time=reported_time,
             battery_level=battery_level,
             voltage=self.packet.voltage or 0.0,
-            channel_utilization=self.packet.channel_utilization or 0.0,
-            air_util_tx=self.packet.air_util_tx or 0.0,
+            meshtastic_channel_utilization=self.packet.meshtastic_channel_utilization or 0.0,
+            meshtastic_air_util_tx=self.packet.meshtastic_air_util_tx or 0.0,
             uptime_seconds=self.packet.uptime_seconds or 0,
         )
 
@@ -34,11 +34,11 @@ class DeviceMetricsPacketService(BasePacketService):
             defaults={
                 "battery_level": self.packet.battery_level or 0.0,
                 "voltage": self.packet.voltage or 0.0,
-                "channel_utilization": self.packet.channel_utilization or 0.0,
-                "air_util_tx": self.packet.air_util_tx or 0.0,
+                "meshtastic_channel_utilization": self.packet.meshtastic_channel_utilization or 0.0,
+                "meshtastic_air_util_tx": self.packet.meshtastic_air_util_tx or 0.0,
                 "uptime_seconds": self.packet.uptime_seconds or 0,
                 "metrics_reported_time": reported_time,
-                "inferred_max_hops": self.observation.hop_start,
+                "meshtastic_inferred_max_hops": self.observation.hop_start,
             },
         )
 

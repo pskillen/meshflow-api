@@ -270,8 +270,8 @@ class PositionPacketSerializerTest(BasePacketSerializerTestCase):
         self.assertEqual(validated_data["longitude"], -122.4194)
         self.assertEqual(validated_data["altitude"], 10.5)
         self.assertEqual(validated_data["heading"], 90.0)
-        self.assertEqual(validated_data["location_source"], LocationSource.INTERNAL)
-        self.assertEqual(validated_data["precision_bits"], 32)
+        self.assertEqual(validated_data["meshtastic_location_source"], LocationSource.INTERNAL)
+        self.assertEqual(validated_data["meshtastic_precision_bits"], 32)
         self.assertEqual(validated_data["ground_speed"], 5.5)
         self.assertEqual(validated_data["ground_track"], 90.0)
 
@@ -427,8 +427,8 @@ class DeviceMetricsPacketSerializerTest(BasePacketSerializerTestCase):
         # Test device metrics-specific fields
         self.assertEqual(validated_data["battery_level"], 95.5)
         self.assertEqual(validated_data["voltage"], 3.7)
-        self.assertEqual(validated_data["channel_utilization"], 0.5)
-        self.assertEqual(validated_data["air_util_tx"], 0.3)
+        self.assertEqual(validated_data["meshtastic_channel_utilization"], 0.5)
+        self.assertEqual(validated_data["meshtastic_air_util_tx"], 0.3)
         self.assertEqual(validated_data["uptime_seconds"], 3600)
 
     def test_create_device_metrics_packet(self):
@@ -496,8 +496,8 @@ class LocalStatsPacketSerializerTest(BasePacketSerializerTestCase):
 
         # Test local stats-specific fields
         self.assertEqual(validated_data["uptime_seconds"], 3600)
-        self.assertEqual(validated_data["channel_utilization"], 0.5)
-        self.assertEqual(validated_data["air_util_tx"], 0.3)
+        self.assertEqual(validated_data["meshtastic_channel_utilization"], 0.5)
+        self.assertEqual(validated_data["meshtastic_air_util_tx"], 0.3)
         self.assertEqual(validated_data["num_packets_tx"], 100)
         self.assertEqual(validated_data["num_packets_rx"], 200)
         self.assertEqual(validated_data["num_packets_rx_bad"], 5)
@@ -532,7 +532,7 @@ class LocalStatsPacketSerializerTest(BasePacketSerializerTestCase):
         self.assertIsInstance(packet, LocalStatsPacket)
         self.assertEqual(packet.packet_id, 123)
         self.assertEqual(packet.uptime_seconds, 3600)
-        self.assertEqual(packet.channel_utilization, 0.5)
+        self.assertEqual(packet.meshtastic_channel_utilization, 0.5)
 
 
 class PacketIngestSerializerTest(BasePacketSerializerTestCase):
@@ -739,7 +739,7 @@ class NodeSerializerTest(BasePacketSerializerTestCase):
                 "longitude": -74.0060,
                 "altitude": 10.0,
                 "heading": 0.0,
-                "location_source": "UNSET",
+                "meshtastic_location_source": "UNSET",
             },
         }
 
@@ -766,8 +766,8 @@ class NodeSerializerTest(BasePacketSerializerTestCase):
                 "reported_time": timezone.now().isoformat(),
                 "battery_level": 85.0,
                 "voltage": 3.9,
-                "channel_utilization": 0.2,
-                "air_util_tx": 0.3,
+                "meshtastic_channel_utilization": 0.2,
+                "meshtastic_air_util_tx": 0.3,
                 "uptime_seconds": 10000,
             },
         }
@@ -779,8 +779,8 @@ class NodeSerializerTest(BasePacketSerializerTestCase):
         latest_status = NodeLatestStatus.objects.get(node=self.from_node)
         self.assertEqual(latest_status.battery_level, 85.0)
         self.assertEqual(latest_status.voltage, 3.9)
-        self.assertEqual(latest_status.channel_utilization, 0.2)
-        self.assertEqual(latest_status.air_util_tx, 0.3)
+        self.assertEqual(latest_status.meshtastic_channel_utilization, 0.2)
+        self.assertEqual(latest_status.meshtastic_air_util_tx, 0.3)
         self.assertEqual(latest_status.uptime_seconds, 10000)
         self.assertIsNotNone(latest_status.metrics_reported_time)
 

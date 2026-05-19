@@ -53,8 +53,8 @@ class Command(BaseCommand):
                     longitude=latest_pos.longitude,
                     altitude=latest_pos.altitude,
                     heading=latest_pos.heading,
-                    location_source=latest_pos.location_source,
-                    precision_bits=latest_pos.precision_bits,
+                    meshtastic_location_source=latest_pos.meshtastic_location_source,
+                    meshtastic_precision_bits=latest_pos.meshtastic_precision_bits,
                     ground_speed=latest_pos.ground_speed,
                     ground_track=latest_pos.ground_track,
                     position_reported_time=latest_pos.reported_time,
@@ -66,8 +66,8 @@ class Command(BaseCommand):
                 defaults.update(
                     battery_level=latest_metrics.battery_level,
                     voltage=latest_metrics.voltage,
-                    channel_utilization=latest_metrics.channel_utilization,
-                    air_util_tx=latest_metrics.air_util_tx,
+                    meshtastic_channel_utilization=latest_metrics.meshtastic_channel_utilization,
+                    meshtastic_air_util_tx=latest_metrics.meshtastic_air_util_tx,
                     uptime_seconds=latest_metrics.uptime_seconds,
                     metrics_reported_time=latest_metrics.reported_time,
                 )

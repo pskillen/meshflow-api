@@ -245,8 +245,8 @@ class PositionPacketSerializer(BasePacketSerializer):
             longitude = serializers.FloatField()
             altitude = serializers.FloatField(required=False, allow_null=True)
             heading = serializers.FloatField(required=False, allow_null=True)
-            locationSource = serializers.CharField(source="location_source", required=False, allow_null=True)
-            precisionBits = serializers.IntegerField(source="precision_bits", required=False, allow_null=True)
+            locationSource = serializers.CharField(source="meshtastic_location_source", required=False, allow_null=True)
+            precisionBits = serializers.IntegerField(source="meshtastic_precision_bits", required=False, allow_null=True)
             time = serializers.IntegerField(source="position_time", required=False, allow_null=True)
             groundSpeed = serializers.FloatField(source="ground_speed", required=False, allow_null=True)
             groundTrack = serializers.FloatField(source="ground_track", required=False, allow_null=True)
@@ -268,9 +268,9 @@ class PositionPacketSerializer(BasePacketSerializer):
         if "position_time" in validated_data and validated_data["position_time"] is not None:
             validated_data["position_time"] = convert_timestamp(validated_data["position_time"])
 
-        # Convert location_source from string to integer using LocationSource
-        if "location_source" in validated_data and validated_data["location_source"]:
-            validated_data["location_source"] = convert_location_source(validated_data["location_source"])
+        # Convert meshtastic_location_source from string to integer using LocationSource
+        if "meshtastic_location_source" in validated_data and validated_data["meshtastic_location_source"]:
+            validated_data["meshtastic_location_source"] = convert_location_source(validated_data["meshtastic_location_source"])
 
         return validated_data
 
@@ -299,8 +299,8 @@ class PositionPacketSerializer(BasePacketSerializer):
             longitude=validated_data.get("longitude"),
             altitude=validated_data.get("altitude"),
             heading=validated_data.get("heading"),
-            location_source=validated_data.get("location_source"),
-            precision_bits=validated_data.get("precision_bits"),
+            meshtastic_location_source=validated_data.get("meshtastic_location_source"),
+            meshtastic_precision_bits=validated_data.get("meshtastic_precision_bits"),
             position_time=validated_data.get("position_time"),
             ground_speed=validated_data.get("ground_speed"),
             ground_track=validated_data.get("ground_track"),
@@ -433,9 +433,9 @@ class DeviceMetricsPacketSerializer(BasePacketSerializer):
                 batteryLevel = serializers.FloatField(source="battery_level", required=False, allow_null=True)
                 voltage = serializers.FloatField(required=False, allow_null=True)
                 channelUtilization = serializers.FloatField(
-                    source="channel_utilization", required=False, allow_null=True
+                    source="meshtastic_channel_utilization", required=False, allow_null=True
                 )
-                airUtilTx = serializers.FloatField(source="air_util_tx", required=False, allow_null=True)
+                airUtilTx = serializers.FloatField(source="meshtastic_air_util_tx", required=False, allow_null=True)
                 uptimeSeconds = serializers.IntegerField(source="uptime_seconds", required=False, allow_null=True)
 
             deviceMetrics = DeviceMetricsSerializer()
@@ -491,8 +491,8 @@ class DeviceMetricsPacketSerializer(BasePacketSerializer):
             reading_time=validated_data.get("reading_time"),
             battery_level=validated_data.get("battery_level"),
             voltage=validated_data.get("voltage"),
-            channel_utilization=validated_data.get("channel_utilization"),
-            air_util_tx=validated_data.get("air_util_tx"),
+            meshtastic_channel_utilization=validated_data.get("meshtastic_channel_utilization"),
+            meshtastic_air_util_tx=validated_data.get("meshtastic_air_util_tx"),
             uptime_seconds=validated_data.get("uptime_seconds"),
         )
 
@@ -512,9 +512,9 @@ class LocalStatsPacketSerializer(BasePacketSerializer):
             class LocalStatsSerializer(serializers.Serializer):
                 uptimeSeconds = serializers.IntegerField(source="uptime_seconds", required=False, allow_null=True)
                 channelUtilization = serializers.FloatField(
-                    source="channel_utilization", required=False, allow_null=True
+                    source="meshtastic_channel_utilization", required=False, allow_null=True
                 )
-                airUtilTx = serializers.FloatField(source="air_util_tx", required=False, allow_null=True)
+                airUtilTx = serializers.FloatField(source="meshtastic_air_util_tx", required=False, allow_null=True)
                 numPacketsTx = serializers.IntegerField(source="num_packets_tx", required=False, allow_null=True)
                 numPacketsRx = serializers.IntegerField(source="num_packets_rx", required=False, allow_null=True)
                 numPacketsRxBad = serializers.IntegerField(source="num_packets_rx_bad", required=False, allow_null=True)
@@ -581,8 +581,8 @@ class LocalStatsPacketSerializer(BasePacketSerializer):
             to_str=validated_data.get("to_str"),
             port_num=validated_data.get("port_num"),
             uptime_seconds=validated_data.get("uptime_seconds"),
-            channel_utilization=validated_data.get("channel_utilization"),
-            air_util_tx=validated_data.get("air_util_tx"),
+            meshtastic_channel_utilization=validated_data.get("meshtastic_channel_utilization"),
+            meshtastic_air_util_tx=validated_data.get("meshtastic_air_util_tx"),
             num_packets_tx=validated_data.get("num_packets_tx"),
             num_packets_rx=validated_data.get("num_packets_rx"),
             num_packets_rx_bad=validated_data.get("num_packets_rx_bad"),
@@ -1266,16 +1266,16 @@ class PositionSerializer(serializers.Serializer):
     longitude = serializers.FloatField()
     altitude = serializers.FloatField()
     heading = serializers.FloatField()
-    location_source = serializers.CharField()
+    meshtastic_location_source = serializers.CharField()
 
     def to_internal_value(self, data):
         """Convert location source from string to integer."""
         # First, handle the standard DRF conversion
         validated_data = super().to_internal_value(data)
 
-        # Convert location_source from string to integer using LocationSource
-        if "location_source" in validated_data and validated_data["location_source"]:
-            validated_data["location_source"] = convert_location_source(validated_data["location_source"])
+        # Convert meshtastic_location_source from string to integer using LocationSource
+        if "meshtastic_location_source" in validated_data and validated_data["meshtastic_location_source"]:
+            validated_data["meshtastic_location_source"] = convert_location_source(validated_data["meshtastic_location_source"])
 
         return validated_data
 
@@ -1285,8 +1285,8 @@ class DeviceMetricsSerializer(serializers.Serializer):
     reported_time = serializers.DateTimeField(required=True)
     battery_level = serializers.FloatField()
     voltage = serializers.FloatField()
-    channel_utilization = serializers.FloatField()
-    air_util_tx = serializers.FloatField()
+    meshtastic_channel_utilization = serializers.FloatField()
+    meshtastic_air_util_tx = serializers.FloatField()
     uptime_seconds = serializers.IntegerField()
 
 
@@ -1367,7 +1367,7 @@ class NodeSerializer(serializers.ModelSerializer):
                 "latitude": position_data.get("latitude"),
                 "longitude": position_data.get("longitude"),
                 "altitude": position_data.get("altitude"),
-                "location_source": position_data.get("location_source"),
+                "meshtastic_location_source": position_data.get("meshtastic_location_source"),
             }
 
         # Handle device metrics
@@ -1377,8 +1377,8 @@ class NodeSerializer(serializers.ModelSerializer):
                 "reported_time": metrics_data.get("reported_time"),
                 "battery_level": metrics_data.get("battery_level"),
                 "voltage": metrics_data.get("voltage"),
-                "channel_utilization": metrics_data.get("channel_utilization"),
-                "air_util_tx": metrics_data.get("air_util_tx"),
+                "meshtastic_channel_utilization": metrics_data.get("meshtastic_channel_utilization"),
+                "meshtastic_air_util_tx": metrics_data.get("meshtastic_air_util_tx"),
                 "uptime_seconds": metrics_data.get("uptime_seconds"),
             }
 
@@ -1395,7 +1395,7 @@ class NodeSerializer(serializers.ModelSerializer):
                 latitude=position_data.get("latitude"),
                 longitude=position_data.get("longitude"),
                 altitude=position_data.get("altitude"),
-                location_source=position_data.get("location_source"),
+                meshtastic_location_source=position_data.get("meshtastic_location_source"),
             )
             # Update NodeLatestStatus with latest position
             NodeLatestStatus.objects.update_or_create(
@@ -1404,7 +1404,7 @@ class NodeSerializer(serializers.ModelSerializer):
                     "latitude": position_data.get("latitude"),
                     "longitude": position_data.get("longitude"),
                     "altitude": position_data.get("altitude"),
-                    "location_source": position_data.get("location_source"),
+                    "meshtastic_location_source": position_data.get("meshtastic_location_source"),
                     "position_reported_time": reported_time,
                 },
             )
@@ -1417,8 +1417,8 @@ class NodeSerializer(serializers.ModelSerializer):
                 reported_time=reported_time,
                 battery_level=device_metrics_data.get("battery_level"),
                 voltage=device_metrics_data.get("voltage"),
-                channel_utilization=device_metrics_data.get("channel_utilization"),
-                air_util_tx=device_metrics_data.get("air_util_tx"),
+                meshtastic_channel_utilization=device_metrics_data.get("meshtastic_channel_utilization"),
+                meshtastic_air_util_tx=device_metrics_data.get("meshtastic_air_util_tx"),
                 uptime_seconds=device_metrics_data.get("uptime_seconds"),
             )
             # Update NodeLatestStatus with latest device metrics
@@ -1427,8 +1427,8 @@ class NodeSerializer(serializers.ModelSerializer):
                 defaults={
                     "battery_level": device_metrics_data.get("battery_level"),
                     "voltage": device_metrics_data.get("voltage"),
-                    "channel_utilization": device_metrics_data.get("channel_utilization"),
-                    "air_util_tx": device_metrics_data.get("air_util_tx"),
+                    "meshtastic_channel_utilization": device_metrics_data.get("meshtastic_channel_utilization"),
+                    "meshtastic_air_util_tx": device_metrics_data.get("meshtastic_air_util_tx"),
                     "uptime_seconds": device_metrics_data.get("uptime_seconds"),
                     "metrics_reported_time": reported_time,
                 },

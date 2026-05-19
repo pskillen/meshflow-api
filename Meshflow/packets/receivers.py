@@ -50,7 +50,7 @@ from .signals import (
 logger = logging.getLogger(__name__)
 
 
-# Packet types that already update NodeLatestStatus (and set inferred_max_hops there)
+# Packet types that already update NodeLatestStatus (and set meshtastic_inferred_max_hops there)
 _PACKET_TYPES_WITH_NLS_UPDATE = (
     PositionPacket,
     DeviceMetricsPacket,
@@ -64,7 +64,7 @@ _PACKET_TYPES_WITH_NLS_UPDATE = (
 
 @receiver(packet_received)
 def on_packet_received_update_inferred_max_hops(sender, packet, observer, observation, **kwargs):
-    """Update NodeLatestStatus.inferred_max_hops for packet types that don't update NodeLatestStatus."""
+    """Update NodeLatestStatus.meshtastic_inferred_max_hops for packet types that don't update NodeLatestStatus."""
     if isinstance(packet, _PACKET_TYPES_WITH_NLS_UPDATE):
         return
     hop_start = observation.hop_start if observation else None
@@ -86,11 +86,11 @@ def on_packet_received_update_inferred_max_hops(sender, packet, observer, observ
         enqueue_new_node_baseline(observed_node, observer)
     node_status, created = NodeLatestStatus.objects.get_or_create(
         node=observed_node,
-        defaults={"inferred_max_hops": hop_start},
+        defaults={"meshtastic_inferred_max_hops": hop_start},
     )
-    if not created and node_status.inferred_max_hops != hop_start:
-        node_status.inferred_max_hops = hop_start
-        node_status.save(update_fields=["inferred_max_hops"])
+    if not created and node_status.meshtastic_inferred_max_hops != hop_start:
+        node_status.meshtastic_inferred_max_hops = hop_start
+        node_status.save(update_fields=["meshtastic_inferred_max_hops"])
 
 
 @receiver(position_packet_received)

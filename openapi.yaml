@@ -1068,7 +1068,7 @@ components:
           format: date-time
           description: The timestamp when the node was last heard from
           nullable: true
-        inferred_max_hops:
+        meshtastic_inferred_max_hops:
           type: integer
           nullable: true
           description: >
@@ -1881,11 +1881,11 @@ components:
           type: number
           description: The heading of the node
           nullable: true
-        location_source:
+        meshtastic_location_source:
           type: string
           description: The source of the location data
           enum: [INTERNAL, EXTERNAL, MANUAL, UNKNOWN]
-        precision_bits:
+        meshtastic_precision_bits:
           type: integer
           description: The precision of the location data in bits
           nullable: true
@@ -1932,10 +1932,10 @@ components:
         voltage:
           type: number
           description: The battery voltage in volts
-        channel_utilization:
+        meshtastic_channel_utilization:
           type: number
           description: The channel utilization as a percentage
-        air_util_tx:
+        meshtastic_air_util_tx:
           type: number
           description: The air utilization for transmission
         uptime_seconds:
@@ -4223,7 +4223,7 @@ paths:
                           format: date-time
                         battery_level:
                           type: number
-                        channel_utilization:
+                        meshtastic_channel_utilization:
                           type: number
                         voltage:
                           type: number

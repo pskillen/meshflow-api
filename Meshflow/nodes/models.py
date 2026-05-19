@@ -365,8 +365,8 @@ class NodeLatestStatus(models.Model):
     longitude = models.FloatField(null=True, blank=True)
     altitude = models.FloatField(null=True, blank=True)
     heading = models.FloatField(null=True, blank=True)
-    location_source = models.IntegerField(choices=LocationSource.choices, null=True, blank=True)
-    precision_bits = models.SmallIntegerField(null=True, blank=True)
+    meshtastic_location_source = models.IntegerField(choices=LocationSource.choices, null=True, blank=True)
+    meshtastic_precision_bits = models.SmallIntegerField(null=True, blank=True)
     ground_speed = models.FloatField(null=True, blank=True)
     ground_track = models.FloatField(null=True, blank=True)
     sats_in_view = models.SmallIntegerField(null=True, blank=True)
@@ -376,8 +376,8 @@ class NodeLatestStatus(models.Model):
     # Device metrics fields (from DeviceMetrics model)
     battery_level = models.FloatField(null=True, blank=True)
     voltage = models.FloatField(null=True, blank=True)
-    channel_utilization = models.FloatField(null=True, blank=True)
-    air_util_tx = models.FloatField(null=True, blank=True)
+    meshtastic_channel_utilization = models.FloatField(null=True, blank=True)
+    meshtastic_air_util_tx = models.FloatField(null=True, blank=True)
     uptime_seconds = models.BigIntegerField(null=True, blank=True)
     metrics_reported_time = models.DateTimeField(null=True, blank=True)
 
@@ -430,7 +430,7 @@ class NodeLatestStatus(models.Model):
     ch8_current = models.FloatField(null=True, blank=True)
     power_reported_time = models.DateTimeField(null=True, blank=True)
 
-    inferred_max_hops = models.SmallIntegerField(
+    meshtastic_inferred_max_hops = models.SmallIntegerField(
         null=True,
         blank=True,
         help_text=_("Meshtastic-only: inferred from packet hop_start when received; the node's max hops setting."),
@@ -529,11 +529,11 @@ class Position(BaseNodeItem):
     longitude = models.FloatField(null=True, blank=True)
     altitude = models.FloatField(null=True, blank=True)
     heading = models.FloatField(null=True, blank=True)
-    location_source = models.IntegerField(
+    meshtastic_location_source = models.IntegerField(
         choices=LocationSource.choices,
         default=LocationSource.UNSET,
     )
-    precision_bits = models.SmallIntegerField(null=True, blank=True)
+    meshtastic_precision_bits = models.SmallIntegerField(null=True, blank=True)
     ground_speed = models.FloatField(null=True, blank=True, help_text="Speed in m/s")
     ground_track = models.FloatField(null=True, blank=True, help_text="Track in degrees (0-359)")
     sats_in_view = models.SmallIntegerField(null=True, blank=True, help_text="Number of satellites in view")
@@ -555,8 +555,8 @@ class DeviceMetrics(BaseNodeItem):
 
     battery_level = models.FloatField(help_text="Battery level as a percentage")
     voltage = models.FloatField(help_text="Battery voltage in volts")
-    channel_utilization = models.FloatField(help_text="Channel utilization as a percentage")
-    air_util_tx = models.FloatField(help_text="Air utilization for transmission")
+    meshtastic_channel_utilization = models.FloatField(help_text="Channel utilization as a percentage")
+    meshtastic_air_util_tx = models.FloatField(help_text="Air utilization for transmission")
     uptime_seconds = models.BigIntegerField(help_text="Device uptime in seconds")
 
     class Meta:
