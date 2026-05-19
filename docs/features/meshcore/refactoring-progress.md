@@ -18,7 +18,7 @@ Living tracker for the [rename audit index](file:///Users/patricks/IdeaProjects/
 
 | ID | Sub-plan | Repos | PRs | Status | Issue | PR |
 |----|----------|-------|-----|--------|-------|-----|
-| SP-01 | OpenAPI contract docs | api | 1 | in_progress | [#308](https://github.com/pskillen/meshflow-api/issues/308) | |
+| SP-01 | OpenAPI contract docs | api | 1 | in_progress | [#308](https://github.com/pskillen/meshflow-api/issues/308) | [#320](https://github.com/pskillen/meshflow-api/pull/320) |
 | SP-02 | Comment-only labelling | api, bot, ui | 1–3 | not_started | [#309](https://github.com/pskillen/meshflow-api/issues/309) | |
 | SP-03 | `node_id` → `meshtastic_node_id` | api, bot, ui | 1 (coordinated) | not_started | [#310](https://github.com/pskillen/meshflow-api/issues/310) | |
 | SP-04 | ObservedNode MT identity fields | api, ui | 1 | not_started | [#312](https://github.com/pskillen/meshflow-api/issues/312) | |
