@@ -143,7 +143,7 @@ Parent index: [meshcore-rename-index](file:///Users/patricks/IdeaProjects/MeshFl
   - **api:** `ObservedNodeViewSet.lookup_field = internal_id`; claim, RF profile/propagation, environment-settings, nested metrics, `traceroute-links` use `<uuid:internal_id>`; `GET …/by-meshtastic-id/{meshtastic_node_id}/` → 302 to canonical detail URL; `openapi.yaml` path `{internal_id}`; tests use `reverse(..., kwargs={"internal_id": ...})`
   - **ui:** `NodeDetails` + `LegacyMeshtasticNodeRedirect` for numeric `/nodes/:id`; links on `ObservedNode` use `internal_id`; `useNodeSuspense(internalId)`; claim/release/cancel use UUID; `ObservedNode.internal_id` typed `string` + `TEST_OBSERVED_INTERNAL_ID` in tests
 - **Breaking:** Clients must use UUID for observed-node detail and nested routes after api deploy. Managed nodes, packet ingest, and stats paths still use Meshtastic numeric id.
-- **Partial ui gap:** `getNodeTracerouteLinks` / `useNodeTracerouteLinks` still pass `meshtastic_node_id` into the detail URL — **must switch to `internal_id` after api #324 merges** (see Outstanding).
+- **ui follow-up (done on #271):** `getNodeTracerouteLinks` / `useNodeTracerouteLinks` use `internal_id` for the detail URL.
 
 ---
 
@@ -160,7 +160,7 @@ _Capture follow-ups so they are not lost between sub-plans. Remove or strike thr
 
 ### SP-11 / #318 — follow-ups after merge
 
-- [ ] **UI traceroute-links URL** — `MeshflowApi.getNodeTracerouteLinks` and `useNodeTracerouteLinks` still use `meshtastic_node_id` in `/nodes/observed-nodes/{id}/traceroute-links/`; api detail routes now require UUID. Update `NodeDetailContent` / `TracerouteLinksSection` to pass `internal_id` (small ui fix, can ship right after #271 or as follow-up PR).
+- [x] **UI traceroute-links URL** — fixed on [ui#271](https://github.com/pskillen/meshflow-ui/pull/271) (`internal_id` in `getNodeTracerouteLinks` / `TracerouteLinksSection`).
 - [ ] **Bookmark / external links** — old numeric observed-node URLs work via ui redirect; api `by-meshtastic-id` supports server-side resolution. Document in release notes.
 - [ ] **Mesh monitoring** — `createNodeWatch` already uses `observed_node_id` (UUID string); no change needed.
 - [ ] **Heatmap / traceroute map links** — ui still links to `/nodes/{meshtastic_node_id}` for types without `internal_id` (`TracerouteRouteNode`, `HeatmapNode`); redirect handles it; optional enrichment: add `internal_id` to those API payloads later.
