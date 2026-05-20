@@ -3,7 +3,15 @@
 MeshCore broadcast semantics differ; see docs/features/packet-ingestion/adr/0003-mc-broadcast-semantics.md.
 """
 
+from __future__ import annotations
+
 import base64
+from typing import TYPE_CHECKING
+
+from common.protocol import Protocol
+
+if TYPE_CHECKING:
+    from nodes.models import ObservedNode
 
 MESHTASTIC_BROADCAST_ID = 0xFFFFFFFF
 
@@ -17,6 +25,62 @@ def meshtastic_id_to_hex(meshtastic_id: int) -> str:
         return "^all"
 
     return f"!{meshtastic_id:08x}"
+
+
+def observed_node_search_conditions(query: str):
+    """Build Q filters for ObservedNode search (display id, names, numeric MT id)."""
+    from django.db.models import Q
+
+    from common.meshcore_node_helpers import MC_NODE_ID_STR_PREFIX, normalize_mc_pubkey_prefix
+
+    conditions = Q()
+    q = query.strip()
+
+    if q.startswith("!") and len(q) == 9:
+        try:
+            conditions |= Q(meshtastic_node_id=meshtastic_hex_to_int(q))
+        except ValueError:
+            pass
+    elif q.lower().startswith(MC_NODE_ID_STR_PREFIX):
+        suffix = q[len(MC_NODE_ID_STR_PREFIX) :].strip().lower().replace("0x", "")
+        if suffix:
+            try:
+                if len(suffix) == 12:
+                    prefix = normalize_mc_pubkey_prefix(suffix)
+                    conditions |= Q(mc_pubkey_prefix=prefix) | Q(mc_pubkey__istartswith=prefix)
+                else:
+                    conditions |= Q(mc_pubkey_prefix__icontains=suffix) | Q(mc_pubkey__icontains=suffix)
+            except ValueError:
+                conditions |= Q(mc_pubkey_prefix__icontains=suffix) | Q(mc_pubkey__icontains=suffix)
+    elif q.startswith("!"):
+        try:
+            conditions |= Q(meshtastic_node_id=meshtastic_hex_to_int(q))
+        except ValueError:
+            pass
+    else:
+        hexish = q.lower().replace("0x", "")
+        if hexish and all(c in "0123456789abcdef" for c in hexish):
+            conditions |= Q(mc_pubkey__icontains=hexish) | Q(mc_pubkey_prefix__icontains=hexish)
+
+    try:
+        conditions |= Q(meshtastic_node_id=int(q))
+    except ValueError, TypeError:
+        pass
+
+    conditions |= Q(short_name__icontains=query)
+    conditions |= Q(long_name__icontains=query)
+    return conditions
+
+
+def observed_node_id_str(node: ObservedNode) -> str:
+    """Protocol-aware display id for an ObservedNode (ADR-0001; not persisted)."""
+    from common.meshcore_node_helpers import mc_node_id_str
+
+    if node.protocol == Protocol.MESHCORE:
+        return mc_node_id_str(mc_pubkey=node.mc_pubkey, mc_pubkey_prefix=node.mc_pubkey_prefix)
+    if node.meshtastic_node_id is None:
+        raise ValueError("Meshtastic ObservedNode requires meshtastic_node_id")
+    return meshtastic_id_to_hex(node.meshtastic_node_id)
 
 
 def meshtastic_hex_to_int(node_id: str) -> int:
