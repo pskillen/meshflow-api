@@ -12,6 +12,7 @@ import users.tests.conftest  # noqa: F401
 from packets.services.traceroute import TraceroutePacketService
 from packets.signals import auto_traceroute_completed_from_packet
 from traceroute.models import AutoTraceRoute
+from traceroute.tests.factories import make_auto_traceroute
 
 pytest_plugins = ["packets.tests.test_traceroute_receiver"]
 
@@ -37,7 +38,10 @@ def test_traceroute_service_emits_completion_signal(
     now = timezone.now()
     packet.first_reported_time = now
     packet.save(update_fields=["first_reported_time"])
-    auto_tr = AutoTraceRoute.objects.create(
+    auto_tr = make_auto_traceroute(
+        create_managed_node,
+        create_observed_node,
+        create_user,
         source_node=source,
         target_node=target,
         status=AutoTraceRoute.STATUS_SENT,
