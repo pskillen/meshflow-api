@@ -13,7 +13,7 @@ Cross-repo MeshCore work is tracked on GitHub epics [#264](https://github.com/ps
 **Feature guides** (how-to, not phase status):
 
 - [feeder-bootstrap.md](./feeder-bootstrap.md) — first MC feeder + API key
-- [text-message-channels.md](./text-message-channels.md) — Phase 2.2 text + channels (design)
+- [text-message-channels.md](./text-message-channels.md) — Phase 2.2 text + channels (design; **device → API sync** for channel config)
 
 **Related (meshflow-api)**
 

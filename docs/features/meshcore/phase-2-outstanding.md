@@ -62,10 +62,46 @@ Items **skipped**, **incomplete**, or **discovered during Phase 2 / rename execu
 
 ---
 
+## Phase 2.2 — text messages & channels ([#296](https://github.com/pskillen/meshflow-api/issues/296), [#297](https://github.com/pskillen/meshflow-api/issues/297))
+
+Design: [text-message-channels.md](./text-message-channels.md) (device = source of truth for channel config; API mirror via sync).
+
+**API**
+
+- [ ] `MessageChannel`: `mc_channel_type`, `mc_hashtag`; uniqueness `(constellation, protocol, mc_channel_idx)`.
+- [ ] `ManagedNode.mc_channels` M2M; optional `mc_channels_synced_at`.
+- [ ] `POST …/mc-channel-sync/` — reconcile mirror from bot device snapshot.
+- [ ] `resolve_mc_channel` — prefer feeder M2M; placeholder before first sync.
+- [ ] `TextMessage`: `protocol`, `original_mc_packet`, nullable `sender`, provenance CHECK.
+- [ ] `MeshCoreTextMessageService` + `meshcore_text_packet_received` receiver.
+- [ ] History API: `protocol` filter; MC channel broadcast; MC `heard` observations.
+- [ ] WS `apply_mc_channel_config` (UI → device; bot re-syncs after).
+- [ ] OpenAPI + tests.
+
+**Bot (child #297)**
+
+- [ ] Read device channel table on connect; `POST mc-channel-sync`.
+- [ ] WS handler: apply config → write device → re-sync.
+- [ ] Enable MC WebSocket when storage API configured.
+- [ ] meshcore_py channel read/write spike.
+
+**UI (child #297)**
+
+- [ ] Display synced `mc_channels`; apply-to-radio (not API-only save).
+- [ ] Sync status / bot offline messaging.
+
+**Deferred (2.2)**
+
+- [ ] Three-way merge / conflict UI when device and staged edits diverge.
+- [ ] Periodic background sync without reconnect.
+- [ ] MC DM history API / message history UI.
+
+---
+
 ## Cross-phase tickets (not rename SP work)
 
 - [ ] **API v1 ingest retirement** — [#319](https://github.com/pskillen/meshflow-api/issues/319), bot [#95](https://github.com/pskillen/meshflow-bot/issues/95).
-- [ ] **`TextMessage` dual FK** — Phase 2.2 / separate work ([#296](https://github.com/pskillen/meshflow-api/issues/296)).
+- [ ] **`TextMessage` dual FK** — Phase 2.2 ([#296](https://github.com/pskillen/meshflow-api/issues/296)); see checklist above.
 - [ ] **Formatting toolchain alignment** (Black / flake8 / isort / Ruff) — bot [#101](https://github.com/pskillen/meshflow-bot/issues/101).
 - [ ] **Rename Django app `packets` or `/api/packets/` URL prefix** — out of scope for #307.
 

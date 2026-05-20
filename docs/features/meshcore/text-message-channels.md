@@ -20,7 +20,8 @@ How MeshCore **group text** and **channel configuration** flow from the radio th
 | | **Meshtastic** | **MeshCore** |
 |---|----------------|--------------|
 | Channel on radio | Fixed slots 0–7, PSK + name in firmware | Arbitrary list on companion; **index** on wire, **name** only in device config |
-| Feeder channel config in API | Eight FKs: `ManagedNode.meshtastic_channel_0..7` → `MessageChannel` | **Planned:** `ManagedNode.mc_channels` M2M → `MessageChannel` rows |
+| Feeder channel config | API slot FKs → `MessageChannel` (operator maps slots in UI) | **Planned:** device is source of truth; API **mirror** via bot `mc-channel-sync` on connect |
+| Feeder channel link in API | `meshtastic_channel_0..7` | `ManagedNode.mc_channels` M2M (reconciled from device snapshot) |
 | What a text packet carries | Channel index + sender node id | `channel_message`: **index + body only** (no sender pubkey); `contact_message`: **12-hex sender prefix** + body |
 | Broadcast vs DM | `to_int == 0xFFFFFFFF` vs directed node id | Broadcast = **no** `to_pubkey*` on wire; channel text is always broadcast on that index ([ADR-0003](../packet-ingestion/adr/0003-mc-broadcast-semantics.md)) |
 | UI today | Slot 0–7 mapping on [Node Settings](https://github.com/pskillen/meshflow-ui/blob/main/src/pages/user/NodeSettings.tsx) | **Planned:** add/remove public and hashtag channels per MC feeder |
@@ -54,25 +55,32 @@ sequenceDiagram
 
 ### Configuration path (planned #297)
 
-Operator-defined channels on the feeder are the **source of truth** in the API; the bot pushes them to the device and reconciles on connect.
+The **MeshCore device / companion** is the **source of truth** for channel names, types (public / hashtag), and indices. The API holds a **mirror** per feeder (`ManagedNode.mc_channels`). On every bot connect the bot reads the device and **uploads a full snapshot**; the API reconciles its own state. Operator edits in the UI go **to the device first** (WebSocket), then the bot re-syncs so the API matches the radio again.
 
 ```mermaid
 sequenceDiagram
-  participant UI as meshflow_ui
-  participant API as meshflow_api
-  participant WS as bot_WebSocket
+  participant Radio as MeshCore_device
   participant Bot as meshflow_bot
-  participant Radio as MeshCore_radio
+  participant API as meshflow_api
+  participant UI as meshflow_ui
 
-  UI->>API: CRUD mc_channels on ManagedNode
-  API->>WS: apply_mc_channel_config
-  WS->>Bot: command
-  Bot->>Radio: meshcore channel read/write
-  Bot->>API: optional sync ack / index report
-  Note over Bot,API: On connect: GET config, reconcile device vs DB
+  Note over Radio,API: On bot start
+  Bot->>Radio: read channel table
+  Bot->>API: POST mc-channel-sync
+  API->>API: reconcile MessageChannel + mc_channels
+
+  Note over UI,Radio: Optional operator edit
+  UI->>API: apply to radio (WS)
+  API->>Bot: apply_mc_channel_config
+  Bot->>Radio: write channels
+  Bot->>API: POST mc-channel-sync
 ```
 
+**Drift:** if the API mirror and device disagree (e.g. failed push), the **next connect sync overwrites the API** from the device. No three-way merge in v1.
+
 Today the bot **does not** start the WebSocket client for `RADIO_PROTOCOL=meshcore` (Meshtastic-only). Enabling WS for MC feeders is part of [#297](https://github.com/pskillen/meshflow-api/issues/297).
+
+**Implementation plan:** Cursor workspace plan `mc_text_textmessage_pipeline_2c3e9fb8.plan.md` (kept in sync with this file; **this doc is canonical** in git for operators and PRs).
 
 ---
 
@@ -144,13 +152,27 @@ Example ingest body (channel text, illustrative):
 
 ### Bot channel configuration (planned #297)
 
-**Not implemented yet.** Intended behaviour:
+**Not implemented yet.**
 
-1. **On connect** — `GET` the feeder’s `mc_channels` from the API; read the device’s channel table via `meshcore` APIs; reconcile (add missing channels on radio, report indices).
-2. **On UI save** — receive WebSocket command `apply_mc_channel_config` with the desired channel list (public vs hashtag, name, optional hashtag string); write to radio; ack success/failure.
-3. **Channel types (v1)** — **public** and **hashtag** only, matching companion capabilities under discussion in [#297](https://github.com/pskillen/meshflow-api/issues/297).
+| Step | Behaviour |
+|------|-----------|
+| **On connect** | Read channel table from device (`meshcore` API — exact calls TBD in bot spike). `POST` full snapshot to API **`mc-channel-sync`**; API updates `MessageChannel` rows and `ManagedNode.mc_channels`. |
+| **On UI “apply to radio”** | WebSocket `apply_mc_channel_config` → write device → re-read device → `POST mc-channel-sync` again. |
+| **Channel types (v1)** | **public** and **hashtag** only ([#297](https://github.com/pskillen/meshflow-api/issues/297)). |
 
-The bot remains responsible for **upload only** in Phase 1; configuration is an additional responsibility in Phase 2.
+The bot does **not** treat API channel rows as authoritative on startup (no “pull API config and push to device” as the default path). Packet **upload** remains as in Phase 1.
+
+**Example sync payload** (illustrative):
+
+```json
+{
+  "channels": [
+    { "mc_channel_idx": 0, "name": "Public", "mc_channel_type": "PUBLIC", "mc_hashtag": null },
+    { "mc_channel_idx": 1, "name": "Galloway", "mc_channel_type": "HASHTAG", "mc_hashtag": "galloway" }
+  ],
+  "synced_at": "2026-05-20T12:00:00Z"
+}
+```
 
 ---
 
@@ -252,19 +274,26 @@ Identity receiver **skips** channel text (no `from_pubkey` / prefix). Contact te
 
 ---
 
-## meshflow-api — channel CRUD and WebSocket (planned #297)
+## meshflow-api — channel mirror and WebSocket (planned #297)
 
-**REST (illustrative paths):**
+### Primary: `POST mc-channel-sync` (device → API)
 
-- List/replace MC channels on a managed node the user owns.
-- Create channel: `{ name, mc_channel_type, mc_hashtag?, mc_channel_idx }` — index may come from UI or from post-sync device report.
-- Delete: remove from `mc_channels` M2M.
+- **Caller:** meshflow-bot with feeder Node API key (same key as ingest), after reading the device.
+- **Body:** full channel list with `mc_channel_idx`, `name`, `mc_channel_type`, `mc_hashtag` per row; optional `synced_at`.
+- **Effect:** upsert constellation-scoped `MessageChannel` rows; set `ManagedNode.mc_channels` to exactly match the snapshot (detach indices no longer on device; do not delete channels still referenced by stored packets).
+- **Read:** `GET` managed node (owner JWT) returns nested `mc_channels` mirror for UI.
 
-**Permissions:** node owner or constellation editor (same spirit as managed-node edits).
+### Secondary: push UI intent → device
 
-**WebSocket:** new command type e.g. `apply_mc_channel_config` to the connected MC feeder (pattern: remote Meshtastic traceroute on [`/ws/nodes/`](../../../Meshflow/ws/tests/test_node_consumer.py)). Optional ack events for UI feedback.
+- **WebSocket** `apply_mc_channel_config` to connected MC feeder (pattern: Meshtastic remote traceroute in [`ws/tests/test_node_consumer.py`](../../../Meshflow/ws/tests/test_node_consumer.py)).
+- Bot writes device, then **must** call `mc-channel-sync` so the API mirror stays aligned with the device.
+- Optional ack events: `mc_channel_config_applied` / `mc_channel_config_failed`.
 
-**OpenAPI:** extend `ManagedNode`, `MessageChannel`, and WS command schemas when implemented.
+**Permissions:** sync endpoint accepts feeder key; read/apply-for-owner uses node owner or constellation editor.
+
+**OpenAPI:** `mc-channel-sync`, nested `mc_channels` on `ManagedNode`, WS command schemas.
+
+**Not v1:** API-only CRUD that changes the mirror without a device round-trip (would reintroduce drift).
 
 ---
 
@@ -279,9 +308,10 @@ Identity receiver **skips** channel text (no `from_pubkey` / prefix). Contact te
 
 When `ManagedNode.protocol === MESHCORE`:
 
-- Channel **list** UI (not eight slots): add/remove channels.
-- Fields: display name, type (**Public** / **Hashtag**), hashtag value when applicable, `mc_channel_idx` (from API or after sync).
-- Calls new meshflow-api endpoints; shows errors if bot offline or WS apply fails.
+- **Display** channel list from API mirror (populated after bot connect sync).
+- **Edit** with explicit **“Apply to radio”** — does not assume API-only saves change the device.
+- Fields: name, type (**Public** / **Hashtag**), hashtag, `mc_channel_idx` (from last sync).
+- Show sync status / errors when bot offline or WS apply fails.
 
 **Message history UI** for MC protocol filter is **out of scope** for #297 (separate epic/UI work); #296 only requires API list support for channel broadcast messages.
 
@@ -292,7 +322,7 @@ When `ManagedNode.protocol === MESHCORE`:
 1. Create MC **constellation** and **ManagedNode** feeder ([feeder-bootstrap.md](feeder-bootstrap.md)).
 2. Link **Node API key** via `NodeAuth` (one key per feeder recommended).
 3. Configure bot env (`MESHCORE_UPLOAD_ENABLED`, storage API).
-4. **(Planned #297)** In UI, define public/hashtag channels on the feeder; wait for bot sync to device.
+4. **(Planned #297)** Start bot with upload enabled; on connect it syncs device channels to API. Optionally use UI to apply changes **to the radio**, then wait for re-sync.
 5. Confirm `channel_message` ingest: `MeshCoreTextPacket` rows with `channel` FK and matching `mc_channel_idx`.
 6. **(Planned #296)** Confirm `TextMessage` rows appear on `GET /api/messages/?protocol=2` (or mixed list) for channel traffic.
 
@@ -306,8 +336,10 @@ When `ManagedNode.protocol === MESHCORE`:
 | API store `MeshCoreTextPacket` + observation | **Done** |
 | `resolve_mc_channel` placeholder `MessageChannel` | **Done** (partial ADR-0002) |
 | `ManagedNode.mc_channels` + channel types | **Planned** [#297](https://github.com/pskillen/meshflow-api/issues/297) |
-| Bot device channel sync + WS apply | **Planned** [#297](https://github.com/pskillen/meshflow-bot/issues/297) (child) |
-| UI MC channel settings | **Planned** [#297](https://github.com/pskillen/meshflow-ui/issues/297) (child) |
+| Bot device → API `mc-channel-sync` on connect | **Planned** [#297](https://github.com/pskillen/meshflow-bot/issues/297) (child) |
+| Bot WS apply + re-sync after UI push | **Planned** [#297](https://github.com/pskillen/meshflow-bot/issues/297) (child) |
+| API `POST mc-channel-sync` reconcile | **Planned** [#297](https://github.com/pskillen/meshflow-api/issues/297) |
+| UI MC channel mirror + apply-to-radio | **Planned** [#297](https://github.com/pskillen/meshflow-ui/issues/297) (child) |
 | `TextMessage` + `protocol` field | **Planned** [#296](https://github.com/pskillen/meshflow-api/issues/296) |
 | MC message history in UI | **Deferred** (epic #266 UI) |
 

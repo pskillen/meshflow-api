@@ -72,6 +72,16 @@ Restart the bot. Confirm HTTP `POST /api/meshcore/packets/ingest/` in logs (no u
 - **MeshCore → Map**: observed nodes appear after ADVERT packets; feeders listed when default location is set.
 - **MeshCore → Nodes**: prefix stubs and nodes with/without position.
 
+## 5. Channel names (Phase 2.2 — planned)
+
+MeshCore **channel names and types** live on the companion device, not on the wire. After Phase 2.2 ([#297](https://github.com/pskillen/meshflow-api/issues/297)):
+
+1. On connect, **meshflow-bot** reads the device channel table and calls **`POST mc-channel-sync`** so the API mirror matches the radio.
+2. Until the first sync, ingest may use placeholder `MessageChannel` rows (`"MC channel N"`).
+3. Operator edits in the UI apply **to the radio** first; the bot re-syncs to update the API.
+
+See [text-message-channels.md](./text-message-channels.md).
+
 ## Operator trial (24h)
 
 Run one production/staging feeder with upload enabled for 24 hours. Check:

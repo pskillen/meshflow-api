@@ -82,7 +82,23 @@ Deploy api #325 before bot fleet upgrade.
 
 ## Phase 2.2 — text messages & channels
 
-**Status:** Not started (design only). **Guide:** [text-message-channels.md](./text-message-channels.md). **Issues:** [#296](https://github.com/pskillen/meshflow-api/issues/296), [#297](https://github.com/pskillen/meshflow-api/issues/297).
+**Status:** Not started (design only). **Guide:** [text-message-channels.md](./text-message-channels.md). **Plan:** `.cursor/plans/mc_text_textmessage_pipeline_2c3e9fb8.plan.md`. **Issues:** [#296](https://github.com/pskillen/meshflow-api/issues/296), [#297](https://github.com/pskillen/meshflow-api/issues/297).
+
+**Design (2026-05-20): channel config**
+
+- **Source of truth:** MeshCore **device** channel table (names, types, indices), not API-first CRUD.
+- **On bot connect:** read device → `POST mc-channel-sync` → API reconciles `MessageChannel` + `ManagedNode.mc_channels`.
+- **UI edits:** push to radio via WebSocket `apply_mc_channel_config`; bot re-reads device and syncs again.
+- **Drift:** connect sync overwrites API from device (no three-way merge in v1).
+- **Ingest:** `resolve_mc_channel` uses synced M2M; placeholder only before first sync.
+
+**Planned deliverables**
+
+| Area | #296 | #297 |
+| --- | --- | --- |
+| API | `TextMessage.protocol`, `original_mc_packet`, `MeshCoreTextMessageService`, history filter | `mc_channels` M2M, `mc-channel-sync`, WS apply |
+| Bot | (upload unchanged) | connect sync + WS apply + re-sync |
+| UI | — | mirror display + apply-to-radio |
 
 ---
 
