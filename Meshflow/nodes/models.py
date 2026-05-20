@@ -6,7 +6,7 @@ from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
-from common.mesh_node_helpers import meshtastic_id_to_hex
+from common.mesh_node_helpers import meshtastic_id_to_hex, observed_node_id_str
 from common.protocol import Protocol
 from constellations.models import MessageChannel
 
@@ -256,13 +256,6 @@ class ObservedNode(models.Model):
         db_index=True,
         help_text=_("Meshtastic numeric node id when protocol is Meshtastic; null for MeshCore."),
     )
-    node_id_str = models.CharField(
-        null=False,
-        blank=False,
-        max_length=16,
-        db_index=True,
-        help_text=_("Display id: !hex8 (Meshtastic) or mc:prefix12 (MeshCore)."),
-    )
     mc_pubkey = models.CharField(
         max_length=64,
         null=True,
@@ -355,6 +348,11 @@ class ObservedNode(models.Model):
                 name="nodes_observednode_mc_pubkey_unique",
             ),
         ]
+
+    @property
+    def node_id_str(self) -> str:
+        """Protocol-aware display id (not a DB column; ADR-0001)."""
+        return observed_node_id_str(self)
 
     def __str__(self):
         """Return a string representation of the node, including user's short name if available."""
