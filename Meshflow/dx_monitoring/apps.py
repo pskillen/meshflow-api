@@ -9,4 +9,6 @@ class DxMonitoringConfig(AppConfig):
     verbose_name = _("DX Monitoring")
 
     def ready(self):
+        import dx_monitoring.receivers  # noqa: F401
+
         from . import signals  # noqa: F401

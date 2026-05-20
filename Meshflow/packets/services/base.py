@@ -6,7 +6,7 @@ from common.mesh_node_helpers import meshtastic_id_to_hex
 from common.protocol import Protocol
 from nodes.models import ManagedNode, ObservedNode
 from packets.models import MtRawPacket, PacketObservation
-from packets.signals import new_node_observed
+from packets.signals import new_node_observed, node_last_heard_advanced, packet_from_node_processed
 from users.models import User
 
 
@@ -35,9 +35,15 @@ class BasePacketService(abc.ABC):
         self._dx_previous_last_heard = None
         self._get_or_create_from_node()
         self._process_packet()
-        from dx_monitoring.services import maybe_detect_dx_candidate
-
-        maybe_detect_dx_candidate(self)
+        packet_from_node_processed.send(
+            sender=self.__class__,
+            packet=self.packet,
+            observer=self.observer,
+            observation=self.observation,
+            from_node=self.from_node,
+            previous_last_heard=self._dx_previous_last_heard,
+            from_node_created=self._dx_from_node_created,
+        )
         self._update_node_last_heard()
 
     @abc.abstractmethod
@@ -74,11 +80,14 @@ class BasePacketService(abc.ABC):
         """Update the last_heard timestamp of the node that sent the packet."""
         if self.packet.from_int and self.packet.first_reported_time:
             try:
-                self.from_node.last_heard = self.packet.first_reported_time
+                last_heard = self.packet.first_reported_time
+                self.from_node.last_heard = last_heard
                 self.from_node.save(update_fields=["last_heard"])
-                from mesh_monitoring.services import clear_presence_on_packet_from_node
-
-                clear_presence_on_packet_from_node(self.from_node)
+                node_last_heard_advanced.send(
+                    sender=self.__class__,
+                    observed_node=self.from_node,
+                    last_heard=last_heard,
+                )
             except ObservedNode.DoesNotExist:
                 # If the node doesn't exist, we don't need to update it
                 pass

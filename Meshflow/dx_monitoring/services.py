@@ -7,7 +7,7 @@ observed-node resolution when MeshCore rows share this pipeline.
 from __future__ import annotations
 
 from datetime import timedelta
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from django.conf import settings
 from django.db import transaction
@@ -27,9 +27,6 @@ from dx_monitoring.models import (
 from nodes.models import ManagedNode, NodeLatestStatus, ObservedNode
 from packets.models import MtRawPacket, PacketObservation, TraceroutePacket
 from traceroute.models import AutoTraceRoute
-
-if TYPE_CHECKING:
-    from packets.services.base import BasePacketService
 
 
 def is_direct_packet_observation(observation: PacketObservation) -> bool:
@@ -260,15 +257,19 @@ def _get_or_create_active_event(
     return event
 
 
-def maybe_detect_dx_candidate(packet_service: BasePacketService) -> None:
+def maybe_detect_dx_candidate(
+    *,
+    packet: MtRawPacket,
+    observer: ManagedNode,
+    observation: PacketObservation,
+    from_node: ObservedNode,
+    previous_last_heard,
+    from_node_created: bool = False,
+) -> None:
     """Run DX rules after packet-specific processing, before ``last_heard`` update."""
+    del from_node_created  # reserved for future rules
     if not getattr(settings, "DX_MONITORING_DETECTION_ENABLED", False):
         return
-
-    packet: MtRawPacket = packet_service.packet
-    observer: ManagedNode = packet_service.observer
-    observation: PacketObservation = packet_service.observation
-    from_node: ObservedNode = packet_service.from_node
 
     if isinstance(packet, TraceroutePacket):
         return
@@ -293,7 +294,6 @@ def maybe_detect_dx_candidate(packet_service: BasePacketService) -> None:
     quiet_days = int(getattr(settings, "DX_MONITORING_RETURNED_DX_QUIET_DAYS", 30))
 
     prior_dx = _prior_dx_events_exist(constellation.id, from_node.pk)
-    previous_last_heard = getattr(packet_service, "_dx_previous_last_heard", None)
 
     dest_lat, dest_lon = _destination_coords(from_node)
     obs_lat, obs_lon = _observer_coords(observer)

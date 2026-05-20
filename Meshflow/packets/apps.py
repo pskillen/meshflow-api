@@ -8,3 +8,6 @@ class PacketsConfig(AppConfig):
     def ready(self):
         """Import signal handlers when Django is ready."""
         import packets.receivers  # noqa
+        from packets.traceroute_completion_wiring import connect_auto_traceroute_completed_receivers
+
+        connect_auto_traceroute_completed_receivers()

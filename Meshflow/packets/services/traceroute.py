@@ -8,10 +8,10 @@ from django.utils import timezone
 
 from packets.models import TraceroutePacket
 from packets.services.base import BasePacketService
+from packets.signals import auto_traceroute_completed_from_packet
 from traceroute.lifecycle import (
     apply_auto_traceroute_completion,
     create_external_inferred_auto_traceroute,
-    schedule_completed_traceroute_neo4j_export,
 )
 from traceroute.models import AutoTraceRoute
 
@@ -75,17 +75,12 @@ class TraceroutePacketService(BasePacketService):
             raw_packet=self.packet,
         )
 
-        from dx_monitoring.exploration import on_auto_traceroute_exploration_finished
-        from dx_monitoring.services import maybe_detect_dx_from_completed_traceroute
-
-        maybe_detect_dx_from_completed_traceroute(auto_tr, self.packet, self.observation)
-        on_auto_traceroute_exploration_finished(auto_tr)
-
-        # Lazy imports so tests can patch traceroute.ws_notify / mesh_monitoring.services / lifecycle Neo4j hook.
-        from mesh_monitoring.services import on_monitoring_traceroute_completed
-        from traceroute.ws_notify import notify_traceroute_status_changed
-
-        on_monitoring_traceroute_completed(auto_tr)
-        notify_traceroute_status_changed(auto_tr.id, AutoTraceRoute.STATUS_COMPLETED)
-        schedule_completed_traceroute_neo4j_export(auto_tr.id)
+        auto_traceroute_completed_from_packet.send(
+            sender=self.__class__,
+            auto_tr=auto_tr,
+            traceroute_packet=self.packet,
+            packet_observation=self.observation,
+            observer=self.observer,
+            from_node=self.from_node,
+        )
         logger.info("Linked TraceroutePacket %s to AutoTraceRoute %s", self.packet.id, auto_tr.id)

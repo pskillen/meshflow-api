@@ -46,7 +46,7 @@ When the traceroute response is received, the bot reports it as a packet. The pa
 
 ## 5. `TraceroutePacketService`: match, complete, `last_heard`
 
-`packets.receivers.on_traceroute_packet_received` delegates to `TraceroutePacketService` — the same `BasePacketService` pattern as other packet types: resolve the sender (`from_int`) as `ObservedNode`, run `_process_packet`, then `_update_node_last_heard` and `clear_presence_on_packet_from_node` for mesh monitoring.
+`packets.receivers.on_traceroute_packet_received` delegates to `TraceroutePacketService` — the same `BasePacketService` pattern as other packet types: resolve the sender (`from_int`) as `ObservedNode`, run `_process_packet`, emit `packet_from_node_processed` (DX skips traceroute packets), update `last_heard`, emit `node_last_heard_advanced` (mesh monitoring clears presence).
 
 `TraceroutePacketService._process_packet`:
 
@@ -54,7 +54,7 @@ When the traceroute response is received, the bot reports it as a packet. The pa
 2. If no match: creates an **external** `AutoTraceRoute` (cross-env or orphaned response). Use case: prod triggers a TR, but the response is ingested by pre-prod (shared node feeding both APIs). Pre-prod has no prior record, so it creates one with `trigger_type=2` (External), `triggered_at=now()`. The target `ObservedNode` is ensured by `BasePacketService._get_or_create_from_node` before this step.
 3. Builds `route` and `route_back` from packet data (node_ids + SNR).
 4. Marks `STATUS_COMPLETED`, saves route/route_back (possibly empty for a direct RF path), links `raw_packet`, clears any prior `error_message`. Empty hop lists match Meshtastic firmware’s “no intermediate hops” case; they are not treated as failure once a response packet is ingested.
-5. Calls `on_monitoring_traceroute_completed` for monitor traceroutes, `notify_traceroute_status_changed()` for WebSocket clients, and `push_traceroute_to_neo4j.delay(auto_tr.id)`.
+5. Emits `auto_traceroute_completed_from_packet`. Receivers (wired in order: dx_monitoring → mesh_monitoring → traceroute) run DX distant-hop detection and exploration follow-up, node-watch verification clear, WebSocket `notify_traceroute_status_changed`, and `push_traceroute_to_neo4j.delay`. See [packet-ingestion signals](../packet-ingestion/signals.md).
 
 True no-response for API-triggered traceroutes remains `pending` or `sent` until Celery marks them failed (see §6).
 

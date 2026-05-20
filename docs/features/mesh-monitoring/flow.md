@@ -7,7 +7,7 @@ Companion to [README.md](README.md). Diagrams use **Mermaid**; node IDs avoid sp
 | Component | Responsibility |
 |-----------|------------------|
 | **`mesh_monitoring` (Django app)** | `NodeWatch`, `NodePresence`, `NodeMonitoringConfig`; Celery task `process_node_watch_presence`; `selection` of monitoring TR sources; `services` state machine; watch + config REST views |
-| **`packets`** | Update `ObservedNode.last_heard`; on advance, call into `mesh_monitoring` to clear presence; emit **`device_metrics_recorded`** after persisting device metrics; TR packet receiver completes `AutoTraceRoute` rows |
+| **`packets`** | Update `ObservedNode.last_heard`; emit **`node_last_heard_advanced`** and **`device_metrics_recorded`**; TR packet service completes `AutoTraceRoute` and emits **`auto_traceroute_completed_from_packet`** |
 | **`traceroute`** | `AutoTraceRoute` including `trigger_type=4` (Node Watch); `pick_traceroute_target` excludes nodes under verification/offline; channel layer sends commands to bots |
 | **`meshtastic-bot`** | WebSocket client receives `traceroute` command, runs TR on radio, reports packets back to API |
 | **`push_notifications.discord`** | Send DM to a verified Discord user id (no OAuth in this module) |

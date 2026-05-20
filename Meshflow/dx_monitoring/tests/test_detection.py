@@ -175,6 +175,67 @@ def test_returned_dx_node_after_quiet_period(
 @override_settings(
     DX_MONITORING_DETECTION_ENABLED=True,
     DX_MONITORING_CLUSTER_DISTANCE_KM=150.0,
+    DX_MONITORING_DIRECT_DISTANCE_KM=5000.0,
+    DX_MONITORING_RETURNED_DX_QUIET_DAYS=30,
+)
+def test_packet_from_node_processed_passes_previous_last_heard_before_update(
+    create_managed_node,
+    create_observed_node,
+    create_packet_observation,
+    create_user,
+    create_position_packet,
+):
+    """DX candidate signal must fire with pre-update last_heard (ordering regression)."""
+    observer = create_managed_node(
+        meshtastic_node_id=0xE2000099,
+        default_location_latitude=55.95,
+        default_location_longitude=-3.19,
+    )
+    user = create_user()
+    remote_id = 0xBEEF0299
+    remote_hex = meshtastic_id_to_hex(remote_id)
+    quiet_before = timezone.now() - timedelta(days=40)
+
+    dest = create_observed_node(meshtastic_node_id=remote_id)
+    dest.last_heard = quiet_before
+    dest.save(update_fields=["last_heard"])
+    NodeLatestStatus.objects.update_or_create(
+        node=dest,
+        defaults={"latitude": 51.5, "longitude": -0.12},
+    )
+    DxNodeMetadata.objects.get_or_create(observed_node=dest)
+    t_prior = timezone.now()
+    DxEvent.objects.create(
+        constellation=observer.constellation,
+        destination=dest,
+        reason_code=DxReasonCode.NEW_DISTANT_NODE,
+        first_observed_at=t_prior,
+        last_observed_at=t_prior,
+        active_until=t_prior + timedelta(hours=1),
+    )
+
+    pos = create_position_packet(
+        packet_id=929999,
+        from_int=remote_id,
+        from_str=remote_hex,
+        latitude=51.5,
+        longitude=-0.12,
+    )
+    pos.first_reported_time = timezone.now()
+    pos.save(update_fields=["first_reported_time"])
+    obs = create_packet_observation(packet=pos, observer=observer)
+
+    with patch("dx_monitoring.services.maybe_detect_dx_candidate") as mock_detect:
+        PositionPacketService().process_packet(pos, observer, obs, user)
+
+    mock_detect.assert_called_once()
+    assert mock_detect.call_args.kwargs["previous_last_heard"] == quiet_before
+
+
+@pytest.mark.django_db
+@override_settings(
+    DX_MONITORING_DETECTION_ENABLED=True,
+    DX_MONITORING_CLUSTER_DISTANCE_KM=150.0,
     DX_MONITORING_DIRECT_DISTANCE_KM=80.0,
 )
 def test_distant_observation_direct_threshold(

@@ -1,4 +1,5 @@
 from datetime import timedelta
+from unittest.mock import patch
 
 from django.utils import timezone
 
@@ -6,6 +7,7 @@ import pytest
 
 from nodes.models import DeviceMetrics, NodeLatestStatus, ObservedNode
 from packets.services.device_metrics import DeviceMetricsPacketService
+from packets.signals import device_metrics_recorded
 
 
 @pytest.mark.django_db
@@ -40,8 +42,12 @@ def test_process_device_metrics_packet(
     user = create_user()
 
     initial_count = DeviceMetrics.objects.count()
-    service.process_packet(packet, observer, observation, user)
+    with patch.object(device_metrics_recorded, "send") as mock_send:
+        service.process_packet(packet, observer, observation, user)
     assert DeviceMetrics.objects.count() == initial_count + 1
+    mock_send.assert_called_once()
+    _, kwargs = mock_send.call_args
+    assert kwargs["battery_level"] == float(packet.battery_level or 0.0)
 
     metrics = DeviceMetrics.objects.latest("id")
     assert metrics.node.meshtastic_node_id == packet.from_int
