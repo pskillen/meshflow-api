@@ -58,7 +58,7 @@ def test_node_neighbour_stats_uses_from_int_when_relay_node_null(create_managed_
 
     ObservedNode.objects.get_or_create(
         meshtastic_node_id=222222222,
-        defaults={"node_id_str": "!0d3b6cde", "short_name": "SRC", "long_name": "Source Node"},
+        defaults={"short_name": "SRC", "long_name": "Source Node"},
     )
 
     client = APIClient()
@@ -108,7 +108,7 @@ def test_node_neighbour_stats_uses_relay_node_when_set(create_managed_node, crea
 
     ObservedNode.objects.get_or_create(
         meshtastic_node_id=444444444,
-        defaults={"node_id_str": "!1a7a8b90", "short_name": "RLY", "long_name": "Relay Node"},
+        defaults={"short_name": "RLY", "long_name": "Relay Node"},
     )
 
     client = APIClient()
@@ -241,11 +241,11 @@ def test_node_neighbour_stats_lsb_returns_candidates(create_managed_node, create
 
     ObservedNode.objects.get_or_create(
         meshtastic_node_id=1129933592,
-        defaults={"node_id_str": "!43596b18", "short_name": "NodeA", "long_name": "Node A"},
+        defaults={"short_name": "NodeA", "long_name": "Node A"},
     )
     ObservedNode.objects.get_or_create(
         meshtastic_node_id=3456789016,
-        defaults={"node_id_str": "!ce0e3418", "short_name": "NodeB", "long_name": "Node B"},
+        defaults={"short_name": "NodeB", "long_name": "Node B"},
     )
 
     client = APIClient()

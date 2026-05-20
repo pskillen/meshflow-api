@@ -83,12 +83,10 @@ def _edge_param_pairs(mock_session):
 
 def _create_observed_with_coords(node_id: int, lat: float, lng: float, short_name: str = "PEER"):
     """Create an ObservedNode with a NodeLatestStatus carrying coords."""
-    from common.mesh_node_helpers import meshtastic_id_to_hex
     from nodes.models import NodeLatestStatus, ObservedNode
 
     obs = ObservedNode.objects.create(
         meshtastic_node_id=node_id,
-        node_id_str=meshtastic_id_to_hex(node_id),
         short_name=short_name,
         long_name=f"Node {short_name}",
     )

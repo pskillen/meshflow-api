@@ -2,7 +2,6 @@ from django.utils import timezone
 
 import pytest
 
-from common.mesh_node_helpers import meshtastic_id_to_hex
 from constellations.models import MessageChannel
 from constellations.tests.conftest import create_constellation  # noqa: F401
 from nodes.models import ManagedNode, ManagedNodeStatus, NodeAPIKey, NodeAuth, ObservedNode
@@ -99,8 +98,7 @@ def create_observed_node(observed_node_data):
         data = observed_node_data.copy()
         data.update(kwargs)
         _coerce_observed_node_legacy_kwargs(data)
-        if data.get("meshtastic_node_id") is not None and "node_id_str" not in data:
-            data["node_id_str"] = meshtastic_id_to_hex(data["meshtastic_node_id"])
+        data.pop("node_id_str", None)
         return ObservedNode.objects.create(**data)
 
     return make_observed_node

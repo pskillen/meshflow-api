@@ -64,7 +64,6 @@ class BasePacketSerializerTestCase(TestCase):
 
         cls.from_node = ObservedNode.objects.create(
             meshtastic_node_id=456789,
-            node_id_str=meshtastic_id_to_hex(456789),
             long_name="From Node",
             short_name="FRM",
         )
