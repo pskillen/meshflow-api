@@ -2,7 +2,7 @@
 
 This file is the **single cross-repo index** for the MeshCore and related multi-protocol work. **Each epic or phase should add its own dated section** below; do not rewrite prior sections except to fix factual errors.
 
-**Rename / relabelling track:** Sub-plans in `IdeaProjects/MeshFlow/.cursor/plans/` ([index](file:///Users/patricks/IdeaProjects/MeshFlow/.cursor/plans/meshcore-rename-index.plan.md)). GitHub: sub-epic [#307](https://github.com/pskillen/meshflow-api/issues/307) under [#266](https://github.com/pskillen/meshflow-api/issues/266). Progress: [`refactoring-progress.md`](./refactoring-progress.md).
+**Rename / relabelling track:** Sub-plans in `IdeaProjects/MeshFlow/.cursor/plans/` ([index](file:///Users/patricks/IdeaProjects/MeshFlow/.cursor/plans/meshcore-rename-index.plan.md)). GitHub: sub-epic [#307](https://github.com/pskillen/meshflow-api/issues/307) under [#266](https://github.com/pskillen/meshflow-api/issues/266). Progress: [`refactoring-progress.md`](./refactoring-progress.md). **Living summary of that track:** [§ Rename track (SP-01–SP-11)](#rename-track-sp-01sp-11-meshtastic-labelling--api-contract) below.
 
 **Convention for contributors**
 
@@ -269,20 +269,54 @@ Use this subsection as the **single inventory** of api-repo refactors tied to Me
 ### Done
 
 - **API:** `ObservedNode.mc_pubkey` / `mc_pubkey_prefix`, CHECK + partial unique index ([#279](https://github.com/pskillen/meshflow-api/issues/279)); `meshcore_packets` app with ingest + list + dedup + `ObservedNode` receiver ([#280](https://github.com/pskillen/meshflow-api/issues/280), [#278](https://github.com/pskillen/meshflow-api/issues/278)); `protocol` filter on observed-nodes ([#284](https://github.com/pskillen/meshflow-api/issues/284)); `openapi.yaml` + `docs/ENV_VARS.md`; `docs/features/meshcore/feeder-bootstrap.md`.
-- **Bot:** `MeshCorePacketSerializer`, `store_raw_meshcore_packet`, `MESHCORE_UPLOAD_ENABLED` ([#83](https://github.com/pskillen/meshflow-bot/issues/83)).
+- **Bot:** `MeshCorePacketSerializer`, `store_raw_meshcore_packet`, `MESHCORE_UPLOAD_ENABLED` ([#83](https://github.com/pskillen/meshflow-bot/issues/83)); **`rx_log_data` ADVERT upload** via **`EventType.RX_LOG_DATA` translation** — **Phase 2.1** ([#102](https://github.com/pskillen/meshflow-bot/issues/102), **[PR #103](https://github.com/pskillen/meshflow-bot/pull/103)**).
 - **UI:** MeshCore map + nodes list pages, sidebar, API hooks ([#250](https://github.com/pskillen/meshflow-ui/issues/250)).
 
 ### Not done (deferred)
 
 - `TextMessage` normalisation for MC; telemetry/ack models; MT pages showing MC; automated 24h trial gate (operator checklist in feeder-bootstrap).
+- Production map GPS for all feeders until **Phase 2.1** bot + api deploy — see **Phase 2.1** verification ([#298](https://github.com/pskillen/meshflow-api/issues/298)).
 
-### Phase 1.x — tech debt (ADR-0001 display id)
+### Phase 1.x — tech debt: computed `ObservedNode.node_id_str` (meshflow-api)
 
-**Status:** Complete. **Tracking:** [#294](https://github.com/pskillen/meshflow-api/issues/294).
+**Status:** Complete (meshflow-api). **Tracking:** [#294](https://github.com/pskillen/meshflow-api/issues/294) (ADR-0001 §6; deferred from Phase 1 MVP [#265](https://github.com/pskillen/meshflow-api/issues/265)). **Canonical delivery:** **[PR #326](https://github.com/pskillen/meshflow-api/pull/326)** on branch **`api-294/patrick/drop-observednode-node-id-str`**.
 
-- **Done:** Dropped stored `ObservedNode.node_id_str`; API returns computed `!hex8` / `mc:{prefix12}` via model property and serializers (ADR-0001 §6). Migrations `nodes.0043` (nullable interim), `nodes.0044` (RemoveField). Rollback: re-add column and backfill from computed values on a prod clone during a maintenance window.
+**Repos touched in this phase:** **meshflow-api only**. **meshflow-bot** and **meshflow-ui** unchanged — JSON field name `node_id_str` is unchanged; clients keep reading the same key from API responses.
 
-### Verification
+### Purpose of this phase
+
+Close the gap between **ADR-0001** (computed display id, not a DB column) and Phase **1 MVP**, which kept `ObservedNode.node_id_str` as a required `CharField` for compatibility. After this phase, only **identity columns** are persisted (`meshtastic_node_id` or `mc_pubkey` / `mc_pubkey_prefix`); `node_id_str` is derived at read time (`!{hex8}` for Meshtastic, `mc:{prefix12}` for MeshCore). **`ManagedNode.node_id_str`** was already a property-only display id — no schema change there.
+
+### meshflow-api — done (concrete checklist)
+
+- **`Meshflow/common/mesh_node_helpers.py`** — **`observed_node_id_str(node)`** (single entry point); **`observed_node_search_conditions(query)`** for API search and Django admin (replaces `node_id_str__icontains` on the ORM).
+- **`Meshflow/common/meshcore_node_helpers.py`** — **`resolve_or_create_mc_observed_node`** no longer writes `node_id_str` on create or `get_or_create` defaults.
+- **`Meshflow/nodes/models.py`** — removed `node_id_str` `CharField`; **`@property node_id_str`** delegates to **`observed_node_id_str(self)`**.
+- **Migrations** (after **`nodes.0042_managednode_bot_version`** on `main`): **`0043_observednode_node_id_str_nullable`** (interim `null=True` so ingest could stop writing before drop), **`0044_remove_observednode_node_id_str`** (`RemoveField` + index drop). Phase **2** position work uses **`0045`** — no numbering clash.
+- **Serializers / ingest** — **`ObservedNodeSerializer`**: `node_id_str` as **`SerializerMethodField`**; removed `to_internal_value` injection from `meshtastic_node_id`. **`NodeSerializer`** (`packets/serializers.py`): `id_str` read-only via helper; **`create`/`update`** pop `node_id_str` from `validated_data`. Meshtastic packet paths: **`packets/services/base.py`**, **`packets/receivers.py`** — no `node_id_str` on `ObservedNode.objects.create` / `get_or_create` defaults.
+- **Search / admin** — **`nodes/views.py`** `search` action uses **`observed_node_search_conditions`**. **`nodes/admin.py`**: `node_id_str` removed from **`search_fields`**; **`get_search_results`** uses the same Q builder; **`list_display`** / **`readonly_fields`** still show computed `node_id_str`.
+- **Stats neighbour API** — **`stats/views.py`**: removed **`node_id_str`** from **`QuerySet.only()`** (not a deferrable column); response dicts still expose **`node_id_str`** via the property.
+- **Tests** — new **`common/tests/test_observed_node_id_str.py`**, **`common/tests/test_observed_node_search.py`**; sweep of **`node_id_str=`** kwargs on direct **`ObservedNode.objects.create`** / **`get_or_create`** across packets (incl. **`PacketDeduplicationTest`**), stats, traceroute, mesh monitoring, nodes RF/weather tests; **`nodes/tests/conftest.py`** strips stray **`node_id_str`** from **`create_observed_node`** kwargs.
+- **Docs / contract** — **[ADR-0001](../packet-ingestion/adr/0001-mc-node-identity.md)** status **Accepted** + note that Phase 1 deferral is closed; **[feeder-bootstrap.md](./feeder-bootstrap.md)** (raw SQL on `observednode` needs identity columns only); **[refactoring-progress.md](./refactoring-progress.md)** item checked off; **`openapi.yaml`** — `node_id_str` documented as **read-only computed** on **`ObservedNode`** / search shapes.
+
+### meshflow-api — not done *in this phase only* (deferred)
+
+- **Rename API field to `display_id`** — explicitly out of scope (SP-04 deferral; JSON name stays **`node_id_str`**).
+- **meshflow-bot** local `mc:` display alignment — optional follow-up [#83](https://github.com/pskillen/meshflow-bot/issues/83).
+- **Neo4j / traceroute graph** node labels using stored `node_id_str` — Phase **3**; runtime code may still *read* **`node.node_id_str`** on in-memory instances (property), but must not use it in **`only()`**, **`values()`**, **`annotate()`**, or create kwargs.
+
+### meshflow-bot / meshflow-ui — status for this phase
+
+**No meshflow-bot or meshflow-ui changes** for Phase 1.x.
+
+### Verification checklist (Phase 1.x)
+
+1. **Migrations:** `python manage.py migrate` on a prod-sized PostgreSQL clone (maintenance window). **Rollback:** re-add `CharField`, backfill from **`observed_node_id_str()`** per row, restore NOT NULL if needed.
+2. **Unit tests:** `python -m pytest Meshflow/common/tests/test_observed_node_id_str.py Meshflow/common/tests/test_observed_node_search.py Meshflow/common/tests/test_meshcore_node_helpers.py -v`; full **`python -m pytest Meshflow/ -v`** before merge.
+3. **API smoke:** `GET /api/nodes/observed-nodes/` and **`/api/nodes/observed-nodes/search/?q=`** with `!…`, `mc:…`, and numeric id — correct MT/MC **`node_id_str`** in JSON.
+4. **MC ingest:** `python -m pytest Meshflow/meshcore_packets/tests/ -v` — upsert without **`node_id_str`** in defaults.
+
+### Verification (Phase 1 MVP — unchanged)
 
 1. `python -m pytest Meshflow/meshcore_packets/tests/ Meshflow/common/tests/test_meshcore_node_helpers.py -v`
 2. Bot: `pytest test/meshcore/ -v` (venv + requirements.dev.txt)
@@ -293,9 +327,9 @@ Use this subsection as the **single inventory** of api-repo refactors tied to Me
 
 ## Phase 2 — MC position from ADVERT ingest (meshflow-api)
 
-**Status:** Complete. **Tracking:** [#298](https://github.com/pskillen/meshflow-api/issues/298) (parent [#266](https://github.com/pskillen/meshflow-api/issues/266)).
+**Status:** Complete (API position pipeline). **Tracking:** [#298](https://github.com/pskillen/meshflow-api/issues/298) (parent [#266](https://github.com/pskillen/meshflow-api/issues/266)). **Canonical delivery:** **[PR #328](https://github.com/pskillen/meshflow-api/pull/328)** (merged) — `apply_advert_position` when ingest body includes `adv_lat`/`adv_lon`.
 
-**Repos touched:** meshflow-api only.
+**Repos touched:** meshflow-api only (this phase). **End-to-end GPS on the map** also requires **Phase 2.1** (bot `rx_log_data` upload + nested field resolution) below.
 
 ### Done
 
@@ -310,12 +344,157 @@ Use this subsection as the **single inventory** of api-repo refactors tied to Me
 - `original_mt_packet` on `Position` for Meshtastic provenance; `protocol` column on `Position`.
 - Altitude/heading/speed from ADVERT; `adv_flags` / `adv_type` → node role.
 - Public `latest_meshcore_location_source` in OpenAPI.
-- Bot/UI changes.
+- Bot/UI changes (bot upload path delivered in **Phase 2.1**).
 
 ### Verification
 
 1. `python -m pytest Meshflow/meshcore_packets/tests/ -v`
 2. `python manage.py migrate` (applies `nodes.0045`)
+
+---
+
+## Phase 2.1 — `rx_log_data` ADVERT pipeline (meshflow-api + meshflow-bot)
+
+**Status:** Complete (implementation); **production E2E** for [#298](https://github.com/pskillen/meshflow-api/issues/298) pending deploy + feeder SQL checks. **Tracking:** meshflow-api **[#330](https://github.com/pskillen/meshflow-api/issues/330)**; meshflow-bot **[#102](https://github.com/pskillen/meshflow-bot/issues/102)** (parent epic **[#266](https://github.com/pskillen/meshflow-api/issues/266)**).
+
+**Repos touched:** **meshflow-api**, **meshflow-bot**.
+
+### Problem (production handoff)
+
+Volunteer feeders showed **`event_type = advertisement` only** in `meshcore_packets_raw` and **no MC nodes with position**, while the companion app map had GPS. On the wire, GPS lives in **`rx_log_data`** frames with `payload_typename: ADVERT` (`adv_lat`/`adv_lon`/`adv_key`), not in bare **`advertisement`** events (identity-only `public_key`). The bot did not translate **`EventType.RX_LOG_DATA`**, so those frames never reached ingest.
+
+### meshflow-api — done
+
+- **`Meshflow/meshcore_packets/services/advert_fields.py`** — `iter_advert_field_dicts` / `get_advert_field`: resolve `adv_*` from top-level ingest body **or** nested `raw.payload` (thin-bot / envelope-only uploads).
+- **`position.py`** — `extract_adv_coords` and `adv_timestamp_to_aware` use `get_advert_field`.
+- **`receivers.py`** — `adv_name` via helper; **`adv_key` → `normalize_mc_pubkey`** when `from_pubkey` is empty; comment that **`advertisement` without coords must not fabricate position**.
+- **Tests:** `test_meshcore_rx_log_data_advert_ingest`, nested-only coords, `advertisement` without coords preserving existing NLS; nested `extract_adv_coords` parametrization; integration `test_meshcore_rx_log_data_advert_ingest_round_trip`.
+- **Docs / contract:** `openapi.yaml` (`MeshCorePacketIngest` `event_type` / `adv_lat`/`adv_lon`); [`docs/features/packet-ingestion/README.md`](../packet-ingestion/README.md) — `rx_log_data` vs `advertisement`.
+- **Delivery:** **[PR #331](https://github.com/pskillen/meshflow-api/pull/331)** on branch **`api-330/paddy/rx-log-data-ingest`**.
+
+### meshflow-bot — done
+
+- **`src/meshcore/translation.py`** — `EventType.RX_LOG_DATA` → `IncomingPacket` (same envelope as `RAW_DATA`; identity from `adv_key` in serializer).
+- **`test/meshcore/test_translation.py`** — translation + full path to `MeshCorePacketSerializer` (WMF capture fixture).
+- **`docs/MESHCORE.md`** — upload table: `advertisement` (identity only) vs **`rx_log_data` ADVERT** (GPS/name).
+- **Delivery:** **[PR #103](https://github.com/pskillen/meshflow-bot/pull/103)** on branch **`bot-102/paddy/rx-log-data-upload`**.
+
+### meshflow-ui — status
+
+**No meshflow-ui changes** for Phase 2.1 (map already reads NLS lat/lon when present).
+
+### Not done (deferred)
+
+- Ingesting non-ADVERT `rx_log_data` (`TEXT_MSG`, `PATH`, …) — bot still raises **`MeshCoreSkipUpload`**.
+- Removing ADVERT flattening from bot serializer (Phase 1 shape kept for compat).
+- Dedicated `MeshCoreAdvertPacket` MTI subclass (epic [#266](https://github.com/pskillen/meshflow-api/issues/266) item 1).
+- Close **[#298](https://github.com/pskillen/meshflow-api/issues/298)** only after production confirms `event_type=rx_log_data` rows and non-zero MC NLS with lat/lon (checklist on issue).
+
+### Deploy order
+
+1. Merge/deploy **api [#331](https://github.com/pskillen/meshflow-api/pull/331)** (manual/curl ingest works without bot).
+2. Deploy **bot [#103](https://github.com/pskillen/meshflow-bot/pull/103)** on MC feeders with **`MESHCORE_UPLOAD_ENABLED=true`** and storage API configured.
+
+### Verification
+
+1. **API unit:** `python -m pytest Meshflow/meshcore_packets/tests/ -v` (18 tests including rx_log_data paths).
+2. **Bot unit:** `pytest test/meshcore/ -v` from meshflow-bot (includes `test_translation.py`).
+3. **Production SQL** (after both deploy):
+
+```sql
+SELECT event_type, COUNT(*) FROM meshcore_packets_raw GROUP BY event_type;
+SELECT COUNT(*) FROM nodes_nodelateststatus nls
+  JOIN nodes_observednode n ON n.internal_id = nls.node_id
+  WHERE n.protocol = 2 AND nls.latitude IS NOT NULL;
+```
+
+Expect **`rx_log_data`** in the first query and a growing count in the second.
+
+---
+
+## Rename track (SP-01–SP-11) — Meshtastic labelling & API contract
+
+**Status:** **In progress** (2026-05-19). **SP-01–SP-04** merged on `main`; **SP-05** skipped; **SP-06–SP-11** delivered on open PRs (awaiting merge). **Tracking:** sub-epic [#307](https://github.com/pskillen/meshflow-api/issues/307); step-by-step status in [`refactoring-progress.md`](./refactoring-progress.md).
+
+**Repos touched:** **meshflow-api**, **meshflow-ui**, **meshflow-bot** (SP-10 only for bot-local naming; no JSON contract change from bot for SP-03/SP-04).
+
+### Purpose of this track
+
+After Phase **1** MeshCore MVP and Phase **1.0** protocol prep, the codebase still mixed **generic names** (`node_id`, `channel_0`, `hw_model`, `Packets` OpenAPI tag) with **Meshtastic-specific** behaviour. This track **renames and documents** without changing mesh semantics: Meshtastic ingest URLs, stats paths, and feeder wire shapes stay compatible where noted; **observed-node detail** moves to stable **`internal_id`** (UUID) in SP-11.
+
+**Out of scope for SP-01–SP-11:** Django app rename `packets`; `TextMessage` dual FK; retiring v1 `POST /raw-packet/` ([#319](https://github.com/pskillen/meshflow-api/issues/319)); full bot wire rename to `meshtastic_*` keys (deferred after SP-10).
+
+### Sub-plan index (what shipped)
+
+| ID | Scope | Status | Primary PRs |
+| --- | --- | --- | --- |
+| **SP-01** | OpenAPI contract alignment (paths, tags, `internal_id`, Meshtastic-only bulk metrics) | **Merged** | api [#320](https://github.com/pskillen/meshflow-api/pull/320) |
+| **SP-02** | Comment / help_text labelling (no JSON renames) | **Merged** | api [#321](https://github.com/pskillen/meshflow-api/pull/321), bot [#96](https://github.com/pskillen/meshflow-bot/pull/96), ui [#267](https://github.com/pskillen/meshflow-ui/pull/267) |
+| **SP-03** | `node_id` → **`meshtastic_node_id`** on `ObservedNode` / `ManagedNode` | **Merged** | api [#322](https://github.com/pskillen/meshflow-api/pull/322), ui [#268](https://github.com/pskillen/meshflow-ui/pull/268) |
+| **SP-04** | ObservedNode **`meshtastic_*`** identity fields (`hw_model` → `meshtastic_hw_model`, etc.) | **Merged** | api [#323](https://github.com/pskillen/meshflow-api/pull/323), ui [#270](https://github.com/pskillen/meshflow-ui/pull/270) |
+| **SP-05** | `MtRawPacket` / NODEINFO wire column renames | **Skipped** [#311](https://github.com/pskillen/meshflow-api/issues/311) | — |
+| **SP-06** | **`meshtastic_channel_0..7`**, constellation **`bot_default_*`** | **PR open** | api + ui [#324](https://github.com/pskillen/meshflow-api/pull/324) · [ui#271](https://github.com/pskillen/meshflow-ui/pull/271) |
+| **SP-07** | **`recipient_meshtastic_node_id`**, **`reply_to_meshtastic_packet_id`** | **PR open** | same batch |
+| **SP-08** | Metrics **`meshtastic_*`** on NLS, `Position`, packet payloads | **PR open** | same batch |
+| **SP-09** | UI **`MeshflowApi`** / `useMeshflowApi` (shim keeps `MeshtasticApi`) | **PR open** | [ui#271](https://github.com/pskillen/meshflow-ui/pull/271) |
+| **SP-10** | Bot **`local_meshtastic_nodenum_provider`**, **`get_by_radio_id`** | **PR open** | [bot#98](https://github.com/pskillen/meshflow-bot/pull/98) |
+| **SP-11** | Observed-node **`lookup_field = internal_id`**; **`by-meshtastic-id`** redirect; UI UUID routes | **PR open** | [#324](https://github.com/pskillen/meshflow-api/pull/324) · [ui#271](https://github.com/pskillen/meshflow-ui/pull/271) |
+
+**Batch branches:** api + ui share **`api-307/pskillen/meshcore-rename-sp06-sp11`**; bot SP-10 uses **`api-317/pskillen/meshcore-rename-sp10-bot-local`**.
+
+### meshflow-api — done (cumulative rename track)
+
+- **OpenAPI (`openapi.yaml`):** Meshtastic ingest under **`/packets/{meshtastic_node_id}/ingest/`** and **`…/nodes/`**; tag **Meshtastic packets**; `MeshProtocol` on shared models; observed-node detail and nested routes use **`{internal_id}`** (UUID); managed-node / stats / ingest path params may still be named `node_id` in the spec (Meshtastic numeric id). Deprecated **`POST /raw-packet/`** documented for v1 bots.
+- **Models & migrations (rename track only):** `nodes/0037`–`0039` (node id + MT identity renames); `nodes/0040` (`meshtastic_channel_*`); `nodes/0041` (metrics `meshtastic_*`); `constellations/0008`; `text_messages/0007`; `packets/0018`; help_text / index follow-ups from SP-02 (`0037` alters, `meshcore_packets/0002`, `text_messages/0006`).
+- **Views / serializers:** `ObservedNodeViewSet` UUID lookup; claim, RF profile, environment-settings, metrics history, traceroute-links under `<uuid:internal_id>`; `GET …/observed-nodes/by-meshtastic-id/{id}/` → 302; ingest channel resolution via **`meshtastic_channel_{n}`**; feeder `NodeSerializer` accepts legacy **`hw_model` / `public_key`** on POST.
+- **Tests:** Unit tests updated for renamed fields and UUID reverses; integration **`tests/integration/`** resolves observed nodes via **`by-meshtastic-id`** then follows **`internal_id`** URLs (see `conftest.py`).
+- **Related (not SP-01–SP-11):** Phase **1.x** [#294](https://github.com/pskillen/meshflow-api/issues/294) / [#326](https://github.com/pskillen/meshflow-api/pull/326) — drop stored **`ObservedNode.node_id_str`** (computed property); migrations **`0043`–`0044`** after rename batch **`0040`–`0041`**. Bot version fields **`0042`** ([#99](https://github.com/pskillen/meshflow-bot/issues/99) / api [#325](https://github.com/pskillen/meshflow-api/pull/325)) are a **separate** feature branch.
+
+### meshflow-bot — status for this track
+
+- **SP-02:** Docstrings on `RadioInterface`, `StorageAPI` (Meshtastic v2 vs MeshCore ingest paths).
+- **SP-10 ([#317](https://github.com/pskillen/meshflow-api/issues/317)):** `StorageAPIWrapper.local_meshtastic_nodenum_provider`; node DB **`get_by_radio_id`**; optional **`MeshNode.User.canonical_id`** — **[PR #98](https://github.com/pskillen/meshflow-bot/pull/98)**.
+- **Not done in rename track:** Bot still POSTs **`hw_model` / `public_key`** on node upsert (api aliases accept them). No change to ingest URL shape (`/api/packets/{nodenum}/…`). **Bot version on connect** is **[#99](https://github.com/pskillen/meshflow-bot/issues/99)** / **[PR #100](https://github.com/pskillen/meshflow-bot/pull/100)**, not #307.
+
+### meshflow-ui — status for this track
+
+- **SP-02–SP-04:** Types and pages use **`meshtastic_node_id`**, **`meshtastic_*`** identity fields on `ObservedNode`.
+- **SP-06–SP-08:** Managed-node channel keys, text message fields, nested metrics types aligned with api renames — **[PR #271](https://github.com/pskillen/meshflow-ui/pull/271)**.
+- **SP-09:** **`MeshflowApi`**, **`useMeshflowApi`**, `config.apis.meshflow` fallback — same PR.
+- **SP-11:** **`NodeDetails`** by UUID; **`LegacyMeshtasticNodeRedirect`** for numeric `/nodes/:id`; traceroute-links use **`internal_id`** — same PR.
+- **Breaking after api #324 deploy:** Observed-node detail and nested API calls must use **`internal_id`**; numeric bookmarks rely on UI redirect + api **`by-meshtastic-id`**.
+
+### Not done / deferred (rename track)
+
+- Merge and deploy **#324**, **ui#271**, **bot#98**; close **#313–#318** when verified on `main`.
+- **Deploy order:** api **#324** (migrations through **`0041`**, `constellations/0008`, `text_messages/0007`, `packets/0018`) → **ui#271** → bot **#98** optional anytime.
+- **SP-05** packet-wire renames — closed skipped; stored traceroute hop JSON may still use key **`node_id`** in DB.
+- **Feeder upsert gap:** Bot sends **`location_source` / `channel_utilization`**; api maps metrics from **`meshtastic_*`** only — optional follow-up to extend `NodeSerializer` aliases (documented in [`refactoring-progress.md`](./refactoring-progress.md)).
+- **OpenAPI / URL clarity:** Optional later pass to rename path parameter **`node_id` → `meshtastic_node_id`** on ingest and stats routes (cosmetic).
+- **UI branding cleanup:** Remove `meshtastic-api.ts` shim, rename `meshtastic.ts` helper — [#316](https://github.com/pskillen/meshflow-api/issues/316) deferrals.
+- **Formatting toolchain alignment** (Black / flake8 / isort / optional Ruff) — [#101](https://github.com/pskillen/meshflow-bot/issues/101); no code change in rename PRs.
+
+### Verification checklist (rename track)
+
+1. **Merged baseline:** On `main`, confirm **#320–#323** and ui **#268–#270**; run **`python -m pytest Meshflow/ -v`**.
+2. **Open batch:** Review **#324** / **ui#271** / **bot#98**; migrate through **`nodes.0041`**; **`pytest tests/integration/ -v`** against API with **`seed_integration_tests`**.
+3. **SP-11 smoke:** `GET /api/nodes/observed-nodes/{uuid}/` works; `GET …/by-meshtastic-id/{int}/` redirects; UI node detail loads via UUID.
+4. **Meshtastic unchanged:** `POST /api/packets/{nodenum}/ingest/` and MC **`POST /api/meshcore/packets/ingest/`** still work with linked Node API keys.
+5. **Progress doc:** Keep [`refactoring-progress.md`](./refactoring-progress.md) in sync when PRs merge (status → `merged`).
+
+---
+
+## Parallel: bot version reporting ([#99](https://github.com/pskillen/meshflow-bot/issues/99))
+
+**Status:** PRs open (not part of #307 rename). **Purpose:** Feeders report Docker **`APP_VERSION`** on connect; api stores **`ManagedNode.bot_version`**; UI shows it on Managed Nodes.
+
+| Repo | PR |
+| --- | --- |
+| meshflow-api | [#325](https://github.com/pskillen/meshflow-api/pull/325) — `PUT /api/packets/{id}/bot-version/`, migration **`nodes/0042`** |
+| meshflow-bot | [#100](https://github.com/pskillen/meshflow-bot/pull/100) |
+| meshflow-ui | [#272](https://github.com/pskillen/meshflow-ui/pull/272) |
+
+Deploy **api #325** before bot fleet upgrade. Coordinate migration numbering with rename batch (**`0042`** bot version vs **`0043`+** for #294 on branches that include both).
 
 ---
 
