@@ -8,7 +8,7 @@ from rest_framework.test import APIClient
 
 from common.protocol import Protocol
 from meshcore_packets.models import MeshCoreRawPacket
-from nodes.models import NodeAuth, ObservedNode
+from nodes.models import MeshCoreLocationSource, NodeAuth, ObservedNode, Position
 
 FULL_PUBKEY = "b" * 64
 PREFIX = "b" * 12
@@ -43,6 +43,10 @@ def test_meshcore_advert_ingest_creates_packet_and_node(ingest_client, meshcore_
     node = ObservedNode.objects.get(protocol=Protocol.MESHCORE, mc_pubkey=FULL_PUBKEY)
     assert node.long_name == "TestNode"
     assert node.latest_status.latitude == 55.1
+    assert Position.objects.filter(node=node).count() == 1
+    position = Position.objects.get(node=node)
+    assert position.meshcore_location_source == MeshCoreLocationSource.ADVERT
+    assert position.original_mc_packet_id is not None
 
 
 @pytest.mark.django_db

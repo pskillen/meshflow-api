@@ -1,12 +1,12 @@
-"""MeshCore packet signal receivers (Phase 1: ObservedNode upsert only)."""
+"""MeshCore packet signal receivers (identity upsert + ADVERT position)."""
 
 from django.dispatch import receiver
 from django.utils import timezone
 
 from common.meshcore_node_helpers import resolve_or_create_mc_observed_node
 from meshcore_packets.models import MeshCorePayloadType
+from meshcore_packets.services.position import apply_advert_position
 from meshcore_packets.signals import meshcore_packet_received
-from nodes.models import NodeLatestStatus
 
 
 @receiver(meshcore_packet_received)
@@ -36,15 +36,7 @@ def upsert_observed_node_from_meshcore_packet(sender, packet, observer, observat
 
     if packet.payload_type == MeshCorePayloadType.ADVERT:
         raw = packet.raw_json or {}
-        adv_lat = raw.get("adv_lat")
-        adv_lon = raw.get("adv_lon")
-        if adv_lat and adv_lon and float(adv_lat) != 0.0 and float(adv_lon) != 0.0:
-            status, _ = NodeLatestStatus.objects.get_or_create(node=node)
-            status.latitude = float(adv_lat)
-            status.longitude = float(adv_lon)
-            status.position_reported_time = last_heard
-            status.save(update_fields=["latitude", "longitude", "position_reported_time"])
-            if long_name:
-                node.long_name = long_name
-                node.short_name = short_name or node.short_name
-                node.save(update_fields=["long_name", "short_name"])
+        if apply_advert_position(node=node, packet=packet, raw=raw) and long_name:
+            node.long_name = long_name
+            node.short_name = short_name or node.short_name
+            node.save(update_fields=["long_name", "short_name"])

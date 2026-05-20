@@ -291,4 +291,32 @@ Use this subsection as the **single inventory** of api-repo refactors tied to Me
 
 ---
 
+## Phase 2 — MC position from ADVERT ingest (meshflow-api)
+
+**Status:** Complete. **Tracking:** [#298](https://github.com/pskillen/meshflow-api/issues/298) (parent [#266](https://github.com/pskillen/meshflow-api/issues/266)).
+
+**Repos touched:** meshflow-api only.
+
+### Done
+
+- **`MeshCoreLocationSource`** enum (`ADVERT = 1`) on [`Meshflow/nodes/models.py`](../../../Meshflow/nodes/models.py); nullable `meshcore_location_source` on `Position` and `NodeLatestStatus` (internal only — API `latest_location_source` stays MT-only for MC nodes).
+- **`Position.original_mc_packet`** FK → `meshcore_packets.MeshCoreRawPacket` (migration `nodes.0045_position_meshcore_provenance`).
+- **`meshcore_packets/services/position.py`:** `extract_adv_coords`, `adv_timestamp_to_aware`, `apply_advert_position` — creates `Position` history + updates NLS (mirrors [`PositionPacketService`](../../../Meshflow/packets/services/position.py)).
+- **Receiver:** [`meshcore_packets/receivers.py`](../../../Meshflow/meshcore_packets/receivers.py) delegates ADVERT coords to the service; `0.0/0.0` sentinel; prefers `adv_timestamp` over `rx_time`.
+- **Tests:** `meshcore_packets/tests/test_advert_position.py`; ingest test asserts `Position` row + provenance.
+
+### Not done (deferred)
+
+- `original_mt_packet` on `Position` for Meshtastic provenance; `protocol` column on `Position`.
+- Altitude/heading/speed from ADVERT; `adv_flags` / `adv_type` → node role.
+- Public `latest_meshcore_location_source` in OpenAPI.
+- Bot/UI changes.
+
+### Verification
+
+1. `python -m pytest Meshflow/meshcore_packets/tests/ -v`
+2. `python manage.py migrate` (applies `nodes.0045`)
+
+---
+
 <!-- Future sections: append below with dated ## headings per contributor convention. -->

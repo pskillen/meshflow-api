@@ -24,6 +24,12 @@ class LocationSource(models.IntegerChoices):
     EXTERNAL = 3, "LOC_EXTERNAL"
 
 
+class MeshCoreLocationSource(models.IntegerChoices):
+    """MeshCore position provenance (separate integer space from Meshtastic ``LocationSource``)."""
+
+    ADVERT = 1, "ADVERT"
+
+
 class RoleSource(models.IntegerChoices):
     """Meshtastic ``Config.DeviceConfig.Role`` values (protobuf).
 
@@ -376,6 +382,12 @@ class NodeLatestStatus(models.Model):
     altitude = models.FloatField(null=True, blank=True)
     heading = models.FloatField(null=True, blank=True)
     meshtastic_location_source = models.IntegerField(choices=LocationSource.choices, null=True, blank=True)
+    meshcore_location_source = models.PositiveSmallIntegerField(
+        choices=MeshCoreLocationSource.choices,
+        null=True,
+        blank=True,
+        help_text=_("MeshCore-only: how the latest position was obtained (e.g. ADVERT decode)."),
+    )
     meshtastic_precision_bits = models.SmallIntegerField(null=True, blank=True)
     ground_speed = models.FloatField(null=True, blank=True)
     ground_track = models.FloatField(null=True, blank=True)
@@ -533,7 +545,7 @@ class BaseNodeItem(models.Model):
 
 
 class Position(BaseNodeItem):
-    """Position sample for an observed node (Meshtastic path today; shared table)."""
+    """Position sample for an observed node (Meshtastic and MeshCore; shared table)."""
 
     latitude = models.FloatField(null=True, blank=True)
     longitude = models.FloatField(null=True, blank=True)
@@ -542,6 +554,20 @@ class Position(BaseNodeItem):
     meshtastic_location_source = models.IntegerField(
         choices=LocationSource.choices,
         default=LocationSource.UNSET,
+    )
+    meshcore_location_source = models.PositiveSmallIntegerField(
+        choices=MeshCoreLocationSource.choices,
+        null=True,
+        blank=True,
+        help_text=_("MeshCore-only: how this position sample was obtained."),
+    )
+    original_mc_packet = models.ForeignKey(
+        "meshcore_packets.MeshCoreRawPacket",
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="positions",
+        help_text=_("Provenance: MeshCore ingest packet that produced this position row."),
     )
     meshtastic_precision_bits = models.SmallIntegerField(null=True, blank=True)
     ground_speed = models.FloatField(null=True, blank=True, help_text="Speed in m/s")
