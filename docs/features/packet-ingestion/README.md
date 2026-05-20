@@ -234,29 +234,28 @@ this is the first time we have heard from them, and emitting
 - Update `ObservedNode.last_heard`.
 - Update `NodeLatestStatus` (latest position, latest device metrics, inferred
 max hops) for telemetry/position packets.
-- Hand off to DX monitoring for candidate detection on the same call
-(`maybe_detect_dx_candidate`).
-- Clear mesh-monitoring presence state on any packet that advances
-`last_heard` (`clear_presence_on_packet_from_node`).
+- Emit post-processing signals (`packet_from_node_processed`,
+`node_last_heard_advanced`, `device_metrics_recorded`,
+`auto_traceroute_completed_from_packet`) for cross-app reactions.
 
 Beyond that, the `packets` app deliberately stops. Other apps subscribe to
-the same signals and own their own normalisation:
+ingest and post-processing signals and own their own normalisation. See
+[signals.md](signals.md) for kwargs and wiring order.
 
 - **Text messages** (`text_messages`) — listens for
 `message_packet_received` and creates `TextMessage` rows. Also handles
 node-claim secret-token detection and emits `node_claim_authorized` and
 `text_message_received`. See [features/node-lifecycle/](../node-lifecycle/)
 and the text-messages feature docs.
-- **Traceroutes** (`traceroute`, `traceroute_analytics`) — listens for
-`traceroute_packet_received` to match incoming responses to pending
-`AutoTraceRoute` rows (or create an `External` row for cross-environment
-responses), and to push edges into Neo4j. See
+- **Traceroutes** (`traceroute`, `traceroute_analytics`) — `TraceroutePacketService`
+completes `AutoTraceRoute` rows; `auto_traceroute_completed_from_packet`
+receivers handle WebSocket notify and Neo4j export. See
 [features/traceroute/](../traceroute/).
-- **Mesh monitoring** (`mesh_monitoring`) — uses `last_heard` updates and
-`device_metrics_recorded` for offline-verification and battery-alert
-decisions. See [features/mesh-monitoring/](../mesh-monitoring/).
-- **DX monitoring** (`dx_monitoring`) — invoked inline from
-`BasePacketService` to evaluate distant/returning-node observations. See
+- **Mesh monitoring** (`mesh_monitoring`) — `device_metrics_recorded`,
+`node_last_heard_advanced`, and traceroute completion receivers. See
+[features/mesh-monitoring/](../mesh-monitoring/).
+- **DX monitoring** (`dx_monitoring`) — `packet_from_node_processed` and
+traceroute completion receivers for candidate detection. See
 [features/dx-monitoring/](../dx-monitoring/).
 
 If you are adding a new downstream feature, the right pattern is almost
