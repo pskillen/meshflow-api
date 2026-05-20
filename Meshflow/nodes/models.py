@@ -141,6 +141,18 @@ class ManagedNode(models.Model):
         help_text=_("Meshtastic channel slot 7 (PSK-backed MessageChannel)."),
     )
 
+    mc_channels = models.ManyToManyField(
+        "constellations.MessageChannel",
+        related_name="managed_nodes_mc",
+        blank=True,
+        help_text=_("MeshCore channels mirrored from the feeder device (protocol=MeshCore only)."),
+    )
+    mc_channels_synced_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text=_("When mc_channels was last reconciled from the device via bot sync."),
+    )
+
     allow_auto_traceroute = models.BooleanField(
         default=False,
         help_text=_("If True, this node may be used for auto-scheduled traceroutes and manual triggers."),
