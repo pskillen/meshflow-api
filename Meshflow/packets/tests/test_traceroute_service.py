@@ -13,13 +13,15 @@ from packets.services.traceroute import TraceroutePacketService
 from packets.signals import auto_traceroute_completed_from_packet
 from traceroute.models import AutoTraceRoute
 
+pytest_plugins = ["packets.tests.test_traceroute_receiver"]
+
 
 @pytest.mark.django_db
 def test_traceroute_service_emits_completion_signal(
     create_managed_node,
     create_observed_node,
     create_traceroute_packet,
-    create_packet_observation,
+    create_packet_observation_for_tr,
     create_user,
 ):
     source = create_managed_node()
@@ -31,7 +33,7 @@ def test_traceroute_service_emits_completion_signal(
         route=[],
         route_back=[],
     )
-    observation = create_packet_observation(packet=packet, observer=source)
+    observation = create_packet_observation_for_tr(packet=packet, observer=source)
     now = timezone.now()
     packet.first_reported_time = now
     packet.save(update_fields=["first_reported_time"])
@@ -47,6 +49,7 @@ def test_traceroute_service_emits_completion_signal(
 
     mock_send.assert_called_once()
     _, kwargs = mock_send.call_args
+    assert kwargs["auto_tr"].pk == auto_tr.pk
     assert kwargs["auto_tr"].status == AutoTraceRoute.STATUS_COMPLETED
     assert kwargs["traceroute_packet"] == packet
     assert kwargs["packet_observation"] == observation
