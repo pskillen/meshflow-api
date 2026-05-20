@@ -42,9 +42,9 @@ This differs from Meshtastic. You do **not** need an `ObservedNode` row for the 
    - **Default location** (optional): lat/lon for map display as a feeder pin
 3. Save. **Display ID** (read-only after save) is `mc:feeder:<internal id>` — this is not stored in the DB.
 
-**Do not** create feeders via raw SQL on `observednode`: that table still requires `node_id_str` (e.g. `mc:…` from packet ingest). Feeders are `managednode` rows only.
+**Do not** create feeders via raw SQL on `observednode`: feeders are `managednode` rows only. Raw inserts into `observednode` need `protocol` plus identity columns (`meshtastic_node_id` or `mc_pubkey` / `mc_pubkey_prefix`); `node_id_str` is computed at read time (ADR-0001, [#294](https://github.com/pskillen/meshflow-api/issues/294)).
 
-**`node_id_str` on ManagedNode** is a computed property, not a database column. Dropping it from `observednode` is tracked in **[meshflow-api#294](https://github.com/pskillen/meshflow-api/issues/294)** (ADR-0001 §6; deferred in Phase 1).
+**`node_id_str` on ManagedNode and ObservedNode** is a computed property in the API, not a database column on either model.
 
 ## 2. Create Node API key + NodeAuth
 

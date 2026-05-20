@@ -276,6 +276,12 @@ Use this subsection as the **single inventory** of api-repo refactors tied to Me
 
 - `TextMessage` normalisation for MC; telemetry/ack models; MT pages showing MC; automated 24h trial gate (operator checklist in feeder-bootstrap).
 
+### Phase 1.x — tech debt (ADR-0001 display id)
+
+**Status:** Complete. **Tracking:** [#294](https://github.com/pskillen/meshflow-api/issues/294).
+
+- **Done:** Dropped stored `ObservedNode.node_id_str`; API returns computed `!hex8` / `mc:{prefix12}` via model property and serializers (ADR-0001 §6). Migrations `nodes.0040` (nullable interim), `nodes.0041` (RemoveField). Rollback: re-add column and backfill from computed values on a prod clone during a maintenance window.
+
 ### Verification
 
 1. `python -m pytest Meshflow/meshcore_packets/tests/ Meshflow/common/tests/test_meshcore_node_helpers.py -v`
