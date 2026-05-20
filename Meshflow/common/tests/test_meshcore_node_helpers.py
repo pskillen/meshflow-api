@@ -4,6 +4,7 @@ from django.utils import timezone
 
 import pytest
 
+from common.mesh_node_helpers import observed_node_id_str
 from common.meshcore_node_helpers import (
     mc_node_id_str,
     merge_prefix_stub_into_full,
@@ -33,7 +34,7 @@ def test_resolve_full_pubkey_creates_node():
     assert node.protocol == Protocol.MESHCORE
     assert node.mc_pubkey == FULL_PUBKEY
     assert node.mc_pubkey_prefix == PREFIX
-    assert node.node_id_str == f"mc:{PREFIX}"
+    assert observed_node_id_str(node) == f"mc:{PREFIX}"
     assert node.last_heard == now
 
 
@@ -63,7 +64,6 @@ def test_merge_prefix_stub_into_full():
     stub = ObservedNode.objects.create(
         protocol=Protocol.MESHCORE,
         mc_pubkey_prefix=PREFIX,
-        node_id_str=mc_node_id_str(mc_pubkey_prefix=PREFIX),
         long_name="stub",
         short_name="stub",
     )
@@ -71,7 +71,6 @@ def test_merge_prefix_stub_into_full():
         protocol=Protocol.MESHCORE,
         mc_pubkey=FULL_PUBKEY,
         mc_pubkey_prefix=PREFIX,
-        node_id_str=mc_node_id_str(mc_pubkey=FULL_PUBKEY),
         long_name="full",
         short_name="full",
     )
