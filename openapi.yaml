@@ -7,7 +7,7 @@ info:
     API for managing Meshtastic networks and nodes. The service is moving toward
     multi-protocol support (MeshCore alongside Meshtastic); new responses may
     include a ``protocol`` discriminator on shared models. See
-    ``docs/features/meshcore/implementation-plan.md`` for the phased rollout.
+    ``docs/features/meshcore/README.md`` for the phased rollout.
 
 servers:
   - url: /api

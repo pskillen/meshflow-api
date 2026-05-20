@@ -46,6 +46,16 @@ We still need a way to:
 - **Risk:** auto-creating `MessageChannel` rows on first sight could pollute the table if an attacker sends bogus channel indices via a compromised observer. Mitigation: limit to indices `0..63` (MC's plausible range) and require channel rows to be attached to the **observer's** `mc_channels` only on packets the observer authenticated for — which they already are.
 - **Out of scope:** UI for managing `mc_channels` per managed node; covered in Phase 1.7 (UI ticket).
 
+## Supplement (2026-05-20) — device as source of truth for operator metadata
+
+ADR §5–6 still govern **ingest resolution** (`mc_channel_idx` → `MessageChannel` via feeder `mc_channels`). For **name**, **type** (public/hashtag), and **hashtag string**, Phase 2 ([#297](https://github.com/pskillen/meshflow-api/issues/297)) treats the **MeshCore companion channel table** as authoritative:
+
+- On bot connect, the bot uploads a full device snapshot; the API **reconciles** `MessageChannel` rows and `ManagedNode.mc_channels` (see [`text-message-channels.md`](../../meshcore/text-message-channels.md)).
+- UI edits push to the device (WebSocket), then the bot re-syncs; the API does not rely on API-only CRUD as the long-term source of names.
+- Auto-created `"MC channel N"` placeholders at ingest (before first sync) remain; they are overwritten when sync supplies device metadata.
+
+This does not change the wire model (index-only) or constellation scoping.
+
 ## Evidence
 
 - [`docs/packets/meshcore/channel_message/20260507_094921_075978.json`](../../../packets/meshcore/channel_message/20260507_094921_075978.json) — shows `channel_idx`, no name, no hash.
