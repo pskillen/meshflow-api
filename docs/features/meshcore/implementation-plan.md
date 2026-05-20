@@ -280,7 +280,7 @@ Use this subsection as the **single inventory** of api-repo refactors tied to Me
 
 **Status:** Complete. **Tracking:** [#294](https://github.com/pskillen/meshflow-api/issues/294).
 
-- **Done:** Dropped stored `ObservedNode.node_id_str`; API returns computed `!hex8` / `mc:{prefix12}` via model property and serializers (ADR-0001 §6). Migrations `nodes.0040` (nullable interim), `nodes.0041` (RemoveField). Rollback: re-add column and backfill from computed values on a prod clone during a maintenance window.
+- **Done:** Dropped stored `ObservedNode.node_id_str`; API returns computed `!hex8` / `mc:{prefix12}` via model property and serializers (ADR-0001 §6). Migrations `nodes.0043` (nullable interim), `nodes.0044` (RemoveField). Rollback: re-add column and backfill from computed values on a prod clone during a maintenance window.
 
 ### Verification
 

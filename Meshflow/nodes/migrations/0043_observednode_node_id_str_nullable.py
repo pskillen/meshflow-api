@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("nodes", "0039_rename_observednode_meshtastic_identity_fields"),
+        ("nodes", "0042_managednode_bot_version"),
     ]
 
     operations = [

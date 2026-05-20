@@ -6,7 +6,7 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("nodes", "0040_observednode_node_id_str_nullable"),
+        ("nodes", "0043_observednode_node_id_str_nullable"),
     ]
 
     operations = [
