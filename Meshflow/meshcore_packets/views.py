@@ -1,14 +1,24 @@
 """MeshCore packet API views."""
 
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from common.ws_groups import managed_node_ws_group
 from meshcore_packets.models import MeshCoreRawPacket, MeshCoreTextPacket
 from meshcore_packets.permissions import MeshCoreFeederPermission
 from meshcore_packets.serializers import MeshCorePacketIngestSerializer, MeshCorePacketListSerializer
+from meshcore_packets.serializers_channel import (
+    McChannelApplySerializer,
+    McChannelSyncSerializer,
+    MessageChannelMcSerializer,
+)
+from meshcore_packets.services.channel_sync import reconcile_mc_channels
 from meshcore_packets.signals import meshcore_packet_received, meshcore_text_packet_received
 from nodes.authentication import NodeAPIKeyAuthentication
+from nodes.models import ManagedNode
 
 
 class MeshCorePacketIngestView(APIView):
@@ -73,3 +83,88 @@ class MeshCorePacketListView(generics.ListAPIView):
         if observer_id:
             qs = qs.filter(observer__internal_id=observer_id)
         return qs
+
+
+class MeshCoreMcChannelSyncView(APIView):
+    """POST device channel snapshot from feeder bot; reconciles API mirror."""
+
+    authentication_classes = [NodeAPIKeyAuthentication]
+    permission_classes = [MeshCoreFeederPermission]
+
+    def post(self, request, format=None):
+        managed_node = request.auth.node
+        serializer = McChannelSyncSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            channels = reconcile_mc_channels(
+                managed_node,
+                serializer.validated_data["channels"],
+                synced_at=serializer.validated_data.get("synced_at"),
+            )
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        managed_node.refresh_from_db()
+        return Response(
+            {
+                "status": "success",
+                "synced_at": managed_node.mc_channels_synced_at,
+                "mc_channels": MessageChannelMcSerializer(channels, many=True).data,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+def _dispatch_mc_channel_apply(managed_node: ManagedNode, channels: list[dict]) -> bool:
+    channel_layer = get_channel_layer()
+    if channel_layer is None:
+        return False
+    group = managed_node_ws_group(managed_node)
+    async_to_sync(channel_layer.group_send)(
+        group,
+        {
+            "type": "node_command",
+            "command": {
+                "type": "apply_mc_channel_config",
+                "channels": channels,
+            },
+        },
+    )
+    return True
+
+
+class ManagedNodeMcChannelApplyView(APIView):
+    """POST desired MC channels; pushes apply_mc_channel_config to connected feeder bot."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, internal_id, format=None):
+        managed_node = ManagedNode.objects.filter(
+            internal_id=internal_id,
+            deleted_at__isnull=True,
+            owner=request.user,
+        ).first()
+        if not managed_node:
+            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = McChannelApplySerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        channels = serializer.validated_data["channels"]
+        sent = _dispatch_mc_channel_apply(managed_node, channels)
+        if not sent:
+            return Response(
+                {"detail": "WebSocket channel layer unavailable."},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        return Response(
+            {
+                "status": "dispatched",
+                "message": "apply_mc_channel_config sent to connected bot; device sync updates API mirror.",
+            },
+            status=status.HTTP_202_ACCEPTED,
+        )
