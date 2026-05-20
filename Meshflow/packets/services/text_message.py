@@ -46,7 +46,7 @@ class TextMessagePacketService(BasePacketService):
             message_text=self.packet.message_text,
             is_emoji=self.packet.emoji,
             reply_to_meshtastic_packet_id=self.packet.reply_packet_id,
-            sent_at=self.packet.rx_time or self.packet.first_reported_time,
+            sent_at=getattr(self.observation, "rx_time", None) or self.packet.first_reported_time,
             channel=self.observation.channel,
         )
 
