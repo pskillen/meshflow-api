@@ -29,6 +29,18 @@ traceroute_packet_received = Signal()
 # kwargs: observed_node, device_metrics, battery_level, reported_time
 device_metrics_recorded = Signal()
 
+# Emitted after a traceroute response is linked to an AutoTraceRoute and completion is persisted.
+# kwargs: auto_tr, traceroute_packet, packet_observation, observer, from_node
+auto_traceroute_completed_from_packet = Signal()
+
+# Emitted after packet-type processing, before ObservedNode.last_heard is updated (DX candidate rules).
+# kwargs: packet, observer, observation, from_node, previous_last_heard, from_node_created
+packet_from_node_processed = Signal()
+
+# Emitted after ObservedNode.last_heard is advanced for this ingest.
+# kwargs: observed_node, last_heard
+node_last_heard_advanced = Signal()
+
 
 # Converted packet signals
 # These are used to signal that a text message has been received
