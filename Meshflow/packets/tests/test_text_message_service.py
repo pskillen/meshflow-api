@@ -1,6 +1,9 @@
 import pytest
 
+from django.utils import timezone
+
 from common.mesh_node_helpers import MESHTASTIC_BROADCAST_ID
+from common.protocol import Protocol
 from constellations.models import ConstellationUserMembership, MessageChannel
 from nodes.models import NodeOwnerClaim, ObservedNode
 from packets.services.text_message import TextMessagePacketService
@@ -40,11 +43,13 @@ def test_process_packet_already_processed(
 
     # Create a message with the same packet_id to simulate already processed
     TextMessage.objects.create(
+        protocol=Protocol.MESHTASTIC,
         sender=ObservedNode.objects.get_or_create(meshtastic_node_id=packet.from_int)[0],
         original_packet=packet,
         recipient_meshtastic_node_id=packet.to_int,
         message_text=packet.message_text,
         is_emoji=packet.emoji,
+        sent_at=timezone.now(),
     )
 
     # This should not raise an error, but also not create a new message

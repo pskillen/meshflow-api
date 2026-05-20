@@ -6,6 +6,7 @@ import re
 from django.utils import timezone
 
 from common.mesh_node_helpers import MESHTASTIC_BROADCAST_ID
+from common.protocol import Protocol
 from nodes.models import NodeOwnerClaim
 from packets.models import MessagePacket
 from packets.services.base import BasePacketService
@@ -38,13 +39,14 @@ class TextMessagePacketService(BasePacketService):
 
         # Create a new Message record
         message = TextMessage.objects.create(
+            protocol=Protocol.MESHTASTIC,
             sender=self.from_node,
             original_packet=self.packet,
             recipient_meshtastic_node_id=self.packet.to_int,
             message_text=self.packet.message_text,
             is_emoji=self.packet.emoji,
             reply_to_meshtastic_packet_id=self.packet.reply_packet_id,
-            # the channel is based on the observer's channel mapping
+            sent_at=self.packet.rx_time or self.packet.first_reported_time,
             channel=self.observation.channel,
         )
 

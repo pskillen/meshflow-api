@@ -1,9 +1,12 @@
 from django.db import models
+from django.db.models import Q
 
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 
 from common.mesh_node_helpers import MESHTASTIC_BROADCAST_ID
+from common.protocol import Protocol
+from meshcore_packets.models import MeshCorePacketObservation
 from nodes.models import ManagedNode, ObservedNode
 from packets.models import PacketObservation
 
@@ -17,42 +20,49 @@ class TextMessageViewSet(viewsets.ModelViewSet):
     http_method_names = ["get", "delete", "head", "options"]
 
     def get_queryset(self):
-        queryset = TextMessage.objects.select_related("sender", "original_packet").all().order_by("-sent_at")
+        queryset = (
+            TextMessage.objects.select_related(
+                "sender",
+                "original_packet",
+                "original_mc_packet",
+                "channel",
+            )
+            .all()
+            .order_by("-sent_at")
+        )
 
         constellation_id = self.request.query_params.get("constellation_id")
         channel_id = self.request.query_params.get("channel_id")
         sender_node_id = self.request.query_params.get("sender_node_id")
+        protocol_param = self.request.query_params.get("protocol")
+
         if constellation_id:
             queryset = queryset.filter(channel__constellation_id=constellation_id)
         if channel_id:
             queryset = queryset.filter(channel_id=channel_id)
         if sender_node_id:
             queryset = queryset.filter(sender__meshtastic_node_id=int(sender_node_id))
+        if protocol_param:
+            key = protocol_param.strip().lower()
+            if key in ("meshtastic", "mt", "1"):
+                queryset = queryset.filter(protocol=Protocol.MESHTASTIC)
+            elif key in ("meshcore", "mc", "2"):
+                queryset = queryset.filter(protocol=Protocol.MESHCORE)
 
-        # filter out any DMs (i.e. recipient_meshtastic_node_id must be '^all')
-        queryset = queryset.filter(recipient_meshtastic_node_id=MESHTASTIC_BROADCAST_ID)
+        queryset = queryset.filter(
+            Q(protocol=Protocol.MESHTASTIC, recipient_meshtastic_node_id=MESHTASTIC_BROADCAST_ID)
+            | Q(protocol=Protocol.MESHCORE, sender__isnull=True, channel__isnull=False)
+        )
 
-        # Prefetch observations and their observer for each original_packet
         observation_qs = PacketObservation.objects.select_related("observer")
         queryset = queryset.prefetch_related(
             models.Prefetch("original_packet__observations", queryset=observation_qs, to_attr="prefetched_observations")
         )
 
-        # NB: Keeping this prefetch for posterity - it's not needed because we're using the observer_nodes_map
-        #     It also doesn't work because ManagedNode doesn't have a formal FK to ObservedNode
-        # # Prefetch ObservedNode for all observer nodes referenced by PacketObservation
-        # observer_node_ids = PacketObservation.objects.values_list("observer_id", flat=True).distinct()
-        # observed_nodes = ObservedNode.objects.filter(meshtastic_node_id__in=observer_node_ids)
-        # queryset = queryset.prefetch_related(
-        #     models.Prefetch("original_packet__observations__observer__observednode_set",
-        #                     queryset=observed_nodes, to_attr="prefetched_observed_nodes")
-        # )
-
         return queryset
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
-        # Build a mapping of node_id -> ObservedNode for all relevant nodes
         observer_node_ids = (
             ManagedNode.objects.filter(deleted_at__isnull=True).values_list("meshtastic_node_id", flat=True).distinct()
         )
