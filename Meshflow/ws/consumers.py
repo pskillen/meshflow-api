@@ -37,8 +37,10 @@ class NodeConsumer(AsyncWebsocketConsumer):
             await self.close()
             return
 
+        from common.ws_groups import managed_node_ws_group
+
         self.managed_node = managed_node
-        self.node_group = f"node_{managed_node.meshtastic_node_id}"
+        self.node_group = managed_node_ws_group(managed_node)
 
         await self.channel_layer.group_add(self.node_group, self.channel_name)
         await self.accept()
