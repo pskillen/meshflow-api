@@ -393,6 +393,8 @@ class ManagedNodeSerializer(serializers.ModelSerializer):
             "constellation_id",
             "constellation",
             "allow_auto_traceroute",
+            "bot_version",
+            "bot_version_reported_at",
             "position",
             "device_metrics",
             "latest_environment_metrics",
@@ -416,6 +418,8 @@ class ManagedNodeSerializer(serializers.ModelSerializer):
             "node_id_str",
             "owner",
             "constellation",
+            "bot_version",
+            "bot_version_reported_at",
         ]
 
     STATUS_FIELDS = (

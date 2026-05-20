@@ -1743,6 +1743,18 @@ components:
           type: boolean
           description: If true, this node may be used for auto-scheduled traceroutes and manual triggers
           default: false
+        bot_version:
+          type: string
+          nullable: true
+          maxLength: 128
+          description: Last meshflow-bot version reported by this feeder on connect
+          readOnly: true
+        bot_version_reported_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When bot_version was last reported by the feeder
+          readOnly: true
         last_packet_ingested_at:
           type: string
           format: date-time
@@ -3583,6 +3595,85 @@ paths:
       responses:
         '200':
           description: Paginated MeshCore raw packets
+
+  /packets/{meshtastic_node_id}/bot-version/:
+    put:
+      summary: Report meshflow-bot version (feeder)
+      description: >
+        Meshtastic feeder bots report their software version on connect. The path segment is
+        the observer's Meshtastic numeric node id and must match the authenticated ManagedNode
+        linked to the Node API key. JWT users cannot update these fields via managed-node CRUD.
+      tags: [Meshtastic packets]
+      security:
+        - NodeApiKeyAuth: []
+      parameters:
+        - name: meshtastic_node_id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Meshtastic numeric node id of the observer (feeder)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [bot_version]
+              properties:
+                bot_version:
+                  type: string
+                  maxLength: 128
+                  description: Bot release tag, semver, or git describe output
+      responses:
+        '200':
+          description: Version recorded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  bot_version:
+                    type: string
+                  bot_version_reported_at:
+                    type: string
+                    format: date-time
+        '400':
+          description: Invalid or empty bot_version
+        '403':
+          description: API key not linked to this managed node
+    post:
+      summary: Report meshflow-bot version (feeder, alias)
+      description: Same as PUT; provided for clients that prefer POST.
+      tags: [Meshtastic packets]
+      security:
+        - NodeApiKeyAuth: []
+      parameters:
+        - name: meshtastic_node_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [bot_version]
+              properties:
+                bot_version:
+                  type: string
+                  maxLength: 128
+      responses:
+        '200':
+          description: Version recorded
+        '400':
+          description: Invalid or empty bot_version
+        '403':
+          description: API key not linked to this managed node
 
   /packets/{meshtastic_node_id}/nodes/:
     post:
