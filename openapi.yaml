@@ -1019,7 +1019,10 @@ components:
           description: Meshtastic numeric node id on the mesh (null for MeshCore observed nodes)
         node_id_str:
           type: string
-          description: Display id (!hex8 for Meshtastic, mc:prefix12 for MeshCore)
+          readOnly: true
+          description: >
+            Computed display id (not stored). !{hex8} for Meshtastic from meshtastic_node_id;
+            mc:{prefix12} for MeshCore from mc_pubkey or mc_pubkey_prefix (ADR-0001).
         mc_pubkey:
           type: string
           nullable: true
@@ -1471,7 +1474,9 @@ components:
           description: Meshtastic numeric node id on the mesh network
         node_id_str:
           type: string
-          description: The ID of the node in Meshastic !hex format
+          readOnly: true
+          description: >
+            Computed display id (!hex8 or mc:prefix12); see ObservedNode.node_id_str.
         long_name:
           type: string
           description: The long name of the node
@@ -1590,8 +1595,9 @@ components:
               readOnly: true
             node_id_str:
               type: string
-              description: The node ID in hex format
               readOnly: true
+              description: >
+                Computed display id (!hex8 or mc:prefix12); not a database column on ObservedNode.
             long_name:
               type: string
               description: The long name of the node
