@@ -6,7 +6,6 @@ from rest_framework.permissions import IsAuthenticated
 
 from common.mesh_node_helpers import MESHTASTIC_BROADCAST_ID
 from common.protocol import Protocol
-from meshcore_packets.models import MeshCorePacketObservation
 from nodes.models import ManagedNode, ObservedNode
 from packets.models import PacketObservation
 

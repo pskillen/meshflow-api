@@ -1,14 +1,13 @@
 """Tests for MeshCoreTextMessageService."""
 
-from datetime import timedelta
+from django.utils import timezone
 
 import pytest
-from django.utils import timezone
 
 from common.protocol import Protocol
 from meshcore_packets.models import MeshCorePayloadType, MeshCoreTextPacket
-from meshcore_packets.services.text_message import MeshCoreTextMessageService
 from meshcore_packets.services.channel_sync import reconcile_mc_channels
+from meshcore_packets.services.text_message import MeshCoreTextMessageService
 from text_messages.models import TextMessage
 
 

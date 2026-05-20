@@ -7,9 +7,8 @@ from rest_framework import serializers
 from common.mesh_node_helpers import meshtastic_id_to_hex, observed_node_id_str
 from common.protocol import Protocol
 from constellations.models import Constellation, ConstellationUserMembership, MessageChannel
-from users.models import User
-
 from meshcore_packets.serializers_channel import MessageChannelMcSerializer
+from users.models import User
 
 from .models import (
     AntennaPattern,

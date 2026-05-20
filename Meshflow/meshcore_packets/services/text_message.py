@@ -2,11 +2,9 @@
 
 import logging
 
-from common.mesh_node_helpers import MESHTASTIC_BROADCAST_ID
 from common.meshcore_node_helpers import resolve_or_create_mc_observed_node
 from common.protocol import Protocol
 from meshcore_packets.models import MeshCorePayloadType, MeshCoreTextPacket
-from meshcore_packets.signals import meshcore_text_packet_received
 from packets.signals import text_message_received
 from text_messages.models import TextMessage
 

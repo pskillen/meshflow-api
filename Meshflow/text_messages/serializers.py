@@ -4,7 +4,6 @@ from common.protocol import Protocol
 from constellations.models import MessageChannel
 from meshcore_packets.models import MeshCorePacketObservation
 from nodes.models import ObservedNode
-from packets.models import PacketObservation
 from packets.serializers import PrefetchedPacketObservationSerializer
 
 from .models import TextMessage

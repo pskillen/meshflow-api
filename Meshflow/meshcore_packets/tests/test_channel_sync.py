@@ -1,15 +1,15 @@
 """Tests for MC channel sync and resolve_mc_channel."""
 
-import pytest
 from django.urls import reverse
 from django.utils import timezone
+
+import pytest
 from rest_framework.test import APIClient
 
 from common.protocol import Protocol
 from constellations.models import MeshCoreChannelType, MessageChannel
 from meshcore_packets.services.channel import resolve_mc_channel
 from meshcore_packets.services.channel_sync import reconcile_mc_channels
-from nodes.models import NodeAuth
 
 
 @pytest.fixture

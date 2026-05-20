@@ -2,8 +2,8 @@
 
 from django.dispatch import receiver
 
-from meshcore_packets.signals import meshcore_text_packet_received
 from meshcore_packets.services.text_message import handle_meshcore_text_packet
+from meshcore_packets.signals import meshcore_text_packet_received
 
 
 @receiver(meshcore_text_packet_received)
