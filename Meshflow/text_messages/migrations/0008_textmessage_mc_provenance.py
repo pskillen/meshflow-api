@@ -75,6 +75,7 @@ class Migration(migrations.Migration):
                 condition=(
                     models.Q(original_packet__isnull=False, original_mc_packet__isnull=True)
                     | models.Q(original_packet__isnull=True, original_mc_packet__isnull=False)
+                    | models.Q(original_packet__isnull=True, original_mc_packet__isnull=True)
                 ),
                 name="textmessage_single_provenance",
             ),

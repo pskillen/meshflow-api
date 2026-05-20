@@ -54,6 +54,7 @@ class TextMessage(models.Model):
                 condition=(
                     Q(original_packet__isnull=False, original_mc_packet__isnull=True)
                     | Q(original_packet__isnull=True, original_mc_packet__isnull=False)
+                    | Q(original_packet__isnull=True, original_mc_packet__isnull=True)
                 ),
                 name="textmessage_single_provenance",
             ),
