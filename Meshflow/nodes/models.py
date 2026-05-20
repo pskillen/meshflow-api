@@ -140,6 +140,18 @@ class ManagedNode(models.Model):
         help_text=_("If True, this node may be used for auto-scheduled traceroutes and manual triggers."),
     )
 
+    bot_version = models.CharField(
+        max_length=128,
+        null=True,
+        blank=True,
+        help_text=_("Last meshflow-bot version reported by this feeder on connect."),
+    )
+    bot_version_reported_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text=_("When bot_version was last reported by the feeder."),
+    )
+
     deleted_at = models.DateTimeField(
         null=True,
         blank=True,

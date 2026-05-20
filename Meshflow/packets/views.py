@@ -1,4 +1,6 @@
-from rest_framework import status
+from django.utils import timezone
+
+from rest_framework import serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -266,3 +268,63 @@ class NodeUpsertView(APIView):
                 )
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ManagedNodeBotVersionSerializer(serializers.Serializer):
+    """Body for feeder-reported meshflow-bot version."""
+
+    bot_version = serializers.CharField(max_length=128, trim_whitespace=True)
+
+
+class ManagedNodeBotVersionView(APIView):
+    """
+    Update the reporting meshflow-bot version for the authenticated managed node.
+
+    Only the feeder whose Node API key is linked to the ``meshtastic_node_id`` in the URL
+    may call this endpoint (same auth as packet ingest).
+    """
+
+    authentication_classes = [NodeAPIKeyAuthentication]
+    permission_classes = [NodeAuthorizationPermission]
+
+    def put(self, request, node_id, format=None):
+        return self._update(request)
+
+    def post(self, request, node_id, format=None):
+        return self._update(request)
+
+    def patch(self, request, node_id, format=None):
+        return self._update(request)
+
+    def _update(self, request):
+        managed_node = request.auth.node if hasattr(request.auth, "node") else None
+        if not managed_node:
+            return Response(
+                {"status": "error", "message": "No authenticated node found"},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        serializer = ManagedNodeBotVersionSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        bot_version = serializer.validated_data["bot_version"]
+        if not bot_version:
+            return Response(
+                {"bot_version": ["This field may not be blank."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        now = timezone.now()
+        managed_node.bot_version = bot_version
+        managed_node.bot_version_reported_at = now
+        managed_node.save(update_fields=["bot_version", "bot_version_reported_at"])
+
+        return Response(
+            {
+                "status": "success",
+                "bot_version": managed_node.bot_version,
+                "bot_version_reported_at": managed_node.bot_version_reported_at,
+            },
+            status=status.HTTP_200_OK,
+        )
