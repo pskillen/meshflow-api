@@ -1,8 +1,10 @@
 # ADR-0001 — MeshCore node identity
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-05-12
 **Tracking:** [meshflow-api#276](https://github.com/pskillen/meshflow-api/issues/276)
+
+Phase 1 MVP ([#265](https://github.com/pskillen/meshflow-api/issues/265)) kept a stored `node_id_str` column temporarily; [#294](https://github.com/pskillen/meshflow-api/issues/294) removed it in favour of the computed display id in §6.
 
 ## Context
 

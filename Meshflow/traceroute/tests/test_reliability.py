@@ -7,7 +7,6 @@ from django.utils import timezone
 import pytest
 
 import nodes.tests.conftest  # noqa: F401
-from common.mesh_node_helpers import meshtastic_id_to_hex
 from nodes.models import NodeLatestStatus
 from traceroute.models import AutoTraceRoute
 from traceroute.reliability import get_reliability_settings, load_source_target_reliability
@@ -32,13 +31,11 @@ def test_load_reliability_hard_cooldown_consecutive_auto_fails(
     )
     bad = create_observed_node(
         meshtastic_node_id=0xE10000AA,
-        node_id_str=meshtastic_id_to_hex(0xE10000AA),
         last_heard=timezone.now(),
     )
     NodeLatestStatus.objects.create(node=bad, latitude=55.6, longitude=-3.5)
     good = create_observed_node(
         meshtastic_node_id=0xE10000BB,
-        node_id_str=meshtastic_id_to_hex(0xE10000BB),
         last_heard=timezone.now(),
     )
     NodeLatestStatus.objects.create(node=good, latitude=55.1, longitude=-3.5)
@@ -77,13 +74,11 @@ def test_load_reliability_ignores_non_auto_triggers(
     )
     target = create_observed_node(
         meshtastic_node_id=0xE20000AA,
-        node_id_str=meshtastic_id_to_hex(0xE20000AA),
         last_heard=timezone.now(),
     )
     NodeLatestStatus.objects.create(node=target, latitude=56.8, longitude=-3.0)
     other = create_observed_node(
         meshtastic_node_id=0xE20000BB,
-        node_id_str=meshtastic_id_to_hex(0xE20000BB),
         last_heard=timezone.now(),
     )
     NodeLatestStatus.objects.create(node=other, latitude=56.1, longitude=-3.0)
@@ -120,7 +115,6 @@ def test_load_reliability_streak_broken_by_recent_success(
     )
     t = create_observed_node(
         meshtastic_node_id=0xE30000AA,
-        node_id_str=meshtastic_id_to_hex(0xE30000AA),
         last_heard=timezone.now(),
     )
     NodeLatestStatus.objects.create(node=t, latitude=57.3, longitude=-3.0)

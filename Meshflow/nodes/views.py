@@ -11,7 +11,6 @@ from django.db.models import (
     DateTimeField,
     IntegerField,
     OuterRef,
-    Q,
     Subquery,
     Value,
     When,
@@ -28,7 +27,7 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from common.mesh_node_helpers import meshtastic_hex_to_int
+from common.mesh_node_helpers import observed_node_search_conditions
 from constellations.models import ConstellationUserMembership
 from nodes.constants import INFRASTRUCTURE_ROLES
 from nodes.models import (
@@ -311,31 +310,7 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Initialize an empty Q object for our conditions
-        conditions = Q()
-
-        # Check if query is a node_id_str (hex format starting with !)
-        if query.startswith("!") and len(query) == 9:
-            try:
-                # Convert hex node_id_str to integer node_id
-                node_id = meshtastic_hex_to_int(query)
-                conditions |= Q(meshtastic_node_id=node_id)
-            except ValueError:
-                # If conversion fails, just continue with other search methods
-                pass
-        else:
-            conditions |= Q(node_id_str__icontains=query)
-
-        # Try to convert query to integer for node_id search if it's numeric
-        try:
-            node_id_query = int(query)
-            conditions |= Q(meshtastic_node_id=node_id_query)
-        except ValueError, TypeError:
-            pass
-
-        # Add conditions for text fields
-        conditions |= Q(short_name__icontains=query)
-        conditions |= Q(long_name__icontains=query)
+        conditions = observed_node_search_conditions(query)
 
         # Search for nodes matching the query
         nodes = ObservedNode.objects.filter(conditions).order_by("meshtastic_node_id")

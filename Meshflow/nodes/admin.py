@@ -6,7 +6,11 @@ from django.db import transaction
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 
-from common.mesh_node_helpers import meshtastic_hex_to_int, meshtastic_id_to_hex
+from common.mesh_node_helpers import (
+    meshtastic_hex_to_int,
+    meshtastic_id_to_hex,
+    observed_node_search_conditions,
+)
 from common.protocol import Protocol
 
 from .models import ManagedNode, ManagedNodeStatus, NodeAPIKey, NodeAuth, NodeLatestStatus, ObservedNode
@@ -648,7 +652,6 @@ class ObservedNodeAdmin(admin.ModelAdmin):
         "short_name",
         "long_name",
         "meshtastic_node_id",
-        "node_id_str",
         "mc_pubkey",
         "mc_pubkey_prefix",
         "mac_addr",
@@ -669,6 +672,12 @@ class ObservedNodeAdmin(admin.ModelAdmin):
 
     def get_queryset(self, request):
         return super().get_queryset(request).select_related("claimed_by", "latest_status")
+
+    def get_search_results(self, request, queryset, search_term):
+        if not search_term:
+            return queryset, False
+        queryset = queryset.filter(observed_node_search_conditions(search_term)).distinct()
+        return queryset, True
 
     def get_fields(self, request, obj=None):
         common = [

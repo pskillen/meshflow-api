@@ -4,7 +4,7 @@ from django.urls import reverse
 
 from rest_framework import serializers
 
-from common.mesh_node_helpers import meshtastic_id_to_hex
+from common.mesh_node_helpers import meshtastic_id_to_hex, observed_node_id_str
 from common.protocol import Protocol
 from constellations.models import Constellation, ConstellationUserMembership, MessageChannel
 from users.models import User
@@ -1087,7 +1087,7 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
             model = User
             fields = ["id", "username"]
 
-    node_id_str = serializers.CharField(read_only=True)
+    node_id_str = serializers.SerializerMethodField()
     latest_position = serializers.SerializerMethodField()
     latest_device_metrics = serializers.SerializerMethodField()
     latest_environment_metrics = serializers.SerializerMethodField()
@@ -1107,10 +1107,8 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
     owner = OwnerSerializer(source="claimed_by", read_only=True)
     claim = serializers.SerializerMethodField()
 
-    def to_internal_value(self, data):
-        if "meshtastic_node_id" in data:
-            data["node_id_str"] = meshtastic_id_to_hex(data["meshtastic_node_id"])
-        return super().to_internal_value(data)
+    def get_node_id_str(self, obj):
+        return observed_node_id_str(obj)
 
     class Meta:
         model = ObservedNode

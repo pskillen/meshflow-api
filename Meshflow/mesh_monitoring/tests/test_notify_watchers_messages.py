@@ -7,7 +7,6 @@ from django.test.utils import override_settings
 import pytest
 
 import nodes.tests.conftest  # noqa: F401
-from common.mesh_node_helpers import meshtastic_id_to_hex
 from mesh_monitoring.services import notify_watchers_node_offline, notify_watchers_verification_started
 from mesh_monitoring.tests.conftest import create_watch_with_offline_threshold
 
@@ -18,7 +17,6 @@ def test_offline_dm_includes_short_name_and_deep_link(create_user, create_observ
     node_id = 0x11223344
     obs = create_observed_node(
         meshtastic_node_id=node_id,
-        node_id_str=meshtastic_id_to_hex(node_id),
         long_name="My Long Node Name",
         short_name="MLNN",
         claimed_by=user,
@@ -46,7 +44,6 @@ def test_offline_dm_omits_url_when_frontend_unset(create_user, create_observed_n
     node_id = 0x22334455
     obs = create_observed_node(
         meshtastic_node_id=node_id,
-        node_id_str=meshtastic_id_to_hex(node_id),
         long_name="Another Node",
         short_name="ANOD",
         claimed_by=user,
@@ -69,7 +66,6 @@ def test_verification_start_dm_includes_short_name_and_deep_link(create_user, cr
     node_id = 0x33445566
     obs = create_observed_node(
         meshtastic_node_id=node_id,
-        node_id_str=meshtastic_id_to_hex(node_id),
         long_name="Verify Me",
         short_name="VFYM",
         claimed_by=user,

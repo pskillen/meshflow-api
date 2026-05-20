@@ -107,7 +107,6 @@ def resolve_or_create_mc_observed_node(
         prefix = pubkey_to_prefix(pubkey)
         defaults = {
             "mc_pubkey_prefix": prefix,
-            "node_id_str": mc_node_id_str(mc_pubkey=pubkey),
             "long_name": long_name or f"MC {prefix}",
             "short_name": (short_name or prefix[-4:])[:5],
         }
@@ -156,7 +155,6 @@ def resolve_or_create_mc_observed_node(
             node = ObservedNode.objects.create(
                 protocol=Protocol.MESHCORE,
                 mc_pubkey_prefix=prefix,
-                node_id_str=mc_node_id_str(mc_pubkey_prefix=prefix),
                 long_name=long_name or f"MC {prefix}",
                 short_name=(short_name or prefix[-4:])[:5],
                 last_heard=last_heard,

@@ -204,7 +204,7 @@ _Capture follow-ups so they are not lost between sub-plans. Remove or strike thr
 
 - [ ] **API v1 ingest retirement** — [#319](https://github.com/pskillen/meshflow-api/issues/319); bot [#95](https://github.com/pskillen/meshflow-bot/issues/95). Deprecated `POST /raw-packet/` in OpenAPI until bot defaults to v2 only.
 - [ ] **`TextMessage` dual FK** (`original_mt_packet` / `original_mc_packet`) — Phase 2 / separate epic.
-- [ ] **Drop `ObservedNode.node_id_str` DB column** — separate ADR/amendment.
+- [x] **Drop `ObservedNode.node_id_str` DB column** — [#294](https://github.com/pskillen/meshflow-api/issues/294) / ADR-0001 §6.
 - [ ] **Rename Django app `packets` or `/api/packets/` URL prefix** — out of scope for rename index.
 
 ### Resolved since earlier revisions (do not re-open)

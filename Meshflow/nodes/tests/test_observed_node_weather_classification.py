@@ -5,7 +5,6 @@ import pytest
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from common.mesh_node_helpers import meshtastic_id_to_hex
 from nodes.models import EnvironmentExposure, NodeLatestStatus, WeatherUse
 
 
@@ -16,7 +15,6 @@ def test_observed_node_detail_includes_weather_fields(create_observed_node, crea
     client.force_authenticate(user=user)
     node = create_observed_node(
         meshtastic_node_id=100100100,
-        node_id_str=meshtastic_id_to_hex(100100100),
         weather_use=WeatherUse.INCLUDE,
         environment_exposure=EnvironmentExposure.OUTDOOR,
     )
@@ -32,7 +30,6 @@ def test_environment_settings_editable_for_claim_owner(create_observed_node, cre
     owner = create_user()
     node = create_observed_node(
         meshtastic_node_id=200200200,
-        node_id_str=meshtastic_id_to_hex(200200200),
         claimed_by=owner,
     )
     client = APIClient()
@@ -45,10 +42,7 @@ def test_environment_settings_editable_for_claim_owner(create_observed_node, cre
 @pytest.mark.django_db
 def test_environment_settings_editable_for_staff(create_observed_node, create_user):
     staff = create_user(is_staff=True)
-    node = create_observed_node(
-        meshtastic_node_id=300300300,
-        node_id_str=meshtastic_id_to_hex(300300300),
-    )
+    node = create_observed_node(meshtastic_node_id=300300300)
     client = APIClient()
     client.force_authenticate(user=staff)
     response = client.get(reverse("observed-node-detail", kwargs={"internal_id": node.internal_id}))
@@ -61,7 +55,6 @@ def test_environment_settings_patch_claim_owner(create_observed_node, create_use
     owner = create_user()
     node = create_observed_node(
         meshtastic_node_id=400400400,
-        node_id_str=meshtastic_id_to_hex(400400400),
         claimed_by=owner,
     )
     client = APIClient()
@@ -83,10 +76,7 @@ def test_environment_settings_patch_claim_owner(create_observed_node, create_use
 @pytest.mark.django_db
 def test_environment_settings_patch_staff(create_observed_node, create_user):
     staff = create_user(is_staff=True)
-    node = create_observed_node(
-        meshtastic_node_id=500500500,
-        node_id_str=meshtastic_id_to_hex(500500500),
-    )
+    node = create_observed_node(meshtastic_node_id=500500500)
     client = APIClient()
     client.force_authenticate(user=staff)
     url = reverse("observed-node-environment-settings", kwargs={"internal_id": node.internal_id})
@@ -101,7 +91,6 @@ def test_environment_settings_patch_forbidden(create_observed_node, create_user)
     other = create_user()
     node = create_observed_node(
         meshtastic_node_id=600600600,
-        node_id_str=meshtastic_id_to_hex(600600600),
         claimed_by=owner,
     )
     client = APIClient()
@@ -114,10 +103,7 @@ def test_environment_settings_patch_forbidden(create_observed_node, create_user)
 @pytest.mark.django_db
 def test_environment_settings_patch_empty_body(create_observed_node, create_user):
     staff = create_user(is_staff=True)
-    node = create_observed_node(
-        meshtastic_node_id=700700700,
-        node_id_str=meshtastic_id_to_hex(700700700),
-    )
+    node = create_observed_node(meshtastic_node_id=700700700)
     client = APIClient()
     client.force_authenticate(user=staff)
     url = reverse("observed-node-environment-settings", kwargs={"internal_id": node.internal_id})
@@ -133,7 +119,6 @@ def test_weather_list_filter_weather_use(create_observed_node, create_user):
     def make_with_env(node_id, wu):
         n = create_observed_node(
             meshtastic_node_id=node_id,
-            node_id_str=meshtastic_id_to_hex(node_id),
             weather_use=wu,
         )
         NodeLatestStatus.objects.update_or_create(

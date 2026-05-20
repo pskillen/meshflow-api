@@ -6,7 +6,6 @@ from uuid import uuid4
 from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
 
-from common.mesh_node_helpers import meshtastic_id_to_hex
 from constellations.models import Constellation, MessageChannel
 from nodes.models import ManagedNode, NodeLatestStatus, ObservedNode
 from packets.models import (
@@ -64,7 +63,6 @@ class BasePacketSerializerTestCase(TestCase):
 
         cls.from_node = ObservedNode.objects.create(
             meshtastic_node_id=456789,
-            node_id_str=meshtastic_id_to_hex(456789),
             long_name="From Node",
             short_name="FRM",
         )
@@ -803,7 +801,6 @@ class PacketDeduplicationTest(BasePacketSerializerTestCase):
         # Second sender (different node) for cross-sender test
         cls.from_node_b = ObservedNode.objects.create(
             meshtastic_node_id=111222333,
-            node_id_str=meshtastic_id_to_hex(111222333),
             long_name="From Node B",
             short_name="FRB",
         )
