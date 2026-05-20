@@ -82,23 +82,25 @@ Deploy api #325 before bot fleet upgrade.
 
 ## Phase 2.2 — text messages & channels
 
-**Status:** Not started (design only). **Guide:** [text-message-channels.md](./text-message-channels.md). **Plan:** `.cursor/plans/mc_text_textmessage_pipeline_2c3e9fb8.plan.md`. **Issues:** [#296](https://github.com/pskillen/meshflow-api/issues/296), [#297](https://github.com/pskillen/meshflow-api/issues/297).
+**Status:** Implemented on branch `api-296/paddy/mc-text-channels` (API + bot + ui); PRs pending. **Guide:** [text-message-channels.md](./text-message-channels.md). **Issues:** [#296](https://github.com/pskillen/meshflow-api/issues/296), [#297](https://github.com/pskillen/meshflow-api/issues/297).
 
-**Design (2026-05-20): channel config**
+**meshflow-api — delivered**
 
-- **Source of truth:** MeshCore **device** channel table (names, types, indices), not API-first CRUD.
-- **On bot connect:** read device → `POST mc-channel-sync` → API reconciles `MessageChannel` + `ManagedNode.mc_channels`.
-- **UI edits:** push to radio via WebSocket `apply_mc_channel_config`; bot re-reads device and syncs again.
-- **Drift:** connect sync overwrites API from device (no three-way merge in v1).
-- **Ingest:** `resolve_mc_channel` uses synced M2M; placeholder only before first sync.
+- `MessageChannel.mc_channel_type` / `mc_hashtag`; `ManagedNode.mc_channels` M2M + `mc_channels_synced_at`.
+- `POST /api/meshcore/feeder/mc-channel-sync/`; `POST …/apply-mc-channel-config/` (WS dispatch).
+- `MeshCoreTextMessageService` + `text_messages` receiver; `TextMessage.protocol` + `original_mc_packet`.
+- History API `protocol` query; MC `heard` from `MeshCorePacketObservation`.
+- `managed_node_ws_group` for MC feeder WebSocket (`node_mc_{internal_id}`).
+- Tests: `test_channel_sync.py`, `test_text_message_service.py`.
 
-**Planned deliverables**
+**meshflow-bot — delivered**
 
-| Area | #296 | #297 |
-| --- | --- | --- |
-| API | `TextMessage.protocol`, `original_mc_packet`, `MeshCoreTextMessageService`, history filter | `mc_channels` M2M, `mc-channel-sync`, WS apply |
-| Bot | (upload unchanged) | connect sync + WS apply + re-sync |
-| UI | — | mirror display + apply-to-radio |
+- `read_device_channels` / `apply_device_channels` via meshcore_py; `post_mc_channel_sync` on connect.
+- WS `apply_mc_channel_config`; MC feeders enable WebSocket when storage API configured.
+
+**meshflow-ui — delivered**
+
+- MeshCore channel panel on Node Settings (mirror + apply-to-radio).
 
 ---
 

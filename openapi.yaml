@@ -1687,6 +1687,11 @@ components:
         Managed nodes submit data to the API (or a bot process does), and a managed node often has an
         associated ObservedNode.
       properties:
+        internal_id:
+          type: string
+          format: uuid
+          readOnly: true
+          description: Stable UUID for this managed node (use for MC WebSocket paths)
         meshtastic_node_id:
           type: integer
           format: int64
@@ -1853,6 +1858,16 @@ components:
               $ref: '#/components/schemas/MessageChannel'
             meshtastic_channel_7:
               $ref: '#/components/schemas/MessageChannel'
+            mc_channels:
+              type: array
+              description: MeshCore channels mirrored from device (protocol=MeshCore only)
+              items:
+                $ref: '#/components/schemas/MessageChannel'
+            mc_channels_synced_at:
+              type: string
+              format: date-time
+              nullable: true
+              readOnly: true
 
     PaginatedResponse:
       type: object
@@ -2470,21 +2485,36 @@ components:
     TextMessage:
       type: object
       description: >
-        A text message on the mesh (Meshtastic-backed storage today). packet_id references the
-        Meshtastic MessagePacket; Phase 2 may add MeshCore provenance without renaming JSON keys.
+        A text message on the mesh (Meshtastic or MeshCore). packet_id is Meshtastic MessagePacket.packet_id
+        or MeshCore pkt_hash / packet UUID for MC rows.
       properties:
         id:
           description: The internal ID of the text message
           type: string
           readOnly: true
           format: uuid
-        packet_id:
-          description: Meshtastic MessagePacket.packet_id for the ingested message (provenance)
+        protocol:
+          $ref: '#/components/schemas/MeshProtocol'
+          readOnly: true
+        original_packet_id:
           type: integer
+          nullable: true
+          readOnly: true
+        original_mc_packet_id:
+          type: string
+          format: uuid
+          nullable: true
+          readOnly: true
+        packet_id:
+          description: Provenance packet id (MT packet_id or MC pkt_hash / UUID)
+          oneOf:
+            - type: integer
+            - type: string
           readOnly: true
         sender:
           type: object
-          description: The sender node info
+          nullable: true
+          description: The sender node info (null for anonymous MC channel text)
           properties:
             node_id_str:
               type: string
@@ -2544,9 +2574,62 @@ components:
           nullable: true
           minimum: 0
           description: MeshCore channel index when protocol is MeshCore; null for Meshtastic
+        mc_channel_type:
+          type: string
+          nullable: true
+          enum: [PUBLIC, HASHTAG]
+          description: MeshCore channel type when protocol is MeshCore
+        mc_hashtag:
+          type: string
+          nullable: true
+          description: Hashtag string when mc_channel_type is HASHTAG (no leading #)
         constellation:
           type: integer
           description: The ID of the constellation this channel belongs to
+
+    McChannelSyncEntry:
+      type: object
+      required: [mc_channel_idx, name, mc_channel_type]
+      properties:
+        mc_channel_idx:
+          type: integer
+          minimum: 0
+          maximum: 63
+        name:
+          type: string
+        mc_channel_type:
+          type: string
+          enum: [PUBLIC, HASHTAG]
+        mc_hashtag:
+          type: string
+          nullable: true
+
+    McChannelSyncRequest:
+      type: object
+      required: [channels]
+      properties:
+        channels:
+          type: array
+          items:
+            $ref: '#/components/schemas/McChannelSyncEntry'
+        synced_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    McChannelSyncResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        synced_at:
+          type: string
+          format: date-time
+          nullable: true
+        mc_channels:
+          type: array
+          items:
+            $ref: '#/components/schemas/MessageChannel'
 
     ConstellationMember:
       type: object
@@ -3580,6 +3663,67 @@ paths:
           description: Invalid payload
         '403':
           description: API key not linked to a MeshCore feeder
+
+  /meshcore/feeder/mc-channel-sync/:
+    post:
+      summary: Sync MeshCore channels from device snapshot
+      description: >
+        Feeder bot POSTs the full channel table read from the companion device. API reconciles
+        MessageChannel rows and ManagedNode.mc_channels (device is source of truth).
+      tags: [MeshCore packets]
+      security:
+        - NodeApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/McChannelSyncRequest'
+      responses:
+        '200':
+          description: Mirror updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/McChannelSyncResponse'
+        '400':
+          description: Invalid payload
+
+  /meshcore/managed-nodes/{internal_id}/apply-mc-channel-config/:
+    post:
+      summary: Push channel config to connected feeder radio
+      description: >
+        Dispatches apply_mc_channel_config to the feeder's WebSocket. Bot writes the device then
+        re-syncs via mc-channel-sync. Requires bot online.
+      tags: [MeshCore packets]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: internal_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [channels]
+              properties:
+                channels:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/McChannelSyncEntry'
+      responses:
+        '202':
+          description: Command dispatched to bot
+        '404':
+          description: Managed node not found or not owned
+        '503':
+          description: WebSocket channel layer unavailable
 
   /meshcore/packets/:
     get:
@@ -6869,6 +7013,13 @@ paths:
           schema:
             type: integer
           description: Filter messages by sender node ID (for "By Node" view)
+        - name: protocol
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [meshtastic, meshcore, mt, mc, 1, 2]
+          description: Filter by mesh protocol (Meshtastic or MeshCore)
       responses:
         '200':
           description: List of text messages

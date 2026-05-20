@@ -10,7 +10,9 @@ from rest_framework.test import APIClient
 
 from common.protocol import Protocol
 from meshcore_packets.models import MeshCoreRawPacket
+from meshcore_packets.services.channel_sync import reconcile_mc_channels
 from nodes.models import MeshCoreLocationSource, NodeAuth, ObservedNode, Position
+from text_messages.models import TextMessage
 
 FULL_PUBKEY = "b" * 64
 PREFIX = "b" * 12
@@ -174,6 +176,31 @@ def test_meshcore_advertisement_without_coords_no_position(ingest_client, meshco
     assert node.latest_status.latitude == 55.0
     assert node.latest_status.longitude == -4.0
     assert Position.objects.filter(node=node).count() == 1
+
+
+@pytest.mark.django_db
+def test_meshcore_channel_text_creates_text_message(ingest_client, meshcore_feeder):
+    reconcile_mc_channels(
+        meshcore_feeder["node"],
+        [{"mc_channel_idx": 0, "name": "Public", "mc_channel_type": "PUBLIC"}],
+    )
+    now = timezone.now()
+    payload = {
+        "event_type": "channel_message",
+        "payload_type": "channel_text",
+        "channel_idx": 0,
+        "pkt_hash": 4242,
+        "rx_time": now.timestamp(),
+        "text": "mesh hello",
+        "raw": {},
+    }
+    url = reverse("meshcore-packet-ingest")
+    response = ingest_client.post(url, payload, format="json")
+    assert response.status_code == 201
+    assert TextMessage.objects.filter(message_text="mesh hello").exists()
+    tm = TextMessage.objects.get(message_text="mesh hello")
+    assert tm.sender_id is None
+    assert tm.channel_id is not None
 
 
 @pytest.mark.django_db
