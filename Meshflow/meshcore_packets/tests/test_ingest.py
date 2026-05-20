@@ -1,5 +1,7 @@
 """MeshCore packet ingest tests."""
 
+from datetime import timedelta
+
 from django.urls import reverse
 from django.utils import timezone
 
@@ -12,6 +14,24 @@ from nodes.models import MeshCoreLocationSource, NodeAuth, ObservedNode, Positio
 
 FULL_PUBKEY = "b" * 64
 PREFIX = "b" * 12
+WMF_PUBKEY = "f3bcf18b78deee33596d29d49aa6891d30ac6e2c97e7e6a9b81907f1470afcfc"
+WMF_RX_LOG_ENVELOPE = {
+    "protocol": "meshcore",
+    "event_type": "rx_log_data",
+    "payload": {
+        "recv_time": 1778101899,
+        "snr": -1.5,
+        "rssi": -111,
+        "payload_typename": "ADVERT",
+        "pkt_hash": 3654312717,
+        "adv_name": "WMF",
+        "adv_key": WMF_PUBKEY,
+        "adv_timestamp": 1778101841,
+        "adv_lat": 55.99578,
+        "adv_lon": -4.09121,
+    },
+    "attributes": {"recv_time": 1778101899},
+}
 
 
 @pytest.fixture
@@ -47,6 +67,113 @@ def test_meshcore_advert_ingest_creates_packet_and_node(ingest_client, meshcore_
     position = Position.objects.get(node=node)
     assert position.meshcore_location_source == MeshCoreLocationSource.ADVERT
     assert position.original_mc_packet_id is not None
+
+
+@pytest.mark.django_db
+def test_meshcore_rx_log_data_advert_ingest(ingest_client, meshcore_feeder):
+    now = timezone.now()
+    payload = {
+        "event_type": "rx_log_data",
+        "payload_type": "advert",
+        "from_pubkey": WMF_PUBKEY,
+        "pkt_hash": 3654312717,
+        "rx_time": now.timestamp(),
+        "rx_rssi": -111.0,
+        "adv_name": "WMF",
+        "adv_lat": 55.99578,
+        "adv_lon": -4.09121,
+        "raw": {
+            "meshcore": True,
+            "type": "rx_log_data",
+            "payload": WMF_RX_LOG_ENVELOPE["payload"],
+            "attributes": WMF_RX_LOG_ENVELOPE["attributes"],
+        },
+    }
+    url = reverse("meshcore-packet-ingest")
+    response = ingest_client.post(url, payload, format="json")
+    assert response.status_code == 201
+    packet = MeshCoreRawPacket.objects.get(pkt_hash=3654312717)
+    assert packet.event_type == "rx_log_data"
+    node = ObservedNode.objects.get(protocol=Protocol.MESHCORE, mc_pubkey=WMF_PUBKEY)
+    assert node.long_name == "WMF"
+    assert node.latest_status.latitude == pytest.approx(55.99578)
+    assert node.latest_status.longitude == pytest.approx(-4.09121)
+    assert Position.objects.filter(node=node).count() == 1
+
+
+@pytest.mark.django_db
+def test_meshcore_rx_log_data_advert_nested_coords_only(ingest_client, meshcore_feeder):
+    """Position from adv_lat/adv_lon nested under raw.payload when top-level coords omitted."""
+    now = timezone.now()
+    pkt_hash = 3654312718
+    payload = {
+        "event_type": "rx_log_data",
+        "payload_type": "advert",
+        "pkt_hash": pkt_hash,
+        "rx_time": now.timestamp(),
+        "raw": {
+            "meshcore": True,
+            "type": "rx_log_data",
+            "payload": {
+                "payload_typename": "ADVERT",
+                "adv_key": WMF_PUBKEY,
+                "adv_name": "WMF",
+                "adv_lat": 55.99578,
+                "adv_lon": -4.09121,
+                "adv_timestamp": 1778101841,
+            },
+            "attributes": {},
+        },
+    }
+    url = reverse("meshcore-packet-ingest")
+    response = ingest_client.post(url, payload, format="json")
+    assert response.status_code == 201
+    node = ObservedNode.objects.get(protocol=Protocol.MESHCORE, mc_pubkey=WMF_PUBKEY)
+    assert node.latest_status.latitude == pytest.approx(55.99578)
+    assert Position.objects.filter(node=node).count() == 1
+
+
+@pytest.mark.django_db
+def test_meshcore_advertisement_without_coords_no_position(ingest_client, meshcore_feeder):
+    """advertisement events without adv_lat/adv_lon create identity only."""
+    now = timezone.now()
+    pubkey = "d" * 64
+    url = reverse("meshcore-packet-ingest")
+    ingest_client.post(
+        url,
+        {
+            "event_type": "advertisement",
+            "payload_type": "advert",
+            "from_pubkey": pubkey,
+            "pkt_hash": 88001,
+            "rx_time": now.timestamp(),
+            "adv_lat": 55.0,
+            "adv_lon": -4.0,
+            "raw": {},
+        },
+        format="json",
+    )
+    node = ObservedNode.objects.get(protocol=Protocol.MESHCORE, mc_pubkey=pubkey)
+    assert node.latest_status.latitude == 55.0
+
+    ingest_client.post(
+        url,
+        {
+            "event_type": "advertisement",
+            "payload_type": "advert",
+            "from_pubkey": pubkey,
+            "pkt_hash": 88002,
+            "rx_time": (now + timedelta(seconds=60)).timestamp(),
+            "adv_name": "Renamed",
+            "raw": {"public_key": pubkey},
+        },
+        format="json",
+    )
+    node.refresh_from_db()
+    assert node.long_name == "Renamed"
+    assert node.latest_status.latitude == 55.0
+    assert node.latest_status.longitude == -4.0
+    assert Position.objects.filter(node=node).count() == 1
 
 
 @pytest.mark.django_db

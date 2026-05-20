@@ -6,6 +6,7 @@ from datetime import timezone as dt_timezone
 from django.utils import timezone
 
 from meshcore_packets.models import MeshCoreRawPacket
+from meshcore_packets.services.advert_fields import get_advert_field
 from nodes.models import MeshCoreLocationSource, NodeLatestStatus, ObservedNode, Position
 
 
@@ -16,8 +17,8 @@ def extract_adv_coords(raw: dict) -> tuple[float, float] | None:
     """
     if not raw:
         return None
-    adv_lat = raw.get("adv_lat")
-    adv_lon = raw.get("adv_lon")
+    adv_lat = get_advert_field(raw, "adv_lat")
+    adv_lon = get_advert_field(raw, "adv_lon")
     if adv_lat is None or adv_lon is None:
         return None
     lat = float(adv_lat)
@@ -29,7 +30,7 @@ def extract_adv_coords(raw: dict) -> tuple[float, float] | None:
 
 def adv_timestamp_to_aware(raw: dict) -> datetime | None:
     """Convert ``adv_timestamp`` (Unix seconds) from ingest envelope to aware datetime."""
-    ts = raw.get("adv_timestamp") if raw else None
+    ts = get_advert_field(raw, "adv_timestamp") if raw else None
     if ts is None:
         return None
     try:

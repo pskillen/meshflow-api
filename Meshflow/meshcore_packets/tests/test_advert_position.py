@@ -9,12 +9,29 @@ import pytest
 
 from common.protocol import Protocol
 from meshcore_packets.models import MeshCorePayloadType
+from meshcore_packets.services.advert_fields import get_advert_field
 from meshcore_packets.services.position import (
     adv_timestamp_to_aware,
     apply_advert_position,
     extract_adv_coords,
 )
 from nodes.models import MeshCoreLocationSource, NodeLatestStatus, ObservedNode, Position
+
+WMF_PUBKEY = "f3bcf18b78deee33596d29d49aa6891d30ac6e2c97e7e6a9b81907f1470afcfc"
+NESTED_RX_LOG_RAW = {
+    "event_type": "rx_log_data",
+    "payload_type": "advert",
+    "raw": {
+        "meshcore": True,
+        "type": "rx_log_data",
+        "payload": {
+            "adv_lat": 55.99578,
+            "adv_lon": -4.09121,
+            "adv_key": WMF_PUBKEY,
+            "adv_timestamp": 1778101841,
+        },
+    },
+}
 
 
 @pytest.mark.parametrize(
@@ -25,10 +42,21 @@ from nodes.models import MeshCoreLocationSource, NodeLatestStatus, ObservedNode,
         ({"adv_lat": 0.0, "adv_lon": 0.0}, None),
         ({}, None),
         ({"adv_lat": 1.0}, None),
+        (NESTED_RX_LOG_RAW, (55.99578, -4.09121)),
     ],
 )
 def test_extract_adv_coords(raw, expected):
     assert extract_adv_coords(raw) == expected
+
+
+def test_get_advert_field_nested_payload():
+    assert get_advert_field(NESTED_RX_LOG_RAW, "adv_name") is None
+    assert get_advert_field(NESTED_RX_LOG_RAW, "adv_key") == WMF_PUBKEY
+
+
+def test_adv_timestamp_to_aware_nested():
+    result = adv_timestamp_to_aware(NESTED_RX_LOG_RAW)
+    assert result == datetime.fromtimestamp(1778101841, tz=dt_timezone.utc)
 
 
 def test_adv_timestamp_to_aware():

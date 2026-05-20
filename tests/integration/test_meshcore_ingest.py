@@ -40,3 +40,37 @@ def test_meshcore_advert_ingest_round_trip():
     body = response.json()
     assert body.get("status") == "success"
     assert body.get("packet_id")
+
+
+@pytest.mark.integration
+@pytest.mark.skipif(not MC_API_KEY, reason="Set MESHFLOW_MC_API_KEY to a MeshCore feeder key")
+def test_meshcore_rx_log_data_advert_ingest_round_trip():
+    """POST rx_log_data ADVERT envelope; expect 201."""
+    payload = {
+        "event_type": "rx_log_data",
+        "payload_type": "advert",
+        "from_pubkey": FULL_PUBKEY,
+        "pkt_hash": int(uuid.uuid4().int % (2**31)),
+        "rx_time": 1730000001,
+        "rx_rssi": -111.0,
+        "adv_name": "IntegrationRxLog",
+        "adv_lat": 55.99578,
+        "adv_lon": -4.09121,
+        "raw": {
+            "meshcore": True,
+            "type": "rx_log_data",
+            "payload": {
+                "payload_typename": "ADVERT",
+                "adv_key": FULL_PUBKEY,
+                "adv_lat": 55.99578,
+                "adv_lon": -4.09121,
+            },
+        },
+    }
+    headers = {"X-API-Key": MC_API_KEY}
+    url = f"{API_URL}/api/meshcore/packets/ingest/"
+    response = requests.post(url, json=payload, headers=headers, timeout=30)
+    assert response.status_code in (201, 200), response.text
+    body = response.json()
+    assert body.get("status") == "success"
+    assert body.get("packet_id")

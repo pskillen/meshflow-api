@@ -92,7 +92,11 @@ components:
       properties:
         event_type:
           type: string
-          description: MeshCore event type (advertisement, channel_message, contact_message, rx_log_data, ...)
+          description: >
+            MeshCore event discriminator. `advertisement` carries identity only (no GPS).
+            `rx_log_data` with `payload_type` advert may include `adv_lat`/`adv_lon` (flattened
+            or nested under `raw.payload`). Also `channel_message`, `contact_message`.
+          example: rx_log_data
         payload_type:
           type: string
           enum: [advert, channel_text, contact_text, raw]
@@ -135,9 +139,11 @@ components:
         adv_lat:
           type: number
           nullable: true
+          description: ADVERT latitude (degrees); present on rx_log_data ADVERT uploads
         adv_lon:
           type: number
           nullable: true
+          description: ADVERT longitude (degrees); present on rx_log_data ADVERT uploads
         raw:
           type: object
         encrypted:
