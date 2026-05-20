@@ -56,15 +56,14 @@ class BasePacketService(abc.ABC):
                 self._dx_previous_last_heard = self.from_node.last_heard
             except ObservedNode.DoesNotExist:
                 self._dx_previous_last_heard = None
-                node_id_str = (
+                display_id = (
                     self.packet.from_str if self.packet.from_str else meshtastic_id_to_hex(self.packet.from_int)
                 )
                 self.from_node = ObservedNode.objects.create(
                     protocol=Protocol.MESHTASTIC,
                     meshtastic_node_id=self.packet.from_int,
-                    node_id_str=node_id_str,
-                    long_name="Unknown Node " + node_id_str,
-                    short_name=node_id_str[-4:] if len(node_id_str) >= 4 else "????",
+                    long_name="Unknown Node " + display_id,
+                    short_name=display_id[-4:] if len(display_id) >= 4 else "????",
                 )
                 self._dx_from_node_created = True
                 new_node_observed.send(sender=self, node=self.from_node, observer=self.observer)

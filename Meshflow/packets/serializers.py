@@ -7,7 +7,12 @@ from django.utils import timezone as django_timezone
 
 from rest_framework import serializers
 
-from common.mesh_node_helpers import meshtastic_hex_to_int, meshtastic_id_to_hex, parse_b64_mac_address
+from common.mesh_node_helpers import (
+    meshtastic_hex_to_int,
+    meshtastic_id_to_hex,
+    observed_node_id_str,
+    parse_b64_mac_address,
+)
 from common.protocol import Protocol
 from constellations.models import MessageChannel
 from nodes.models import DeviceMetrics, ManagedNode, NodeLatestStatus, ObservedNode, Position
@@ -1302,7 +1307,7 @@ class NodeSerializer(serializers.ModelSerializer):
         short_name = serializers.CharField(required=False, allow_null=True)
 
     id = serializers.IntegerField(source="meshtastic_node_id")
-    id_str = serializers.CharField(source="node_id_str")
+    id_str = serializers.SerializerMethodField()
     macaddr = serializers.CharField(source="mac_addr", allow_null=True, allow_blank=True)
     meshtastic_hw_model = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     meshtastic_public_key = serializers.CharField(required=False, allow_null=True, allow_blank=True)
@@ -1325,6 +1330,9 @@ class NodeSerializer(serializers.ModelSerializer):
             "short_name",
             "last_heard",
         ]
+
+    def get_id_str(self, obj):
+        return observed_node_id_str(obj)
 
     def to_internal_value(self, data):
         """Convert the incoming data to the appropriate format."""
@@ -1351,7 +1359,7 @@ class NodeSerializer(serializers.ModelSerializer):
             else:
                 data["id"] = node_id
 
-            data["id_str"] = meshtastic_id_to_hex(data["id"])
+        data.pop("id_str", None)
 
         # Handle the nested user data
         if "user" in data:
@@ -1443,6 +1451,7 @@ class NodeSerializer(serializers.ModelSerializer):
         # Handle position and device metrics data
         position_data = validated_data.pop("position", None)
         device_metrics_data = validated_data.pop("device_metrics", None)
+        validated_data.pop("node_id_str", None)
 
         # Create the node
         node = ObservedNode.objects.create(**validated_data)
@@ -1457,6 +1466,7 @@ class NodeSerializer(serializers.ModelSerializer):
         # Handle position and device metrics data
         position_data = validated_data.pop("position", None)
         device_metrics_data = validated_data.pop("device_metrics", None)
+        validated_data.pop("node_id_str", None)
 
         # Update the node
         for attr, value in validated_data.items():
