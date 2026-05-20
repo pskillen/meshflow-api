@@ -8,7 +8,6 @@ import pytest
 from rest_framework import status
 from rest_framework.test import APIClient, APIRequestFactory
 
-from common.mesh_node_helpers import meshtastic_id_to_hex
 from nodes.models import AntennaPattern, NodeRfProfile, NodeRfPropagationRender
 from nodes.serializers import NodeRfProfileSerializer
 
@@ -38,10 +37,7 @@ def _rf_profile_fields(**overrides):
 
 @pytest.mark.django_db
 def test_node_rf_profile_one_to_one(create_observed_node):
-    node = create_observed_node(
-        meshtastic_node_id=801_801_801,
-        node_id_str=meshtastic_id_to_hex(801_801_801),
-    )
+    node = create_observed_node(meshtastic_node_id=801_801_801)
     NodeRfProfile.objects.create(observed_node=node, antenna_pattern=AntennaPattern.OMNI)
     with pytest.raises(IntegrityError):
         NodeRfProfile.objects.create(observed_node=node, antenna_pattern=AntennaPattern.OMNI)
@@ -49,10 +45,7 @@ def test_node_rf_profile_one_to_one(create_observed_node):
 
 @pytest.mark.django_db
 def test_node_rf_propagation_render_create(create_observed_node):
-    node = create_observed_node(
-        meshtastic_node_id=802_802_802,
-        node_id_str=meshtastic_id_to_hex(802_802_802),
-    )
+    node = create_observed_node(meshtastic_node_id=802_802_802)
     row = NodeRfPropagationRender.objects.create(observed_node=node)
     assert row.status == NodeRfPropagationRender.Status.PENDING
     assert node.latest_rf_render() == row
@@ -63,7 +56,6 @@ def test_rf_profile_serializer_hides_private_for_anonymous(create_observed_node,
     owner = create_user()
     node = create_observed_node(
         meshtastic_node_id=803_803_803,
-        node_id_str=meshtastic_id_to_hex(803_803_803),
         claimed_by=owner,
     )
     profile = NodeRfProfile.objects.create(
@@ -88,7 +80,6 @@ def test_rf_profile_serializer_hides_private_for_stranger(create_observed_node, 
     stranger = create_user()
     node = create_observed_node(
         meshtastic_node_id=804_804_804,
-        node_id_str=meshtastic_id_to_hex(804_804_804),
         claimed_by=owner,
     )
     profile = NodeRfProfile.objects.create(
@@ -110,7 +101,6 @@ def test_rf_profile_serializer_shows_private_for_owner(create_observed_node, cre
     owner = create_user()
     node = create_observed_node(
         meshtastic_node_id=805_805_805,
-        node_id_str=meshtastic_id_to_hex(805_805_805),
         claimed_by=owner,
     )
     profile = NodeRfProfile.objects.create(
@@ -134,7 +124,6 @@ def test_rf_profile_serializer_shows_private_for_staff(create_observed_node, cre
     staff = create_user(is_staff=True)
     node = create_observed_node(
         meshtastic_node_id=806_806_806,
-        node_id_str=meshtastic_id_to_hex(806_806_806),
     )
     profile = NodeRfProfile.objects.create(
         observed_node=node,
@@ -155,7 +144,6 @@ def test_rf_profile_get_empty_returns_204(create_observed_node, create_user):
     user = create_user()
     node = create_observed_node(
         meshtastic_node_id=807_807_807,
-        node_id_str=meshtastic_id_to_hex(807_807_807),
     )
     client = APIClient()
     client.force_authenticate(user=user)
@@ -169,7 +157,6 @@ def test_rf_profile_get_after_patch(create_observed_node, create_user):
     owner = create_user()
     node = create_observed_node(
         meshtastic_node_id=808_808_808,
-        node_id_str=meshtastic_id_to_hex(808_808_808),
         claimed_by=owner,
     )
     client = APIClient()
@@ -202,7 +189,6 @@ def test_rf_profile_patch_owner_staff_stranger_unauth(create_observed_node, crea
     staff = create_user(is_staff=True)
     node = create_observed_node(
         meshtastic_node_id=809_809_809,
-        node_id_str=meshtastic_id_to_hex(809_809_809),
         claimed_by=owner,
     )
     url = reverse("observed-node-rf-profile", kwargs={"internal_id": node.internal_id})
@@ -229,7 +215,6 @@ def test_rf_propagation_get_none_then_pending(create_observed_node, create_user,
     owner = create_user()
     node = create_observed_node(
         meshtastic_node_id=810_810_810,
-        node_id_str=meshtastic_id_to_hex(810_810_810),
         claimed_by=owner,
     )
     NodeRfProfile.objects.create(observed_node=node, **_rf_profile_fields())
@@ -257,7 +242,6 @@ def test_rf_propagation_recompute_forbidden_stranger(create_observed_node, creat
     stranger = create_user()
     node = create_observed_node(
         meshtastic_node_id=811_811_811,
-        node_id_str=meshtastic_id_to_hex(811_811_811),
         claimed_by=owner,
     )
     client = APIClient()
@@ -272,7 +256,6 @@ def test_rf_propagation_recompute_creates_row(create_observed_node, create_user,
     owner = create_user()
     node = create_observed_node(
         meshtastic_node_id=812_812_812,
-        node_id_str=meshtastic_id_to_hex(812_812_812),
         claimed_by=owner,
     )
     NodeRfProfile.objects.create(observed_node=node, **_rf_profile_fields())
@@ -290,7 +273,6 @@ def test_rf_propagation_recompute_400_when_no_profile(create_observed_node, crea
     owner = create_user()
     node = create_observed_node(
         meshtastic_node_id=812_812_813,
-        node_id_str=meshtastic_id_to_hex(812_812_813),
         claimed_by=owner,
     )
     client = APIClient()
@@ -306,7 +288,6 @@ def test_rf_propagation_recompute_dedup_returns_in_flight(create_observed_node, 
     owner = create_user()
     node = create_observed_node(
         meshtastic_node_id=812_812_814,
-        node_id_str=meshtastic_id_to_hex(812_812_814),
         claimed_by=owner,
     )
     NodeRfProfile.objects.create(observed_node=node, **_rf_profile_fields())
@@ -335,7 +316,6 @@ def test_rf_propagation_recompute_cache_hit_reuses_asset(settings, create_observ
     owner = create_user()
     node = create_observed_node(
         meshtastic_node_id=812_812_815,
-        node_id_str=meshtastic_id_to_hex(812_812_815),
         claimed_by=owner,
     )
     profile = NodeRfProfile.objects.create(observed_node=node, **_rf_profile_fields())
@@ -373,7 +353,6 @@ def test_rf_propagation_cancel_marks_in_flight_as_failed(create_observed_node, c
     owner = create_user()
     node = create_observed_node(
         meshtastic_node_id=812_812_816,
-        node_id_str=meshtastic_id_to_hex(812_812_816),
         claimed_by=owner,
     )
     NodeRfProfile.objects.create(observed_node=node, **_rf_profile_fields())
@@ -407,7 +386,6 @@ def test_rf_propagation_cancel_is_noop_when_nothing_in_flight(create_observed_no
     owner = create_user()
     node = create_observed_node(
         meshtastic_node_id=812_812_817,
-        node_id_str=meshtastic_id_to_hex(812_812_817),
         claimed_by=owner,
     )
     client = APIClient()
@@ -424,7 +402,6 @@ def test_rf_propagation_cancel_allows_new_recompute(create_observed_node, create
     owner = create_user()
     node = create_observed_node(
         meshtastic_node_id=812_812_818,
-        node_id_str=meshtastic_id_to_hex(812_812_818),
         claimed_by=owner,
     )
     NodeRfProfile.objects.create(observed_node=node, **_rf_profile_fields())
@@ -449,7 +426,6 @@ def test_rf_propagation_delete_removes_non_ready_rows(create_observed_node, crea
     owner = create_user()
     node = create_observed_node(
         meshtastic_node_id=812_812_820,
-        node_id_str=meshtastic_id_to_hex(812_812_820),
         claimed_by=owner,
     )
     NodeRfPropagationRender.objects.create(observed_node=node, status=NodeRfPropagationRender.Status.PENDING)
@@ -482,7 +458,6 @@ def test_rf_propagation_delete_requires_edit_permission(create_observed_node, cr
     stranger = create_user(username="stranger", email="stranger@example.com")
     node = create_observed_node(
         meshtastic_node_id=812_812_821,
-        node_id_str=meshtastic_id_to_hex(812_812_821),
         claimed_by=owner,
     )
     NodeRfPropagationRender.objects.create(observed_node=node, status=NodeRfPropagationRender.Status.PENDING)
@@ -500,7 +475,6 @@ def test_observed_node_detail_rf_flags(create_observed_node, create_user):
     owner = create_user()
     node = create_observed_node(
         meshtastic_node_id=813_813_813,
-        node_id_str=meshtastic_id_to_hex(813_813_813),
         claimed_by=owner,
     )
     NodeRfProfile.objects.create(observed_node=node, antenna_pattern=AntennaPattern.OMNI)
@@ -524,10 +498,7 @@ def test_rf_propagation_asset_missing_file_404(settings, create_observed_node):
 
     with tempfile.TemporaryDirectory() as tmp:
         settings.RF_PROPAGATION_ASSET_DIR = tmp
-        node = create_observed_node(
-            meshtastic_node_id=814_814_814,
-            node_id_str=meshtastic_id_to_hex(814_814_814),
-        )
+        node = create_observed_node(meshtastic_node_id=814_814_814)
         client = APIClient()
         url = reverse("rf-propagation-asset", kwargs={"internal_id": node.internal_id, "filename": "missing.png"})
         response = client.get(url)
@@ -542,10 +513,7 @@ def test_rf_propagation_asset_serves_png_and_cache_control(settings, create_obse
     with tempfile.TemporaryDirectory() as tmp:
         settings.RF_PROPAGATION_ASSET_DIR = tmp
         Path(tmp, "tile.png").write_bytes(b"\x89PNG\r\n\x1a\n")
-        node = create_observed_node(
-            meshtastic_node_id=815_815_815,
-            node_id_str=meshtastic_id_to_hex(815_815_815),
-        )
+        node = create_observed_node(meshtastic_node_id=815_815_815)
         client = APIClient()
         url = reverse("rf-propagation-asset", kwargs={"internal_id": node.internal_id, "filename": "tile.png"})
         response = client.get(url)
@@ -556,10 +524,7 @@ def test_rf_propagation_asset_serves_png_and_cache_control(settings, create_obse
 
 @pytest.mark.django_db
 def test_rf_propagation_asset_rejects_traversal(create_observed_node):
-    node = create_observed_node(
-        meshtastic_node_id=816_816_816,
-        node_id_str=meshtastic_id_to_hex(816_816_816),
-    )
+    node = create_observed_node(meshtastic_node_id=816_816_816)
     client = APIClient()
     url = reverse("rf-propagation-asset", kwargs={"internal_id": node.internal_id, "filename": "bad..name.png"})
     response = client.get(url)

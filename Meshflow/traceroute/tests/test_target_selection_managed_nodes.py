@@ -5,7 +5,6 @@ from django.utils import timezone
 import pytest
 
 import nodes.tests.conftest  # noqa: F401
-from common.mesh_node_helpers import meshtastic_id_to_hex
 from nodes.models import NodeLatestStatus
 from traceroute.target_selection import pick_traceroute_target
 
@@ -26,14 +25,12 @@ def test_pick_traceroute_target_excludes_observed_node_whose_mesh_id_is_managed(
     on_mesh_id = other_mn.meshtastic_node_id
     victim = create_observed_node(
         meshtastic_node_id=on_mesh_id,
-        node_id_str=meshtastic_id_to_hex(on_mesh_id),
         last_heard=timezone.now(),
     )
     NodeLatestStatus.objects.create(node=victim, latitude=51.01, longitude=-0.11)
 
     free = create_observed_node(
         meshtastic_node_id=0xD1000099,
-        node_id_str=meshtastic_id_to_hex(0xD1000099),
         last_heard=timezone.now(),
     )
     NodeLatestStatus.objects.create(node=free, latitude=51.02, longitude=-0.12)
@@ -57,14 +54,12 @@ def test_managed_node_mesh_id_excluded_even_without_managednodestatus_row(create
 
     victim = create_observed_node(
         meshtastic_node_id=0xD2000002,
-        node_id_str=meshtastic_id_to_hex(0xD2000002),
         last_heard=timezone.now(),
     )
     NodeLatestStatus.objects.create(node=victim, latitude=52.01, longitude=1.01)
 
     free = create_observed_node(
         meshtastic_node_id=0xD2000099,
-        node_id_str=meshtastic_id_to_hex(0xD2000099),
         last_heard=timezone.now(),
     )
     NodeLatestStatus.objects.create(node=free, latitude=52.02, longitude=1.02)

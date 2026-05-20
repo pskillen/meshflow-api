@@ -366,7 +366,7 @@ def node_neighbour_stats(request, node_id: int):
                 candidates_qs = (
                     ObservedNode.objects.annotate(lsb=Mod(F("meshtastic_node_id"), 256))
                     .filter(lsb=source_val, protocol=Protocol.MESHTASTIC)
-                    .only("meshtastic_node_id", "node_id_str", "short_name")
+                    .only("meshtastic_node_id", "short_name", "protocol", "mc_pubkey", "mc_pubkey_prefix")
                 )
                 candidates = [
                     {
@@ -379,9 +379,9 @@ def node_neighbour_stats(request, node_id: int):
             else:
                 source_type = "full"
                 try:
-                    obs = ObservedNode.objects.only("meshtastic_node_id", "node_id_str", "short_name").get(
-                        meshtastic_node_id=source_val, protocol=Protocol.MESHTASTIC
-                    )
+                    obs = ObservedNode.objects.only(
+                        "meshtastic_node_id", "short_name", "protocol", "mc_pubkey", "mc_pubkey_prefix"
+                    ).get(meshtastic_node_id=source_val, protocol=Protocol.MESHTASTIC)
                     candidates = [
                         {
                             "meshtastic_node_id": obs.meshtastic_node_id,

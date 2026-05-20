@@ -5,7 +5,6 @@ import pytest
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from common.mesh_node_helpers import meshtastic_id_to_hex
 from nodes.models import NodeAuth, NodeLatestStatus, NodeOwnerClaim
 from nodes.tasks import update_managed_node_statuses
 
@@ -58,7 +57,6 @@ def test_managed_nodes_status_fields_only_returned_with_include_status(
     managed = create_managed_node(owner=user, meshtastic_node_id=123450001, allow_auto_traceroute=True)
     observed = create_observed_node(
         meshtastic_node_id=managed.meshtastic_node_id,
-        node_id_str=meshtastic_id_to_hex(managed.meshtastic_node_id),
         last_heard=now,
     )
     NodeLatestStatus.objects.create(node=observed)
@@ -171,7 +169,6 @@ def test_claim_post_rejected_when_node_owned_by_another_user(create_observed_nod
     node_id = 111222333444
     node = create_observed_node(
         meshtastic_node_id=node_id,
-        node_id_str=meshtastic_id_to_hex(node_id),
         claimed_by=owner,
     )
 
@@ -191,7 +188,6 @@ def test_claim_delete_clears_claimed_by_when_owner(create_observed_node, create_
     node_id = 555001001
     node = create_observed_node(
         meshtastic_node_id=node_id,
-        node_id_str=meshtastic_id_to_hex(node_id),
         claimed_by=owner,
     )
     NodeOwnerClaim.objects.create(node=node, user=owner, claim_key="k", accepted_at=timezone.now())
@@ -212,7 +208,6 @@ def test_claim_delete_pending_does_not_require_claimed_by(create_observed_node, 
     node_id = 555001002
     node = create_observed_node(
         meshtastic_node_id=node_id,
-        node_id_str=meshtastic_id_to_hex(node_id),
         claimed_by=None,
     )
     NodeOwnerClaim.objects.create(node=node, user=owner, claim_key="k2", accepted_at=None)
@@ -232,7 +227,6 @@ def test_claim_delete_does_not_clear_other_users_claimed_by(create_observed_node
     node_id = 555001003
     node = create_observed_node(
         meshtastic_node_id=node_id,
-        node_id_str=meshtastic_id_to_hex(node_id),
         claimed_by=other,
     )
     NodeOwnerClaim.objects.create(node=node, user=owner, claim_key="k3", accepted_at=None)
@@ -253,7 +247,6 @@ def test_claim_delete_non_owner_no_claim_returns_404(create_observed_node, creat
     node_id = 555001004
     node = create_observed_node(
         meshtastic_node_id=node_id,
-        node_id_str=meshtastic_id_to_hex(node_id),
         claimed_by=owner,
     )
     NodeOwnerClaim.objects.create(node=node, user=owner, claim_key="k4", accepted_at=timezone.now())
@@ -274,7 +267,6 @@ def test_claim_delete_staff_without_own_claim_returns_404(create_observed_node, 
     node_id = 555001005
     node = create_observed_node(
         meshtastic_node_id=node_id,
-        node_id_str=meshtastic_id_to_hex(node_id),
         claimed_by=owner,
     )
     NodeOwnerClaim.objects.create(node=node, user=owner, claim_key="k5", accepted_at=timezone.now())

@@ -410,12 +410,14 @@ class TestTracerouteTriggerableNodes:
         self, api_client, editor_user, editor_managed_node
     ):
         """position is populated from NodeLatestStatus when the node has been heard."""
-        from common.mesh_node_helpers import meshtastic_id_to_hex
         from nodes.models import NodeLatestStatus, ObservedNode
 
         observed, _ = ObservedNode.objects.get_or_create(
             meshtastic_node_id=editor_managed_node.meshtastic_node_id,
-            defaults={"node_id_str": meshtastic_id_to_hex(editor_managed_node.meshtastic_node_id)},
+            defaults={
+                "long_name": editor_managed_node.name,
+                "short_name": editor_managed_node.name[:5],
+            },
         )
         NodeLatestStatus.objects.update_or_create(node=observed, defaults={"latitude": 55.86, "longitude": -4.25})
         api_client.force_authenticate(user=editor_user)

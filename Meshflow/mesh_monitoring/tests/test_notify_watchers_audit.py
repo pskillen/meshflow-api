@@ -5,7 +5,6 @@ from unittest.mock import patch
 import pytest
 
 import nodes.tests.conftest  # noqa: F401
-from common.mesh_node_helpers import meshtastic_id_to_hex
 from mesh_monitoring.services import notify_watchers_node_offline, notify_watchers_verification_started
 from mesh_monitoring.tests.conftest import create_watch_with_offline_threshold
 from nodes.models import RoleSource
@@ -18,7 +17,6 @@ def test_offline_notify_writes_sent_audit(create_user, create_observed_node):
     user = create_user()
     obs = create_observed_node(
         meshtastic_node_id=0x10101010,
-        node_id_str=meshtastic_id_to_hex(0x10101010),
         long_name="N",
         short_name="SN",
         claimed_by=user,
@@ -37,7 +35,6 @@ def test_offline_notify_writes_skipped_audit_when_discord_unverified(create_user
     user = create_user()
     obs = create_observed_node(
         meshtastic_node_id=0x20202020,
-        node_id_str=meshtastic_id_to_hex(0x20202020),
         claimed_by=user,
     )
     create_watch_with_offline_threshold(user=user, observed_node=obs, offline_after=60)
@@ -57,7 +54,6 @@ def test_offline_notify_writes_failed_audit_on_discord_error(create_user, create
     user = create_user()
     obs = create_observed_node(
         meshtastic_node_id=0x30303030,
-        node_id_str=meshtastic_id_to_hex(0x30303030),
         claimed_by=user,
     )
     create_watch_with_offline_threshold(user=user, observed_node=obs, offline_after=60)
@@ -78,7 +74,6 @@ def test_verification_started_writes_sent_and_skipped_audits(create_user, create
     u_skip = create_user(username="watcher_skip")
     obs = create_observed_node(
         meshtastic_node_id=0x40404040,
-        node_id_str=meshtastic_id_to_hex(0x40404040),
         meshtastic_role=RoleSource.ROUTER,
     )
     create_watch_with_offline_threshold(user=u_send, observed_node=obs, offline_after=60)
