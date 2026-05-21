@@ -55,7 +55,8 @@ Items **skipped**, **incomplete**, or **discovered during Phase 2 / rename execu
 - [x] **UI nav parity** — [ui#269](https://github.com/pskillen/meshflow-ui/issues/269) (in PR; see [phase-2-progress.md](./phase-2-progress.md) § UI nav & map parity).
 - [x] **MeshCore managed-nodes live status** — `include=status` MC annotations + UI table (api branch; see progress § MeshCore managed-node live status). **Still ship**; does not close [#329](https://github.com/pskillen/meshflow-api/issues/329).
 - [ ] **Hourly MC stats snapshots** — [#329](https://github.com/pskillen/meshflow-api/issues/329): `collect_stats_snapshots` / `StatsSnapshot` / dashboard charts; document Meshtastic path first (`docs/features/stats/meshtastic_packets.md`).
-- [ ] **UI out of scope for #269** — `/meshtastic/*` URL migration; MeshCore messages / traceroutes / weather screens; server-side `protocol` filter on `GET /nodes/managed-nodes/`.
+- [ ] **UI out of scope for #269** — `/meshtastic/*` URL migration; MeshCore traceroutes / weather screens; server-side `protocol` filter on `GET /nodes/managed-nodes/`.
+- [x] **MeshCore channel messages UI** — [ui#275](https://github.com/pskillen/meshflow-ui/issues/275) (in PR; see progress § MeshCore messages UI). MC DM history still open below.
 - [ ] **Node search** still Meshtastic-centric (global sidebar search).
 
 ---
@@ -76,7 +77,7 @@ Design: [text-message-channels.md](./text-message-channels.md). **Core 2.2 merge
 - [ ] Sync status / bot offline messaging in UI (basic toasts only; richer UX deferred).
 - [ ] Three-way merge / conflict UI when device and staged edits diverge.
 - [ ] Periodic background sync without reconnect.
-- [ ] MC DM history API / message history UI.
+- [ ] MC DM history API / message history UI (channel history covered by ui#275).
 
 ---
 

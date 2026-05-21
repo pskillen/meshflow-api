@@ -106,6 +106,24 @@ Deploy api #325 before bot fleet upgrade.
 
 ---
 
+## MeshCore messages UI ([ui#275](https://github.com/pskillen/meshflow-ui/issues/275))
+
+**Status:** In progress (branch `ui-275/paddy/meshcore-messages` on meshflow-ui).
+
+**meshflow-ui — delivered (pending PR)**
+
+- `/meshcore/messages` — channel-scoped history via shared `ProtocolMessageHistoryPage`; `GET /api/messages/text/?protocol=meshcore`.
+- Flattened MeshCore nav: **Messages**, **Nodes** (map on nodes page), **Managed nodes**; removed standalone `/meshcore/map` (redirect to `/meshcore/nodes`).
+- Protocol-scoped unread badges on Meshtastic and MeshCore **Messages** nav links (WebSocket `protocol` on `TextMessage`).
+- Meshtastic `/messages` is channels-only (removed broken **By Node** tab).
+- `MessageItem` MC heard display (observer `node_id_str` string rows from API).
+
+**meshflow-api:** no code changes; uses Phase 2.2 history API + WS payload `protocol` field.
+
+**Still open:** MC DM / contact message history UI (separate from channel history).
+
+---
+
 ## Feeder identity & apply fixes ([#295](https://github.com/pskillen/meshflow-api/issues/295))
 
 **Status:** Core identity merged; staging fixes on branch `api-295/paddy/mc-feeder-identity` — [api #335](https://github.com/pskillen/meshflow-api/pull/335), [bot #108](https://github.com/pskillen/meshflow-bot/pull/108) (open at last update).
@@ -143,7 +161,7 @@ Deploy api #325 before bot fleet upgrade.
 **meshflow-ui — delivered (pending PR)**
 
 - Sidebar: **Meshtastic** and **MeshCore** sections; Dashboard and Weather remain top-level.
-- Meshtastic **Map** in nav (`/map`); MeshCore **Managed nodes** (`/meshcore/managed-nodes`).
+- Meshtastic **Map** in nav (`/map`); MeshCore **Managed nodes** (`/meshcore/managed-nodes`). Standalone MC **Map** nav item superseded by ui#275 (map on `/meshcore/nodes` only).
 - Shared `ProtocolMapPage`, `ProtocolNodesPage`, `ProtocolManagedNodesPage` (legacy URLs unchanged).
 - MeshCore map legend uses ADV_TYPE roles (Chat / Repeater / Room / Sensor), not Meshtastic role swatches.
 - **MeshCore node detail follow-ups** (same UI branch, separate commits): no bogus Meshtastic traceroute history when `meshtastic_node_id` is 0; statistics charts tolerate missing `packet_types`; hide Traceroutes / Monitoring tabs; node-detail map uses MC legend.
