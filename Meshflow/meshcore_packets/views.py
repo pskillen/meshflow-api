@@ -1,11 +1,18 @@
 """MeshCore packet API views."""
 
+import logging
+
 from asgiref.sync import async_to_sync
-from channels.layers import get_channel_layer
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from common.feeder_ws import (
+    COMMAND_DISPATCH_UNAVAILABLE,
+    FEEDER_BOT_NOT_CONNECTED,
+    dispatch_node_command,
+    feeder_ws_group_has_subscribers,
+)
 from common.ws_groups import managed_node_ws_group
 from meshcore_packets.models import MeshCoreRawPacket, MeshCoreTextPacket
 from meshcore_packets.permissions import MeshCoreFeederPermission
@@ -19,6 +26,8 @@ from meshcore_packets.services.channel_sync import reconcile_mc_channels
 from meshcore_packets.signals import meshcore_packet_received, meshcore_text_packet_received
 from nodes.authentication import NodeAPIKeyAuthentication
 from nodes.models import ManagedNode
+
+logger = logging.getLogger(__name__)
 
 
 class MeshCorePacketIngestView(APIView):
@@ -117,22 +126,32 @@ class MeshCoreMcChannelSyncView(APIView):
         )
 
 
-def _dispatch_mc_channel_apply(managed_node: ManagedNode, channels: list[dict]) -> bool:
-    channel_layer = get_channel_layer()
-    if channel_layer is None:
-        return False
+def _dispatch_mc_channel_apply(managed_node: ManagedNode, channels: list[dict]) -> str:
+    """Dispatch apply_mc_channel_config. Returns ``sent`` or an error code string."""
     group = managed_node_ws_group(managed_node)
-    async_to_sync(channel_layer.group_send)(
-        group,
-        {
-            "type": "node_command",
-            "command": {
-                "type": "apply_mc_channel_config",
-                "channels": channels,
-            },
-        },
-    )
-    return True
+
+    async def _check_and_send() -> str:
+        try:
+            if not await feeder_ws_group_has_subscribers(group):
+                return FEEDER_BOT_NOT_CONNECTED
+        except Exception as exc:
+            logger.exception("MC channel apply: feeder presence check failed: %s", exc)
+            return COMMAND_DISPATCH_UNAVAILABLE
+
+        try:
+            await dispatch_node_command(
+                group,
+                {
+                    "type": "apply_mc_channel_config",
+                    "channels": channels,
+                },
+            )
+        except Exception as exc:
+            logger.exception("MC channel apply: group_send failed: %s", exc)
+            return COMMAND_DISPATCH_UNAVAILABLE
+        return "sent"
+
+    return async_to_sync(_check_and_send)()
 
 
 class ManagedNodeMcChannelApplyView(APIView):
@@ -154,10 +173,26 @@ class ManagedNodeMcChannelApplyView(APIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         channels = serializer.validated_data["channels"]
-        sent = _dispatch_mc_channel_apply(managed_node, channels)
-        if not sent:
+        result = _dispatch_mc_channel_apply(managed_node, channels)
+        if result == FEEDER_BOT_NOT_CONNECTED:
             return Response(
-                {"detail": "WebSocket channel layer unavailable."},
+                {
+                    "detail": (
+                        "Feeder bot is not connected via WebSocket. "
+                        "Start the bot with MESHCORE_UPLOAD_ENABLED and MESHFLOW_WS_URL configured."
+                    ),
+                    "code": FEEDER_BOT_NOT_CONNECTED,
+                },
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        if result == COMMAND_DISPATCH_UNAVAILABLE:
+            return Response(
+                {
+                    "detail": (
+                        "Could not dispatch command to the feeder (channel layer / Redis unavailable)."
+                    ),
+                    "code": COMMAND_DISPATCH_UNAVAILABLE,
+                },
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
 

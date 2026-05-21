@@ -3723,7 +3723,19 @@ paths:
         '404':
           description: Managed node not found or not owned
         '503':
-          description: WebSocket channel layer unavailable
+          description: Feeder bot not connected or command dispatch unavailable
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+                  code:
+                    type: string
+                    enum:
+                      - feeder_bot_not_connected
+                      - command_dispatch_unavailable
 
   /meshcore/packets/:
     get:
