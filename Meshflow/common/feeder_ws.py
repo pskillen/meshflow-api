@@ -13,6 +13,21 @@ FEEDER_BOT_NOT_CONNECTED = "feeder_bot_not_connected"
 COMMAND_DISPATCH_UNAVAILABLE = "command_dispatch_unavailable"
 
 
+def _ws_json_safe(value):
+    """Recursively coerce channel-layer payloads to msgpack-safe plain Python."""
+    from django.utils.functional import Promise
+
+    if isinstance(value, Promise):
+        return str(value)
+    if isinstance(value, dict):
+        return {str(k): _ws_json_safe(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_ws_json_safe(v) for v in value]
+    if isinstance(value, (str, int, float, bool)) or value is None:
+        return value
+    return str(value)
+
+
 async def _redis_group_has_channels(layer, group: str) -> bool:
     """Presence check for channels_redis (group is a ZSET at asgi:group:{name})."""
     key = layer._group_key(group)
@@ -66,8 +81,10 @@ async def dispatch_node_command(group: str, command: dict) -> None:
         raise RuntimeError("Channel layer is not configured")
     await channel_layer.group_send(
         group,
-        {
-            "type": "node_command",
-            "command": command,
-        },
+        _ws_json_safe(
+            {
+                "type": "node_command",
+                "command": command,
+            }
+        ),
     )

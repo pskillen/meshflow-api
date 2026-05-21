@@ -133,3 +133,5 @@ def test_apply_dispatches_when_feeder_connected(create_user, create_managed_node
     sent_channels = dispatch_mock.await_args[0][1]["channels"]
     assert sent_channels[0]["mc_hashtag"] == "galloway"
     assert sent_channels[0]["name"] == "galloway"
+    assert sent_channels[0]["mc_channel_type"] == "HASHTAG"
+    assert type(sent_channels[0]["mc_channel_type"]) is str
