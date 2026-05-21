@@ -20,11 +20,11 @@ How MeshCore **group text** and **channel configuration** flow from the radio th
 | | **Meshtastic** | **MeshCore** |
 |---|----------------|--------------|
 | Channel on radio | Fixed slots 0–7, PSK + name in firmware | Arbitrary list on companion; **index** on wire, **name** only in device config |
-| Feeder channel config | API slot FKs → `MessageChannel` (operator maps slots in UI) | **Planned:** device is source of truth; API **mirror** via bot `mc-channel-sync` on connect |
+| Feeder channel config | API slot FKs → `MessageChannel` (operator maps slots in UI) | Device is source of truth; API **mirror** via bot `mc-channel-sync` on connect |
 | Feeder channel link in API | `meshtastic_channel_0..7` | `ManagedNode.mc_channels` M2M (reconciled from device snapshot) |
 | What a text packet carries | Channel index + sender node id | `channel_message`: **index + body only** (no sender pubkey); `contact_message`: **12-hex sender prefix** + body |
 | Broadcast vs DM | `to_int == 0xFFFFFFFF` vs directed node id | Broadcast = **no** `to_pubkey*` on wire; channel text is always broadcast on that index ([ADR-0003](../packet-ingestion/adr/0003-mc-broadcast-semantics.md)) |
-| UI today | Slot 0–7 mapping on [Node Settings](https://github.com/pskillen/meshflow-ui/blob/main/src/pages/user/NodeSettings.tsx) | **Planned:** add/remove public and hashtag channels per MC feeder |
+| UI today | Slot 0–7 mapping on [Node Settings](https://github.com/pskillen/meshflow-ui/blob/main/src/pages/user/NodeSettings.tsx) | MC feeders: mirror + **Apply to radio** on Node Settings |
 
 MeshCore channels are still **scoped to a constellation**: channel index `0` in one region is not the same `MessageChannel` row as index `0` in another ([ADR-0002](../packet-ingestion/adr/0002-mc-channel-modelling.md) §6).
 
@@ -32,9 +32,9 @@ MeshCore channels are still **scoped to a constellation**: channel index `0` in 
 
 ## End-to-end architecture
 
-### Ingest path (implemented today)
+### Ingest path
 
-Text heard on the mesh is uploaded as raw packets first; normalisation into `TextMessage` is **planned** ([#296](https://github.com/pskillen/meshflow-api/issues/296)).
+Text heard on the mesh is uploaded as raw packets; normalisation into `TextMessage` is implemented ([#296](https://github.com/pskillen/meshflow-api/issues/296)).
 
 ```mermaid
 sequenceDiagram
@@ -46,16 +46,17 @@ sequenceDiagram
 
   Radio->>Bot: channel_message or contact_message
   Bot->>Bot: translate + MeshCorePacketSerializer
-  Bot->>API: POST /api/meshcore/packets/ingest/
+  Bot->>API: POST /api/meshcore/feeders/{prefix}/packets/ingest/
   API->>Raw: save + MeshCorePacketObservation
   API->>API: meshcore_text_packet_received
-  Note over TM: Subscriber planned #296
   API-->>TM: create TextMessage row
 ```
 
-### Configuration path (planned #297)
+### Configuration path ([#297](https://github.com/pskillen/meshflow-api/issues/297))
 
 The **MeshCore device / companion** is the **source of truth** for channel names, types (public / hashtag), and indices. The API holds a **mirror** per feeder (`ManagedNode.mc_channels`). On every bot connect the bot reads the device and **uploads a full snapshot**; the API reconciles its own state. Operator edits in the UI go **to the device first** (WebSocket), then the bot re-syncs so the API matches the radio again.
+
+**Feeder identity:** ingest, channel sync, and bot version use **`/api/meshcore/feeders/{feeder_pubkey_prefix}/…`** (12-hex prefix from device pubkey). See [feeder-bootstrap.md](feeder-bootstrap.md) ([#295](https://github.com/pskillen/meshflow-api/issues/295)).
 
 ```mermaid
 sequenceDiagram
@@ -66,14 +67,14 @@ sequenceDiagram
 
   Note over Radio,API: On bot start
   Bot->>Radio: read channel table
-  Bot->>API: POST mc-channel-sync
+  Bot->>API: POST …/feeders/{prefix}/mc-channel-sync
   API->>API: reconcile MessageChannel + mc_channels
 
   Note over UI,Radio: Optional operator edit
   UI->>API: apply to radio (WS)
   API->>Bot: apply_mc_channel_config
   Bot->>Radio: write channels
-  Bot->>API: POST mc-channel-sync
+  Bot->>API: POST …/feeders/{prefix}/mc-channel-sync
 ```
 
 **Drift:** if the API mirror and device disagree (e.g. failed push), the **next connect sync overwrites the API** from the device. No three-way merge in v1.
@@ -108,7 +109,19 @@ The bot registers in Redis group `node_mc_{uuid}` through **pre-prod’s** `Node
 2. Point **bot** `STORAGE_API_ROOT` at local API and run bot + API locally, or  
 3. Keep split hosts but verify local `CHANNEL_LAYERS` is `channels_redis` to the **same** Redis DB 0 as pre-prod.
 
-**Implementation plan:** Cursor workspace plan `mc_text_textmessage_pipeline_2c3e9fb8.plan.md` (kept in sync with this file; **this doc is canonical** in git for operators and PRs).
+**Common 503 causes (fixed on api #335 / bot #108 branch):**
+
+| Symptom | Cause | Fix |
+|---------|--------|-----|
+| 503 `feeder_bot_not_connected` but Redis has `asgi:group:node_mc_{uuid}` | Presence check called `group_channels()` (not in channels_redis 4.x) | ZSET probe on `asgi:group:…` |
+| 503 `command_dispatch_unavailable`, log `__proxy__` | gettext labels in apply payload | Plain `PUBLIC`/`HASHTAG` + `_ws_json_safe()` |
+| Apply works on pre-prod UI but not localhost | Bot WS registered on pre-prod only | Align UI API URL with bot `STORAGE_API_ROOT` or shared Redis + local `channels_redis` |
+
+**Dual API (`STORAGE_API_2_*`):** with `MESHCORE_UPLOAD_ENABLED`, the bot POSTs **`mc-channel-sync`** (and packets) to **both** `STORAGE_API_ROOT` and `STORAGE_API_2_ROOT`. **WebSocket** and **apply** use **primary** only (`STORAGE_API_ROOT` / `MESHFLOW_WS_URL`). API 2 gets mirror updates on connect; UI apply against API 2 will 503 unless WS is also on API 2.
+
+**Django admin:** read-only device mirror on MeshCore managed nodes; **MeshCore channels** admin for constellation catalog; **Push MC channel config to feeder device** action (see [feeder-bootstrap.md](feeder-bootstrap.md) §5).
+
+**Implementation plan:** Cursor workspace plan `mc_text_textmessage_pipeline_2c3e9fb8.plan.md` (historical); **this doc is canonical** in git for operators and PRs.
 
 ---
 
@@ -145,7 +158,8 @@ See [feeder-bootstrap.md](feeder-bootstrap.md) and [meshflow-bot `docs/MESHCORE.
 |----------|------|
 | `RADIO_PROTOCOL=meshcore` | Use `MeshCoreRadio` + `MeshCorePacketSerializer` |
 | `MESHCORE_UPLOAD_ENABLED=true` | POST packets to API (otherwise capture-only dumps) |
-| `STORAGE_API_ROOT` / `STORAGE_API_TOKEN` | `POST /api/meshcore/packets/ingest/` with Node API key |
+| `STORAGE_API_ROOT` / `STORAGE_API_TOKEN` | Feeder-scoped ingest + `mc-channel-sync` (see [feeder-bootstrap.md](feeder-bootstrap.md)) |
+| `STORAGE_API_2_*` (optional) | Second upload destination; **no** WS unless `MESHFLOW_WS_URL` points there |
 | `MESHCORE_SERIAL_DEVICE` or `MESHCORE_BLE_ADDRESS` | Transport to companion |
 
 Uploadable text events today ([`MeshCorePacketSerializer`](https://github.com/pskillen/meshflow-bot/blob/main/src/meshcore/serializers.py)):
@@ -178,17 +192,15 @@ Example ingest body (channel text, illustrative):
 }
 ```
 
-### Bot channel configuration (planned #297)
-
-**Not implemented yet.**
+### Bot channel configuration
 
 | Step | Behaviour |
 |------|-----------|
-| **On connect** | Read channel table from device (`meshcore` API — exact calls TBD in bot spike). `POST` full snapshot to API **`mc-channel-sync`**; API updates `MessageChannel` rows and `ManagedNode.mc_channels`. |
-| **On UI “apply to radio”** | WebSocket `apply_mc_channel_config` → write device → re-read device → `POST mc-channel-sync` again. |
-| **Channel types (v1)** | **public** and **hashtag** only ([#297](https://github.com/pskillen/meshflow-api/issues/297)). |
+| **On connect** | `read_device_channels` via `meshcore.commands.get_channel`; `POST` snapshot to **`/api/meshcore/feeders/{prefix}/mc-channel-sync/`** for each entry in `bot.storage_apis` (primary + optional API 2). |
+| **On UI / admin “apply”** | WebSocket `apply_mc_channel_config` on **primary** WS only → `set_channel` on device → re-sync to **all** `storage_apis`. |
+| **Channel types (v1)** | **PUBLIC** and **HASHTAG** only. |
 
-The bot does **not** treat API channel rows as authoritative on startup (no “pull API config and push to device” as the default path). Packet **upload** remains as in Phase 1.
+The bot does **not** pull API channel config and push to device on startup. If the device reports zero named channels, logs include a per-slot scan warning ([#107](https://github.com/pskillen/meshflow-bot/pull/107)) — still an open ops issue when other tools show channels on the same radio.
 
 **Example sync payload** (illustrative):
 
@@ -210,26 +222,28 @@ The bot does **not** treat API channel rows as authoritative on startup (no “p
 
 [`Meshflow/constellations/models.py`](../../../Meshflow/constellations/models.py)
 
-| Field | Today | Planned (#297) |
-|-------|--------|----------------|
-| `name` | Operator-facing label | Same; set in UI, not from wire |
-| `constellation` | FK | Unchanged |
-| `protocol` | `MESHTASTIC` or `MESHCORE` | Unchanged |
-| `mc_channel_idx` | Nullable; set on MC ingest | Unique per `(constellation, protocol)` for MC |
-| `mc_channel_type` | — | `PUBLIC` / `HASHTAG` |
-| `mc_hashtag` | — | Hashtag string when type is `HASHTAG` |
+| Field | Role |
+|-------|------|
+| `name` | Operator-facing label (UI/admin); not on wire |
+| `constellation` | FK |
+| `protocol` | `MESHCORE` for MC rows |
+| `mc_channel_idx` | Device slot `0..63`; unique per `(constellation, protocol)` |
+| `mc_channel_type` | `PUBLIC` / `HASHTAG` |
+| `mc_hashtag` | Hashtag string when type is `HASHTAG` (no leading `#` in DB) |
 
 Meshtastic channels use PSK-backed slots on the managed node (`meshtastic_channel_0..7`). MeshCore does **not** use those slots.
 
 ### `ManagedNode` (feeder)
 
-| Field | Today | Planned (#297) |
-|-------|--------|----------------|
-| `protocol` | `MESHCORE` for MC feeders | Unchanged |
-| `meshtastic_channel_0..7` | MT only | Unchanged for MT |
-| `mc_channels` | — | M2M to `MessageChannel` (`protocol=MESHCORE`) |
+| Field | Role |
+|-------|------|
+| `protocol` | `MESHCORE` for MC feeders |
+| `mc_pubkey` | Full 64-hex feeder identity ([#295](https://github.com/pskillen/meshflow-api/issues/295)) |
+| `meshtastic_channel_0..7` | Meshtastic only |
+| `mc_channels` | M2M mirror of device slots |
+| `mc_channels_synced_at` | Last successful bot `mc-channel-sync` |
 
-Authentication: one Node API key per MC feeder via `NodeAuth` → `ManagedNode` ([feeder-bootstrap.md](feeder-bootstrap.md)). Ingest has no `{node_id}` in the URL; the observer is whichever node owns the key.
+Authentication: Node API key via `NodeAuth`; feeder resolved by URL **`{feeder_pubkey_prefix}`** + optional **`X-MeshCore-Feeder-Pubkey`** header ([feeder-bootstrap.md](feeder-bootstrap.md)).
 
 ### Raw ingest: `MeshCoreTextPacket`
 
@@ -252,15 +266,15 @@ Per-feeder sighting of a packet, with optional `channel` FK (same `MessageChanne
 
 [`Meshflow/text_messages/models.py`](../../../Meshflow/text_messages/models.py) — **Meshtastic-only today.**
 
-| Field | Today | Planned (#296) |
-|-------|--------|------------------|
-| `original_packet` | FK → MT `MessagePacket` | Still for MT |
-| `original_mc_packet` | — | FK → `MeshCoreTextPacket` |
-| `protocol` | — | `MESHTASTIC` / `MESHCORE` on every row |
-| `sender` | Required FK → `ObservedNode` | **Nullable** for channel text (no sender on wire) |
-| `channel` | FK → `MessageChannel` | From packet / observation |
-| `recipient_meshtastic_node_id` | MT broadcast sentinel | Null for MC broadcast |
-| `sent_at` | `auto_now_add` | MC: use packet `rx_time` |
+| Field | Role |
+|-------|------|
+| `original_packet` | FK → MT `MessagePacket` (MT rows) |
+| `original_mc_packet` | FK → `MeshCoreTextPacket` (MC rows) |
+| `protocol` | `MESHTASTIC` / `MESHCORE` |
+| `sender` | FK → `ObservedNode`; **nullable** for MC channel text |
+| `channel` | FK → `MessageChannel` |
+| `recipient_meshtastic_node_id` | MT broadcast sentinel; null for MC broadcast |
+| `sent_at` | MC uses packet `rx_time` where applicable |
 
 **Dedup:** one `TextMessage` per raw packet (`original_packet` or `original_mc_packet`).
 
@@ -270,8 +284,8 @@ Per-feeder sighting of a packet, with optional `channel` FK (same `MessageChanne
 
 ## meshflow-api — ingest and channel resolution
 
-**Endpoint:** `POST /api/meshcore/packets/ingest/`  
-**Code:** [`MeshCorePacketIngestSerializer`](../../../Meshflow/meshcore_packets/serializers.py), [`MeshCorePacketIngestView`](../../../Meshflow/meshcore_packets/views.py)
+**Endpoint:** `POST /api/meshcore/feeders/{feeder_pubkey_prefix}/packets/ingest/`  
+**Code:** [`MeshCorePacketIngestSerializer`](../../../Meshflow/meshcore_packets/serializers.py), ingest views + [`resolve_meshcore_feeder`](../../../Meshflow/common/meshcore_feeder_auth.py)
 
 Flow for text packets:
 
@@ -279,69 +293,53 @@ Flow for text packets:
 2. Dedup by `pkt_hash` + time window ([`dedup.py`](../../../Meshflow/meshcore_packets/services/dedup.py)).
 3. **`resolve_mc_channel(observer, channel_idx)`** — [`channel.py`](../../../Meshflow/meshcore_packets/services/channel.py).
 
-### `resolve_mc_channel` — today vs planned
+### `resolve_mc_channel`
 
-**Today:** `get_or_create` `MessageChannel` on `(constellation, protocol=MESHCORE, mc_channel_idx)` with default name `"MC channel {idx}"`. Does **not** yet attach the row to `ManagedNode.mc_channels`.
+1. Clamp `channel_idx` to `0..63`.
+2. Prefer `observer.mc_channels.filter(mc_channel_idx=idx).first()` (feeder mirror).
+3. If missing, auto-create placeholder `MessageChannel`, attach to `observer.mc_channels`.
 
-**Planned (ADR-0002 + #297):**
-
-1. Reject or clamp `channel_idx` to `0..63`.
-2. Prefer `observer.mc_channels.filter(mc_channel_idx=idx).first()`.
-3. If missing, auto-create placeholder channel, attach to `observer.mc_channels`, allow UI rename/type later.
-
-This links **heard** traffic to **operator-configured** channels without requiring names on the wire.
+Heard traffic links to configured channels without names on the wire.
 
 ### Signals
 
 | Signal | When | Subscriber |
 |--------|------|------------|
 | `meshcore_packet_received` | Every stored packet | Identity upsert ([`receivers.py`](../../../Meshflow/meshcore_packets/receivers.py)) |
-| `meshcore_text_packet_received` | `MeshCoreTextPacket` saved | **Planned:** `text_messages` → `TextMessage` ([#296](https://github.com/pskillen/meshflow-api/issues/296)) |
+| `meshcore_text_packet_received` | `MeshCoreTextPacket` saved | `text_messages` → `TextMessage` |
 
 Identity receiver **skips** channel text (no `from_pubkey` / prefix). Contact text creates or touches a **prefix stub** `ObservedNode` per [ADR-0001](../packet-ingestion/adr/0001-mc-node-identity.md).
 
 ---
 
-## meshflow-api — channel mirror and WebSocket (planned #297)
+## meshflow-api — channel mirror and WebSocket
 
-### Primary: `POST mc-channel-sync` (device → API)
+### Primary: `POST …/feeders/{prefix}/mc-channel-sync` (device → API)
 
-- **Caller:** meshflow-bot with feeder Node API key (same key as ingest), after reading the device.
-- **Body:** full channel list with `mc_channel_idx`, `name`, `mc_channel_type`, `mc_hashtag` per row; optional `synced_at`.
-- **Effect:** upsert constellation-scoped `MessageChannel` rows; set `ManagedNode.mc_channels` to exactly match the snapshot (detach indices no longer on device; do not delete channels still referenced by stored packets).
-- **Read:** `GET` managed node (owner JWT) returns nested `mc_channels` mirror for UI.
+- **Caller:** meshflow-bot with Node API key, after reading the device.
+- **Body:** full channel list (`mc_channel_idx`, `name`, `mc_channel_type`, `mc_hashtag`); optional `synced_at`.
+- **Effect:** upsert `MessageChannel` rows; set `ManagedNode.mc_channels` to match snapshot ([`reconcile_mc_channels`](../../../Meshflow/meshcore_packets/services/channel_sync.py)).
+- **Read:** managed node API returns nested `mc_channels` for UI.
 
-### Secondary: push UI intent → device
+### Secondary: push UI / admin intent → device
 
-- **WebSocket** `apply_mc_channel_config` to connected MC feeder (pattern: Meshtastic remote traceroute in [`ws/tests/test_node_consumer.py`](../../../Meshflow/ws/tests/test_node_consumer.py)).
-- Bot writes device, then **must** call `mc-channel-sync` so the API mirror stays aligned with the device.
-- Optional ack events: `mc_channel_config_applied` / `mc_channel_config_failed`.
+- **REST:** `POST /api/meshcore/managed-nodes/{internal_id}/apply-mc-channel-config/` (owner JWT) → [`channel_apply`](../../../Meshflow/meshcore_packets/services/channel_apply.py) → Redis `group_send` → bot WS.
+- **WebSocket command:** `apply_mc_channel_config` with `channels` array (plain string types).
+- **Django admin:** action **Push MC channel config to feeder device** uses the same dispatch with mirror payload.
+- Bot writes device, then re-syncs to all configured storage APIs.
 
-**Permissions:** sync endpoint accepts feeder key; read/apply-for-owner uses node owner or constellation editor.
+**Permissions:** sync uses feeder key + prefix; apply uses authenticated node owner.
 
-**OpenAPI:** `mc-channel-sync`, nested `mc_channels` on `ManagedNode`, WS command schemas.
-
-**Not v1:** API-only CRUD that changes the mirror without a device round-trip (would reintroduce drift).
+**Not v1:** API-only mirror edits without device round-trip (drift until next connect sync).
 
 ---
 
 ## meshflow-ui
 
-### Today
+- **Meshtastic feeders:** [Node Settings](https://github.com/pskillen/meshflow-ui/blob/main/src/pages/user/NodeSettings.tsx) — slots 0–7 → `meshtastic_channel_*`.
+- **MeshCore feeders:** mirror from API; **Apply to radio** via `apply-mc-channel-config` (PUBLIC / HASHTAG, hashtag). Toasts on 503; richer offline UX still deferred.
 
-- **Meshtastic feeders:** [Node Settings](https://github.com/pskillen/meshflow-ui/blob/main/src/pages/user/NodeSettings.tsx) maps **slots 0–7** to constellation `MessageChannel` rows via `meshtastic_channel_*` PATCH fields.
-- **MeshCore feeders:** no channel editor; MC map/nodes views do not configure channels.
-
-### Implemented (#297)
-
-When `ManagedNode.protocol === MESHCORE`:
-
-- **Display** channel list from API mirror (populated after bot connect sync).
-- **Edit** with explicit **“Apply to radio”** — does not assume API-only saves change the device.
-- Fields: name, type (**Public** / **Hashtag**), hashtag, `mc_channel_idx` (from last sync).
-- Show sync status / errors when bot offline or WS apply fails.
-
-**Message history UI** for MC protocol filter is **out of scope** for #297 (separate epic/UI work); #296 only requires API list support for channel broadcast messages.
+**Message history UI** for MC remains deferred; API supports `GET /api/messages/text/?protocol=meshcore` for channel broadcast.
 
 ---
 
@@ -360,16 +358,18 @@ When `ManagedNode.protocol === MESHCORE`:
 
 | Capability | Status |
 |------------|--------|
-| Bot upload `channel_text` / `contact_text` | **Done** (Phase 1) |
-| API store `MeshCoreTextPacket` + observation | **Done** |
-| `resolve_mc_channel` via feeder `mc_channels` | **Done** (API branch `api-296/paddy/mc-text-channels`) |
-| `ManagedNode.mc_channels` + channel types | **Done** (API) |
-| API `POST /api/meshcore/feeder/mc-channel-sync/` | **Done** (API) |
-| `TextMessage` + `protocol` field + history filter | **Done** (API) [#296](https://github.com/pskillen/meshflow-api/issues/296) |
-| Bot device → API `mc-channel-sync` on connect | **Done** (bot, same branch family) |
-| Bot WS apply + re-sync after UI push | **Done** (bot) |
-| UI MC channel mirror + apply-to-radio | **Done** (ui) |
-| MC message history in UI | **Deferred** (epic #266 UI) |
+| Bot upload `channel_text` / `contact_text` | **Done** |
+| Feeder-scoped ingest + `mc-channel-sync` URLs ([#295](https://github.com/pskillen/meshflow-api/issues/295)) | **Done** (main + #335 fixes) |
+| `ManagedNode.mc_channels` + `mc_channel_type` / `mc_hashtag` | **Done** |
+| `TextMessage` + MC provenance ([#296](https://github.com/pskillen/meshflow-api/issues/296)) | **Done** |
+| Bot sync + WS apply ([#297](https://github.com/pskillen/meshflow-api/issues/297)) | **Done** |
+| UI mirror + apply-to-radio | **Done** |
+| Apply 503 / msgpack / WS group fixes | **Done** on [api #335](https://github.com/pskillen/meshflow-api/pull/335), [bot #108](https://github.com/pskillen/meshflow-bot/pull/108) (merge pending) |
+| Django admin MC channels + push action | **Done** (#335) |
+| Dual API channel sync (no WS on API 2) | **Done** (bot behaviour; documented) |
+| Empty device channel table / auto `mc_pubkey` | **Outstanding** — [phase-2-outstanding.md](./phase-2-outstanding.md) |
+| MC message history in UI | **Deferred** |
+| Three-way merge / periodic sync | **Deferred** |
 
 ---
 
