@@ -146,10 +146,37 @@ Deploy api #325 before bot fleet upgrade.
 - Meshtastic **Map** in nav (`/map`); MeshCore **Managed nodes** (`/meshcore/managed-nodes`).
 - Shared `ProtocolMapPage`, `ProtocolNodesPage`, `ProtocolManagedNodesPage` (legacy URLs unchanged).
 - MeshCore map legend uses ADV_TYPE roles (Chat / Repeater / Room / Sensor), not Meshtastic role swatches.
+- **MeshCore node detail follow-ups** (same UI branch, separate commits): no bogus Meshtastic traceroute history when `meshtastic_node_id` is 0; statistics charts tolerate missing `packet_types`; hide Traceroutes / Monitoring tabs; node-detail map uses MC legend.
 
 **meshflow-api — delivered (pending PR)**
 
 - `ObservedNode.meshcore_adv_type` from ADVERT `adv_type` on ingest; migration `nodes/0048`; OpenAPI field.
+
+---
+
+## MeshCore managed-node live status (API + UI table)
+
+**Status:** Implemented on branch `ui-269/paddy/meshcore-adv-type-on-observed-node` (api commit `fix(api): MeshCore managed node status and packet counts`); ship with or after ui#269 PRs.
+
+**Problem:** `GET /api/nodes/managed-nodes/?include=status` annotated `ObservedNode` and packet counts only via `meshtastic_node_id` and `PacketObservation`. MeshCore feeders (`protocol=2`, `mc_pubkey`, often `meshtastic_node_id=0`) showed zeros for packets/hr, last packet ingested, and radio last heard on the MeshCore managed-nodes page.
+
+**Delivered (meshflow-api)**
+
+- `ManagedNodeViewSet._annotate_common_fields` / `_annotate_status_fields`: join `ObservedNode` by `mc_pubkey` for MC; count `MeshCorePacketObservation` for `packets_last_hour` / `packets_last_24h`.
+- `nodes.tasks.update_managed_node_statuses`: refresh `ManagedNodeStatus.last_packet_ingested_at` from `MeshCorePacketObservation` for MC feeders.
+- Test: `test_managed_nodes_status_fields_meshcore_feeder`.
+
+**Relationship to [#329](https://github.com/pskillen/meshflow-api/issues/329) (hourly stats snapshots)**
+
+| Area | This work | #329 |
+| --- | --- | --- |
+| **Consumer** | MeshCore managed-nodes table (`include=status`), same fields as Meshtastic list | Dashboard / `usePacketStats`, `GET /api/stats/snapshots/`, `collect_stats_snapshots` |
+| **Mechanism** | Live SQL annotations + 5‑min `ManagedNodeStatus` refresh | Hourly Celery at :05 UTC → `StatsSnapshot` JSON (`packet_volume`, `online_nodes`, …) |
+| **Data** | `MeshCorePacketObservation` + `ObservedNode` (MC) | `MeshCoreRawPacket` / MC observed nodes in snapshot collectors (not implemented yet) |
+
+**Overlap:** both touch MC packet volume over time. **Not a substitute:** #329 remains required for historical hourly snapshots and stats API parity; this fix only unblocks the operational managed-feeder table and reuses the same observation rows #329 will eventually aggregate.
+
+**Docs:** [RECENCY.md](../../RECENCY.md) § managed-node annotations (protocol split). Task 1 of #329 (Meshtastic stats doc) is still open.
 
 ---
 

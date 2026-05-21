@@ -53,6 +53,8 @@ Items **skipped**, **incomplete**, or **discovered during Phase 2 / rename execu
 - [ ] Stored traceroute hop JSON key `node_id` in DB (SP-05 skipped; API enrichment uses `meshtastic_node_id`).
 - [ ] Test factories — legacy kwargs (`node_id`, `hw_model`, …) remain aliases in `create_observed_node`.
 - [x] **UI nav parity** — [ui#269](https://github.com/pskillen/meshflow-ui/issues/269) (in PR; see [phase-2-progress.md](./phase-2-progress.md) § UI nav & map parity).
+- [x] **MeshCore managed-nodes live status** — `include=status` MC annotations + UI table (api branch; see progress § MeshCore managed-node live status). **Still ship**; does not close [#329](https://github.com/pskillen/meshflow-api/issues/329).
+- [ ] **Hourly MC stats snapshots** — [#329](https://github.com/pskillen/meshflow-api/issues/329): `collect_stats_snapshots` / `StatsSnapshot` / dashboard charts; document Meshtastic path first (`docs/features/stats/meshtastic_packets.md`).
 - [ ] **UI out of scope for #269** — `/meshtastic/*` URL migration; MeshCore messages / traceroutes / weather screens; server-side `protocol` filter on `GET /nodes/managed-nodes/`.
 - [ ] **Node search** still Meshtastic-centric (global sidebar search).
 
@@ -112,6 +114,7 @@ Follow-up after local UI + pre-prod bot + shared Postgres/Redis. Tracked on [#29
 
 ## Cross-phase tickets (not rename SP work)
 
+- [ ] **Hourly packet stats snapshots (MeshCore)** — [#329](https://github.com/pskillen/meshflow-api/issues/329). Live managed-node counts (2026-05-21) are separate; see [phase-2-progress.md](./phase-2-progress.md) § MeshCore managed-node live status.
 - [ ] **API v1 ingest retirement** — [#319](https://github.com/pskillen/meshflow-api/issues/319), bot [#95](https://github.com/pskillen/meshflow-bot/issues/95).
 - [ ] **`TextMessage` dual FK** — Phase 2.2 ([#296](https://github.com/pskillen/meshflow-api/issues/296)); see checklist above.
 - [ ] **Formatting toolchain alignment** (Black / flake8 / isort / Ruff) — bot [#101](https://github.com/pskillen/meshflow-bot/issues/101).
