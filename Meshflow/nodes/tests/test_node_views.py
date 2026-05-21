@@ -96,6 +96,55 @@ def test_managed_nodes_status_fields_only_returned_with_include_status(
 
 
 @pytest.mark.django_db
+def test_managed_nodes_status_fields_meshcore_feeder(create_managed_node, create_observed_node, create_user):
+    """MeshCore feeders use mc_pubkey + MeshCorePacketObservation, not meshtastic_node_id."""
+    from common.protocol import Protocol
+    from meshcore_packets.models import MeshCorePacketObservation, MeshCorePayloadType, MeshCoreTextPacket
+
+    user = create_user()
+    managed = create_managed_node(
+        owner=user,
+        meshtastic_node_id=0,
+        protocol=Protocol.MESHCORE,
+        mc_pubkey="b" * 64,
+    )
+    client = APIClient()
+    client.force_authenticate(user=user)
+
+    now = timezone.now()
+    observed = create_observed_node(
+        protocol=2,
+        meshtastic_node_id=0,
+        mc_pubkey=managed.mc_pubkey,
+        last_heard=now,
+    )
+    NodeLatestStatus.objects.create(node=observed)
+    packet = MeshCoreTextPacket.objects.create(
+        observer=managed,
+        payload_type=MeshCorePayloadType.CHANNEL_TEXT,
+        event_type="channel_message",
+        rx_time=now,
+        raw_json={},
+        text="ping",
+    )
+    MeshCorePacketObservation.objects.create(
+        packet=packet,
+        observer=managed,
+        rx_time=now,
+        upload_time=now,
+    )
+    update_managed_node_statuses()
+
+    response = client.get(reverse("managed-nodes-list"), {"include": "status"})
+    assert response.status_code == status.HTTP_200_OK
+    row = next(r for r in response.data["results"] if r["node_id_str"] == managed.node_id_str)
+    assert row["last_packet_ingested_at"] is not None
+    assert row["packets_last_hour"] == 1
+    assert row["packets_last_24h"] == 1
+    assert row["radio_last_heard"] is not None
+
+
+@pytest.mark.django_db
 def test_observed_node_list_view(create_observed_node, create_user):
     """Test observed node list view."""
     client = APIClient()

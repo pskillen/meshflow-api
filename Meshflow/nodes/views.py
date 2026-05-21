@@ -11,6 +11,7 @@ from django.db.models import (
     DateTimeField,
     IntegerField,
     OuterRef,
+    Q,
     Subquery,
     Value,
     When,
@@ -28,7 +29,9 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from common.mesh_node_helpers import observed_node_search_conditions
+from common.protocol import Protocol
 from constellations.models import ConstellationUserMembership
+from meshcore_packets.models import MeshCorePacketObservation
 from nodes.constants import INFRASTRUCTURE_ROLES
 from nodes.models import (
     DeviceMetrics,
@@ -1008,9 +1011,35 @@ class ManagedNodeViewSet(viewsets.ModelViewSet):
         include_values = _multi_query_strings(self.request, "include")
         return "geo_classification" in {value.lower() for value in include_values}
 
+    @staticmethod
+    def _observed_node_for_managed_outer_ref():
+        return ObservedNode.objects.filter(
+            Q(
+                protocol=Protocol.MESHTASTIC,
+                meshtastic_node_id=OuterRef("meshtastic_node_id"),
+            )
+            | Q(
+                protocol=Protocol.MESHCORE,
+                mc_pubkey=OuterRef("mc_pubkey"),
+            )
+        )
+
+    @staticmethod
+    def _node_latest_status_for_managed_outer_ref():
+        return NodeLatestStatus.objects.filter(
+            Q(
+                node__protocol=Protocol.MESHTASTIC,
+                node__meshtastic_node_id=OuterRef("meshtastic_node_id"),
+            )
+            | Q(
+                node__protocol=Protocol.MESHCORE,
+                node__mc_pubkey=OuterRef("mc_pubkey"),
+            )
+        )
+
     def _annotate_common_fields(self, queryset):
-        observed_node_qs = ObservedNode.objects.filter(meshtastic_node_id=OuterRef("meshtastic_node_id"))
-        latest_status_qs = NodeLatestStatus.objects.filter(node__meshtastic_node_id=OuterRef("meshtastic_node_id"))
+        observed_node_qs = self._observed_node_for_managed_outer_ref()
+        latest_status_qs = self._node_latest_status_for_managed_outer_ref()
         return queryset.annotate(
             long_name=Subquery(observed_node_qs.values("long_name")[:1]),
             short_name=Subquery(observed_node_qs.values("short_name")[:1]),
@@ -1039,8 +1068,9 @@ class ManagedNodeViewSet(viewsets.ModelViewSet):
         hour_cutoff = now - timedelta(hours=1)
         day_cutoff = now - timedelta(hours=24)
 
-        packet_observation_qs = PacketObservation.objects.filter(observer_id=OuterRef("pk"))
-        observed_node_qs = ObservedNode.objects.filter(meshtastic_node_id=OuterRef("meshtastic_node_id"))
+        meshtastic_packet_qs = PacketObservation.objects.filter(observer_id=OuterRef("pk"))
+        meshcore_packet_qs = MeshCorePacketObservation.objects.filter(observer_id=OuterRef("pk"))
+        observed_node_qs = self._observed_node_for_managed_outer_ref()
 
         status_qs = ManagedNodeStatus.objects.filter(node_id=OuterRef("pk"))
         last_packet_subquery = status_qs.values("last_packet_ingested_at")[:1]
@@ -1048,28 +1078,32 @@ class ManagedNodeViewSet(viewsets.ModelViewSet):
             status_qs.values("is_sending_data")[:1],
             output_field=BooleanField(),
         )
-        packets_last_hour_subquery = (
-            packet_observation_qs.filter(upload_time__gte=hour_cutoff)
-            .values("observer")
-            .annotate(c=Count("id"))
-            .values("c")[:1]
-        )
-        packets_last_24h_subquery = (
-            packet_observation_qs.filter(upload_time__gte=day_cutoff)
-            .values("observer")
-            .annotate(c=Count("id"))
-            .values("c")[:1]
-        )
+
+        def _packet_count_subquery(packet_qs, cutoff):
+            return packet_qs.filter(upload_time__gte=cutoff).values("observer").annotate(c=Count("id")).values("c")[:1]
+
+        mt_packets_last_hour = _packet_count_subquery(meshtastic_packet_qs, hour_cutoff)
+        mc_packets_last_hour = _packet_count_subquery(meshcore_packet_qs, hour_cutoff)
+        mt_packets_last_24h = _packet_count_subquery(meshtastic_packet_qs, day_cutoff)
+        mc_packets_last_24h = _packet_count_subquery(meshcore_packet_qs, day_cutoff)
 
         return queryset.annotate(
             last_packet_ingested_at=Subquery(last_packet_subquery, output_field=DateTimeField()),
-            packets_last_hour=Coalesce(
-                Subquery(packets_last_hour_subquery, output_field=IntegerField()),
-                Value(0),
+            packets_last_hour=Case(
+                When(
+                    protocol=Protocol.MESHCORE,
+                    then=Coalesce(Subquery(mc_packets_last_hour, output_field=IntegerField()), Value(0)),
+                ),
+                default=Coalesce(Subquery(mt_packets_last_hour, output_field=IntegerField()), Value(0)),
+                output_field=IntegerField(),
             ),
-            packets_last_24h=Coalesce(
-                Subquery(packets_last_24h_subquery, output_field=IntegerField()),
-                Value(0),
+            packets_last_24h=Case(
+                When(
+                    protocol=Protocol.MESHCORE,
+                    then=Coalesce(Subquery(mc_packets_last_24h, output_field=IntegerField()), Value(0)),
+                ),
+                default=Coalesce(Subquery(mt_packets_last_24h, output_field=IntegerField()), Value(0)),
+                output_field=IntegerField(),
             ),
             radio_last_heard=Subquery(observed_node_qs.values("last_heard")[:1], output_field=DateTimeField()),
             is_eligible_traceroute_source=Case(
