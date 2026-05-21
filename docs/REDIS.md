@@ -12,7 +12,7 @@ Configuration lives in [`Meshflow/Meshflow/settings/base.py`](../Meshflow/Meshfl
   - **Purpose:** Pub/sub and group membership for WebSocket delivery (`channel_layer.group_send` / `group_add`).  
   - **Code:** [`Meshflow/ws/consumers.py`](../Meshflow/ws/consumers.py).  
   - **Consumers / groups:**
-    - **`NodeConsumer`** (`ws/nodes/?api_key=…`) — bots join group `node_{node_id}`; receives **`node_command`** events (e.g. traceroute commands). Emitters include traceroute views/tasks and management commands (see grep for `group_send` under `Meshflow/`).
+    - **`NodeConsumer`** (`ws/nodes/?api_key=…`) — feeder bots join group `node_{meshtastic_node_id}` or **`node_mc_{managed_node.internal_id}`** (MeshCore); receives **`node_command`** events (e.g. traceroute, `apply_mc_channel_config`). Any API/ASGI worker can `group_send`; membership is cluster-wide in Redis DB 0. Emitters include traceroute views/tasks, `meshcore_packets` apply-channel, and management commands.
     - **`TextMessageConsumer`** — authenticated UI clients join group **`text_messages`**; receives **`text_message`** events for mesh text broadcasts ([`Meshflow/ws/services/text_message.py`](../Meshflow/ws/services/text_message.py)).
     - **`TracerouteConsumer`** (`ws/traceroutes/?token=…`) — clients join group **`traceroutes`**; receives **`traceroute_update`** events ([`Meshflow/traceroute/ws_notify.py`](../Meshflow/traceroute/ws_notify.py)).
   - **TTL:** Connection/session lifetime; Channels manages internal keys.

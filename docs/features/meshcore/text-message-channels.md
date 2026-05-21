@@ -78,7 +78,35 @@ sequenceDiagram
 
 **Drift:** if the API mirror and device disagree (e.g. failed push), the **next connect sync overwrites the API** from the device. No three-way merge in v1.
 
-Today the bot **does not** start the WebSocket client for `RADIO_PROTOCOL=meshcore` (Meshtastic-only). Enabling WS for MC feeders is part of [#297](https://github.com/pskillen/meshflow-api/issues/297).
+The bot starts **`MeshflowWSClient`** for MeshCore when `STORAGE_API_ROOT` + token are set (WebSocket URL derived from the API base URL unless `MESHFLOW_WS_URL` is set). The feeder’s 12-hex pubkey prefix is appended automatically on connect (not an operator env var).
+
+### Horizontal scaling (API web tier)
+
+Apply and traceroute commands use **Django Channels + Redis DB 0** ([`docs/REDIS.md`](../../REDIS.md)), not in-process Django signals. Signals only run inside one Python process and do not reach other workers or hosts.
+
+| Piece | Scales horizontally? |
+|-------|----------------------|
+| `POST apply-mc-channel-config` on any Gunicorn/Uvicorn worker | Yes — handler calls `channel_layer.group_send` via Redis |
+| `feeder_ws_group_has_subscribers` on any worker | Yes — `channels_redis` stores group membership in Redis DB 0 |
+| Bot `NodeConsumer` WebSocket | One connection per bot; must land on **some** ASGI instance in the deployment that shares that Redis |
+| Browser UI WebSocket (`text_messages`, JWT) | Separate consumer/groups; unrelated to feeder commands |
+
+You do **not** need a separate “signal” bus for multi-worker API: Redis channel layer already is that bus.
+
+### Local API + pre-prod bot (common 503 cause)
+
+Sharing **Postgres** and **Redis** is not enough if the **HTTP hosts differ**:
+
+- UI / `apply-mc-channel-config` → `http://localhost:8000` (local Django)
+- Bot → `STORAGE_API_ROOT=https://pre-prod…/api` and WebSocket to **pre-prod**
+
+The bot registers in Redis group `node_mc_{uuid}` through **pre-prod’s** `NodeConsumer`. Local Django also reads Redis DB 0, so presence *can* work if both use the same `REDIS_HOST` / password and the managed node `internal_id` + `mc_pubkey` match the device. If local settings use **`InMemoryChannelLayer`** (tests only) or a different Redis DB/host, local apply always sees **503 feeder not connected** even though pre-prod logs show `MeshflowWSClient: connected`.
+
+**Practical dev setups (pick one):**
+
+1. Point **meshflow-ui** at pre-prod API (browser and bot share one deployment), or  
+2. Point **bot** `STORAGE_API_ROOT` at local API and run bot + API locally, or  
+3. Keep split hosts but verify local `CHANNEL_LAYERS` is `channels_redis` to the **same** Redis DB 0 as pre-prod.
 
 **Implementation plan:** Cursor workspace plan `mc_text_textmessage_pipeline_2c3e9fb8.plan.md` (kept in sync with this file; **this doc is canonical** in git for operators and PRs).
 
