@@ -7,6 +7,7 @@ from rest_framework import serializers
 from common.mesh_node_helpers import meshtastic_id_to_hex, observed_node_id_str
 from common.protocol import Protocol
 from constellations.models import Constellation, ConstellationUserMembership, MessageChannel
+from meshcore_packets.serializers_channel import MessageChannelMcSerializer
 from users.models import User
 
 from .models import (
@@ -381,6 +382,7 @@ class ManagedNodeSerializer(serializers.ModelSerializer):
     class Meta:
         model = ManagedNode
         fields = [
+            "internal_id",
             "meshtastic_node_id",
             "protocol",
             "name",
@@ -395,6 +397,7 @@ class ManagedNodeSerializer(serializers.ModelSerializer):
             "allow_auto_traceroute",
             "bot_version",
             "bot_version_reported_at",
+            "mc_channels_synced_at",
             "position",
             "device_metrics",
             "latest_environment_metrics",
@@ -776,11 +779,17 @@ class OwnedManagedNodeSerializer(ManagedNodeSerializer):
         else:
             rep["meshtastic_channel_7"] = None
 
+        rep["mc_channels"] = MessageChannelMcSerializer(
+            instance.mc_channels.order_by("mc_channel_idx"),
+            many=True,
+        ).data
+
         return rep
 
     class Meta:
         model = ManagedNode
         fields = ManagedNodeSerializer.Meta.fields + [
+            "mc_channels",
             "meshtastic_channel_0",
             "meshtastic_channel_1",
             "meshtastic_channel_2",

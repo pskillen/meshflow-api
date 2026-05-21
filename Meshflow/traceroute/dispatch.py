@@ -18,6 +18,8 @@ from django.utils import timezone
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 
+from common.ws_groups import managed_node_ws_group
+
 from .models import AutoTraceRoute
 from .trigger_intervals import MONITORING_TRIGGER_MIN_INTERVAL_SEC
 from .ws_notify import notify_traceroute_status_changed
@@ -133,7 +135,7 @@ def _send_and_update(tr: AutoTraceRoute, channel_layer) -> dict:
     now = timezone.now()
     try:
         async_to_sync(channel_layer.group_send)(
-            f"node_{tr.source_node.meshtastic_node_id}",
+            managed_node_ws_group(tr.source_node),
             {
                 "type": "node_command",
                 "command": {"type": "traceroute", "target": tr.target_node.meshtastic_node_id},

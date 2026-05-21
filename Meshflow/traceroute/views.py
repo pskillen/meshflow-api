@@ -287,8 +287,10 @@ def traceroute_trigger(request):
 
     # Send command via channel layer
     channel_layer = get_channel_layer()
+    from common.ws_groups import managed_node_ws_group
+
     async_to_sync(channel_layer.group_send)(
-        f"node_{source_node.meshtastic_node_id}",
+        managed_node_ws_group(source_node),
         {"type": "node_command", "command": {"type": "traceroute", "target": target_node.meshtastic_node_id}},
     )
 

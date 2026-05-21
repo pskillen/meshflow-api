@@ -66,29 +66,29 @@ Items **skipped**, **incomplete**, or **discovered during Phase 2 / rename execu
 
 Design: [text-message-channels.md](./text-message-channels.md) (device = source of truth for channel config; API mirror via sync).
 
-**API**
+**API** (branch `api-296/paddy/mc-text-channels` — merge pending)
 
-- [ ] `MessageChannel`: `mc_channel_type`, `mc_hashtag`; uniqueness `(constellation, protocol, mc_channel_idx)`.
-- [ ] `ManagedNode.mc_channels` M2M; optional `mc_channels_synced_at`.
-- [ ] `POST …/mc-channel-sync/` — reconcile mirror from bot device snapshot.
-- [ ] `resolve_mc_channel` — prefer feeder M2M; placeholder before first sync.
-- [ ] `TextMessage`: `protocol`, `original_mc_packet`, nullable `sender`, provenance CHECK.
-- [ ] `MeshCoreTextMessageService` + `meshcore_text_packet_received` receiver.
-- [ ] History API: `protocol` filter; MC channel broadcast; MC `heard` observations.
-- [ ] WS `apply_mc_channel_config` (UI → device; bot re-syncs after).
-- [ ] OpenAPI + tests.
+- [x] `MessageChannel`: `mc_channel_type`, `mc_hashtag`; uniqueness `(constellation, protocol, mc_channel_idx)`.
+- [x] `ManagedNode.mc_channels` M2M; optional `mc_channels_synced_at`.
+- [x] `POST …/mc-channel-sync/` — reconcile mirror from bot device snapshot.
+- [x] `resolve_mc_channel` — prefer feeder M2M; placeholder before first sync.
+- [x] `TextMessage`: `protocol`, `original_mc_packet`, nullable `sender`, provenance CHECK.
+- [x] `MeshCoreTextMessageService` + `meshcore_text_packet_received` receiver.
+- [x] History API: `protocol` filter; MC channel broadcast; MC `heard` observations.
+- [x] WS `apply_mc_channel_config` (UI → device; bot re-syncs after).
+- [x] OpenAPI + tests.
 
-**Bot (child #297)**
+**Bot (child #297)** (branch `api-296/paddy/mc-text-channels` — merge pending)
 
-- [ ] Read device channel table on connect; `POST mc-channel-sync`.
-- [ ] WS handler: apply config → write device → re-sync.
-- [ ] Enable MC WebSocket when storage API configured.
-- [ ] meshcore_py channel read/write spike.
+- [x] Read device channel table on connect; `POST mc-channel-sync`.
+- [x] WS handler: apply config → write device → re-sync.
+- [x] Enable MC WebSocket when storage API configured.
+- [x] meshcore_py channel read/write spike.
 
-**UI (child #297)**
+**UI (child #297)** (branch `api-296/paddy/mc-channel-settings` — merge pending)
 
-- [ ] Display synced `mc_channels`; apply-to-radio (not API-only save).
-- [ ] Sync status / bot offline messaging.
+- [x] Display synced `mc_channels`; apply-to-radio (not API-only save).
+- [ ] Sync status / bot offline messaging (basic toasts only; richer UX deferred).
 
 **Deferred (2.2)**
 
