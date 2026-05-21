@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import time
 
 from channels.layers import get_channel_layer
 
@@ -12,16 +13,50 @@ FEEDER_BOT_NOT_CONNECTED = "feeder_bot_not_connected"
 COMMAND_DISPATCH_UNAVAILABLE = "command_dispatch_unavailable"
 
 
+async def _redis_group_has_channels(layer, group: str) -> bool:
+    """Presence check for channels_redis (group is a ZSET at asgi:group:{name})."""
+    key = layer._group_key(group)
+    connection = layer.connection(layer.consistent_hash(group))
+    await connection.zremrangebyscore(
+        key,
+        min=0,
+        max=int(time.time()) - layer.group_expiry,
+    )
+    names = await connection.zrange(key, 0, -1)
+    return bool(names)
+
+
+async def _inmemory_group_has_channels(layer, group: str) -> bool:
+    """Presence check for InMemoryChannelLayer (tests)."""
+    members = layer.groups.get(group) or {}
+    now = time.time()
+    return any(now - ts < layer.group_expiry for ts in members.values())
+
+
 async def feeder_ws_group_has_subscribers(group: str) -> bool:
     """Return True if at least one bot WebSocket is subscribed to ``group``."""
     channel_layer = get_channel_layer()
     if channel_layer is None:
         return False
-    if not hasattr(channel_layer, "group_channels"):
-        logger.warning("Channel layer does not support group_channels; assuming feeder offline")
-        return False
-    channels = await channel_layer.group_channels(group)
-    return bool(channels)
+
+    try:
+        from channels.layers import InMemoryChannelLayer
+        from channels_redis.core import RedisChannelLayer
+    except ImportError:
+        RedisChannelLayer = None  # type: ignore[misc, assignment]
+        InMemoryChannelLayer = None  # type: ignore[misc, assignment]
+
+    if RedisChannelLayer is not None and isinstance(channel_layer, RedisChannelLayer):
+        return await _redis_group_has_channels(channel_layer, group)
+
+    if InMemoryChannelLayer is not None and isinstance(channel_layer, InMemoryChannelLayer):
+        return await _inmemory_group_has_channels(channel_layer, group)
+
+    logger.warning(
+        "Channel layer %s has no membership probe; assuming feeder offline",
+        type(channel_layer).__name__,
+    )
+    return False
 
 
 async def dispatch_node_command(group: str, command: dict) -> None:
