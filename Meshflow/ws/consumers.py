@@ -109,8 +109,7 @@ class NodeConsumer(AsyncWebsocketConsumer):
             mc_auths = [a for a in auths if a.node.protocol == Protocol.MESHCORE]
             if len(mc_auths) > 1:
                 logger.warning(
-                    "NodeConsumer: API key linked to %s MC feeders; "
-                    "pass feeder_pubkey_prefix on ws/nodes/",
+                    "NodeConsumer: API key linked to %s MC feeders; " "pass feeder_pubkey_prefix on ws/nodes/",
                     len(mc_auths),
                 )
                 return None

@@ -3,9 +3,10 @@
 import time
 from unittest.mock import AsyncMock, MagicMock
 
+from django.utils.translation import gettext_lazy
+
 import msgpack
 import pytest
-from django.utils.translation import gettext_lazy
 
 from common.feeder_ws import _ws_json_safe, dispatch_node_command, feeder_ws_group_has_subscribers
 

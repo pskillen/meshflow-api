@@ -6,7 +6,6 @@ from channels.routing import URLRouter
 from channels.testing import WebsocketCommunicator
 
 import Meshflow.routing  # noqa: F401
-
 from common.protocol import Protocol
 from common.ws_groups import managed_node_ws_group
 
@@ -18,9 +17,7 @@ FEEDER_PREFIX = "1a37f5aea4a1"
 
 @pytest.mark.django_db
 @pytest.mark.asyncio
-async def test_mc_consumer_requires_prefix_when_multiple_feeders(
-    create_managed_node, create_node_api_key
-):
+async def test_mc_consumer_requires_prefix_when_multiple_feeders(create_managed_node, create_node_api_key):
     from nodes.models import NodeAuth
 
     @database_sync_to_async
@@ -55,10 +52,9 @@ async def test_mc_consumer_requires_prefix_when_multiple_feeders(
 
 @pytest.mark.django_db
 @pytest.mark.asyncio
-async def test_mc_consumer_accepts_feeder_pubkey_prefix(
-    create_managed_node, create_node_api_key
-):
+async def test_mc_consumer_accepts_feeder_pubkey_prefix(create_managed_node, create_node_api_key):
     from channels.layers import get_channel_layer
+
     from nodes.models import NodeAuth
 
     @database_sync_to_async
