@@ -416,6 +416,19 @@ class ManagedNodeAdminForm(forms.ModelForm):
         except ValueError:
             raise forms.ValidationError(_("Enter a decimal node ID or !hex8."))
 
+    def clean_mc_pubkey(self):
+        from common.meshcore_node_helpers import normalize_mc_pubkey
+
+        raw = self.cleaned_data.get("mc_pubkey")
+        if not raw:
+            return None
+        if self._protocol_from_form() != Protocol.MESHCORE:
+            return None
+        try:
+            return normalize_mc_pubkey(raw)
+        except ValueError as exc:
+            raise forms.ValidationError(str(exc))
+
     def clean(self):
         cleaned_data = super().clean()
         latlong = cleaned_data.get("latlong")
@@ -499,7 +512,8 @@ class ManagedNodeAdmin(admin.ModelAdmin):
             },
         )
         if obj and obj.protocol == Protocol.MESHCORE:
-            return (common,)
+            mc_fields = (_("MeshCore identity"), {"fields": ("mc_pubkey", "display_id")})
+            return (common, mc_fields)
         return (common, channels)
 
 
