@@ -188,9 +188,7 @@ class ManagedNodeMcChannelApplyView(APIView):
         if result == COMMAND_DISPATCH_UNAVAILABLE:
             return Response(
                 {
-                    "detail": (
-                        "Could not dispatch command to the feeder (channel layer / Redis unavailable)."
-                    ),
+                    "detail": ("Could not dispatch command to the feeder (channel layer / Redis unavailable)."),
                     "code": COMMAND_DISPATCH_UNAVAILABLE,
                 },
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,

@@ -56,9 +56,7 @@ class McChannelApplySerializer(serializers.Serializer):
             if entry.get("mc_channel_type") == MeshCoreChannelType.HASHTAG.label:
                 tag = (entry.get("mc_hashtag") or entry.get("name") or "").strip().lstrip("#")
                 if not tag:
-                    raise serializers.ValidationError(
-                        {"channels": "Hashtag channels require a non-empty hashtag."}
-                    )
+                    raise serializers.ValidationError({"channels": "Hashtag channels require a non-empty hashtag."})
                 entry["mc_hashtag"] = tag[:64]
                 entry["name"] = tag[:100]
         return attrs

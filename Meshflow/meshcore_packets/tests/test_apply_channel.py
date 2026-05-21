@@ -3,9 +3,9 @@
 from unittest.mock import AsyncMock, patch
 
 from django.urls import reverse
-from rest_framework.test import APIClient
 
 import pytest
+from rest_framework.test import APIClient
 
 from common.feeder_ws import COMMAND_DISPATCH_UNAVAILABLE, FEEDER_BOT_NOT_CONNECTED
 from common.protocol import Protocol
@@ -60,14 +60,17 @@ def test_apply_returns_503_when_dispatch_fails(create_user, create_managed_node)
     client.force_authenticate(user=user)
     url = reverse("meshcore-apply-mc-channel-config", kwargs={"internal_id": node.internal_id})
 
-    with patch(
-        "meshcore_packets.views.feeder_ws_group_has_subscribers",
-        new_callable=AsyncMock,
-        return_value=True,
-    ), patch(
-        "meshcore_packets.views.dispatch_node_command",
-        new_callable=AsyncMock,
-        side_effect=RuntimeError("TCPTransport closed"),
+    with (
+        patch(
+            "meshcore_packets.views.feeder_ws_group_has_subscribers",
+            new_callable=AsyncMock,
+            return_value=True,
+        ),
+        patch(
+            "meshcore_packets.views.dispatch_node_command",
+            new_callable=AsyncMock,
+            side_effect=RuntimeError("TCPTransport closed"),
+        ),
     ):
         response = client.post(
             url,
@@ -99,14 +102,17 @@ def test_apply_dispatches_when_feeder_connected(create_user, create_managed_node
     client.force_authenticate(user=user)
     url = reverse("meshcore-apply-mc-channel-config", kwargs={"internal_id": node.internal_id})
 
-    with patch(
-        "meshcore_packets.views.feeder_ws_group_has_subscribers",
-        new_callable=AsyncMock,
-        return_value=True,
-    ), patch(
-        "meshcore_packets.views.dispatch_node_command",
-        new_callable=AsyncMock,
-    ) as dispatch_mock:
+    with (
+        patch(
+            "meshcore_packets.views.feeder_ws_group_has_subscribers",
+            new_callable=AsyncMock,
+            return_value=True,
+        ),
+        patch(
+            "meshcore_packets.views.dispatch_node_command",
+            new_callable=AsyncMock,
+        ) as dispatch_mock,
+    ):
         response = client.post(
             url,
             {
