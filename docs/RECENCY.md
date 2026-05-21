@@ -67,21 +67,29 @@ Implemented in
 | Radio / mesh | `ObservedNode.last_heard` (or `ManagedNode.radio_last_heard` proxy) | within **2 h** (aligned with `online_nodes` window) | code |
 
 `eligible_auto_traceroute_sources_queryset()` requires `allow_auto_traceroute`
-and `status.is_sending_data`; the status row is derived from recent
-`PacketObservation.upload_time` by the refresh task (same cutoff as the env
-var above). This is the **canonical** rule for whether a managed node may
-originate an auto or monitoring traceroute.
+and `status.is_sending_data`; the status row is derived from recent ingest
+upload time by the refresh task (same cutoff as the env var above). This is the
+**canonical** rule for whether a managed node may originate an auto or monitoring
+traceroute.
+
+**Protocol split (2026-05-21):** Meshtastic feeders use `PacketObservation`;
+MeshCore feeders use `MeshCorePacketObservation` (same `observer_id =
+ManagedNode.pk`). `radio_last_heard` / list `last_heard` join `ObservedNode` by
+`meshtastic_node_id` (MT) or `mc_pubkey` (MC). This fixes the MeshCore managed-nodes
+UI table; it does **not** implement hourly `StatsSnapshot` collection — see
+[#329](https://github.com/pskillen/meshflow-api/issues/329).
 
 ### Managed-node API annotations
 
-In `ManagedNodeViewSet` (see `Meshflow/nodes/views.py`):
+In `ManagedNodeViewSet` (see `Meshflow/nodes/views.py`), when `include=status`:
 
-| Annotation | Window | Source |
-| --- | --- | --- |
-| `packets_last_hour` | **1 h** | `PacketObservation.upload_time` |
-| `packets_last_24h` | **24 h** | `PacketObservation.upload_time` |
-| `last_packet_ingested_at` | snapshot | `ManagedNodeStatus.last_packet_ingested_at` |
-| `is_eligible_traceroute_source` | `allow_auto_traceroute` and `status.is_sending_data` | `ManagedNodeStatus` |
+| Annotation | Window | Meshtastic source | MeshCore source |
+| --- | --- | --- | --- |
+| `packets_last_hour` | **1 h** | `PacketObservation.upload_time` | `MeshCorePacketObservation.upload_time` |
+| `packets_last_24h` | **24 h** | `PacketObservation.upload_time` | `MeshCorePacketObservation.upload_time` |
+| `last_packet_ingested_at` | snapshot | `ManagedNodeStatus` (from MT observations) | `ManagedNodeStatus` (from MC observations) |
+| `radio_last_heard` | live | `ObservedNode.last_heard` via `meshtastic_node_id` | `ObservedNode.last_heard` via `mc_pubkey` |
+| `is_eligible_traceroute_source` | `allow_auto_traceroute` and `status.is_sending_data` | `ManagedNodeStatus` | same (MC TR not productised yet) |
 
 ### Managed-node status denormalization (`ManagedNodeStatus`)
 
@@ -89,17 +97,21 @@ The `ManagedNodeStatus` model (`Meshflow/nodes/models.py`) stores a **snapshot**
 feeder/API ingestion state per `ManagedNode` (one-to-one). It is **not** mesh RF
 liveness; that remains `ObservedNode.last_heard`.
 
-| Field | Meaning | Source |
-| --- | --- | --- |
-| `last_packet_ingested_at` | Latest ingest time for this observer | `Max(PacketObservation.upload_time)` for `observer_id = ManagedNode.pk` |
-| `is_sending_data` | Whether the observer is “currently feeding” per the same window as traceroute sources | `last_packet_ingested_at >= now - SCHEDULE_TRACEROUTE_SOURCE_RECENCY_SECONDS` (default **600 s**) |
-| `updated_at` | When the snapshot row was last written | set when the periodic task runs |
+| Field | Meaning | Meshtastic source | MeshCore source |
+| --- | --- | --- | --- |
+| `last_packet_ingested_at` | Latest ingest time for this observer | `Max(PacketObservation.upload_time)` | `Max(MeshCorePacketObservation.upload_time)` |
+| `is_sending_data` | Whether the observer is “currently feeding” per the same window as traceroute sources | `last_packet_ingested_at >= now - SCHEDULE_TRACEROUTE_SOURCE_RECENCY_SECONDS` (default **600 s**) | same rule |
+| `updated_at` | When the snapshot row was last written | set when the periodic task runs | same |
 
 The Celery task `nodes.tasks.update_managed_node_statuses` runs on a **5-minute**
 `django_celery_beat` interval (see `nodes` migration `0032_add_update_managed_node_statuses_periodic_task`).
 Managed-node `include=status` responses use this snapshot for ingest time and
-traceroute-source eligibility; packet-count fields remain live aggregates over
-`PacketObservation`.
+traceroute-source eligibility; packet-count fields are live aggregates over the
+protocol-appropriate observation table.
+
+**Not covered here (tracked separately):** hourly `StatsSnapshot` rows for dashboard
+/ `GET /api/stats/snapshots/` — still Meshtastic-only until
+[#329](https://github.com/pskillen/meshflow-api/issues/329) lands.
 
 ### `ObservedNodeViewSet.recent_counts`
 

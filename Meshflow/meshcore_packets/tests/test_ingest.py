@@ -31,6 +31,7 @@ WMF_RX_LOG_ENVELOPE = {
         "adv_timestamp": 1778101841,
         "adv_lat": 55.99578,
         "adv_lon": -4.09121,
+        "adv_type": 2,
     },
     "attributes": {"recv_time": 1778101899},
 }
@@ -98,6 +99,7 @@ def test_meshcore_rx_log_data_advert_ingest(ingest_client, meshcore_feeder):
     assert packet.event_type == "rx_log_data"
     node = ObservedNode.objects.get(protocol=Protocol.MESHCORE, mc_pubkey=WMF_PUBKEY)
     assert node.long_name == "WMF"
+    assert node.meshcore_adv_type == 2
     assert node.latest_status.latitude == pytest.approx(55.99578)
     assert node.latest_status.longitude == pytest.approx(-4.09121)
     assert Position.objects.filter(node=node).count() == 1

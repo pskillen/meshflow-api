@@ -1095,6 +1095,11 @@ components:
             Meshtastic Config.DeviceConfig.Role integer (RoleSource enum, e.g. CLIENT, ROUTER);
             null for MeshCore.
           nullable: true
+        meshcore_adv_type:
+          type: integer
+          description: >
+            MeshCore ADVERT adv_type (0=none, 1=chat, 2=repeater, 3=room server, 4=sensor); null when unknown.
+          nullable: true
         meshtastic_is_licensed:
           type: boolean
           description: Whether the Meshtastic node operator is a licensed ham radio operator

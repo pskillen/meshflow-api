@@ -7,6 +7,8 @@ from django.utils import timezone
 
 from celery import shared_task
 
+from common.protocol import Protocol
+from meshcore_packets.models import MeshCorePacketObservation
 from nodes.managed_node_liveness import schedule_traceroute_source_recency_seconds
 from nodes.models import ManagedNode, ManagedNodeStatus
 from packets.models import PacketObservation
@@ -15,7 +17,7 @@ from packets.models import PacketObservation
 @shared_task
 def update_managed_node_statuses():
     """
-    Bulk refresh ManagedNodeStatus from PacketObservation.upload_time.
+    Bulk refresh ManagedNodeStatus from PacketObservation and MeshCorePacketObservation upload_time.
 
     is_sending_data uses the same recency window as traceroute feeder eligibility
     (SCHEDULE_TRACEROUTE_SOURCE_RECENCY_SECONDS).
@@ -23,8 +25,13 @@ def update_managed_node_statuses():
     now = timezone.now()
     cutoff = now - timedelta(seconds=schedule_traceroute_source_recency_seconds())
 
-    last_by_observer = dict(
+    last_by_observer_mt = dict(
         PacketObservation.objects.values("observer_id").annotate(m=Max("upload_time")).values_list("observer_id", "m")
+    )
+    last_by_observer_mc = dict(
+        MeshCorePacketObservation.objects.values("observer_id")
+        .annotate(m=Max("upload_time"))
+        .values_list("observer_id", "m")
     )
 
     existing = {s.node_id: s for s in ManagedNodeStatus.objects.all()}
@@ -32,8 +39,11 @@ def update_managed_node_statuses():
     to_update = []
     sending_count = 0
 
-    for mn in ManagedNode.objects.filter(deleted_at__isnull=True).only("pk"):
-        last = last_by_observer.get(mn.pk)
+    for mn in ManagedNode.objects.filter(deleted_at__isnull=True).only("pk", "protocol"):
+        if mn.protocol == Protocol.MESHCORE:
+            last = last_by_observer_mc.get(mn.pk)
+        else:
+            last = last_by_observer_mt.get(mn.pk)
         is_sending = last is not None and last >= cutoff
         if is_sending:
             sending_count += 1
