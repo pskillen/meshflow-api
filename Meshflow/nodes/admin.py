@@ -51,7 +51,7 @@ MANAGED_NODE_COMMON_FIELDS = (
     "allow_auto_traceroute",
     "latlong",
 )
-MANAGED_NODE_CHANNEL_FIELDS = tuple(f"channel_{i}" for i in range(8))
+MANAGED_NODE_CHANNEL_FIELDS = tuple(f"meshtastic_channel_{i}" for i in range(8))
 
 
 class ProtocolListFilter(admin.SimpleListFilter):
