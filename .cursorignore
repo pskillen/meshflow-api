@@ -72,3 +72,6 @@ remote_db_dump.sql
 
 # Tailwind / CSS build artifact (if generated locally)
 tailwind.css
+
+# Secrets
+.env

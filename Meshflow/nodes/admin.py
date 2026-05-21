@@ -1,17 +1,25 @@
 from django import forms
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.contrib.admin.widgets import FilteredSelectMultiple
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
+from django.utils.html import format_html, format_html_join
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 
+from common.feeder_ws import COMMAND_DISPATCH_UNAVAILABLE, FEEDER_BOT_NOT_CONNECTED
+from common.mc_channel_labels import (
+    managed_node_mc_channels_queryset,
+    mc_channel_admin_label,
+    mc_channel_type_name,
+)
 from common.mesh_node_helpers import (
     meshtastic_hex_to_int,
     meshtastic_id_to_hex,
     observed_node_search_conditions,
 )
 from common.protocol import Protocol
+from meshcore_packets.services.channel_apply import apply_mc_channels_to_feeder
 
 from .models import ManagedNode, ManagedNodeStatus, NodeAPIKey, NodeAuth, NodeLatestStatus, ObservedNode
 
@@ -443,9 +451,49 @@ class ManagedNodeAdminForm(forms.ModelForm):
         return super().save(commit=commit)
 
 
+@admin.action(description=_("Push MC channel config to feeder device"))
+def push_mc_channels_to_feeder(modeladmin, request, queryset):
+    for node in queryset:
+        if node.protocol != Protocol.MESHCORE:
+            modeladmin.message_user(
+                request,
+                _("%(name)s is not a MeshCore feeder.") % {"name": node.name},
+                level=messages.WARNING,
+            )
+            continue
+        channel_count = managed_node_mc_channels_queryset(node).count()
+        if channel_count == 0:
+            modeladmin.message_user(
+                request,
+                _("%(name)s has no synced MC channels to push.") % {"name": node.name},
+                level=messages.WARNING,
+            )
+            continue
+        result = apply_mc_channels_to_feeder(node)
+        if result == FEEDER_BOT_NOT_CONNECTED:
+            modeladmin.message_user(
+                request,
+                _("%(name)s: feeder bot not connected via WebSocket.") % {"name": node.name},
+                level=messages.ERROR,
+            )
+        elif result == COMMAND_DISPATCH_UNAVAILABLE:
+            modeladmin.message_user(
+                request,
+                _("%(name)s: could not dispatch to channel layer.") % {"name": node.name},
+                level=messages.ERROR,
+            )
+        else:
+            modeladmin.message_user(
+                request,
+                _("%(name)s: pushed %(count)s channel(s) to feeder.") % {"name": node.name, "count": channel_count},
+                level=messages.SUCCESS,
+            )
+
+
 @admin.register(ManagedNode)
 class ManagedNodeAdmin(admin.ModelAdmin):
     form = ManagedNodeAdminForm
+    actions = [push_mc_channels_to_feeder]
     list_display = (
         "protocol",
         "meshtastic_node_id",
@@ -453,6 +501,8 @@ class ManagedNodeAdmin(admin.ModelAdmin):
         "name",
         "owner",
         "constellation",
+        "mc_channel_count",
+        "mc_channels_synced_at",
         "allow_auto_traceroute",
         "status_is_sending_data",
         "status_last_packet_ingested_at",
@@ -468,6 +518,7 @@ class ManagedNodeAdmin(admin.ModelAdmin):
     search_fields = (
         "meshtastic_node_id",
         "name",
+        "mc_pubkey",
         "owner__username",
         "owner__email",
     )
@@ -496,10 +547,46 @@ class ManagedNodeAdmin(admin.ModelAdmin):
     def display_id(self, obj):
         return obj.node_id_str
 
+    @admin.display(description=_("MC channels"))
+    def mc_channel_count(self, obj):
+        if obj.protocol != Protocol.MESHCORE:
+            return "—"
+        return obj.mc_channels.count()
+
+    @admin.display(description=_("Device channels (read-only)"))
+    def mc_channels_mirror(self, obj):
+        if obj is None or obj.protocol != Protocol.MESHCORE:
+            return "—"
+        rows = list(managed_node_mc_channels_queryset(obj))
+        if not rows:
+            return format_html(
+                "<p><em>{}</em></p>",
+                _("No channels synced from device yet. Connect the bot to populate this mirror."),
+            )
+        row_html = format_html_join(
+            "",
+            "<tr><td>{}</td><td>{}</td><td><strong>{}</strong></td></tr>",
+            (
+                (
+                    ch.mc_channel_idx if ch.mc_channel_idx is not None else "—",
+                    mc_channel_type_name(ch),
+                    mc_channel_admin_label(ch),
+                )
+                for ch in rows
+            ),
+        )
+        return format_html(
+            "<table><thead><tr><th>{}</th><th>{}</th><th>{}</th></tr></thead><tbody>{}</tbody></table>",
+            _("Slot"),
+            _("Type"),
+            _("Label"),
+            row_html,
+        )
+
     def get_readonly_fields(self, request, obj=None):
         if obj and obj.protocol == Protocol.MESHCORE:
-            return ("display_id",)
-        return ()
+            return ("display_id", "mc_channels_mirror", "mc_channels_synced_at")
+        return ("mc_channels_synced_at",)
 
     def get_fieldsets(self, request, obj=None):
         common = (_("Feeder"), {"fields": MANAGED_NODE_COMMON_FIELDS})
@@ -512,8 +599,20 @@ class ManagedNodeAdmin(admin.ModelAdmin):
             },
         )
         if obj and obj.protocol == Protocol.MESHCORE:
-            mc_fields = (_("MeshCore identity"), {"fields": ("mc_pubkey", "display_id")})
-            return (common, mc_fields)
+            mc_identity = (_("MeshCore identity"), {"fields": ("mc_pubkey", "display_id")})
+            mc_channels = (
+                _("MeshCore channels (device mirror)"),
+                {
+                    "fields": ("mc_channels_mirror", "mc_channels_synced_at"),
+                    "description": _(
+                        "Read-only snapshot from the feeder device (bot channel sync). "
+                        "Edit constellation channel definitions under MeshCore channels, "
+                        "then use the admin action “Push MC channel config to feeder device” "
+                        "to apply this mirror to the radio."
+                    ),
+                },
+            )
+            return (common, mc_identity, mc_channels)
         return (common, channels)
 
 

@@ -31,9 +31,16 @@ class NodeConsumer(AsyncWebsocketConsumer):
             await self.close()
             return
 
-        managed_node = await self._validate_api_key(api_key)
+        feeder_pubkey_prefix = query_params.get("feeder_pubkey_prefix")
+        managed_node = await self._validate_api_key(
+            api_key,
+            feeder_pubkey_prefix=feeder_pubkey_prefix,
+        )
         if not managed_node:
-            logger.warning("NodeConsumer: invalid or inactive api_key")
+            logger.warning(
+                "NodeConsumer: invalid api_key or feeder_pubkey_prefix=%s",
+                feeder_pubkey_prefix,
+            )
             await self.close()
             return
 
@@ -45,7 +52,9 @@ class NodeConsumer(AsyncWebsocketConsumer):
         await self.channel_layer.group_add(self.node_group, self.channel_name)
         await self.accept()
         logger.info(
-            f"NodeConsumer: bot connected for node {managed_node.meshtastic_node_id} ({managed_node.node_id_str})"
+            "NodeConsumer: bot connected for %s group=%s",
+            managed_node.node_id_str,
+            self.node_group,
         )
 
     async def disconnect(self, close_code):
@@ -65,8 +74,13 @@ class NodeConsumer(AsyncWebsocketConsumer):
         await self.send(text_data=json.dumps(command))
 
     @database_sync_to_async
-    def _validate_api_key(self, api_key):
-        """Validate NodeAPIKey and return the first linked ManagedNode, or None."""
+    def _validate_api_key(self, api_key, feeder_pubkey_prefix=None):
+        """Validate NodeAPIKey and return the linked ManagedNode, or None."""
+        from common.meshcore_feeder_auth import (
+            MeshCoreFeederResolutionError,
+            resolve_meshcore_feeder,
+        )
+        from common.protocol import Protocol
         from nodes.models import NodeAPIKey, NodeAuth
 
         try:
@@ -74,13 +88,44 @@ class NodeConsumer(AsyncWebsocketConsumer):
             key_obj.last_used = timezone.now()
             key_obj.save(update_fields=["last_used"])
 
-            node_auth = NodeAuth.objects.filter(api_key=key_obj).select_related("node").first()
-            if node_auth:
-                return node_auth.node
+            if feeder_pubkey_prefix:
+                try:
+                    return resolve_meshcore_feeder(
+                        api_key=key_obj,
+                        feeder_pubkey_prefix=feeder_pubkey_prefix,
+                    )
+                except MeshCoreFeederResolutionError:
+                    return None
+
+            auths = list(
+                NodeAuth.objects.filter(
+                    api_key=key_obj,
+                    node__deleted_at__isnull=True,
+                ).select_related("node")
+            )
+            if not auths:
+                return None
+
+            mc_auths = [a for a in auths if a.node.protocol == Protocol.MESHCORE]
+            if len(mc_auths) > 1:
+                logger.warning(
+                    "NodeConsumer: API key linked to %s MC feeders; " "pass feeder_pubkey_prefix on ws/nodes/",
+                    len(mc_auths),
+                )
+                return None
+            if len(mc_auths) == 1:
+                return mc_auths[0].node
+
+            if len(auths) > 1:
+                logger.warning(
+                    "NodeConsumer: API key linked to %s nodes; use feeder_pubkey_prefix for MC",
+                    len(auths),
+                )
+            return auths[0].node
         except NodeAPIKey.DoesNotExist:
             pass
         except Exception as e:
-            logger.exception(f"NodeConsumer: error validating api_key: {e}")
+            logger.exception("NodeConsumer: error validating api_key: %s", e)
         return None
 
 

@@ -4,13 +4,17 @@ from rest_framework import serializers
 
 from constellations.models import MeshCoreChannelType, MessageChannel
 
+# Wire/API strings (not gettext labels — lazy __proxy__ breaks Channels msgpack).
+MC_CHANNEL_TYPE_API_CHOICES = [
+    ("PUBLIC", "PUBLIC"),
+    ("HASHTAG", "HASHTAG"),
+]
+
 
 class McChannelSnapshotEntrySerializer(serializers.Serializer):
     mc_channel_idx = serializers.IntegerField(min_value=0, max_value=63)
     name = serializers.CharField(max_length=100)
-    mc_channel_type = serializers.ChoiceField(
-        choices=[(c.label, c.label) for c in MeshCoreChannelType],
-    )
+    mc_channel_type = serializers.ChoiceField(choices=MC_CHANNEL_TYPE_API_CHOICES)
     mc_hashtag = serializers.CharField(max_length=64, required=False, allow_null=True, allow_blank=True)
 
 
@@ -35,15 +39,13 @@ class MessageChannelMcSerializer(serializers.ModelSerializer):
     def get_mc_channel_type(self, obj):
         if obj.mc_channel_type is None:
             return None
-        return MeshCoreChannelType(obj.mc_channel_type).label
+        return MeshCoreChannelType(obj.mc_channel_type).name
 
 
 class McChannelApplyEntrySerializer(serializers.Serializer):
     mc_channel_idx = serializers.IntegerField(min_value=0, max_value=63, required=False)
     name = serializers.CharField(max_length=100)
-    mc_channel_type = serializers.ChoiceField(
-        choices=[(c.label, c.label) for c in MeshCoreChannelType],
-    )
+    mc_channel_type = serializers.ChoiceField(choices=MC_CHANNEL_TYPE_API_CHOICES)
     mc_hashtag = serializers.CharField(max_length=64, required=False, allow_null=True, allow_blank=True)
 
 
@@ -53,7 +55,7 @@ class McChannelApplySerializer(serializers.Serializer):
     def validate(self, attrs):
         channels = attrs.get("channels") or []
         for entry in channels:
-            if entry.get("mc_channel_type") == MeshCoreChannelType.HASHTAG.label:
+            if str(entry.get("mc_channel_type")).upper() == "HASHTAG":
                 tag = (entry.get("mc_hashtag") or entry.get("name") or "").strip().lstrip("#")
                 if not tag:
                     raise serializers.ValidationError({"channels": "Hashtag channels require a non-empty hashtag."})

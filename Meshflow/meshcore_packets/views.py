@@ -4,18 +4,11 @@ import logging
 
 from django.utils import timezone
 
-from asgiref.sync import async_to_sync
 from rest_framework import generics, permissions, serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from common.feeder_ws import (
-    COMMAND_DISPATCH_UNAVAILABLE,
-    FEEDER_BOT_NOT_CONNECTED,
-    dispatch_node_command,
-    feeder_ws_group_has_subscribers,
-)
-from common.ws_groups import managed_node_ws_group
+from common.feeder_ws import COMMAND_DISPATCH_UNAVAILABLE, FEEDER_BOT_NOT_CONNECTED
 from meshcore_packets.models import MeshCoreRawPacket, MeshCoreTextPacket
 from meshcore_packets.permissions import MeshCoreFeederPermission
 from meshcore_packets.serializers import MeshCorePacketIngestSerializer, MeshCorePacketListSerializer
@@ -24,6 +17,7 @@ from meshcore_packets.serializers_channel import (
     McChannelSyncSerializer,
     MessageChannelMcSerializer,
 )
+from meshcore_packets.services.channel_apply import apply_mc_channels_to_feeder
 from meshcore_packets.services.channel_sync import reconcile_mc_channels
 from meshcore_packets.signals import meshcore_packet_received, meshcore_text_packet_received
 from nodes.authentication import NodeAPIKeyAuthentication
@@ -177,34 +171,6 @@ class MeshCoreMcChannelSyncView(APIView):
         )
 
 
-def _dispatch_mc_channel_apply(managed_node: ManagedNode, channels: list[dict]) -> str:
-    """Dispatch apply_mc_channel_config. Returns ``sent`` or an error code string."""
-    group = managed_node_ws_group(managed_node)
-
-    async def _check_and_send() -> str:
-        try:
-            if not await feeder_ws_group_has_subscribers(group):
-                return FEEDER_BOT_NOT_CONNECTED
-        except Exception as exc:
-            logger.exception("MC channel apply: feeder presence check failed: %s", exc)
-            return COMMAND_DISPATCH_UNAVAILABLE
-
-        try:
-            await dispatch_node_command(
-                group,
-                {
-                    "type": "apply_mc_channel_config",
-                    "channels": channels,
-                },
-            )
-        except Exception as exc:
-            logger.exception("MC channel apply: group_send failed: %s", exc)
-            return COMMAND_DISPATCH_UNAVAILABLE
-        return "sent"
-
-    return async_to_sync(_check_and_send)()
-
-
 class ManagedNodeMcChannelApplyView(APIView):
     """POST desired MC channels; pushes apply_mc_channel_config to connected feeder bot."""
 
@@ -224,13 +190,15 @@ class ManagedNodeMcChannelApplyView(APIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         channels = serializer.validated_data["channels"]
-        result = _dispatch_mc_channel_apply(managed_node, channels)
+        result = apply_mc_channels_to_feeder(managed_node, channels)
         if result == FEEDER_BOT_NOT_CONNECTED:
             return Response(
                 {
                     "detail": (
                         "Feeder bot is not connected via WebSocket. "
-                        "Start the bot with MESHCORE_UPLOAD_ENABLED and MESHFLOW_WS_URL configured."
+                        "Start the bot with MESHCORE_UPLOAD_ENABLED and MESHFLOW_WS_URL configured. "
+                        "For shared API keys, the bot must connect with "
+                        "feeder_pubkey_prefix in the WebSocket URL (same 12-hex prefix as ingest)."
                     ),
                     "code": FEEDER_BOT_NOT_CONNECTED,
                 },

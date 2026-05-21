@@ -99,3 +99,12 @@ class MessageChannel(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class MeshCoreMessageChannel(MessageChannel):
+    """Proxy for Django admin: MeshCore channel rows only."""
+
+    class Meta:
+        proxy = True
+        verbose_name = _("MeshCore channel")
+        verbose_name_plural = _("MeshCore channels")

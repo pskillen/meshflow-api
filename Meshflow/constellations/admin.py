@@ -3,7 +3,15 @@ from django.contrib import admin
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 
-from .models import Constellation, ConstellationUserMembership, MessageChannel
+from common.mc_channel_labels import mc_channel_admin_label, mc_channel_type_name
+from common.protocol import Protocol
+
+from .models import (
+    Constellation,
+    ConstellationUserMembership,
+    MeshCoreMessageChannel,
+    MessageChannel,
+)
 
 
 class ConstellationAdminForm(forms.ModelForm):
@@ -126,11 +134,61 @@ class ConstellationUserMembershipAdmin(admin.ModelAdmin):
 
 @admin.register(MessageChannel)
 class MessageChannelAdmin(admin.ModelAdmin):
-    list_display = ("id", "name", "protocol", "mc_channel_idx", "constellation")
+    """Meshtastic and legacy rows; MeshCore operators should use MeshCore channels."""
+
+    list_display = ("id", "name", "protocol", "constellation")
     list_filter = (
         ("protocol", admin.ChoicesFieldListFilter),
         "constellation",
-        ("mc_channel_idx", admin.EmptyFieldListFilter),
     )
-    search_fields = ("name", "id")
-    ordering = ("name",)
+    search_fields = ("name", "id", "constellation__name")
+    ordering = ("constellation__name", "name")
+    list_select_related = ("constellation",)
+
+
+@admin.register(MeshCoreMessageChannel)
+class MeshCoreMessageChannelAdmin(admin.ModelAdmin):
+    """Constellation MC channel catalog (device slots). Push to radio from Managed node admin."""
+
+    list_display = (
+        "mc_channel_idx",
+        "admin_label",
+        "mc_channel_type_display",
+        "constellation",
+        "id",
+    )
+    list_filter = (
+        ("mc_channel_type", admin.ChoicesFieldListFilter),
+        "constellation",
+    )
+    search_fields = ("name", "mc_hashtag", "constellation__name")
+    ordering = ("constellation__name", "mc_channel_idx")
+    list_select_related = ("constellation",)
+    fieldsets = (
+        (None, {"fields": ("constellation", "mc_channel_idx")}),
+        (
+            _("Channel"),
+            {
+                "fields": ("name", "mc_channel_type", "mc_hashtag"),
+                "description": _(
+                    "PUBLIC channels use a plain name. HASHTAG channels use mc_hashtag "
+                    "(no leading #); lists show #prefix for hashtags."
+                ),
+            },
+        ),
+    )
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).filter(protocol=Protocol.MESHCORE)
+
+    def save_model(self, request, obj, form, change):
+        obj.protocol = Protocol.MESHCORE
+        super().save_model(request, obj, form, change)
+
+    @admin.display(description=_("Label"), ordering="name")
+    def admin_label(self, obj):
+        return mc_channel_admin_label(obj)
+
+    @admin.display(description=_("Type"), ordering="mc_channel_type")
+    def mc_channel_type_display(self, obj):
+        return mc_channel_type_name(obj)
