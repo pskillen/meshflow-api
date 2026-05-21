@@ -2,7 +2,6 @@
 
 from datetime import timedelta
 
-from django.urls import reverse
 from django.utils import timezone
 
 import pytest
@@ -11,6 +10,7 @@ from rest_framework.test import APIClient
 from common.protocol import Protocol
 from meshcore_packets.models import MeshCoreRawPacket
 from meshcore_packets.services.channel_sync import reconcile_mc_channels
+from meshcore_packets.tests.conftest import FEEDER_MC_PUBKEY_PREFIX, feeder_url
 from nodes.models import MeshCoreLocationSource, NodeAuth, ObservedNode, Position
 from text_messages.models import TextMessage
 
@@ -58,7 +58,7 @@ def test_meshcore_advert_ingest_creates_packet_and_node(ingest_client, meshcore_
         "adv_lon": -4.2,
         "raw": {"public_key": FULL_PUBKEY},
     }
-    url = reverse("meshcore-packet-ingest")
+    url = feeder_url("meshcore-feeder-packet-ingest", FEEDER_MC_PUBKEY_PREFIX)
     response = ingest_client.post(url, payload, format="json")
     assert response.status_code == 201
     assert MeshCoreRawPacket.objects.filter(pkt_hash=12345).exists()
@@ -91,7 +91,7 @@ def test_meshcore_rx_log_data_advert_ingest(ingest_client, meshcore_feeder):
             "attributes": WMF_RX_LOG_ENVELOPE["attributes"],
         },
     }
-    url = reverse("meshcore-packet-ingest")
+    url = feeder_url("meshcore-feeder-packet-ingest", FEEDER_MC_PUBKEY_PREFIX)
     response = ingest_client.post(url, payload, format="json")
     assert response.status_code == 201
     packet = MeshCoreRawPacket.objects.get(pkt_hash=3654312717)
@@ -127,7 +127,7 @@ def test_meshcore_rx_log_data_advert_nested_coords_only(ingest_client, meshcore_
             "attributes": {},
         },
     }
-    url = reverse("meshcore-packet-ingest")
+    url = feeder_url("meshcore-feeder-packet-ingest", FEEDER_MC_PUBKEY_PREFIX)
     response = ingest_client.post(url, payload, format="json")
     assert response.status_code == 201
     node = ObservedNode.objects.get(protocol=Protocol.MESHCORE, mc_pubkey=WMF_PUBKEY)
@@ -140,7 +140,7 @@ def test_meshcore_advertisement_without_coords_no_position(ingest_client, meshco
     """advertisement events without adv_lat/adv_lon create identity only."""
     now = timezone.now()
     pubkey = "d" * 64
-    url = reverse("meshcore-packet-ingest")
+    url = feeder_url("meshcore-feeder-packet-ingest", FEEDER_MC_PUBKEY_PREFIX)
     ingest_client.post(
         url,
         {
@@ -194,7 +194,7 @@ def test_meshcore_channel_text_creates_text_message(ingest_client, meshcore_feed
         "text": "mesh hello",
         "raw": {},
     }
-    url = reverse("meshcore-packet-ingest")
+    url = feeder_url("meshcore-feeder-packet-ingest", FEEDER_MC_PUBKEY_PREFIX)
     response = ingest_client.post(url, payload, format="json")
     assert response.status_code == 201
     assert TextMessage.objects.filter(message_text="mesh hello").exists()
@@ -216,7 +216,7 @@ def test_meshcore_contact_text_ingest(ingest_client):
         "channel_idx": 0,
         "raw": {},
     }
-    url = reverse("meshcore-packet-ingest")
+    url = feeder_url("meshcore-feeder-packet-ingest", FEEDER_MC_PUBKEY_PREFIX)
     response = ingest_client.post(url, payload, format="json")
     assert response.status_code == 201
     assert ObservedNode.objects.filter(protocol=Protocol.MESHCORE, mc_pubkey_prefix=PREFIX).exists()
@@ -233,7 +233,7 @@ def test_meshcore_dedup_returns_existing(ingest_client):
         "rx_time": now.timestamp(),
         "raw": {},
     }
-    url = reverse("meshcore-packet-ingest")
+    url = feeder_url("meshcore-feeder-packet-ingest", FEEDER_MC_PUBKEY_PREFIX)
     r1 = ingest_client.post(url, payload, format="json")
     r2 = ingest_client.post(url, payload, format="json")
     assert r1.status_code == 201
@@ -248,7 +248,7 @@ def test_meshcore_ingest_requires_mc_feeder(create_managed_node, create_node_api
     NodeAuth.objects.create(api_key=api_key, node=mt_node)
     client = APIClient()
     client.credentials(HTTP_X_API_KEY=api_key.key)
-    url = reverse("meshcore-packet-ingest")
+    url = feeder_url("meshcore-feeder-packet-ingest", FEEDER_MC_PUBKEY_PREFIX)
     response = client.post(
         url,
         {

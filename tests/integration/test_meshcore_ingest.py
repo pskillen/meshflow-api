@@ -12,13 +12,22 @@ import requests
 
 API_URL = os.environ.get("MESHFLOW_API_URL", "http://localhost:8000").rstrip("/")
 MC_API_KEY = os.environ.get("MESHFLOW_MC_API_KEY", "")
+MC_FEEDER_PREFIX = os.environ.get("MESHFLOW_MC_FEEDER_PREFIX", "")
 
 FULL_PUBKEY = "c" * 64
 PREFIX = "c" * 12
 
 
+def _feeder_ingest_url() -> str:
+    prefix = MC_FEEDER_PREFIX or PREFIX
+    return f"{API_URL}/api/meshcore/feeders/{prefix}/packets/ingest/"
+
+
 @pytest.mark.integration
-@pytest.mark.skipif(not MC_API_KEY, reason="Set MESHFLOW_MC_API_KEY to a MeshCore feeder key")
+@pytest.mark.skipif(
+    not MC_API_KEY or not (MC_FEEDER_PREFIX or PREFIX),
+    reason="Set MESHFLOW_MC_API_KEY and MESHFLOW_MC_FEEDER_PREFIX (or use default test prefix)",
+)
 def test_meshcore_advert_ingest_round_trip():
     """POST advert envelope; expect 201 and retrievable packet list (staff JWT optional)."""
     payload = {
@@ -34,7 +43,7 @@ def test_meshcore_advert_ingest_round_trip():
         "raw": {"public_key": FULL_PUBKEY},
     }
     headers = {"X-API-Key": MC_API_KEY}
-    url = f"{API_URL}/api/meshcore/packets/ingest/"
+    url = _feeder_ingest_url()
     response = requests.post(url, json=payload, headers=headers, timeout=30)
     assert response.status_code in (201, 200), response.text
     body = response.json()
@@ -43,7 +52,10 @@ def test_meshcore_advert_ingest_round_trip():
 
 
 @pytest.mark.integration
-@pytest.mark.skipif(not MC_API_KEY, reason="Set MESHFLOW_MC_API_KEY to a MeshCore feeder key")
+@pytest.mark.skipif(
+    not MC_API_KEY or not (MC_FEEDER_PREFIX or PREFIX),
+    reason="Set MESHFLOW_MC_API_KEY and MESHFLOW_MC_FEEDER_PREFIX (or use default test prefix)",
+)
 def test_meshcore_rx_log_data_advert_ingest_round_trip():
     """POST rx_log_data ADVERT envelope; expect 201."""
     payload = {
@@ -68,7 +80,7 @@ def test_meshcore_rx_log_data_advert_ingest_round_trip():
         },
     }
     headers = {"X-API-Key": MC_API_KEY}
-    url = f"{API_URL}/api/meshcore/packets/ingest/"
+    url = _feeder_ingest_url()
     response = requests.post(url, json=payload, headers=headers, timeout=30)
     assert response.status_code in (201, 200), response.text
     body = response.json()
