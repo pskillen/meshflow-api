@@ -1,6 +1,5 @@
 """Tests for MC channel sync and resolve_mc_channel."""
 
-from django.urls import reverse
 from django.utils import timezone
 
 import pytest
@@ -10,6 +9,7 @@ from common.protocol import Protocol
 from constellations.models import MeshCoreChannelType, MessageChannel
 from meshcore_packets.services.channel import resolve_mc_channel
 from meshcore_packets.services.channel_sync import reconcile_mc_channels
+from meshcore_packets.tests.conftest import FEEDER_MC_PUBKEY_PREFIX, feeder_url
 
 
 @pytest.fixture
@@ -72,7 +72,7 @@ def test_reconcile_updates_name_on_resync(meshcore_feeder):
 
 @pytest.mark.django_db
 def test_mc_channel_sync_endpoint(sync_client, meshcore_feeder):
-    url = reverse("meshcore-mc-channel-sync")
+    url = feeder_url("meshcore-feeder-mc-channel-sync", FEEDER_MC_PUBKEY_PREFIX)
     response = sync_client.post(
         url,
         {

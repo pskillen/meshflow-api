@@ -2,8 +2,10 @@
 
 import logging
 
+from django.utils import timezone
+
 from asgiref.sync import async_to_sync
-from rest_framework import generics, permissions, status
+from rest_framework import generics, permissions, serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -30,13 +32,62 @@ from nodes.models import ManagedNode
 logger = logging.getLogger(__name__)
 
 
-class MeshCorePacketIngestView(APIView):
-    """POST ingest for MeshCore feeder bots (API key auth, no URL node id)."""
+class MeshCoreFeederBotVersionSerializer(serializers.Serializer):
+    """Body for feeder-reported meshflow-bot version."""
+
+    bot_version = serializers.CharField(max_length=128, trim_whitespace=True)
+
+
+class MeshCoreFeederBotVersionView(APIView):
+    """Update bot_version for the MeshCore feeder identified in the URL prefix."""
 
     authentication_classes = [NodeAPIKeyAuthentication]
     permission_classes = [MeshCoreFeederPermission]
 
-    def post(self, request, format=None):
+    def put(self, request, feeder_pubkey_prefix, format=None):
+        return self._update(request)
+
+    def post(self, request, feeder_pubkey_prefix, format=None):
+        return self._update(request)
+
+    def patch(self, request, feeder_pubkey_prefix, format=None):
+        return self._update(request)
+
+    def _update(self, request):
+        managed_node = request.auth.node
+        serializer = MeshCoreFeederBotVersionSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        bot_version = serializer.validated_data["bot_version"]
+        if not bot_version:
+            return Response(
+                {"bot_version": ["This field may not be blank."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        now = timezone.now()
+        managed_node.bot_version = bot_version
+        managed_node.bot_version_reported_at = now
+        managed_node.save(update_fields=["bot_version", "bot_version_reported_at"])
+
+        return Response(
+            {
+                "status": "success",
+                "bot_version": managed_node.bot_version,
+                "bot_version_reported_at": managed_node.bot_version_reported_at,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class MeshCorePacketIngestView(APIView):
+    """POST ingest for MeshCore feeder bots (API key + feeder pubkey prefix in URL)."""
+
+    authentication_classes = [NodeAPIKeyAuthentication]
+    permission_classes = [MeshCoreFeederPermission]
+
+    def post(self, request, feeder_pubkey_prefix, format=None):
         if request.data.get("encrypted"):
             return Response(
                 {"status": "success", "message": "Encrypted packet skipped"},
@@ -100,7 +151,7 @@ class MeshCoreMcChannelSyncView(APIView):
     authentication_classes = [NodeAPIKeyAuthentication]
     permission_classes = [MeshCoreFeederPermission]
 
-    def post(self, request, format=None):
+    def post(self, request, feeder_pubkey_prefix, format=None):
         managed_node = request.auth.node
         serializer = McChannelSyncSerializer(data=request.data)
         if not serializer.is_valid():

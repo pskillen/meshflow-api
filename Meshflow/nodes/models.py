@@ -64,6 +64,16 @@ class ManagedNode(models.Model):
         db_index=True,
         help_text=_("Mesh protocol for this managed node (constellation must match)."),
     )
+    mc_pubkey = models.CharField(
+        max_length=64,
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text=_(
+            "MeshCore feeder device pubkey (64-char lowercase hex). "
+            "Required when multiple feeders share a constellation API key."
+        ),
+    )
     owner = models.ForeignKey(
         "users.User",
         on_delete=models.CASCADE,
@@ -182,11 +192,22 @@ class ManagedNode(models.Model):
 
         verbose_name = _("Managed node")
         verbose_name_plural = _("Managed nodes")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["constellation", "mc_pubkey"],
+                condition=models.Q(protocol=Protocol.MESHCORE) & models.Q(mc_pubkey__isnull=False),
+                name="managednode_unique_mc_pubkey_per_constellation",
+            ),
+        ]
 
     @property
     def node_id_str(self) -> str:
         """Protocol-aware display id (not a DB column)."""
         if self.protocol == Protocol.MESHCORE:
+            if self.mc_pubkey:
+                from common.meshcore_node_helpers import pubkey_to_prefix
+
+                return f"mc:{pubkey_to_prefix(self.mc_pubkey)}"
             return f"mc:feeder:{self.internal_id.hex[:12]}"
         return meshtastic_id_to_hex(self.meshtastic_node_id)
 

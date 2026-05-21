@@ -4,55 +4,49 @@ Manual steps to create the first MeshCore feeder so `meshflow-bot` can upload pa
 
 ## Prerequisites
 
-- meshflow-api running with Phase 1 migrations applied (`nodes.0036`, `meshcore_packets.0001`)
+- meshflow-api running with Phase 1 migrations applied (`nodes.0036`, `meshcore_packets.0001`, `nodes.0047` for `mc_pubkey`)
 - Django admin access
 - A **MeshCore** constellation (or create one with `protocol=MeshCore`)
 
 ## How the API knows which feeder is uploading
 
-This differs from Meshtastic. You do **not** need an `ObservedNode` row for the feeder, and for MeshCore the API does **not** match the bot’s radio identity to `ManagedNode.node_id`.
+MeshCore uses the same pattern as Meshtastic: **device identity in the URL**, plus the Node API key.
 
-| | **Meshtastic** | **MeshCore (Phase 1)** |
+| | **Meshtastic** | **MeshCore** |
 | --- | --- | --- |
-| **Ingest URL** | `POST /api/packets/{node_id}/ingest/` | `POST /api/meshcore/packets/ingest/` (no `{node_id}` in the path) |
-| **What the bot sends** | `node_id` in the URL = device `my_nodenum` (decimal Meshtastic id) | API key header only (`X-API-Key` or `Authorization: Token …`) |
-| **How the API picks the observer** | `NodeAuth` must link the key to the `ManagedNode` whose **`node_id`** equals the URL segment | `NodeAuth` must link the key to the **MeshCore** `ManagedNode`; permission loads that row as `request.auth.node` |
-| **`ManagedNode.node_id`** | Must match the radio (same number the bot puts in the URL) | Placeholder **`0`** only; **not** used for ingest auth |
-| **Payload `from_pubkey` / `from`** | Packet **sender** on the mesh (separate from observer) | Remote node identity in the heard packet; **not** the feeder’s own pubkey |
-| **ObservedNode for feeder** | Often exists from node-info traffic; not what authenticates ingest | **Not required** for upload |
+| **Ingest URL** | `POST /api/packets/{node_id}/ingest/` | `POST /api/meshcore/feeders/{feeder_pubkey_prefix}/packets/ingest/` |
+| **Channel sync** | — | `POST /api/meshcore/feeders/{feeder_pubkey_prefix}/mc-channel-sync/` |
+| **Bot version** | `PUT /api/packets/{node_id}/bot-version/` | `PUT /api/meshcore/feeders/{feeder_pubkey_prefix}/bot-version/` |
+| **What the bot sends** | `node_id` in URL = device nodenum | **12-hex pubkey prefix** in URL (from `mc:` id after connect) |
+| **Optional header** | — | `X-MeshCore-Feeder-Pubkey` (64 hex) must match `ManagedNode.mc_pubkey` when set |
+| **How the API picks the observer** | `NodeAuth` + URL `node_id` | `NodeAuth` + URL prefix matches `pubkey_to_prefix(mc_pubkey)` |
+| **`ManagedNode.meshtastic_node_id`** | Must match the radio | Placeholder **`0`** only |
+| **Payload `from_pubkey`** | Packet sender on the mesh | Remote node in the heard packet; not the feeder |
 
-**MeshCore bot behaviour:** `meshflow-bot` with `RADIO_PROTOCOL=meshcore` has `my_nodenum = None` and posts to a fixed ingest path. Locally it may know `mc:<12-hex-prefix>` after connect (`MeshCoreRadio.local_node_id`), but Phase 1 **does not** send that on the ingest request. The API never compares the upload to an `ObservedNode` or to `ManagedNode.node_id`.
+**Shared constellation API keys:** multiple MeshCore feeders may use the same `NodeAPIKey` if each `ManagedNode` has a distinct **`mc_pubkey`** (full 64-hex from bot logs). The bot disambiguates via the URL prefix, like Meshtastic `{node_id}`.
 
-**What you must configure:** a **`NodeAPIKey`** and exactly **one** **`NodeAuth`** row tying that key to the MeshCore **`ManagedNode`** from step 1. If the key is not linked, ingest returns **403**. If the key is linked to **multiple** nodes, MeshCore ingest can fail (`NodeAuth.objects.get(api_key=…)` expects a single row).
+**403 codes** (JSON `detail` + `code`): `feeder_not_linked`, `feeder_identity_ambiguous`, `feeder_pubkey_mismatch`, `feeder_pubkey_not_configured`.
 
-**Shared API keys (known Phase 1 gap):** Meshtastic ingest supports one key linked to many `ManagedNode`s because each bot disambiguates the observer via `{node_id}` in the URL. MeshCore ingest has no URL segment and no feeder pubkey in the body yet, so a shared constellation key cannot identify which feeder uploaded. **Use one API key per MC feeder** until ingest carries feeder identity (e.g. `ManagedNode.mc_pubkey` — see Future below). This is stricter than the Meshtastic shared-key pattern in [`docs/API_KEYS.md`](../../API_KEYS.md).
-
-**Meshtastic pitfall (for comparison):** if `ManagedNode.node_id` in admin does not match the bot’s device id, or `NodeAuth` is missing, `POST /api/packets/{id}/ingest/` is rejected even with a valid API key.
-
-**Future (priority):** **[#295](https://github.com/pskillen/meshflow-api/issues/295)** — feeder identity on ingest so shared constellation API keys work like Meshtastic (`ManagedNode.mc_pubkey` + bot-sent observer id). See also [#279](https://github.com/pskillen/meshflow-api/issues/279).
+See [#295](https://github.com/pskillen/meshflow-api/issues/295). Optional follow-up: auto-set `mc_pubkey` on first connect ([#279](https://github.com/pskillen/meshflow-api/issues/279)).
 
 ## 1. Create MC ManagedNode
 
 1. Open **Django admin** → **Managed nodes** → **Add**.
 2. Set:
    - **Protocol**: MeshCore
-   - **Node ID (placeholder)**: `0` (MeshCore has no Meshtastic numeric id on the wire)
+   - **Node ID (placeholder)**: `0`
    - **Name**: e.g. `Scottish Mesh MC Feeder`
    - **Owner** / **Constellation**: your MC constellation
-   - **Default location** (optional): lat/lon for map display as a feeder pin
-3. Save. **Display ID** (read-only after save) is `mc:feeder:<internal id>` — this is not stored in the DB.
+   - **Default location** (optional): lat/lon for map display
+3. Save.
 
-**Do not** create feeders via raw SQL on `observednode`: feeders are `managednode` rows only. Raw inserts into `observednode` need `protocol` plus identity columns (`meshtastic_node_id` or `mc_pubkey` / `mc_pubkey_prefix`); `node_id_str` is computed at read time (ADR-0001, [#294](https://github.com/pskillen/meshflow-api/issues/294)).
+## 2. Set feeder pubkey and API key
 
-**`node_id_str` on ManagedNode and ObservedNode** is a computed property in the API, not a database column on either model.
-
-## 2. Create Node API key + NodeAuth
-
-This step is what binds uploads to the feeder. Without it, the API accepts the key but cannot attach an observer `ManagedNode`.
-
-1. **Node API keys** → **Add** (or reuse an existing key for the constellation).
-2. **Node authentications** → **Add**: link the API key to the MC ManagedNode from step 1 (one feeder per key for MeshCore ingest).
-3. Put the same key in the bot env as `STORAGE_API_TOKEN` (see step 3).
+1. Start **meshflow-bot** once with `RADIO_PROTOCOL=meshcore` and note the **full 64-hex pubkey** from connect logs (or `SELF_INFO`).
+2. Edit the ManagedNode → **MeshCore identity** → paste into **`mc_pubkey`** (lowercase hex). Save. **Display ID** becomes `mc:{12-hex-prefix}`.
+3. **Node API keys** → create or reuse a constellation key.
+4. **Node authentications** → link the key to this MC ManagedNode (multiple feeders may share one key if each has a unique `mc_pubkey`).
+5. Put the key in the bot env as `STORAGE_API_TOKEN`.
 
 ## 3. Configure meshflow-bot
 
@@ -65,20 +59,16 @@ STORAGE_API_TOKEN=<key from step 2>
 STORAGE_API_VERSION=2
 ```
 
-Restart the bot. Confirm HTTP `POST /api/meshcore/packets/ingest/` in logs (no upload when `MESHCORE_UPLOAD_ENABLED` is false). A **403** usually means the token is wrong, inactive, or not linked via **NodeAuth** to a `protocol=MeshCore` managed node—not a missing `node_id` in the URL.
+Restart the bot. Confirm logs show feeder-scoped paths, e.g. `POST /api/meshcore/feeders/{prefix}/packets/ingest/`. Do **not** use `/api/packets/0/bot-version/` for MeshCore.
 
 ## 4. Verify in UI
 
-- **MeshCore → Map**: observed nodes appear after ADVERT packets; feeders listed when default location is set.
+- **MeshCore → Map**: observed nodes after ADVERT packets; feeders with default location appear as pins.
 - **MeshCore → Nodes**: prefix stubs and nodes with/without position.
 
-## 5. Channel names (Phase 2.2 — planned)
+## 5. Channel names (Phase 2.2)
 
-MeshCore **channel names and types** live on the companion device, not on the wire. After Phase 2.2 ([#297](https://github.com/pskillen/meshflow-api/issues/297)):
-
-1. On connect, **meshflow-bot** reads the device channel table and calls **`POST mc-channel-sync`** so the API mirror matches the radio.
-2. Until the first sync, ingest may use placeholder `MessageChannel` rows (`"MC channel N"`).
-3. Operator edits in the UI apply **to the radio** first; the bot re-syncs to update the API.
+On connect, **meshflow-bot** reads the device channel table and calls **`POST …/mc-channel-sync/`** so the API mirror matches the radio.
 
 See [text-message-channels.md](./text-message-channels.md).
 

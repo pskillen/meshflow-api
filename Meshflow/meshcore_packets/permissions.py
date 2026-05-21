@@ -1,24 +1,31 @@
-"""Permissions for MeshCore feeder ingest (no URL node_id)."""
+"""Permissions for MeshCore feeder ingest (feeder pubkey prefix in URL)."""
 
 from rest_framework import permissions
+from rest_framework.exceptions import PermissionDenied
 
-from common.protocol import Protocol
-from nodes.models import NodeAuth
+from common.meshcore_feeder_auth import MeshCoreFeederResolutionError, resolve_meshcore_feeder
 
 
 class MeshCoreFeederPermission(permissions.BasePermission):
-    """Attach the ManagedNode linked to the API key for MeshCore ingest."""
+    """Resolve ManagedNode from API key + ``feeder_pubkey_prefix`` URL kwarg."""
 
     def has_permission(self, request, view):
         if not request.auth:
             return False
+
+        prefix = view.kwargs.get("feeder_pubkey_prefix")
+        if not prefix:
+            return False
+
+        header_full = request.META.get("HTTP_X_MESHCORE_FEEDER_PUBKEY")
         try:
-            node_auth = NodeAuth.objects.select_related("node", "node__constellation").get(api_key=request.auth)
-        except NodeAuth.DoesNotExist:
-            return False
-        if node_auth.node.deleted_at is not None:
-            return False
-        if node_auth.node.protocol != Protocol.MESHCORE:
-            return False
-        request.auth.node = node_auth.node
+            node = resolve_meshcore_feeder(
+                api_key=request.auth,
+                feeder_pubkey_prefix=prefix,
+                feeder_pubkey_full=header_full,
+            )
+        except MeshCoreFeederResolutionError as exc:
+            raise PermissionDenied(detail={"detail": exc.detail, "code": exc.code}) from exc
+
+        request.auth.node = node
         return True
