@@ -64,6 +64,22 @@ components:
         minimum: 1
         maximum: 1000
         description: Number of items per page
+    FeederPubkeyPrefix:
+      name: feeder_pubkey_prefix
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: '^[0-9a-f]{12}$'
+      description: First 12 hex chars of the feeder device pubkey (mc: prefix in bot logs)
+    MeshCoreFeederPubkeyHeader:
+      name: X-MeshCore-Feeder-Pubkey
+      in: header
+      required: false
+      schema:
+        type: string
+        pattern: '^[0-9a-f]{64}$'
+      description: Full 64-char hex feeder pubkey; must match ManagedNode.mc_pubkey when configured
 
   securitySchemes:
     BearerAuth:
@@ -345,6 +361,21 @@ components:
           enum: [error]
         message:
           type: string
+
+    MeshCoreFeederAuthError:
+      type: object
+      properties:
+        detail:
+          type: string
+        code:
+          type: string
+          enum:
+            - feeder_not_linked
+            - feeder_identity_ambiguous
+            - feeder_pubkey_mismatch
+            - feeder_pubkey_not_configured
+            - invalid_feeder_pubkey_prefix
+            - invalid_feeder_pubkey
 
     Success:
       type: object
@@ -3629,15 +3660,19 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /meshcore/packets/ingest/:
+  /meshcore/feeders/{feeder_pubkey_prefix}/packets/ingest/:
     post:
       summary: Ingest a MeshCore packet
       description: >
         MeshCore feeder bots POST captured frames here. Authenticated via Node API key
-        linked to a ManagedNode with protocol=meshcore. No URL node id (identity is in the body).
+        plus feeder pubkey prefix in the URL (12 lowercase hex chars, same as mc: prefix in bot logs).
+        Optional header X-MeshCore-Feeder-Pubkey (64 hex) must match ManagedNode.mc_pubkey when set.
       tags: [MeshCore packets]
       security:
         - NodeApiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/FeederPubkeyPrefix'
+        - $ref: '#/components/parameters/MeshCoreFeederPubkeyHeader'
       requestBody:
         required: true
         content:
@@ -3662,9 +3697,13 @@ paths:
         '400':
           description: Invalid payload
         '403':
-          description: API key not linked to a MeshCore feeder
+          description: Feeder not linked, ambiguous identity, or pubkey mismatch
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeshCoreFeederAuthError'
 
-  /meshcore/feeder/mc-channel-sync/:
+  /meshcore/feeders/{feeder_pubkey_prefix}/mc-channel-sync/:
     post:
       summary: Sync MeshCore channels from device snapshot
       description: >
@@ -3673,6 +3712,9 @@ paths:
       tags: [MeshCore packets]
       security:
         - NodeApiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/FeederPubkeyPrefix'
+        - $ref: '#/components/parameters/MeshCoreFeederPubkeyHeader'
       requestBody:
         required: true
         content:
@@ -3688,6 +3730,45 @@ paths:
                 $ref: '#/components/schemas/McChannelSyncResponse'
         '400':
           description: Invalid payload
+        '403':
+          description: Feeder not linked, ambiguous identity, or pubkey mismatch
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeshCoreFeederAuthError'
+
+  /meshcore/feeders/{feeder_pubkey_prefix}/bot-version/:
+    put:
+      summary: Report meshflow-bot version (MeshCore feeder)
+      description: >
+        Updates bot_version on the ManagedNode matching the API key and feeder pubkey prefix.
+        Same auth model as MeshCore packet ingest.
+      tags: [MeshCore packets]
+      security:
+        - NodeApiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/FeederPubkeyPrefix'
+        - $ref: '#/components/parameters/MeshCoreFeederPubkeyHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [bot_version]
+              properties:
+                bot_version:
+                  type: string
+                  maxLength: 128
+      responses:
+        '200':
+          description: Version recorded
+        '403':
+          description: Feeder not linked, ambiguous identity, or pubkey mismatch
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeshCoreFeederAuthError'
 
   /meshcore/managed-nodes/{internal_id}/apply-mc-channel-config/:
     post:
