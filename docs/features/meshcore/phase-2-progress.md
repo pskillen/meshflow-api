@@ -82,12 +82,12 @@ Deploy api #325 before bot fleet upgrade.
 
 ## Phase 2.2 — text messages & channels
 
-**Status:** Implemented on branch `api-296/paddy/mc-text-channels` (API + bot + ui); PRs pending. **Guide:** [text-message-channels.md](./text-message-channels.md). **Issues:** [#296](https://github.com/pskillen/meshflow-api/issues/296), [#297](https://github.com/pskillen/meshflow-api/issues/297).
+**Status:** Merged to `main` (2026-05-21). **Guide:** [text-message-channels.md](./text-message-channels.md). **Issues:** [#296](https://github.com/pskillen/meshflow-api/issues/296), [#297](https://github.com/pskillen/meshflow-api/issues/297).
 
 **meshflow-api — delivered**
 
 - `MessageChannel.mc_channel_type` / `mc_hashtag`; `ManagedNode.mc_channels` M2M + `mc_channels_synced_at`.
-- `POST /api/meshcore/feeder/mc-channel-sync/`; `POST …/apply-mc-channel-config/` (WS dispatch).
+- `POST /api/meshcore/feeders/{prefix}/mc-channel-sync/`; `POST …/apply-mc-channel-config/` (WS dispatch).
 - `MeshCoreTextMessageService` + `text_messages` receiver; `TextMessage.protocol` + `original_mc_packet`.
 - History API `protocol` query; MC `heard` from `MeshCorePacketObservation`.
 - `managed_node_ws_group` for MC feeder WebSocket (`node_mc_{internal_id}`).
@@ -101,6 +101,55 @@ Deploy api #325 before bot fleet upgrade.
 **meshflow-ui — delivered**
 
 - MeshCore channel panel on Node Settings (mirror + apply-to-radio).
+
+**Merged to `main` (2026-05-21):** api [#333](https://github.com/pskillen/meshflow-api/pull/333), bot [#105](https://github.com/pskillen/meshflow-bot/pull/105), ui [#273](https://github.com/pskillen/meshflow-ui/pull/273).
+
+---
+
+## Feeder identity & apply fixes ([#295](https://github.com/pskillen/meshflow-api/issues/295))
+
+**Status:** Core identity merged; staging fixes on branch `api-295/paddy/mc-feeder-identity` — [api #335](https://github.com/pskillen/meshflow-api/pull/335), [bot #108](https://github.com/pskillen/meshflow-bot/pull/108) (open at last update).
+
+**meshflow-api — delivered**
+
+- `ManagedNode.mc_pubkey` (64 hex, unique per constellation); feeder-scoped routes:
+  - `POST /api/meshcore/feeders/{prefix}/packets/ingest/`
+  - `POST /api/meshcore/feeders/{prefix}/mc-channel-sync/`
+  - `PUT /api/meshcore/feeders/{prefix}/bot-version/`
+- `resolve_meshcore_feeder()` + structured 403 codes (`feeder_not_linked`, `feeder_identity_ambiguous`, `feeder_pubkey_mismatch`, `feeder_pubkey_not_configured`).
+- **Feeder WebSocket:** `NodeConsumer` joins `node_mc_{internal_id}` using `feeder_pubkey_prefix` query param when multiple feeders share an API key.
+- **Apply path fixes (staging):**
+  - `feeder_ws_group_has_subscribers` probes Redis group ZSET (`asgi:group:…`) — `group_channels()` does not exist on `channels_redis` 4.x.
+  - `apply_mc_channel_config` payloads use plain `PUBLIC`/`HASHTAG` strings + `_ws_json_safe()` before `group_send` (gettext `__proxy__` broke msgpack).
+  - `meshcore_packets/services/channel_apply.py` shared by REST apply and Django admin push action.
+- **Django admin:** `MeshCoreMessageChannel` proxy (MC-only list); ManagedNode **read-only** device mirror table (`#` prefix for hashtags); admin action **Push MC channel config to feeder device**.
+- Migration `constellations/0010_meshcore_message_channel_proxy.py`.
+- Docs: [feeder-bootstrap.md](./feeder-bootstrap.md), [text-message-channels.md](./text-message-channels.md), [REDIS.md](../../REDIS.md) (MC groups).
+
+**meshflow-bot — delivered** ([#106](https://github.com/pskillen/meshflow-bot/pull/106) merged; [#108](https://github.com/pskillen/meshflow-bot/pull/108) open)
+
+- Feeder-scoped storage URLs + `X-MeshCore-Feeder-Pubkey`; no `PUT /api/packets/0/bot-version/` for MC.
+- WS URL appends `feeder_pubkey_prefix` automatically after `SELF_INFO`.
+- Channel sync logging + per-slot `get_channel` scan warning when device reports zero named channels ([#107](https://github.com/pskillen/meshflow-bot/pull/107) merged).
+
+**Verified in dev:** local UI → local API `apply-mc-channel-config` → 202 when bot WS on primary API and both share Redis DB 0 with pre-prod bot uploading to both APIs.
+
+---
+
+## UI nav & map parity ([ui#269](https://github.com/pskillen/meshflow-ui/issues/269))
+
+**Status:** In progress (branch `ui-269/paddy/meshtastic-meshcore-nav-parity` on meshflow-ui; API field on `ui-269/paddy/meshcore-adv-type-on-observed-node`).
+
+**meshflow-ui — delivered (pending PR)**
+
+- Sidebar: **Meshtastic** and **MeshCore** sections; Dashboard and Weather remain top-level.
+- Meshtastic **Map** in nav (`/map`); MeshCore **Managed nodes** (`/meshcore/managed-nodes`).
+- Shared `ProtocolMapPage`, `ProtocolNodesPage`, `ProtocolManagedNodesPage` (legacy URLs unchanged).
+- MeshCore map legend uses ADV_TYPE roles (Chat / Repeater / Room / Sensor), not Meshtastic role swatches.
+
+**meshflow-api — delivered (pending PR)**
+
+- `ObservedNode.meshcore_adv_type` from ADVERT `adv_type` on ingest; migration `nodes/0048`; OpenAPI field.
 
 ---
 

@@ -47,7 +47,19 @@ def upsert_observed_node_from_meshcore_packet(sender, packet, observer, observat
     # Position enrichment only when ADVERT coords are present; advertisement without
     # adv_lat/adv_lon must not fabricate coordinates.
     if packet.payload_type == MeshCorePayloadType.ADVERT:
-        if apply_advert_position(node=node, packet=packet, raw=raw) and long_name:
+        adv_type = get_advert_field(raw, "adv_type")
+        update_fields: list[str] = []
+        if adv_type is not None:
+            try:
+                node.meshcore_adv_type = int(adv_type)
+                update_fields.append("meshcore_adv_type")
+            except TypeError, ValueError:
+                pass
+        if apply_advert_position(node=node, packet=packet, raw=raw):
+            pass
+        if long_name:
             node.long_name = long_name
             node.short_name = short_name or node.short_name
-            node.save(update_fields=["long_name", "short_name"])
+            update_fields.extend(["long_name", "short_name"])
+        if update_fields:
+            node.save(update_fields=update_fields)

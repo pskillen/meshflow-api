@@ -337,6 +337,11 @@ class ObservedNode(models.Model):
         blank=True,
         help_text=_("Meshtastic role (RoleSource); null for MeshCore."),
     )
+    meshcore_adv_type = models.PositiveSmallIntegerField(
+        null=True,
+        blank=True,
+        help_text=_("MeshCore ADVERT adv_type (0=none, 1=chat, 2=repeater, 3=room, 4=sensor); null when unknown."),
+    )
     meshtastic_is_licensed = models.BooleanField(null=True, blank=True)
     meshtastic_is_unmessagable = models.BooleanField(null=True, blank=True)
 
