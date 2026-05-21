@@ -24,7 +24,7 @@ def test_apply_returns_503_when_feeder_not_connected(create_user, create_managed
     url = reverse("meshcore-apply-mc-channel-config", kwargs={"internal_id": node.internal_id})
 
     with patch(
-        "meshcore_packets.views.feeder_ws_group_has_subscribers",
+        "meshcore_packets.services.channel_apply.feeder_ws_group_has_subscribers",
         new_callable=AsyncMock,
         return_value=False,
     ):
@@ -62,12 +62,12 @@ def test_apply_returns_503_when_dispatch_fails(create_user, create_managed_node)
 
     with (
         patch(
-            "meshcore_packets.views.feeder_ws_group_has_subscribers",
+            "meshcore_packets.services.channel_apply.feeder_ws_group_has_subscribers",
             new_callable=AsyncMock,
             return_value=True,
         ),
         patch(
-            "meshcore_packets.views.dispatch_node_command",
+            "meshcore_packets.services.channel_apply.dispatch_node_command",
             new_callable=AsyncMock,
             side_effect=RuntimeError("TCPTransport closed"),
         ),
@@ -104,13 +104,13 @@ def test_apply_dispatches_when_feeder_connected(create_user, create_managed_node
 
     with (
         patch(
-            "meshcore_packets.views.feeder_ws_group_has_subscribers",
+            "meshcore_packets.services.channel_apply.feeder_ws_group_has_subscribers",
             new_callable=AsyncMock,
             return_value=True,
         ),
         patch(
-            "meshcore_packets.views.dispatch_node_command",
-            new_callable=AsyncMock,
+            "meshcore_packets.views.apply_mc_channels_to_feeder",
+            return_value="sent",
         ) as dispatch_mock,
     ):
         response = client.post(
@@ -129,8 +129,8 @@ def test_apply_dispatches_when_feeder_connected(create_user, create_managed_node
         )
 
     assert response.status_code == 202
-    dispatch_mock.assert_awaited_once()
-    sent_channels = dispatch_mock.await_args[0][1]["channels"]
+    dispatch_mock.assert_called_once()
+    sent_channels = dispatch_mock.call_args[0][1]
     assert sent_channels[0]["mc_hashtag"] == "galloway"
     assert sent_channels[0]["name"] == "galloway"
     assert sent_channels[0]["mc_channel_type"] == "HASHTAG"
