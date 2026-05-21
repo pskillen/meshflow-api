@@ -184,6 +184,10 @@ def _dispatch_mc_channel_apply(managed_node: ManagedNode, channels: list[dict]) 
     async def _check_and_send() -> str:
         try:
             if not await feeder_ws_group_has_subscribers(group):
+                logger.warning(
+                    "MC channel apply: no WebSocket subscriber on group %s",
+                    group,
+                )
                 return FEEDER_BOT_NOT_CONNECTED
         except Exception as exc:
             logger.exception("MC channel apply: feeder presence check failed: %s", exc)
@@ -230,7 +234,9 @@ class ManagedNodeMcChannelApplyView(APIView):
                 {
                     "detail": (
                         "Feeder bot is not connected via WebSocket. "
-                        "Start the bot with MESHCORE_UPLOAD_ENABLED and MESHFLOW_WS_URL configured."
+                        "Start the bot with MESHCORE_UPLOAD_ENABLED and MESHFLOW_WS_URL configured. "
+                        "For shared API keys, the bot must connect with "
+                        "feeder_pubkey_prefix in the WebSocket URL (same 12-hex prefix as ingest)."
                     ),
                     "code": FEEDER_BOT_NOT_CONNECTED,
                 },
