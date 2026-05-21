@@ -453,6 +453,8 @@ class ManagedNodeAdmin(admin.ModelAdmin):
         "name",
         "owner",
         "constellation",
+        "mc_channel_count",
+        "mc_channels_synced_at",
         "allow_auto_traceroute",
         "status_is_sending_data",
         "status_last_packet_ingested_at",
@@ -468,6 +470,7 @@ class ManagedNodeAdmin(admin.ModelAdmin):
     search_fields = (
         "meshtastic_node_id",
         "name",
+        "mc_pubkey",
         "owner__username",
         "owner__email",
     )
@@ -496,9 +499,20 @@ class ManagedNodeAdmin(admin.ModelAdmin):
     def display_id(self, obj):
         return obj.node_id_str
 
+    @admin.display(description=_("MC channels"))
+    def mc_channel_count(self, obj):
+        if obj.protocol != Protocol.MESHCORE:
+            return "—"
+        return obj.mc_channels.count()
+
     def get_readonly_fields(self, request, obj=None):
         if obj and obj.protocol == Protocol.MESHCORE:
-            return ("display_id",)
+            return ("display_id", "mc_channels_synced_at")
+        return ("mc_channels_synced_at",)
+
+    def get_filter_horizontal(self, request, obj=None):
+        if obj and obj.protocol == Protocol.MESHCORE:
+            return ("mc_channels",)
         return ()
 
     def get_fieldsets(self, request, obj=None):
@@ -512,8 +526,18 @@ class ManagedNodeAdmin(admin.ModelAdmin):
             },
         )
         if obj and obj.protocol == Protocol.MESHCORE:
-            mc_fields = (_("MeshCore identity"), {"fields": ("mc_pubkey", "display_id")})
-            return (common, mc_fields)
+            mc_identity = (_("MeshCore identity"), {"fields": ("mc_pubkey", "display_id")})
+            mc_channels = (
+                _("MeshCore channels"),
+                {
+                    "fields": ("mc_channels", "mc_channels_synced_at"),
+                    "description": _(
+                        "Mirror of the feeder device channel table (updated by bot sync). "
+                        "Edit links only; channel rows live under Message channels."
+                    ),
+                },
+            )
+            return (common, mc_identity, mc_channels)
         return (common, channels)
 
 

@@ -3,7 +3,9 @@ from django.contrib import admin
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 
-from .models import Constellation, ConstellationUserMembership, MessageChannel
+from common.protocol import Protocol
+
+from .models import Constellation, ConstellationUserMembership, MeshCoreChannelType, MessageChannel
 
 
 class ConstellationAdminForm(forms.ModelForm):
@@ -124,13 +126,61 @@ class ConstellationUserMembershipAdmin(admin.ModelAdmin):
     get_constellation_creator.admin_order_field = "constellation__created_by__username"
 
 
+class MeshCoreMessageChannelFilter(admin.SimpleListFilter):
+    title = _("MeshCore channels")
+    parameter_name = "meshcore_channels"
+
+    def lookups(self, request, model_admin):
+        return (
+            ("yes", _("MeshCore only")),
+            ("no", _("Non-MeshCore")),
+        )
+
+    def queryset(self, request, queryset):
+        if self.value() == "yes":
+            return queryset.filter(protocol=Protocol.MESHCORE)
+        if self.value() == "no":
+            return queryset.exclude(protocol=Protocol.MESHCORE)
+        return queryset
+
+
 @admin.register(MessageChannel)
 class MessageChannelAdmin(admin.ModelAdmin):
-    list_display = ("id", "name", "protocol", "mc_channel_idx", "constellation")
+    list_display = (
+        "id",
+        "name",
+        "protocol",
+        "mc_channel_idx",
+        "mc_channel_type_display",
+        "mc_hashtag",
+        "constellation",
+    )
     list_filter = (
         ("protocol", admin.ChoicesFieldListFilter),
+        MeshCoreMessageChannelFilter,
+        ("mc_channel_type", admin.ChoicesFieldListFilter),
         "constellation",
         ("mc_channel_idx", admin.EmptyFieldListFilter),
     )
-    search_fields = ("name", "id")
-    ordering = ("name",)
+    search_fields = ("name", "id", "mc_hashtag", "constellation__name")
+    ordering = ("constellation__name", "protocol", "mc_channel_idx", "name")
+    list_select_related = ("constellation",)
+    fieldsets = (
+        (None, {"fields": ("name", "constellation", "protocol")}),
+        (
+            _("MeshCore channel"),
+            {
+                "fields": ("mc_channel_idx", "mc_channel_type", "mc_hashtag"),
+                "description": _(
+                    "Device channel index and type when protocol is MeshCore. "
+                    "Hashtag is required for HASHTAG channels (no leading #)."
+                ),
+            },
+        ),
+    )
+
+    @admin.display(description=_("MC type"), ordering="mc_channel_type")
+    def mc_channel_type_display(self, obj):
+        if obj.mc_channel_type is None:
+            return "—"
+        return MeshCoreChannelType(obj.mc_channel_type).name
