@@ -1266,13 +1266,87 @@ class PacketIngestSerializer(serializers.Serializer):
         return packet
 
 
+def _normalize_position_block(position_data, *, allow_legacy_fields):
+    """Map feeder position payload to nested PositionSerializer input."""
+    if not allow_legacy_fields:
+        if "location_source" in position_data and position_data.get("meshtastic_location_source") is None:
+            raise serializers.ValidationError(
+                {
+                    "position": {
+                        "location_source": ["Legacy field not accepted on API v3; use meshtastic_location_source."]
+                    }
+                }
+            )
+
+    location_source = position_data.get("meshtastic_location_source")
+    if allow_legacy_fields and location_source is None:
+        location_source = position_data.get("location_source")
+    if location_source in (None, ""):
+        location_source = "UNSET"
+
+    block = {
+        "reported_time": position_data.get("reported_time"),
+        "latitude": position_data.get("latitude"),
+        "longitude": position_data.get("longitude"),
+        "altitude": position_data.get("altitude"),
+        "meshtastic_location_source": location_source,
+    }
+    if position_data.get("heading") is not None:
+        block["heading"] = position_data.get("heading")
+    return block
+
+
+def _normalize_device_metrics_block(metrics_data, *, allow_legacy_fields):
+    """Map feeder device_metrics payload to nested DeviceMetricsSerializer input."""
+    if not allow_legacy_fields:
+        if "channel_utilization" in metrics_data and metrics_data.get("meshtastic_channel_utilization") is None:
+            raise serializers.ValidationError(
+                {
+                    "device_metrics": {
+                        "channel_utilization": [
+                            "Legacy field not accepted on API v3; use meshtastic_channel_utilization."
+                        ]
+                    }
+                }
+            )
+        if "air_util_tx" in metrics_data and metrics_data.get("meshtastic_air_util_tx") is None:
+            raise serializers.ValidationError(
+                {
+                    "device_metrics": {
+                        "air_util_tx": ["Legacy field not accepted on API v3; use meshtastic_air_util_tx."]
+                    }
+                }
+            )
+
+    channel_utilization = metrics_data.get("meshtastic_channel_utilization")
+    if channel_utilization is None and allow_legacy_fields:
+        channel_utilization = metrics_data.get("channel_utilization")
+    if channel_utilization is None:
+        channel_utilization = 0.0
+
+    air_util_tx = metrics_data.get("meshtastic_air_util_tx")
+    if air_util_tx is None and allow_legacy_fields:
+        air_util_tx = metrics_data.get("air_util_tx")
+    if air_util_tx is None:
+        air_util_tx = 0.0
+
+    return {
+        "reported_time": metrics_data.get("reported_time"),
+        "battery_level": metrics_data.get("battery_level"),
+        "voltage": metrics_data.get("voltage"),
+        "meshtastic_channel_utilization": channel_utilization,
+        "meshtastic_air_util_tx": air_util_tx,
+        "uptime_seconds": metrics_data.get("uptime_seconds"),
+    }
+
+
 class PositionSerializer(serializers.Serializer):
     logged_time = serializers.DateTimeField(read_only=True, default=django_timezone.now)
     reported_time = serializers.DateTimeField(required=True)
     latitude = serializers.FloatField()
     longitude = serializers.FloatField()
     altitude = serializers.FloatField()
-    heading = serializers.FloatField()
+    heading = serializers.FloatField(required=False, allow_null=True)
     meshtastic_location_source = serializers.CharField()
 
     def to_internal_value(self, data):
@@ -1281,10 +1355,9 @@ class PositionSerializer(serializers.Serializer):
         validated_data = super().to_internal_value(data)
 
         # Convert meshtastic_location_source from string to integer using LocationSource
-        if "meshtastic_location_source" in validated_data and validated_data["meshtastic_location_source"]:
-            validated_data["meshtastic_location_source"] = convert_location_source(
-                validated_data["meshtastic_location_source"]
-            )
+        validated_data["meshtastic_location_source"] = convert_location_source(
+            validated_data.get("meshtastic_location_source")
+        )
 
         return validated_data
 
@@ -1299,8 +1372,10 @@ class DeviceMetricsSerializer(serializers.Serializer):
     uptime_seconds = serializers.IntegerField()
 
 
-class NodeSerializer(serializers.ModelSerializer):
-    """Serializer for node information updates."""
+class BaseNodeSerializer(serializers.ModelSerializer):
+    """Shared node upsert serializer; subclasses set allow_legacy_fields."""
+
+    allow_legacy_fields = True
 
     class UserSerializer(serializers.Serializer):
         long_name = serializers.CharField(required=False, allow_null=True)
@@ -1374,25 +1449,14 @@ class NodeSerializer(serializers.ModelSerializer):
         # Handle position data
         if "position" in data:
             position_data = data.pop("position")
-            data["position"] = {
-                "reported_time": position_data.get("reported_time"),
-                "latitude": position_data.get("latitude"),
-                "longitude": position_data.get("longitude"),
-                "altitude": position_data.get("altitude"),
-                "meshtastic_location_source": position_data.get("meshtastic_location_source"),
-            }
+            data["position"] = _normalize_position_block(position_data, allow_legacy_fields=self.allow_legacy_fields)
 
         # Handle device metrics
         if "device_metrics" in data:
             metrics_data = data.pop("device_metrics")
-            data["device_metrics"] = {
-                "reported_time": metrics_data.get("reported_time"),
-                "battery_level": metrics_data.get("battery_level"),
-                "voltage": metrics_data.get("voltage"),
-                "meshtastic_channel_utilization": metrics_data.get("meshtastic_channel_utilization"),
-                "meshtastic_air_util_tx": metrics_data.get("meshtastic_air_util_tx"),
-                "uptime_seconds": metrics_data.get("uptime_seconds"),
-            }
+            data["device_metrics"] = _normalize_device_metrics_block(
+                metrics_data, allow_legacy_fields=self.allow_legacy_fields
+            )
 
         return super().to_internal_value(data)
 
@@ -1477,6 +1541,18 @@ class NodeSerializer(serializers.ModelSerializer):
         self._create_related_objects(instance, position_data, device_metrics_data)
 
         return instance
+
+
+class NodeSerializer(BaseNodeSerializer):
+    """Feeder node upsert (API v2 paths): legacy field aliases + meshtastic_*."""
+
+    allow_legacy_fields = True
+
+
+class NodeSerializerV3(BaseNodeSerializer):
+    """Feeder node upsert (API v3 paths): meshtastic_* wire only."""
+
+    allow_legacy_fields = False
 
 
 class PrefetchedPacketObservationSerializer(serializers.ModelSerializer):

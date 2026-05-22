@@ -3931,12 +3931,13 @@ paths:
 
   /packets/{meshtastic_node_id}/nodes/:
     post:
-      summary: Upsert observed node (feeder)
+      summary: Upsert observed node (feeder, API v2 wire)
       description: >
-        Meshtastic feeder bots upsert observed-node rows via this endpoint. The path segment is
-        the observer's Meshtastic numeric node id (``meshtastic_node_id``) and must match the
-        authenticated ManagedNode. Similar to ``/nodes/observed-nodes/`` but scoped to Node API
-        key auth for bots.
+        Meshtastic feeder bots upsert observed-node rows via this endpoint (client ``STORAGE_API_VERSION=2``).
+        The path segment is the observer's Meshtastic numeric node id (``meshtastic_node_id``) and must
+        match the authenticated ManagedNode. Nested ``position`` / ``device_metrics`` accept legacy
+        unprefixed fields (``location_source``, ``channel_utilization``, ``air_util_tx``) as aliases for
+        ``meshtastic_*`` fields. New installs should use ``POST /v3/packets/{meshtastic_node_id}/nodes/``.
       tags: [Meshtastic packets]
       security:
         - NodeApiKeyAuth: []
@@ -3947,6 +3948,127 @@ paths:
           schema:
             type: integer
           description: Meshtastic numeric node id of the observer (feeder)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ObservedNodeUpdate'
+      responses:
+        '200':
+          description: Node information updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObservedNode'
+
+  /v3/packets/{meshtastic_node_id}/ingest/:
+    post:
+      summary: Ingest a Meshtastic packet (feeder API v3)
+      description: >
+        Same behaviour as ``POST /packets/{meshtastic_node_id}/ingest/``. Use with client
+        ``STORAGE_API_VERSION=3``.
+      tags: [Meshtastic packets]
+      security:
+        - NodeApiKeyAuth: []
+      parameters:
+        - name: meshtastic_node_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IncomingPacket'
+      responses:
+        '201':
+          description: Packet ingested successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Success'
+        '400':
+          description: Invalid packet data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /v3/packets/{meshtastic_node_id}/bot-version/:
+    put:
+      summary: Report meshflow-bot version (feeder API v3)
+      description: Same as ``PUT /packets/{meshtastic_node_id}/bot-version/`` for ``STORAGE_API_VERSION=3``.
+      tags: [Meshtastic packets]
+      security:
+        - NodeApiKeyAuth: []
+      parameters:
+        - name: meshtastic_node_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [bot_version]
+              properties:
+                bot_version:
+                  type: string
+                  maxLength: 128
+      responses:
+        '200':
+          description: Version recorded
+        '400':
+          description: Invalid or empty bot_version
+        '403':
+          description: API key not linked to this managed node
+    post:
+      summary: Report meshflow-bot version (feeder API v3, alias)
+      tags: [Meshtastic packets]
+      security:
+        - NodeApiKeyAuth: []
+      parameters:
+        - name: meshtastic_node_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [bot_version]
+              properties:
+                bot_version:
+                  type: string
+                  maxLength: 128
+      responses:
+        '200':
+          description: Version recorded
+
+  /v3/packets/{meshtastic_node_id}/nodes/:
+    post:
+      summary: Upsert observed node (feeder API v3)
+      description: >
+        Strict feeder node upsert for ``STORAGE_API_VERSION=3``. Requires ``meshtastic_*`` nested
+        fields only (no legacy ``location_source`` / ``channel_utilization`` / ``air_util_tx``).
+      tags: [Meshtastic packets]
+      security:
+        - NodeApiKeyAuth: []
+      parameters:
+        - name: meshtastic_node_id
+          in: path
+          required: true
+          schema:
+            type: integer
       requestBody:
         required: true
         content:

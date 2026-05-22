@@ -24,7 +24,7 @@ from packets.models import (
     TrafficManagementStatsPacket,
 )
 
-from .serializers import NodeSerializer, PacketIngestSerializer
+from .serializers import NodeSerializer, NodeSerializerV3, PacketIngestSerializer
 from .signals import (
     air_quality_metrics_packet_received,
     device_metrics_packet_received,
@@ -160,16 +160,16 @@ class PacketIngestView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-class NodeUpsertView(APIView):
+class BaseNodeUpsertView(APIView):
     """
     Meshtastic observed-node upsert for feeders (Node API key).
 
     Creates or updates an ``ObservedNode`` row for Meshtastic ``node_id`` / ``node_id_str``.
-    MeshCore will use separate endpoints when implemented.
     """
 
     authentication_classes = [NodeAPIKeyAuthentication]
     permission_classes = [NodeAuthorizationPermission]
+    serializer_class = NodeSerializer
 
     def post(self, request, node_id, format=None):
         """
@@ -233,10 +233,10 @@ class NodeUpsertView(APIView):
         q = ObservedNode.objects.filter(meshtastic_node_id=observed_node_id, protocol=Protocol.MESHTASTIC)
         if q.exists():
             node = q.first()
-            serializer = NodeSerializer(instance=node, data=request.data, partial=True)
+            serializer = self.serializer_class(instance=node, data=request.data, partial=True)
         else:
             node = None
-            serializer = NodeSerializer(data=request.data, partial=True)
+            serializer = self.serializer_class(data=request.data, partial=True)
 
         if serializer.is_valid():
             try:
@@ -268,6 +268,18 @@ class NodeUpsertView(APIView):
                 )
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class NodeUpsertView(BaseNodeUpsertView):
+    """Node upsert on ``/api/packets/...`` (v2 wire: legacy field aliases allowed)."""
+
+    serializer_class = NodeSerializer
+
+
+class NodeUpsertViewV3(BaseNodeUpsertView):
+    """Node upsert on ``/api/v3/packets/...`` (strict ``meshtastic_*`` wire)."""
+
+    serializer_class = NodeSerializerV3
 
 
 class ManagedNodeBotVersionSerializer(serializers.Serializer):

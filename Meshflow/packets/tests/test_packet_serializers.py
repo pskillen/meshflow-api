@@ -782,6 +782,82 @@ class NodeSerializerTest(BasePacketSerializerTestCase):
         self.assertEqual(latest_status.uptime_seconds, 10000)
         self.assertIsNotNone(latest_status.metrics_reported_time)
 
+    def test_node_upsert_v2_compat_legacy_position_and_metrics_fields(self):
+        """Legacy bot wire (location_source, channel_utilization) validates on v2 serializer."""
+        from django.utils import timezone
+
+        data = {
+            "id": self.from_node.meshtastic_node_id,
+            "position": {
+                "reported_time": timezone.now().isoformat(),
+                "latitude": 51.5,
+                "longitude": -0.12,
+                "altitude": 5.0,
+                "location_source": "",
+            },
+            "device_metrics": {
+                "reported_time": timezone.now().isoformat(),
+                "battery_level": 90.0,
+                "voltage": 4.0,
+                "channel_utilization": 0.15,
+                "air_util_tx": 0.05,
+                "uptime_seconds": 5000,
+            },
+        }
+
+        serializer = NodeSerializer(instance=self.from_node, data=data, partial=True)
+        assert_serializer_valid(serializer)
+        serializer.save()
+
+        latest_status = NodeLatestStatus.objects.get(node=self.from_node)
+        self.assertEqual(latest_status.meshtastic_location_source, LocationSource.UNSET)
+        self.assertEqual(latest_status.meshtastic_channel_utilization, 0.15)
+        self.assertEqual(latest_status.meshtastic_air_util_tx, 0.05)
+
+    def test_node_upsert_v3_rejects_legacy_only_position_field(self):
+        from django.utils import timezone
+
+        from packets.serializers import NodeSerializerV3
+
+        data = {
+            "id": self.from_node.meshtastic_node_id,
+            "position": {
+                "reported_time": timezone.now().isoformat(),
+                "latitude": 51.5,
+                "longitude": -0.12,
+                "altitude": 5.0,
+                "location_source": "LOC_INTERNAL",
+            },
+        }
+
+        serializer = NodeSerializerV3(instance=self.from_node, data=data, partial=True)
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("position", serializer.errors)
+
+    def test_node_upsert_v3_accepts_meshtastic_fields(self):
+        from django.utils import timezone
+
+        from packets.serializers import NodeSerializerV3
+
+        data = {
+            "id": self.from_node.meshtastic_node_id,
+            "device_metrics": {
+                "reported_time": timezone.now().isoformat(),
+                "battery_level": 80.0,
+                "voltage": 3.8,
+                "meshtastic_channel_utilization": 0.1,
+                "meshtastic_air_util_tx": 0.2,
+                "uptime_seconds": 100,
+            },
+        }
+
+        serializer = NodeSerializerV3(instance=self.from_node, data=data, partial=True)
+        assert_serializer_valid(serializer)
+        serializer.save()
+
+        latest_status = NodeLatestStatus.objects.get(node=self.from_node)
+        self.assertEqual(latest_status.meshtastic_channel_utilization, 0.1)
+
 
 @override_settings(PACKET_DEDUP_WINDOW_MINUTES=10)
 class PacketDeduplicationTest(BasePacketSerializerTestCase):

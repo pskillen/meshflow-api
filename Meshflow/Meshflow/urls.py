@@ -33,6 +33,7 @@ urlpatterns = [
             [
                 path("status/", StatusView.as_view(), name="status"),
                 path("packets/", include("packets.urls")),
+                path("v3/packets/", include("packets.urls_v3")),
                 path("meshcore/", include("meshcore_packets.urls")),
                 path("constellations/", include("constellations.urls")),
                 path("nodes/", include("nodes.urls")),

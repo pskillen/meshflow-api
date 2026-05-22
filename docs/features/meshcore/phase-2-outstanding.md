@@ -21,7 +21,7 @@ Items **skipped**, **incomplete**, or **discovered during Phase 2 / rename execu
 - [ ] **Deploy order:** api #324 → ui #271 (bot #98 anytime). Migrations through `nodes.0041`, `constellations/0008`, `text_messages/0007`, `packets/0018`.
 - [ ] **`tests/integration/`** full run after deploy (`pytest tests/integration/ -v`).
 - [ ] **Release notes** — numeric observed-node bookmarks → UI redirect + api `by-meshtastic-id`.
-- [ ] **Feeder upsert gap** — bot may send `location_source` / `channel_utilization`; api maps metrics from `meshtastic_*` only; optional `NodeSerializer` aliases.
+- [x] **Feeder upsert gap** — v2 paths accept legacy `location_source` / `channel_utilization` / `air_util_tx` aliases; v3 at `/api/v3/packets/.../nodes/` (meshflow-api #339).
 - [ ] **OpenAPI path param naming** — ingest/stats still use parameter name `node_id` (Meshtastic nodenum); cosmetic rename to `meshtastic_node_id` deferred.
 - [ ] **Cursor rename index** — mark SP-05 `skipped` in `meshcore-rename-index.plan.md` when convenient (plan repo).
 
