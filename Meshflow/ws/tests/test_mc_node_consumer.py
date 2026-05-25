@@ -88,4 +88,14 @@ async def test_mc_consumer_accepts_feeder_pubkey_prefix(create_managed_node, cre
     response = await communicator.receive_json_from()
     assert response["type"] == "apply_mc_channel_config"
 
+    await channel_layer.group_send(
+        data["group"],
+        {
+            "type": "node_command",
+            "command": {"type": "refresh_feeder_config"},
+        },
+    )
+    response = await communicator.receive_json_from()
+    assert response["type"] == "refresh_feeder_config"
+
     await communicator.disconnect()
