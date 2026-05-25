@@ -10,7 +10,6 @@ from meshcore_packets.services.channel_sync import reconcile_mc_channels
 from meshcore_packets.services.text_message import MeshCoreTextMessageService
 from nodes.models import NodeOwnerClaim, ObservedNode
 from text_messages.models import TextMessage
-from users.tests.conftest import create_user  # noqa: F401
 
 
 @pytest.mark.django_db

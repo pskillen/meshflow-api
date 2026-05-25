@@ -1,7 +1,6 @@
 """Tests for nodes.claim_authorization."""
 
 from django.test import override_settings
-from django.utils import timezone
 
 import pytest
 
