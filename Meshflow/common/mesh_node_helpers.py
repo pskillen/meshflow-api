@@ -15,8 +15,24 @@ if TYPE_CHECKING:
 
 MESHTASTIC_BROADCAST_ID = 0xFFFFFFFF
 
+MT_NODE_ID_STR_PREFIX = "mt:"
+
 # Deprecated alias — prefer MESHTASTIC_BROADCAST_ID; remove once all call sites are migrated.
 BROADCAST_ID = MESHTASTIC_BROADCAST_ID
+
+
+def normalize_meshtastic_lookup_hex(token: str) -> str | None:
+    """Extract 8-char Meshtastic hex from ``!…``, ``mt:…``, or bare suffix."""
+    t = token.strip()
+    lower = t.lower()
+    if lower.startswith(MT_NODE_ID_STR_PREFIX):
+        t = t[len(MT_NODE_ID_STR_PREFIX) :]
+    elif t.startswith("!"):
+        t = t[1:]
+    t = t.lower().replace("0x", "")
+    if len(t) == 8 and all(c in "0123456789abcdef" for c in t):
+        return t
+    return None
 
 
 def meshtastic_id_to_hex(meshtastic_id: int) -> str:

@@ -1036,6 +1036,39 @@ components:
           maximum: 7
           description: Default for TR_HOPS_LIMIT and TEXT_MESSAGE_MAX_HOPS env vars in generated docker-compose
 
+    ObservedNodeLookupChoice:
+      type: object
+      description: Candidate node when a bare-hex detail lookup matches multiple protocols (HTTP 300).
+      properties:
+        internal_id:
+          type: string
+          format: uuid
+        protocol:
+          $ref: '#/components/schemas/MeshProtocol'
+        node_id_str:
+          type: string
+        short_name:
+          type: string
+        long_name:
+          type: string
+      required:
+        - internal_id
+        - protocol
+        - node_id_str
+
+    ObservedNodeLookupAmbiguous:
+      type: object
+      properties:
+        detail:
+          type: string
+        choices:
+          type: array
+          items:
+            $ref: '#/components/schemas/ObservedNodeLookupChoice'
+      required:
+        - detail
+        - choices
+
     ObservedNode:
       type: object
       description: >
@@ -4870,9 +4903,11 @@ paths:
     get:
       summary: Get observed node details
       description: >
-        Detail lookup by ``ObservedNode.internal_id`` (UUID). Works for Meshtastic and MeshCore.
-        Legacy Meshtastic numeric bookmarks: ``GET /nodes/observed-nodes/by-meshtastic-id/{meshtastic_node_id}/``
-        redirects to this URL.
+        Resolve an observed node by path segment: UUID ``internal_id``; Meshtastic ``!{hex8}`` or
+        ``mt:{hex8}``; MeshCore ``mc:{prefix12}``; legacy decimal Meshtastic node id; or bare hex.
+        Bare hex matching
+        both Meshtastic and MeshCore returns **300 Multiple Choices** with candidate list.
+        Deprecated numeric redirect: ``GET /nodes/observed-nodes/by-meshtastic-id/{id}/``.
       tags: [Nodes]
       security:
         - BearerAuth: []
@@ -4882,8 +4917,8 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
-          description: Meshtastic numeric node id (detail routes); not MeshCore pubkey or ``internal_id``
+          description: >
+            UUID, ``mt:``/``!`` Meshtastic hex, ``mc:`` MeshCore prefix, decimal MT id, or bare hex (may return 300).
       responses:
         '200':
           description: Node details
@@ -4891,6 +4926,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ObservedNode'
+        '300':
+          description: Multiple nodes match a bare-hex lookup (pick a protocol-specific id)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObservedNodeLookupAmbiguous'
 
     put:
       summary: Update observed node

@@ -111,17 +111,22 @@ def api_client(api_base_url, wait_for_api, jwt_token):
             return isinstance(node_id, str) and bool(_OBSERVED_NODE_UUID_RE.match(node_id))
 
         def resolve_internal_id(self, node_id):
-            """Map meshtastic_node_id (int) to ObservedNode.internal_id (UUID string)."""
+            """Map any observed-node lookup segment to ObservedNode.internal_id (UUID string)."""
             if self._is_internal_id(node_id):
                 return node_id
-            if self._is_meshtastic_node_id(node_id):
-                r = self.get_observed_node(int(node_id))
-                if r.status_code != 200:
-                    raise AssertionError(
-                        f"Could not resolve meshtastic_node_id {node_id}: {r.status_code} {r.text}"
-                    )
+            r = self.get_observed_node(node_id)
+            if r.status_code == 200:
                 return r.json()["internal_id"]
-            raise ValueError(f"Not a meshtastic_node_id or internal_id: {node_id!r}")
+            if r.status_code == 300:
+                choices = r.json().get("choices") or []
+                if len(choices) == 1:
+                    return choices[0]["internal_id"]
+                raise AssertionError(
+                    f"Ambiguous observed node lookup {node_id!r}: {len(choices)} choices"
+                )
+            raise AssertionError(
+                f"Could not resolve observed node {node_id!r}: {r.status_code} {r.text}"
+            )
 
         def post_ingest(self, payload, observer_node_id=OBSERVER_NODE_ID):
             url = f"{self.base}/api/packets/{observer_node_id}/ingest/"
@@ -136,15 +141,10 @@ def api_client(api_base_url, wait_for_api, jwt_token):
             )
 
         def get_observed_node(self, node_id):
-            if self._is_meshtastic_node_id(node_id):
-                url = f"{self.base}/api/nodes/observed-nodes/by-meshtastic-id/{int(node_id)}/"
-                return requests.get(
-                    url,
-                    headers=self._auth_headers(),
-                    allow_redirects=True,
-                    timeout=INTEGRATION_HTTP_TIMEOUT,
-                )
-            url = f"{self.base}/api/nodes/observed-nodes/{node_id}/"
+            from urllib.parse import quote
+
+            segment = quote(str(node_id), safe="")
+            url = f"{self.base}/api/nodes/observed-nodes/{segment}/"
             return requests.get(
                 url,
                 headers=self._auth_headers(),
