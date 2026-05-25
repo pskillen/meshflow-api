@@ -6,12 +6,7 @@ from django.utils.translation import gettext_lazy as _
 from common.mc_channel_labels import mc_channel_admin_label, mc_channel_type_name
 from common.protocol import Protocol
 
-from .models import (
-    Constellation,
-    ConstellationUserMembership,
-    MeshCoreMessageChannel,
-    MessageChannel,
-)
+from .models import Constellation, MeshCoreMessageChannel, MessageChannel
 
 
 class ConstellationAdminForm(forms.ModelForm):
@@ -30,8 +25,6 @@ class ConstellationAdmin(admin.ModelAdmin):
         "name",
         "protocol",
         "created_by",
-        "get_member_count",
-        "get_admin_count",
         "get_node_count",
         "map_color",
         "bot_default_ignore_meshtastic_portnums",
@@ -61,17 +54,6 @@ class ConstellationAdmin(admin.ModelAdmin):
         "{map_color}"
         "</div>"
     )
-
-    def get_member_count(self, obj):
-        return obj.constellationusermembership_set.count()
-
-    get_member_count.short_description = _("Members")
-    get_member_count.admin_order_field = "constellationusermembership__count"
-
-    def get_admin_count(self, obj):
-        return obj.constellationusermembership_set.filter(role="admin").count()
-
-    get_admin_count.short_description = _("Admins")
 
     def get_node_count(self, obj):
         return obj.nodes.count()
@@ -104,32 +86,6 @@ class ConstellationAdmin(admin.ModelAdmin):
         if not change:  # Only set created_by on creation
             obj.created_by = request.user
         super().save_model(request, obj, form, change)
-
-
-@admin.register(ConstellationUserMembership)
-class ConstellationUserMembershipAdmin(admin.ModelAdmin):
-    list_display = (
-        "user",
-        "constellation",
-        "role",
-        "get_user_email",
-        "get_constellation_creator",
-    )
-    list_filter = ("role", "constellation", "user")
-    search_fields = ("user__username", "user__email", "constellation__name")
-    ordering = ("constellation__name", "user__username")
-
-    def get_user_email(self, obj):
-        return obj.user.email
-
-    get_user_email.short_description = _("User Email")
-    get_user_email.admin_order_field = "user__email"
-
-    def get_constellation_creator(self, obj):
-        return obj.constellation.created_by.username
-
-    get_constellation_creator.short_description = _("Constellation Creator")
-    get_constellation_creator.admin_order_field = "constellation__created_by__username"
 
 
 @admin.register(MessageChannel)

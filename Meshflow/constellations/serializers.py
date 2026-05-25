@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from constellations.models import Constellation, ConstellationUserMembership, MeshCoreChannelType, MessageChannel
+from constellations.models import Constellation, MeshCoreChannelType, MessageChannel
 
 
 def message_channel_payload(channel: MessageChannel) -> dict:
@@ -59,12 +59,3 @@ class MessageChannelSerializer(serializers.ModelSerializer):
     class Meta:
         model = MessageChannel
         fields = "__all__"
-
-
-class ConstellationMemberSerializer(serializers.ModelSerializer):
-    username = serializers.CharField(source="user.username", read_only=True)
-    user_id = serializers.IntegerField(source="user.id", read_only=True)
-
-    class Meta:
-        model = ConstellationUserMembership
-        fields = ["user_id", "username", "role"]

@@ -15,7 +15,8 @@ import os
 
 from django.core.management.base import BaseCommand
 
-from constellations.models import Constellation, ConstellationUserMembership, MessageChannel
+from common.access import grant_feeder_role
+from constellations.models import Constellation, MessageChannel
 from nodes.models import ManagedNode, NodeAPIKey, NodeAuth
 from users.models import User
 
@@ -51,6 +52,7 @@ class Command(BaseCommand):
             self.stdout.write(f"Created user {INTEGRATION_TEST_USERNAME}")
         else:
             self.stdout.write(f"User {INTEGRATION_TEST_USERNAME} already exists")
+        grant_feeder_role(user)
 
         constellation, c_created = Constellation.objects.get_or_create(
             name="Integration Test Constellation",
@@ -60,11 +62,6 @@ class Command(BaseCommand):
             },
         )
         if c_created:
-            ConstellationUserMembership.objects.create(
-                user=user,
-                constellation=constellation,
-                role="admin",
-            )
             self.stdout.write("Created constellation")
         else:
             constellation.created_by = user

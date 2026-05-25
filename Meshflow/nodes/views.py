@@ -28,6 +28,8 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from common.access import user_can_manage_api_keys
+from common.drf_permissions import AllowGuestReadOnly, IsAuthenticatedUser, IsFeederOrAdmin
 from common.mesh_node_helpers import observed_node_search_conditions
 from common.observed_node_lookup import (
     ObservedNodeLookupAmbiguous,
@@ -37,7 +39,6 @@ from common.observed_node_lookup import (
     resolve_observed_node_lookup,
 )
 from common.protocol import Protocol
-from constellations.models import ConstellationUserMembership
 from meshcore_packets.models import MeshCorePacketObservation
 from nodes.constants import INFRASTRUCTURE_ROLES
 from nodes.models import (
@@ -108,7 +109,13 @@ class APIKeyViewSet(viewsets.ModelViewSet):
     they have admin or editor access to.
     """
 
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsAuthenticatedUser]
+
+    def get_permissions(self):
+        if self.action in ("create", "update", "partial_update", "destroy", "add_node", "remove_node"):
+            return [IsFeederOrAdmin()]
+        return [IsAuthenticatedUser()]
+
     serializer_class = APIKeySerializer
 
     def get_queryset(self):
@@ -125,17 +132,8 @@ class APIKeyViewSet(viewsets.ModelViewSet):
         return APIKeySerializer
 
     def perform_create(self, serializer):
-        """Create a new API key and ensure the user has proper permissions."""
-        constellation = serializer.validated_data["constellation"]
-
-        # Check if user has permission to create API keys for this constellation
-        if not ConstellationUserMembership.objects.filter(
-            user=self.request.user,
-            constellation=constellation,
-            role__in=["admin", "editor"],
-        ).exists():
-            raise permissions.PermissionDenied("You don't have permission to create API keys for this constellation.")
-
+        if not user_can_manage_api_keys(self.request.user):
+            raise PermissionDenied("Feeder or admin access required to create API keys.")
         serializer.save(owner=self.request.user)
 
     @action(detail=True, methods=["post"])
@@ -221,8 +219,14 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
     """
 
     queryset = ObservedNode.objects.all().order_by("meshtastic_node_id")
-    permission_classes = [permissions.IsAuthenticated]
     serializer_class = ObservedNodeSerializer
+
+    def get_permissions(self):
+        guest_read_actions = ("list", "retrieve", "search", "recent_counts")
+        if self.action in guest_read_actions:
+            return [AllowGuestReadOnly()]
+        return [IsAuthenticatedUser()]
+
     lookup_field = "internal_id"
     lookup_url_kwarg = "internal_id"
 

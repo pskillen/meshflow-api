@@ -467,11 +467,11 @@ def test_node_packet_stats_excludes_self_only_device_metrics(create_managed_node
 
 
 @pytest.mark.django_db
-def test_stats_snapshots_list_requires_auth():
-    """Stats snapshots endpoint requires authentication."""
+def test_stats_snapshots_list_allows_guest_read():
+    """Stats snapshots list is guest-readable (issue #346)."""
     client = APIClient()
     response = client.get(reverse("stats:stats-snapshots"))
-    assert response.status_code == status.HTTP_401_UNAUTHORIZED
+    assert response.status_code == status.HTTP_200_OK
 
 
 @pytest.mark.django_db

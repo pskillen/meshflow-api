@@ -4,7 +4,7 @@ import pytest
 
 from common.mesh_node_helpers import MESHTASTIC_BROADCAST_ID
 from common.protocol import Protocol
-from constellations.models import ConstellationUserMembership, MessageChannel
+from constellations.models import MessageChannel
 from nodes.models import NodeOwnerClaim, ObservedNode
 from packets.services.text_message import TextMessagePacketService
 from text_messages.models import TextMessage
@@ -188,7 +188,7 @@ def test_authorize_node_claim_success(
 def test_authorize_node_claim_adds_user_to_constellation_as_viewer(
     create_message_packet, create_managed_node, create_packet_observation, create_user
 ):
-    """When a claim is accepted, add the user to the observer's constellation as a viewer."""
+    """When a claim is accepted, ownership is set; constellation membership is not created."""
     service = TextMessagePacketService()
     packet = create_message_packet(message_text="word word word 123")
     observer = create_managed_node()
@@ -203,9 +203,7 @@ def test_authorize_node_claim_adds_user_to_constellation_as_viewer(
         accepted_at=None,
     )
 
-    assert not ConstellationUserMembership.objects.filter(user=user, constellation=observer.constellation).exists()
-
     service.process_packet(packet, observer, observation, user)
 
-    membership = ConstellationUserMembership.objects.get(user=user, constellation=observer.constellation)
-    assert membership.role == "viewer"
+    from_node.refresh_from_db()
+    assert from_node.claimed_by_id == user.id

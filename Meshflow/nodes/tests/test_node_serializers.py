@@ -1,5 +1,6 @@
 import pytest
 
+from common.access import grant_feeder_role
 from nodes.serializers import (
     APIKeyCreateSerializer,
     APIKeyDetailSerializer,
@@ -75,6 +76,7 @@ def test_api_key_detail_serializer_valid_data(create_node_auth):
 def test_api_key_create_serializer_valid_data(create_user, create_constellation):
     """Test API key create serializer with valid data."""
     user = create_user()
+    grant_feeder_role(user)
     constellation = create_constellation(created_by=user)
 
     data = {"name": "Test API Key", "constellation": constellation.id, "nodes": []}

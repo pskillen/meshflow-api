@@ -187,7 +187,8 @@ for live dashboard / message-page updates.
 
 ## Cross-Cutting Reference
 
-- `[AUTH.md](../AUTH.md)`, `[API_KEYS.md](../API_KEYS.md)`,
+- `[permissions/README.md](../permissions/README.md)` (canonical access levels),
+  `[AUTH.md](../AUTH.md)`, `[API_KEYS.md](../API_KEYS.md)`,
 `[USER_ONBOARDING.md](../USER_ONBOARDING.md)` — authentication, JWT, social
 auth, node API keys, user onboarding.
 - `[API.md](../API.md)` — REST API conventions; `openapi.yaml` is the

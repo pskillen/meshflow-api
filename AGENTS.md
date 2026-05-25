@@ -23,7 +23,7 @@ Meshflow/
 
 - **ObservedNode**: Meshtastic radio node seen on the mesh (from packet observations). Has `last_heard`, `node_id_str`, position/metrics via `NodeLatestStatus`.
 - **ManagedNode**: User-owned node linked to a Constellation. Part of system infrastucture. Matched to ObservedNode by `node_id`.
-- **Constellation**: Subset of nodes representing a region. Has `ConstellationUserMembership` (admin/editor/viewer).
+- **Constellation**: Subset of nodes representing a region (organizational; no membership ACL). Access levels: see `docs/permissions/README.md`.
 - **NodeAPIKey**: API keys for node authentication, scoped to a Constellation.
 - **Mesh monitoring** (`mesh_monitoring`): `NodeWatch` / `NodePresence`, Celery `process_node_watch_presence`, `trigger_type=monitor` traceroutes; integrates with `packets` and `traceroute`; authenticated watch CRUD at `api/monitoring/watches/`.
 

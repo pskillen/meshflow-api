@@ -13,9 +13,9 @@ from channels.layers import get_channel_layer
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.pagination import PageNumberPagination
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from common.drf_permissions import AllowGuestReadOnly, IsAuthenticatedUser
 from common.mesh_node_helpers import MESHTASTIC_BROADCAST_ID
 from common.protocol import Protocol
 from nodes.models import ManagedNode, NodeOwnerClaim, ObservedNode
@@ -43,7 +43,7 @@ class TraceroutePagination(PageNumberPagination):
 
 
 @api_view(["GET"])
-@permission_classes([IsAuthenticated])
+@permission_classes([AllowGuestReadOnly])
 def traceroute_list(request):
     """List AutoTraceRoute with filters. All authenticated users."""
     qs = AutoTraceRoute.objects.select_related(
@@ -163,7 +163,7 @@ def traceroute_list(request):
 
 
 @api_view(["GET"])
-@permission_classes([IsAuthenticated])
+@permission_classes([AllowGuestReadOnly])
 def traceroute_detail(request, pk):
     """Single AutoTraceRoute. All authenticated users."""
     obj = get_object_or_404(
@@ -177,7 +177,7 @@ def traceroute_detail(request, pk):
 
 
 @api_view(["POST"])
-@permission_classes([IsAuthenticated, CanTriggerTraceroute])
+@permission_classes([IsAuthenticatedUser, CanTriggerTraceroute])
 def traceroute_trigger(request):
     """Manual trigger. Admin/editor only."""
     serializer = TriggerTracerouteSerializer(data=request.data)
@@ -303,7 +303,7 @@ def traceroute_trigger(request):
 
 
 @api_view(["GET"])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticatedUser])
 def traceroute_triggerable_nodes(request):
     """Returns ManagedNodes the current user can trigger traceroutes from."""
     qs = get_triggerable_nodes_queryset(request.user)
@@ -312,7 +312,7 @@ def traceroute_triggerable_nodes(request):
 
 
 @api_view(["GET"])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticatedUser])
 def traceroute_can_trigger(request):
     """Returns whether the current user can trigger traceroutes (has at least one triggerable node)."""
     can = get_triggerable_nodes_queryset(request.user).exists()

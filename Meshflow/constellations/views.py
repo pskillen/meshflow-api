@@ -1,46 +1,31 @@
 from django.shortcuts import get_object_or_404
 
-from rest_framework import mixins, permissions, status, viewsets
+from rest_framework import mixins, status, viewsets
 from rest_framework.response import Response
 
+from common.drf_permissions import AllowGuestReadOnly, IsSystemAdmin
 from common.protocol import protocol_from_query_param
 from Meshflow.permissions import NoPermission
 
-from .models import Constellation, ConstellationUserMembership, MessageChannel
-from .permissions import IsConstellationAdmin, IsConstellationEditorOrAdmin, IsConstellationMember
-from .serializers import ConstellationMemberSerializer, ConstellationSerializer, MessageChannelSerializer
+from .models import Constellation, MessageChannel
+from .serializers import ConstellationSerializer, MessageChannelSerializer
 
 
 class ConstellationViewSet(viewsets.ModelViewSet):
     """
-    API endpoint that allows constellations to be viewed or edited.
-    Users can only see constellations they are members of.
-
-    Permissions:
-    - GET /constellations/ - returns a list of any constellation for which the user is a member (regardless of role)
-    - POST /constellations/ - only Django admins
-    - GET /constellations/<id> - if member (any role)
-    - PUT /constellations/<id>/ - if ConstellationMembership.role is admin
-    - DELETE /constellations/<id>/ - Django admins
+    Constellations are public for read (guest or authenticated).
+    Writes require Django staff.
     """
 
     serializer_class = ConstellationSerializer
     queryset = Constellation.objects.all().order_by("id")
 
     def get_permissions(self):
-        admin_permission = permissions.IsAdminUser()
-        if self.action == "create":
-            return [admin_permission]
-        elif self.action == "list":
-            return [permissions.IsAuthenticated()]
-        elif self.action == "retrieve":
-            return [permissions.OR(admin_permission, IsConstellationMember())]
-        elif self.action in ["update", "partial_update"]:
-            return [permissions.OR(admin_permission, IsConstellationAdmin())]
-        elif self.action == "destroy":
-            return [admin_permission]
-        else:
-            return [NoPermission()]
+        if self.action in ("list", "retrieve"):
+            return [AllowGuestReadOnly()]
+        if self.action in ("create", "update", "partial_update", "destroy"):
+            return [IsSystemAdmin()]
+        return [NoPermission()]
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
@@ -49,15 +34,7 @@ class ConstellationViewSet(viewsets.ModelViewSet):
         return context
 
     def get_queryset(self):
-        """
-        Return constellations the user is a member of.
-        Optional ?protocol=meshtastic|meshcore filters by constellation.protocol; omit to return all protocols.
-        """
-        if self.action == "retrieve":
-            # For single object retrieval, return all constellations to let permission classes handle access
-            return Constellation.objects.all().order_by("id")
-
-        qs = Constellation.objects.filter(constellationusermembership__user=self.request.user).distinct().order_by("id")
+        qs = Constellation.objects.all().order_by("id")
         if self.action == "list":
             protocol_val = protocol_from_query_param(self.request.query_params.get("protocol"))
             if protocol_val is not None:
@@ -65,84 +42,7 @@ class ConstellationViewSet(viewsets.ModelViewSet):
         return qs
 
     def perform_create(self, serializer):
-        """
-        Create a new constellation and assign the creating user as an admin.
-        """
-        constellation = serializer.save()
-        # Create membership for the creating user as admin
-        ConstellationUserMembership.objects.create(user=self.request.user, constellation=constellation, role="admin")
-
-
-class ConstellationMembersViewSet(
-    viewsets.GenericViewSet,
-    mixins.ListModelMixin,
-    mixins.CreateModelMixin,
-    mixins.UpdateModelMixin,
-    mixins.DestroyModelMixin,
-):
-    """
-    ViewSet for managing constellation members.
-    list: GET /constellations/<id>/members/ (if member)
-    create: POST /constellations/<id>/members/ (if admin or editor)
-    update: PUT /constellations/<id>/members/<user_id>/ (if admin or editor)
-    destroy: DELETE /constellations/<id>/members/<user_id>/ (if admin or editor)
-    """
-
-    serializer_class = ConstellationMemberSerializer
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get_queryset(self):
-        constellation_id = self.kwargs.get("constellation_id")
-        constellation = get_object_or_404(Constellation, pk=constellation_id)
-        return ConstellationUserMembership.objects.filter(constellation=constellation).order_by("id")
-
-    def get_permissions(self):
-        admin_permission = permissions.IsAdminUser()
-        if self.action == "list":
-            return [permissions.OR(admin_permission, IsConstellationMember())]
-        else:
-            return [permissions.OR(admin_permission, IsConstellationEditorOrAdmin())]
-
-    def create(self, request, constellation_id=None):
-        constellation = get_object_or_404(Constellation, pk=constellation_id)
-        members_data = request.data.get("members", [])
-        for member_data in members_data:
-            user_id = member_data.get("user")
-            role = member_data.get("role")
-            if user_id and role:
-                ConstellationUserMembership.objects.update_or_create(
-                    user_id=user_id, constellation=constellation, defaults={"role": role}
-                )
-        return Response(status=status.HTTP_200_OK)
-
-    def update(self, request, pk=None, constellation_id=None):
-        constellation = get_object_or_404(Constellation, pk=constellation_id)
-        user_id = pk
-        role = request.data.get("role")
-        if not role:
-            return Response({"detail": "Role is required."}, status=status.HTTP_400_BAD_REQUEST)
-        membership, created = ConstellationUserMembership.objects.update_or_create(
-            user_id=user_id, constellation=constellation, defaults={"role": role}
-        )
-        return Response(ConstellationMemberSerializer(membership).data)
-
-    def destroy(self, request, user_id=None, constellation_id=None):
-        constellation = get_object_or_404(Constellation, pk=constellation_id)
-        if not user_id:
-            return Response({"detail": "User ID is required."}, status=status.HTTP_400_BAD_REQUEST)
-        if (
-            str(user_id) == str(request.user.id)
-            and ConstellationUserMembership.objects.filter(
-                user=request.user, constellation=constellation, role="admin"
-            ).exists()
-        ):
-            return Response({"detail": "Cannot remove yourself as an admin."}, status=status.HTTP_400_BAD_REQUEST)
-        membership = ConstellationUserMembership.objects.filter(user_id=user_id, constellation=constellation)
-        if membership.exists():
-            membership.delete()
-            return Response(status=status.HTTP_204_NO_CONTENT)
-        else:
-            return Response({"detail": "Membership not found."}, status=status.HTTP_404_NOT_FOUND)
+        serializer.save(created_by=self.request.user)
 
 
 class ConstellationMessageChannelsViewSet(
@@ -153,15 +53,11 @@ class ConstellationMessageChannelsViewSet(
     mixins.DestroyModelMixin,
 ):
     """
-    ViewSet for managing message channels in a constellation.
-    list: GET /constellations/<id>/channels/ (if member)
-    create: POST /constellations/<id>/channels/ (if admin)
-    update: PUT /constellations/<id>/channels/<pk>/ (if admin)
-    destroy: DELETE /constellations/<id>/channels/<pk>/ (if admin)
+    Message channels: public list; staff-only mutations.
     """
 
     serializer_class = MessageChannelSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [AllowGuestReadOnly]
 
     def get_queryset(self):
         constellation_id = self.kwargs.get("constellation_id")
@@ -173,11 +69,9 @@ class ConstellationMessageChannelsViewSet(
         return qs
 
     def get_permissions(self):
-        admin_permission = permissions.IsAdminUser()
         if self.action == "list":
-            return [permissions.OR(admin_permission, IsConstellationMember())]
-        else:
-            return [permissions.OR(admin_permission, IsConstellationAdmin())]
+            return [AllowGuestReadOnly()]
+        return [IsSystemAdmin()]
 
     def create(self, request, constellation_id=None):
         constellation = get_object_or_404(Constellation, pk=constellation_id)

@@ -4123,13 +4123,10 @@ paths:
     get:
       summary: List constellations
       description: >
-        Returns constellations the authenticated user is a member of (any role), including both Meshtastic and
-        MeshCore protocol rows. Omit `protocol` to return all protocols; pass `protocol=meshtastic` or
-        `protocol=meshcore` to filter by `Constellation.protocol`. Embedded `channels` respect the same optional
-        filter.
+        Public list of all constellations (guest or authenticated). Omit `protocol` to return all protocols;
+        pass `protocol=meshtastic` or `protocol=meshcore` to filter. Embedded `channels` respect the same filter.
       tags: [Constellations]
-      security:
-        - BearerAuth: []
+      security: []
       parameters:
         - $ref: '#/components/parameters/PaginationPage'
         - $ref: '#/components/parameters/PaginationPageSize'
@@ -4184,10 +4181,9 @@ paths:
   /constellations/{id}/:
     get:
       summary: Get constellation details
-      description: User must be a member of the constellation (any role)
+      description: Public read (guest or authenticated).
       tags: [Constellations]
-      security:
-        - BearerAuth: []
+      security: []
       parameters:
         - name: id
           in: path
@@ -4201,12 +4197,9 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Constellation'
-        '403':
-          description: Forbidden - User is not a member of the constellation
-
     put:
       summary: Update constellation
-      description: User must be an admin of the constellation
+      description: Django staff only.
       tags: [Constellations]
       security:
         - BearerAuth: []
@@ -4259,140 +4252,14 @@ paths:
         '403':
           description: Forbidden - User is not a Django admin
 
-  /constellations/{id}/members/:
-    get:
-      summary: List members of a constellation
-      description: User must be a member of the constellation (any role)
-      tags: [Constellations]
-      security:
-        - BearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-      responses:
-        '200':
-          description: List of members for the constellation
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/ConstellationMember'
-        '403':
-          description: Forbidden - User is not a member of the constellation
-
-    post:
-      summary: Add member to constellation
-      description: User must be an admin or editor of the constellation
-      tags: [Constellations]
-      security:
-        - BearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                members:
-                  type: array
-                  items:
-                    type: object
-                    properties:
-                      user:
-                        type: integer
-                      role:
-                        type: string
-                        enum: [admin, editor, viewer]
-      responses:
-        '200':
-          description: Member added successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Constellation'
-        '403':
-          description: Forbidden - User is not an admin or editor of the constellation
-
-  /constellations/{id}/members/{user_id}/:
-    put:
-      summary: Update member role
-      description: User must be an admin or editor of the constellation
-      tags: [Constellations]
-      security:
-        - BearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-        - name: user_id
-          in: path
-          required: true
-          schema:
-            type: integer
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                role:
-                  type: string
-                  enum: [admin, editor, viewer]
-      responses:
-        '200':
-          description: Member role updated successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Constellation'
-        '403':
-          description: Forbidden - User is not an admin or editor of the constellation
-
-    delete:
-      summary: Remove member from constellation
-      description: User must be an admin or editor of the constellation
-      tags: [Constellations]
-      security:
-        - BearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-        - name: user_id
-          in: path
-          required: true
-          schema:
-            type: integer
-      responses:
-        '204':
-          description: Member removed successfully
-        '403':
-          description: Forbidden - User is not an admin or editor of the constellation
-
   /constellations/{id}/channels/:
     get:
       summary: List message channels for a constellation
       description: >
-        User must be a member of the constellation (any role). Omit `protocol` to return all channel rows; pass
+        Public read (guest or authenticated). Omit `protocol` to return all channel rows; pass
         `protocol=meshtastic` or `protocol=meshcore` to filter by `MessageChannel.protocol`.
       tags: [Constellations]
-      security:
-        - BearerAuth: []
+      security: []
       parameters:
         - name: id
           in: path
@@ -6581,7 +6448,7 @@ paths:
   /traceroutes/triggerable-nodes/:
     get:
       summary: List nodes user can trigger traceroutes from
-      description: Returns ManagedNodes the current user can trigger traceroutes from (staff=all, constellation admin/editor=nodes in their constellations, owner=their nodes). Only nodes with allow_auto_traceroute=True and recent packet ingestion as observer (SCHEDULE_TRACEROUTE_SOURCE_RECENCY_SECONDS), matching Celery schedule_traceroutes source selection.
+      description: Returns ManagedNodes the current feeder or admin user can trigger traceroutes from (all eligible sources). Only nodes with allow_auto_traceroute=True and recent packet ingestion as observer (SCHEDULE_TRACEROUTE_SOURCE_RECENCY_SECONDS).
       tags: [Traceroutes]
       security:
         - BearerAuth: []

@@ -1,5 +1,7 @@
 # Social Authentication Flow (Google/GitHub/Discord)
 
+Authorization levels (guest / user / feeder / admin) are documented in **[permissions/README.md](permissions/README.md)**. This file covers OAuth login only.
+
 This document explains how social authentication (Google/GitHub/Discord OAuth2) is implemented in this project, including the flow between the frontend (React) and backend (Django REST Framework with dj-rest-auth/allauth).
 
 ---
