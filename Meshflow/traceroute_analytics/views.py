@@ -21,6 +21,25 @@ from nodes.models import ManagedNode, ObservedNode
 from traceroute.models import AutoTraceRoute
 
 
+def _route_hop_node_id(entry) -> int | None:
+    """Meshtastic hop id from a route list item (``{node_id, snr}`` dict or legacy bare int)."""
+    if entry is None:
+        return None
+    if isinstance(entry, dict):
+        nid = entry.get("node_id")
+    else:
+        try:
+            nid = int(entry)
+        except TypeError, ValueError:
+            return None
+    if nid is None:
+        return None
+    try:
+        return int(nid)
+    except TypeError, ValueError:
+        return None
+
+
 def _traceroute_stats_by_strategy(qs):
     """Aggregate counts per coalesced target_strategy for a queryset."""
     legacy_label = AutoTraceRoute.TARGET_STRATEGY_LEGACY
@@ -402,7 +421,7 @@ def traceroute_stats(request):
         tgt_id = tr.target_node.meshtastic_node_id if tr.target_node else None
         exclude_ids = {src_id, tgt_id, UNKNOWN_NODE_ID}
         for item in (tr.route or []) + (tr.route_back or []):
-            nid = item.get("node_id")
+            nid = _route_hop_node_id(item)
             if nid is not None and nid not in exclude_ids:
                 router_counts[nid] += 1
 

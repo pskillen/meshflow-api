@@ -361,6 +361,35 @@ class TestTracerouteStats:
         sources = {s["trigger_type"]: s["count"] for s in body["sources"]}
         assert sources.get(AutoTraceRoute.TRIGGER_TYPE_EXTERNAL) == 1
 
+    def test_stats_top_routers_accepts_legacy_integer_route_hops(
+        self,
+        api_client,
+        create_user,
+        create_managed_node,
+        create_observed_node,
+        create_auto_traceroute,
+    ):
+        """Regression: legacy rows store route hops as bare ints, not {node_id, snr} dicts."""
+        user = create_user()
+        mn = create_managed_node(meshtastic_node_id=999_999_901)
+        on = create_observed_node(meshtastic_node_id=999_999_902)
+        relay_id = 0xABCD0001
+        api_client.force_authenticate(user=user)
+
+        create_auto_traceroute(
+            source_node=mn,
+            target_node=on,
+            triggered_by=user,
+            status=AutoTraceRoute.STATUS_COMPLETED,
+            route=[relay_id],
+            route_back=[relay_id],
+        )
+
+        resp = api_client.get("/api/traceroutes/stats/")
+        assert resp.status_code == 200
+        top = resp.json()["top_routers"]
+        assert any(r["meshtastic_node_id"] == relay_id and r["count"] == 2 for r in top)
+
 
 @pytest.mark.django_db
 class TestFeederReach:
