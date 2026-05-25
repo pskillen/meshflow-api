@@ -29,27 +29,6 @@ class Constellation(models.Model):
         return self.name
 
 
-class ConstellationUserMembership(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    constellation = models.ForeignKey(Constellation, on_delete=models.CASCADE)
-    role = models.CharField(
-        max_length=32,
-        choices=[
-            ("admin", "Admin"),
-            ("editor", "Editor"),
-            ("viewer", "Viewer"),
-        ],
-    )
-
-    class Meta:
-        unique_together = ("user", "constellation")
-        verbose_name = _("Constellation membership")
-        verbose_name_plural = _("Constellation memberships")
-
-    def __str__(self):
-        return f"{self.user.username} - {self.constellation.name}"
-
-
 class MeshCoreChannelType(models.IntegerChoices):
     """MeshCore companion channel type (device config; not on wire)."""
 
