@@ -4,9 +4,10 @@ from django.urls import reverse
 
 from rest_framework import serializers
 
+from common.access import AccessLevel, get_access_level, user_can_manage_api_keys
 from common.mesh_node_helpers import meshtastic_id_to_hex, observed_node_id_str
 from common.protocol import Protocol
-from constellations.models import Constellation, ConstellationUserMembership, MessageChannel
+from constellations.models import Constellation, MessageChannel
 from meshcore_packets.serializers_channel import MessageChannelMcSerializer
 from users.models import User
 
@@ -278,17 +279,9 @@ class APIKeyCreateSerializer(serializers.ModelSerializer):
         fields = ["id", "name", "constellation", "nodes", "owner", "created_at", "last_used", "is_active", "key"]
 
     def validate_constellation(self, value):
-        """Validate that the user has permission to create API keys for this constellation."""
         user = self.context["request"].user
-
-        # Check if the user is a member of the constellation with admin or editor role
-        membership = ConstellationUserMembership.objects.filter(
-            user=user, constellation=value, role__in=["admin", "editor"]
-        ).first()
-
-        if not membership:
-            raise serializers.ValidationError("You don't have permission to create API keys for this constellation.")
-
+        if not user_can_manage_api_keys(user):
+            raise serializers.ValidationError("Feeder or admin access required to create API keys.")
         return value
 
     def create(self, validated_data):
@@ -1229,6 +1222,24 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
     def get_meshtastic_inferred_max_hops(self, obj):
         status = self._get_latest_status(obj)
         return status.meshtastic_inferred_max_hops if status else None
+
+    GUEST_REDACTED_FIELDS = (
+        "latest_position",
+        "owner",
+        "claim",
+        "environment_settings_editable",
+        "rf_profile_editable",
+        "has_rf_profile",
+        "has_ready_rf_render",
+    )
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        request = self.context.get("request")
+        if request and get_access_level(request) == AccessLevel.GUEST:
+            for field in self.GUEST_REDACTED_FIELDS:
+                data.pop(field, None)
+        return data
 
     def get_claim(self, obj):
         """

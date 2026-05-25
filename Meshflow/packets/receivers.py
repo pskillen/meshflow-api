@@ -3,7 +3,6 @@ import logging
 from django.dispatch import receiver
 
 from common.mesh_node_helpers import meshtastic_id_to_hex
-from constellations.models import ConstellationUserMembership
 from nodes.models import NodeLatestStatus, ObservedNode
 from traceroute.new_node_baseline import enqueue_new_node_baseline
 
@@ -123,16 +122,6 @@ def message_packet_received(
 
     service = TextMessagePacketService()
     service.process_packet(packet, observer, observation, user=None)
-
-
-@receiver(node_claim_authorized)
-def on_node_claim_authorized_add_user_to_constellation(sender, node, claim, observer, **kwargs):
-    """Add the claiming user to the observer's constellation as a viewer."""
-    ConstellationUserMembership.objects.get_or_create(
-        user=claim.user,
-        constellation=observer.constellation,
-        defaults={"role": "viewer"},
-    )
 
 
 @receiver(node_info_packet_received)
