@@ -31,6 +31,7 @@ from .permission_helpers import (
     user_can_edit_observed_node_environment_settings,
     user_can_edit_observed_node_rf_profile,
 )
+from .positioning import managed_node_default_position_data
 
 
 class ObservedNodeEnvironmentSettingsSerializer(serializers.Serializer):
@@ -496,14 +497,15 @@ class ManagedNodeSerializer(serializers.ModelSerializer):
                 "last_sats_in_view",
                 "last_pdop",
             ]
-            if all(data[k] is None for k in real_fields):
-                return None
-            return PositionSerializer(data).data
-        # Fallback to latest Position instance
+            if not all(data[k] is None for k in real_fields):
+                return PositionSerializer(data).data
         latest = (
             Position.objects.filter(node__meshtastic_node_id=obj.meshtastic_node_id).order_by("-reported_time").first()
         )
-        return PositionSerializer(latest).data if latest else None
+        if latest:
+            return PositionSerializer(latest).data
+        default_data = managed_node_default_position_data(obj)
+        return PositionSerializer(default_data).data if default_data else None
 
     def get_device_metrics(self, obj):
         annotation_keys = [
