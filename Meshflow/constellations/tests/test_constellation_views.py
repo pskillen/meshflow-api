@@ -4,6 +4,7 @@ import pytest
 from rest_framework import status
 from rest_framework.test import APIClient
 
+from common.protocol import Protocol
 from constellations.models import Constellation, ConstellationUserMembership, MessageChannel
 
 
@@ -27,6 +28,76 @@ def test_constellation_list_view(create_constellation, create_user):
     assert len(results) == 2
     assert results[0]["name"] == constellation1.name
     assert results[1]["name"] == constellation2.name
+
+
+@pytest.mark.django_db
+def test_constellation_list_includes_meshcore_and_meshtastic(create_constellation, create_user):
+    """List returns member constellations for every protocol when ?protocol is omitted."""
+    client = APIClient()
+    user = create_user()
+    client.force_authenticate(user=user)
+
+    mt = create_constellation(created_by=user, name="MT Region", protocol=Protocol.MESHTASTIC)
+    mc = create_constellation(created_by=user, name="MC Region", protocol=Protocol.MESHCORE)
+    MessageChannel.objects.create(
+        name="MC Public",
+        constellation=mc,
+        protocol=Protocol.MESHCORE,
+        mc_channel_idx=0,
+    )
+
+    response = client.get(reverse("constellation-list"))
+
+    assert response.status_code == status.HTTP_200_OK
+    by_id = {row["id"]: row for row in response.data["results"]}
+    assert mt.id in by_id
+    assert mc.id in by_id
+    assert by_id[mc.id]["protocol"] == Protocol.MESHCORE
+    assert len(by_id[mc.id]["channels"]) == 1
+    assert by_id[mc.id]["channels"][0]["protocol"] == Protocol.MESHCORE
+
+
+@pytest.mark.django_db
+def test_constellation_list_protocol_query_filters_constellations_and_channels(create_constellation, create_user):
+    client = APIClient()
+    user = create_user()
+    client.force_authenticate(user=user)
+
+    mt = create_constellation(created_by=user, name="MT Only", protocol=Protocol.MESHTASTIC)
+    MessageChannel.objects.create(name="MT Ch", constellation=mt, protocol=Protocol.MESHTASTIC)
+    mc = create_constellation(created_by=user, name="MC Only", protocol=Protocol.MESHCORE)
+    MessageChannel.objects.create(
+        name="MC Ch",
+        constellation=mc,
+        protocol=Protocol.MESHCORE,
+        mc_channel_idx=1,
+    )
+
+    response = client.get(reverse("constellation-list"), {"protocol": "meshcore"})
+
+    assert response.status_code == status.HTTP_200_OK
+    ids = {row["id"] for row in response.data["results"]}
+    assert ids == {mc.id}
+    channels = response.data["results"][0]["channels"]
+    assert len(channels) == 1
+    assert channels[0]["name"] == "MC Ch"
+
+
+@pytest.mark.django_db
+def test_constellation_channels_list_protocol_filter(create_constellation, create_user):
+    client = APIClient()
+    user = create_user()
+    client.force_authenticate(user=user)
+    constellation = create_constellation(created_by=user, protocol=Protocol.MESHCORE)
+    MessageChannel.objects.create(name="MC", constellation=constellation, protocol=Protocol.MESHCORE, mc_channel_idx=0)
+    MessageChannel.objects.create(name="MT stray", constellation=constellation, protocol=Protocol.MESHTASTIC)
+
+    url = reverse("constellation-channels-list-create", kwargs={"constellation_id": constellation.id})
+    response = client.get(url, {"protocol": "meshcore"})
+
+    assert response.status_code == status.HTTP_200_OK
+    names = [row["name"] for row in response.data["results"]]
+    assert names == ["MC"]
 
 
 @pytest.mark.django_db

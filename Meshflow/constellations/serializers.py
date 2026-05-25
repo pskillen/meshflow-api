@@ -1,6 +1,22 @@
 from rest_framework import serializers
 
-from .models import Constellation, ConstellationUserMembership, MessageChannel
+from constellations.models import Constellation, ConstellationUserMembership, MeshCoreChannelType, MessageChannel
+
+
+def message_channel_payload(channel: MessageChannel) -> dict:
+    """Nested channel dict for Constellation list/detail (matches MessageChannel schema)."""
+    mc_type = None
+    if channel.mc_channel_type is not None:
+        mc_type = MeshCoreChannelType(channel.mc_channel_type).label
+    return {
+        "id": channel.id,
+        "name": channel.name,
+        "protocol": channel.protocol,
+        "mc_channel_idx": channel.mc_channel_idx,
+        "mc_channel_type": mc_type,
+        "mc_hashtag": channel.mc_hashtag,
+        "constellation": channel.constellation_id,
+    }
 
 
 class ConstellationSerializer(serializers.ModelSerializer):
@@ -24,16 +40,11 @@ class ConstellationSerializer(serializers.ModelSerializer):
         read_only_fields = ["created_by"]
 
     def get_channels(self, obj):
-        channels = MessageChannel.objects.filter(constellation=obj)
-        return [
-            {
-                "id": channel.id,
-                "name": channel.name,
-                "protocol": channel.protocol,
-                "mc_channel_idx": channel.mc_channel_idx,
-            }
-            for channel in channels
-        ]
+        channels = MessageChannel.objects.filter(constellation=obj).order_by("id")
+        protocol_filter = self.context.get("channel_protocol_filter")
+        if protocol_filter is not None:
+            channels = channels.filter(protocol=protocol_filter)
+        return [message_channel_payload(ch) for ch in channels]
 
     def create(self, validated_data):
         """Create a new constellation."""
