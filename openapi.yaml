@@ -1885,7 +1885,10 @@ components:
                 enum: [intra_zone, dx_across, dx_same_side]
         position:
           type: object
-          description: The latest known position of the node
+          description: >
+            Latest known position from observed telemetry (NodeLatestStatus or position history).
+            When none exists, falls back to the operator-configured default location on the managed node
+            (stored as default_location_latitude/longitude in the API; not exposed as separate fields).
           readOnly: true
           properties:
             latitude:
