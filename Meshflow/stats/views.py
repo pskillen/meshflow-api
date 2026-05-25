@@ -12,9 +12,9 @@ from django.db.models.functions import Mod, Trunc
 
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from common.drf_permissions import AllowGuestReadOnly, IsAuthenticatedUser
 from common.mesh_node_helpers import meshtastic_id_to_hex
 from common.protocol import Protocol
 from nodes.models import ManagedNode, ObservedNode
@@ -127,7 +127,7 @@ def get_interval_delta(interval_type: str, interval: int) -> timedelta:
 
 
 @api_view(["GET"])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticatedUser])
 def node_packet_stats(request, node_id: int):
     """
     Get packet statistics for a specific node over time intervals.
@@ -217,7 +217,7 @@ def node_packet_stats(request, node_id: int):
 
 
 @api_view(["GET"])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticatedUser])
 def node_received_stats(request, node_id: int):
     """
     Get statistics for packets received/heard by a specific node over time intervals.
@@ -299,7 +299,7 @@ def node_received_stats(request, node_id: int):
 
 
 @api_view(["GET"])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticatedUser])
 def node_neighbour_stats(request, node_id: int):
     """
     Get statistics for packets received by a managed node, grouped by source
@@ -430,7 +430,7 @@ def node_neighbour_stats(request, node_id: int):
 
 
 @api_view(["GET"])
-@permission_classes([IsAuthenticated])
+@permission_classes([AllowGuestReadOnly])
 def global_packet_stats(request):
     """
     Get global packet statistics across all nodes.
@@ -521,7 +521,7 @@ def _parse_datetime_param(value):
 
 
 @api_view(["GET"])
-@permission_classes([IsAuthenticated])
+@permission_classes([AllowGuestReadOnly])
 def stats_snapshots_list(request):
     """
     List stored stats snapshots with optional filters.
