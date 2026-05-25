@@ -393,9 +393,7 @@ class ManagedNodeAdminForm(forms.ModelForm):
             interval_field = self.fields["mc_flood_advert_interval_hours"]
             interval_field.required = False
             if interval_field.initial in (None, ""):
-                interval_field.initial = getattr(
-                    self.instance, "mc_flood_advert_interval_hours", None
-                ) or 6
+                interval_field.initial = getattr(self.instance, "mc_flood_advert_interval_hours", None) or 6
 
     def _protocol_from_form(self):
         protocol = self.cleaned_data.get("protocol") if hasattr(self, "cleaned_data") else None
