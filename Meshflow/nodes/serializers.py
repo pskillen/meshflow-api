@@ -727,11 +727,7 @@ class OwnedManagedNodeSerializer(ManagedNodeSerializer):
                 protocol = self.instance.protocol
             if protocol is not None and protocol != Protocol.MESHCORE:
                 raise serializers.ValidationError(
-                    {
-                        "mc_flood_advert_interval_hours": (
-                            "Only MeshCore managed nodes support flood advert interval."
-                        )
-                    }
+                    {"mc_flood_advert_interval_hours": ("Only MeshCore managed nodes support flood advert interval.")}
                 )
 
         return attrs

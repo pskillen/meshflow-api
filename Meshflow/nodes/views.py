@@ -1212,10 +1212,7 @@ class ManagedNodeViewSet(viewsets.ModelViewSet):
         self._managed_node_mutate_allowed(instance)
         old_interval = instance.mc_flood_advert_interval_hours
         instance = serializer.save()
-        if (
-            instance.protocol == Protocol.MESHCORE
-            and instance.mc_flood_advert_interval_hours != old_interval
-        ):
+        if instance.protocol == Protocol.MESHCORE and instance.mc_flood_advert_interval_hours != old_interval:
             result = dispatch_feeder_config_refresh(instance)
             if result != "sent":
                 logger.info(

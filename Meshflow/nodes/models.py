@@ -175,9 +175,7 @@ class ManagedNode(models.Model):
             MinValueValidator(2),
             MaxValueValidator(24),
         ],
-        help_text=_(
-            "MeshCore feeder: hours between flood-routed advertisements sent by the bot."
-        ),
+        help_text=_("MeshCore feeder: hours between flood-routed advertisements sent by the bot."),
     )
 
     bot_version = models.CharField(

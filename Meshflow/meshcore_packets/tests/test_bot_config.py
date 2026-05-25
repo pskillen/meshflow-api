@@ -1,7 +1,5 @@
 """Tests for feeder bot-config GET."""
 
-from django.urls import reverse
-
 import pytest
 from rest_framework.test import APIClient
 
