@@ -178,6 +178,17 @@ def test_observed_node_detail_view(create_observed_node, create_user):
 
 
 @pytest.mark.django_db
+def test_observed_node_detail_by_legacy_decimal_id(create_observed_node, create_user):
+    client = APIClient()
+    user = create_user()
+    client.force_authenticate(user=user)
+    node = create_observed_node(meshtastic_node_id=524809444)
+    response = client.get(reverse("observed-node-detail", kwargs={"internal_id": "524809444"}))
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data["internal_id"] == str(node.internal_id)
+
+
+@pytest.mark.django_db
 def test_observed_node_detail_by_mt_prefix(create_observed_node, create_user):
     client = APIClient()
     user = create_user()

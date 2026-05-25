@@ -134,7 +134,8 @@ def resolve_observed_node_lookup(lookup: str) -> ObservedNodeLookupResult:
     """
     Resolve a path/query segment to zero, one, or two (ambiguous) ObservedNode rows.
 
-    Supports UUID, ``mt:`` / ``!`` Meshtastic hex, ``mc:`` prefix, and bare hex.
+    Supports UUID, ``mt:`` / ``!`` Meshtastic hex, ``mc:`` prefix, legacy decimal
+    Meshtastic node id, and bare hex.
     """
     from nodes.models import ObservedNode
 
@@ -163,6 +164,11 @@ def resolve_observed_node_lookup(lookup: str) -> ObservedNodeLookupResult:
         if node is None:
             return ObservedNodeLookupNotFound()
         return ObservedNodeLookupResolved(node=node)
+
+    if raw.isdigit():
+        node = _meshtastic_node_by_id(int(raw))
+        if node is not None:
+            return ObservedNodeLookupResolved(node=node)
 
     hexish = lower.replace("0x", "")
     if hexish and all(c in "0123456789abcdef" for c in hexish):

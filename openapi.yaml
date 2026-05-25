@@ -4904,7 +4904,8 @@ paths:
       summary: Get observed node details
       description: >
         Resolve an observed node by path segment: UUID ``internal_id``; Meshtastic ``!{hex8}`` or
-        ``mt:{hex8}``; MeshCore ``mc:{prefix12}``; or bare hex (8+ hex chars). Bare hex matching
+        ``mt:{hex8}``; MeshCore ``mc:{prefix12}``; legacy decimal Meshtastic node id; or bare hex.
+        Bare hex matching
         both Meshtastic and MeshCore returns **300 Multiple Choices** with candidate list.
         Deprecated numeric redirect: ``GET /nodes/observed-nodes/by-meshtastic-id/{id}/``.
       tags: [Nodes]
@@ -4917,7 +4918,7 @@ paths:
           schema:
             type: string
           description: >
-            UUID, ``mt:``/``!`` Meshtastic hex, ``mc:`` MeshCore prefix, or bare hex (may return 300).
+            UUID, ``mt:``/``!`` Meshtastic hex, ``mc:`` MeshCore prefix, decimal MT id, or bare hex (may return 300).
       responses:
         '200':
           description: Node details

@@ -54,6 +54,14 @@ def test_lookup_meshcore_mc_prefix(create_observed_node):
 
 
 @pytest.mark.django_db
+def test_lookup_legacy_decimal_meshtastic_id(create_observed_node):
+    node = create_observed_node(meshtastic_node_id=524809444)
+    result = resolve_observed_node_lookup("524809444")
+    assert isinstance(result, ObservedNodeLookupResolved)
+    assert result.node.pk == node.pk
+
+
+@pytest.mark.django_db
 def test_lookup_bare_hex_meshtastic_only(create_observed_node):
     node = create_observed_node(meshtastic_node_id=0xABCDEF01)
     result = resolve_observed_node_lookup("abcdef01")
