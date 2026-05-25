@@ -29,6 +29,13 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from common.mesh_node_helpers import observed_node_search_conditions
+from common.observed_node_lookup import (
+    ObservedNodeLookupAmbiguous,
+    ObservedNodeLookupNotFound,
+    ambiguous_lookup_exception,
+    build_ambiguous_lookup_response,
+    resolve_observed_node_lookup,
+)
 from common.protocol import Protocol
 from constellations.models import ConstellationUserMembership
 from meshcore_packets.models import MeshCorePacketObservation
@@ -208,8 +215,9 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
     """Observed nodes across Meshtastic and MeshCore.
 
     List supports ``protocol`` (``meshtastic`` / ``meshcore``) and ``last_heard_after``.
-    Detail lookup uses ``internal_id`` (UUID). Meshtastic bookmarks may use
-    ``GET …/by-meshtastic-id/{meshtastic_node_id}/`` to resolve the canonical URL.
+    Detail path ``{internal_id}`` accepts UUID, ``mt:``/``!`` Meshtastic hex, ``mc:`` prefix,
+    or bare hex (HTTP 300 when both protocols match). Legacy numeric bookmarks:
+    ``GET …/by-meshtastic-id/{meshtastic_node_id}/`` (deprecated).
     """
 
     queryset = ObservedNode.objects.all().order_by("meshtastic_node_id")
@@ -217,6 +225,29 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
     serializer_class = ObservedNodeSerializer
     lookup_field = "internal_id"
     lookup_url_kwarg = "internal_id"
+
+    def _resolve_detail_lookup(self):
+        lookup = self.kwargs.get(self.lookup_url_kwarg, "")
+        return resolve_observed_node_lookup(lookup)
+
+    def get_object(self):
+        result = self._resolve_detail_lookup()
+        if isinstance(result, ObservedNodeLookupAmbiguous):
+            raise ambiguous_lookup_exception(result.choices)
+        if isinstance(result, ObservedNodeLookupNotFound):
+            raise Http404
+        node = result.node
+        self.check_object_permissions(self.request, node)
+        return node
+
+    def retrieve(self, request, *args, **kwargs):
+        result = self._resolve_detail_lookup()
+        if isinstance(result, ObservedNodeLookupAmbiguous):
+            return Response(build_ambiguous_lookup_response(result.choices), status=300)
+        if isinstance(result, ObservedNodeLookupNotFound):
+            raise Http404
+        serializer = self.get_serializer(result.node)
+        return Response(serializer.data)
 
     def get_queryset(self):
         """Filter nodes based on user permissions and prefetch latest status."""
@@ -327,8 +358,14 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
         url_path=r"by-meshtastic-id/(?P<meshtastic_node_id>[0-9]+)",
     )
     def by_meshtastic_id(self, request, meshtastic_node_id=None):
-        """Redirect legacy Meshtastic numeric bookmarks to the canonical ``internal_id`` detail URL."""
-        node = get_object_or_404(ObservedNode, meshtastic_node_id=meshtastic_node_id)
+        """Deprecated: redirect numeric Meshtastic id to UUID detail URL. Prefer ``mt:``/``!`` on retrieve."""
+        from common.protocol import Protocol
+
+        node = get_object_or_404(
+            ObservedNode,
+            protocol=Protocol.MESHTASTIC,
+            meshtastic_node_id=meshtastic_node_id,
+        )
         detail_url = reverse(
             "observed-node-detail",
             kwargs={"internal_id": node.internal_id},

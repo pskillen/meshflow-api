@@ -178,6 +178,69 @@ def test_observed_node_detail_view(create_observed_node, create_user):
 
 
 @pytest.mark.django_db
+def test_observed_node_detail_by_mt_prefix(create_observed_node, create_user):
+    client = APIClient()
+    user = create_user()
+    client.force_authenticate(user=user)
+    node = create_observed_node(meshtastic_node_id=0x12345678)
+    response = client.get(reverse("observed-node-detail", kwargs={"internal_id": "mt:12345678"}))
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data["internal_id"] == str(node.internal_id)
+
+
+@pytest.mark.django_db
+def test_observed_node_detail_by_mc_prefix(create_observed_node, create_user):
+    from common.protocol import Protocol
+
+    client = APIClient()
+    user = create_user()
+    client.force_authenticate(user=user)
+    prefix = "c" * 12
+    node = create_observed_node(
+        protocol=Protocol.MESHCORE,
+        meshtastic_node_id=None,
+        mc_pubkey=prefix + "d" * 52,
+        mc_pubkey_prefix=prefix,
+        long_name="MC",
+        short_name="MC",
+    )
+    response = client.get(reverse("observed-node-detail", kwargs={"internal_id": f"mc:{prefix}"}))
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data["internal_id"] == str(node.internal_id)
+
+
+@pytest.mark.django_db
+def test_observed_node_detail_bare_hex_ambiguous(create_observed_node, create_user):
+    from common.protocol import Protocol
+
+    client = APIClient()
+    user = create_user()
+    client.force_authenticate(user=user)
+    hex8 = "3ade68b1"
+    create_observed_node(meshtastic_node_id=int(hex8, 16))
+    create_observed_node(
+        protocol=Protocol.MESHCORE,
+        meshtastic_node_id=None,
+        mc_pubkey_prefix=hex8 + "cafebabe",
+        mc_pubkey=hex8 + "cafebabe" + "0" * 48,
+        long_name="MC",
+        short_name="MC",
+    )
+    response = client.get(reverse("observed-node-detail", kwargs={"internal_id": hex8}))
+    assert response.status_code == 300
+    assert len(response.data["choices"]) == 2
+
+
+@pytest.mark.django_db
+def test_observed_node_detail_lookup_not_found(create_user):
+    client = APIClient()
+    user = create_user()
+    client.force_authenticate(user=user)
+    response = client.get(reverse("observed-node-detail", kwargs={"internal_id": "mc:" + "f" * 12}))
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+
+
+@pytest.mark.django_db
 def test_node_api_key_list_view(create_node_api_key, create_user):
     """Test node API key list view."""
     client = APIClient()
