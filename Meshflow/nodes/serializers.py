@@ -389,6 +389,7 @@ class ManagedNodeSerializer(serializers.ModelSerializer):
             "constellation_id",
             "constellation",
             "allow_auto_traceroute",
+            "mc_flood_advert_interval_hours",
             "bot_version",
             "bot_version_reported_at",
             "mc_channels_synced_at",
@@ -719,6 +720,16 @@ class OwnedManagedNodeSerializer(ManagedNodeSerializer):
                 errors[key] = "Message channel must belong to the managed node's constellation."
         if errors:
             raise serializers.ValidationError(errors)
+
+        if "mc_flood_advert_interval_hours" in attrs:
+            protocol = attrs.get("protocol")
+            if protocol is None and self.instance is not None:
+                protocol = self.instance.protocol
+            if protocol is not None and protocol != Protocol.MESHCORE:
+                raise serializers.ValidationError(
+                    {"mc_flood_advert_interval_hours": ("Only MeshCore managed nodes support flood advert interval.")}
+                )
+
         return attrs
 
     def update(self, instance, validated_data):

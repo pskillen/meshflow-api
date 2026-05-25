@@ -2,6 +2,7 @@ from django.urls import path
 
 from meshcore_packets.views import (
     ManagedNodeMcChannelApplyView,
+    MeshCoreFeederBotConfigView,
     MeshCoreFeederBotVersionView,
     MeshCoreMcChannelSyncView,
     MeshCorePacketIngestView,
@@ -18,6 +19,11 @@ urlpatterns = [
         "feeders/<str:feeder_pubkey_prefix>/mc-channel-sync/",
         MeshCoreMcChannelSyncView.as_view(),
         name="meshcore-feeder-mc-channel-sync",
+    ),
+    path(
+        "feeders/<str:feeder_pubkey_prefix>/bot-config/",
+        MeshCoreFeederBotConfigView.as_view(),
+        name="meshcore-feeder-bot-config",
     ),
     path(
         "feeders/<str:feeder_pubkey_prefix>/bot-version/",

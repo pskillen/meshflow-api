@@ -32,6 +32,22 @@ class MeshCoreFeederBotVersionSerializer(serializers.Serializer):
     bot_version = serializers.CharField(max_length=128, trim_whitespace=True)
 
 
+class MeshCoreFeederBotConfigView(APIView):
+    """Return operator config for the meshflow-bot linked to this MeshCore feeder."""
+
+    authentication_classes = [NodeAPIKeyAuthentication]
+    permission_classes = [MeshCoreFeederPermission]
+
+    def get(self, request, feeder_pubkey_prefix, format=None):
+        managed_node = request.auth.node
+        return Response(
+            {
+                "mc_flood_advert_interval_hours": managed_node.mc_flood_advert_interval_hours,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
 class MeshCoreFeederBotVersionView(APIView):
     """Update bot_version for the MeshCore feeder identified in the URL prefix."""
 

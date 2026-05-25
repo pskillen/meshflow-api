@@ -1829,6 +1829,12 @@ components:
           type: boolean
           description: If true, this node may be used for auto-scheduled traceroutes and manual triggers
           default: false
+        mc_flood_advert_interval_hours:
+          type: integer
+          minimum: 2
+          maximum: 24
+          default: 6
+          description: MeshCore feeder hours between flood-routed advertisements sent by the bot
         bot_version:
           type: string
           nullable: true
@@ -3804,6 +3810,38 @@ paths:
       responses:
         '200':
           description: Version recorded
+        '403':
+          description: Feeder not linked, ambiguous identity, or pubkey mismatch
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeshCoreFeederAuthError'
+
+  /meshcore/feeders/{feeder_pubkey_prefix}/bot-config/:
+    get:
+      summary: Feeder bot runtime config (MeshCore)
+      description: >
+        Returns operator-configured settings for the meshflow-bot process linked to this feeder
+        (e.g. flood advert interval). Same auth as bot-version and packet ingest.
+      tags: [MeshCore packets]
+      security:
+        - NodeApiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/FeederPubkeyPrefix'
+        - $ref: '#/components/parameters/MeshCoreFeederPubkeyHeader'
+      responses:
+        '200':
+          description: Bot config for this feeder
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [mc_flood_advert_interval_hours]
+                properties:
+                  mc_flood_advert_interval_hours:
+                    type: integer
+                    minimum: 2
+                    maximum: 24
         '403':
           description: Feeder not linked, ambiguous identity, or pubkey mismatch
           content:

@@ -17,6 +17,7 @@ MeshCore uses the same pattern as Meshtastic: **device identity in the URL**, pl
 | **Ingest URL** | `POST /api/packets/{node_id}/ingest/` | `POST /api/meshcore/feeders/{feeder_pubkey_prefix}/packets/ingest/` |
 | **Channel sync** | — | `POST /api/meshcore/feeders/{feeder_pubkey_prefix}/mc-channel-sync/` |
 | **Bot version** | `PUT /api/packets/{node_id}/bot-version/` | `PUT /api/meshcore/feeders/{feeder_pubkey_prefix}/bot-version/` |
+| **Bot config** | — | `GET /api/meshcore/feeders/{feeder_pubkey_prefix}/bot-config/` (`mc_flood_advert_interval_hours`, default 6h) |
 | **What the bot sends** | `node_id` in URL = device nodenum | **12-hex pubkey prefix** in URL (from `mc:` id after connect) |
 | **Optional header** | — | `X-MeshCore-Feeder-Pubkey` (64 hex) must match `ManagedNode.mc_pubkey` when set |
 | **How the API picks the observer** | `NodeAuth` + URL `node_id` | `NodeAuth` + URL prefix matches `pubkey_to_prefix(mc_pubkey)` |

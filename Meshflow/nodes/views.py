@@ -1,3 +1,4 @@
+import logging
 import re
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -88,6 +89,8 @@ from nodes.services.environment_metrics import get_environment_metrics_bulk
 from packets.models import PacketObservation
 
 from .utils import generate_claim_key
+
+logger = logging.getLogger(__name__)
 
 
 def _multi_query_strings(request, name):
@@ -1202,8 +1205,21 @@ class ManagedNodeViewSet(viewsets.ModelViewSet):
         serializer.save(owner=self.request.user)
 
     def perform_update(self, serializer):
-        self._managed_node_mutate_allowed(serializer.instance)
-        serializer.save()
+        from common.protocol import Protocol
+        from meshcore_packets.services.feeder_config import dispatch_feeder_config_refresh
+
+        instance = serializer.instance
+        self._managed_node_mutate_allowed(instance)
+        old_interval = instance.mc_flood_advert_interval_hours
+        instance = serializer.save()
+        if instance.protocol == Protocol.MESHCORE and instance.mc_flood_advert_interval_hours != old_interval:
+            result = dispatch_feeder_config_refresh(instance)
+            if result != "sent":
+                logger.info(
+                    "ManagedNode %s interval updated; feeder config refresh: %s",
+                    instance.internal_id,
+                    result,
+                )
 
     def perform_destroy(self, instance):
         self._managed_node_mutate_allowed(instance)
