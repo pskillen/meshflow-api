@@ -40,7 +40,6 @@ def test_constellation_list_protocol_filter(create_constellation, create_user):
     user = create_user()
     client.force_authenticate(user=user)
 
-    mt = create_constellation(created_by=user, name="MT Only", protocol=Protocol.MESHTASTIC)
     mc = create_constellation(created_by=user, name="MC Only", protocol=Protocol.MESHCORE)
     MessageChannel.objects.create(
         name="MC Ch",

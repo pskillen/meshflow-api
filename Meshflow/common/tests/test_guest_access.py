@@ -1,14 +1,11 @@
 """Representative guest / user / feeder access tests for issue #346."""
 
-from django.contrib.auth.models import Group
-
 import pytest
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from common.access import FEEDER_GROUP_NAME, grant_feeder_role
+from common.access import grant_feeder_role
 from constellations.models import Constellation
-from users.models import User
 
 
 @pytest.fixture

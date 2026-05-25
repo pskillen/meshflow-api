@@ -1,6 +1,6 @@
 from django.shortcuts import get_object_or_404
 
-from rest_framework import mixins, permissions, status, viewsets
+from rest_framework import mixins, status, viewsets
 from rest_framework.response import Response
 
 from common.drf_permissions import AllowGuestReadOnly, IsSystemAdmin

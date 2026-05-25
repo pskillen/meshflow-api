@@ -37,7 +37,6 @@ from .signals import (
     health_metrics_packet_received,
     host_metrics_packet_received,
     message_packet_received,
-    node_claim_authorized,
     node_info_packet_received,
     packet_received,
     position_packet_received,

@@ -15,7 +15,7 @@ from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 
-from common.drf_permissions import AllowGuestReadOnly, IsAuthenticatedUser
+from common.drf_permissions import AllowGuestReadOnly
 from common.mesh_node_helpers import MESHTASTIC_BROADCAST_ID
 from nodes.models import ManagedNode, ObservedNode
 from traceroute.models import AutoTraceRoute

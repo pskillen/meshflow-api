@@ -1,12 +1,12 @@
 import pytest
 
+from nodes.models import NodeLatestStatus
+
 pytest_plugins = [
     "users.tests.conftest",
     "nodes.tests.conftest",
     "constellations.tests.conftest",
 ]
-
-from nodes.models import NodeLatestStatus
 
 
 @pytest.fixture
