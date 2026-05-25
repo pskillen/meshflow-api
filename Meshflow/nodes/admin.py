@@ -389,6 +389,14 @@ class ManagedNodeAdminForm(forms.ModelForm):
         elif not self.instance._state.adding and self.instance.protocol == Protocol.MESHTASTIC:
             self.fields["meshtastic_node_id"].initial = meshtastic_id_to_hex(self.instance.meshtastic_node_id)
 
+        if "mc_flood_advert_interval_hours" in self.fields:
+            interval_field = self.fields["mc_flood_advert_interval_hours"]
+            interval_field.required = False
+            if interval_field.initial in (None, ""):
+                interval_field.initial = getattr(
+                    self.instance, "mc_flood_advert_interval_hours", None
+                ) or 6
+
     def _protocol_from_form(self):
         protocol = self.cleaned_data.get("protocol") if hasattr(self, "cleaned_data") else None
         if protocol is not None:
@@ -436,6 +444,12 @@ class ManagedNodeAdminForm(forms.ModelForm):
             return normalize_mc_pubkey(raw)
         except ValueError as exc:
             raise forms.ValidationError(str(exc))
+
+    def clean_mc_flood_advert_interval_hours(self):
+        value = self.cleaned_data.get("mc_flood_advert_interval_hours")
+        if value in (None, ""):
+            return 6
+        return value
 
     def clean(self):
         cleaned_data = super().clean()
