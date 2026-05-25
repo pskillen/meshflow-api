@@ -522,6 +522,11 @@ LOGGING = {
             "style": "{",
         },
     },
+    "filters": {
+        "client_disconnect": {
+            "()": "Meshflow.asgi_client_disconnect.ClientDisconnectLogFilter",
+        },
+    },
     "handlers": {
         "console": {
             "class": "logging.StreamHandler",
@@ -537,6 +542,12 @@ LOGGING = {
         "django": {
             "handlers": ["console"],
             "level": "INFO",
+            "propagate": False,
+        },
+        "asyncio": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "filters": ["client_disconnect"],
             "propagate": False,
         },
     },
