@@ -6,8 +6,6 @@ from rest_framework.test import APIRequestFactory
 from common.access import FEEDER_GROUP_NAME, AccessLevel, get_access_level, grant_feeder_role, user_is_feeder
 from users.models import User
 
-pytest_plugins = ["users.tests.conftest"]
-
 
 @pytest.mark.django_db
 def test_grant_feeder_role():
