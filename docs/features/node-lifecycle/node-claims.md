@@ -1,21 +1,15 @@
-# Node Claims
+# Node claims
 
-Node claims let a user prove that they control a Meshtastic radio represented by an `ObservedNode`.
+Node claims let authenticated users prove they control a radio represented by an `ObservedNode`. Proof is always an out-of-band message containing a server-generated **claim key**; the API never trusts UI assertions alone.
 
-## Claim Flow
+## Protocol-specific flows
 
-1. The user signs in to the frontend.
-2. The user finds an unclaimed observed node.
-3. The frontend calls `POST /api/nodes/observed-nodes/{node_id}/claim/`.
-4. The API creates a `NodeOwnerClaim` with a generated `claim_key`.
-5. The user sends the claim key as a direct Meshtastic message from their node to a Meshflow managed node.
-6. Packet ingestion receives that text message.
-7. `Meshflow/packets/services/text_message.py` matches the message body to the claim key.
-8. The API sets `ObservedNode.claimed_by` to the claiming user and marks `NodeOwnerClaim.accepted_at`.
+| Protocol | Proof | Doc |
+|----------|--------|-----|
+| Meshtastic | Direct message to any Meshtastic feeder | [node-claims-meshtastic.md](node-claims-meshtastic.md) |
+| MeshCore | Contact/DM to a MeshCore feeder | [node-claims-meshcore.md](node-claims-meshcore.md) |
 
-Accepted claims do not create the observed node. The observed node must already exist, usually because it was discovered from packet ingestion.
-
-## Claim Records
+## Claim records
 
 `NodeOwnerClaim` represents an attempt to claim a node. A claim row is not ownership by itself.
 
@@ -23,23 +17,31 @@ Accepted claims do not create the observed node. The observed node must already 
 - `user`: the user attempting the claim.
 - `claim_key`: the proof string the radio must send.
 - `created_at`: when the claim was started.
-- `accepted_at`: when the proof was received.
+- `accepted_at`: when the proof was received (null while pending).
 
 `ObservedNode.claimed_by` is the authoritative owner field once the claim is accepted.
 
+Implementation: [`Meshflow/nodes/claim_authorization.py`](../../../Meshflow/nodes/claim_authorization.py).
+
+## Real-time UI (`node_claim_authorized`)
+
+When proof succeeds, the API emits Django signal **`node_claim_authorized`** (`packets.signals`) with kwargs:
+
+- `node` — the observed node that was claimed
+- `claim` — the `NodeOwnerClaim` row (with `accepted_at` set)
+- `observer` — the `ManagedNode` feeder that received the proof message
+
+The `ws` app listens and sends **`node_claim_accepted`** JSON to the claiming user’s channel group `user_claims_{user_id}` ([`NodeClaimConsumer`](../../../Meshflow/ws/consumers.py) at `ws/claims/?token=<jwt>`). No other built-in receivers exist today; the signal remains an extension point for notifications or audit.
+
 ## Permissions
 
-An authenticated user can start a claim for an unclaimed node. If `ObservedNode.claimed_by` is already set to another user, the API must reject the claim.
+An authenticated user can start a claim for an unclaimed node. If `ObservedNode.claimed_by` is already set to another user, the API rejects the claim.
 
-Only the user who owns a claim can see or cancel that claim through the claim endpoint.
+Only the claim owner can see or cancel their claim through the claim endpoint.
 
-When claim removal is implemented:
-
-- The claim owner can delete their own pending claim.
-- The claim owner can release their own accepted claim.
-- Releasing an accepted claim clears `ObservedNode.claimed_by` when it points at the current user.
-- Django staff do not get a REST endpoint to release another user's valid claim.
-- If an administrator needs to correct ownership, they can use Django Admin or a future purpose-built admin flow.
+- The claim owner can delete a pending claim.
+- The claim owner can release an accepted claim (`DELETE …/claim/`), clearing `claimed_by` when it matches.
+- Django staff do not get a REST shortcut to release another user’s claim.
 
 ## Constellation access
 
@@ -47,6 +49,6 @@ Constellations are **public for read** (no membership required). Claiming a node
 
 Managed-node setup requires the **feeder** role for API key creation (see [API_KEYS.md](../../API_KEYS.md) and [permissions/README.md](../../permissions/README.md)).
 
-## Observed Node Retention
+## Observed node retention
 
-Releasing a claim never deletes the `ObservedNode`. If the radio is still active, future packets continue to update it. If it is no longer active, it naturally falls out of recent-node views according to the same time-window behavior as any other observed node.
+Releasing a claim never deletes the `ObservedNode`. If the radio is still active, future packets continue to update it.

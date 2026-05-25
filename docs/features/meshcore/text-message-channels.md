@@ -141,6 +141,8 @@ It does **not** include channel name, hashtag string, sender full pubkey, or des
 
 ### `contact_message` → DM / private text
 
+Contact DMs are also used for **node ownership claims**: the user sends only the UI-generated claim key to a feeder ([node-claims-meshcore.md](../node-lifecycle/node-claims-meshcore.md)).
+
 - `pubkey_prefix` — 12 hex chars (6-byte sender prefix)
 - `text`, `channel_idx` (often `0` in samples; DMs are not a channel in the ADR sense)
 
