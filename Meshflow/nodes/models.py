@@ -2,6 +2,7 @@ import binascii
 import os
 import uuid
 
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -166,6 +167,17 @@ class ManagedNode(models.Model):
     allow_auto_traceroute = models.BooleanField(
         default=False,
         help_text=_("If True, this node may be used for auto-scheduled traceroutes and manual triggers."),
+    )
+
+    mc_flood_advert_interval_hours = models.PositiveSmallIntegerField(
+        default=6,
+        validators=[
+            MinValueValidator(2),
+            MaxValueValidator(24),
+        ],
+        help_text=_(
+            "MeshCore feeder: hours between flood-routed advertisements sent by the bot."
+        ),
     )
 
     bot_version = models.CharField(
