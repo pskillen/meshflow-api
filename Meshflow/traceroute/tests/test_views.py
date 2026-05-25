@@ -12,7 +12,8 @@ from rest_framework.test import APIClient
 import nodes.tests.conftest  # noqa: F401 - load fixtures
 import packets.tests.conftest  # noqa: F401 - load fixtures
 import users.tests.conftest  # noqa: F401 - load fixtures
-from constellations.models import ConstellationUserMembership, MessageChannel
+from common.access import grant_feeder_role
+from constellations.models import MessageChannel
 from nodes.tasks import update_managed_node_statuses
 from packets.models import PacketObservation
 from traceroute.models import AutoTraceRoute
@@ -60,22 +61,19 @@ def staff_user(create_user):
 
 
 @pytest.fixture
-def editor_user(create_user, create_constellation):
-    """User with editor role in a constellation (created by another user)."""
-    creator = create_user()
-    constellation = create_constellation(created_by=creator)
-    editor = create_user()
-    ConstellationUserMembership.objects.create(user=editor, constellation=constellation, role="editor")
-    return editor
+def feeder_user(create_user):
+    user = create_user()
+    grant_feeder_role(user)
+    return user
 
 
 @pytest.fixture
-def editor_managed_node(editor_user, create_constellation, create_managed_node, add_traceroute_source_ingestion):
-    """Managed node in a constellation where editor_user has editor role."""
-    membership = ConstellationUserMembership.objects.filter(user=editor_user, role="editor").first()
-    constellation = membership.constellation
+def feeder_managed_node(
+    feeder_user, create_user, create_constellation, create_managed_node, add_traceroute_source_ingestion
+):
+    constellation = create_constellation(created_by=feeder_user)
     mn = create_managed_node(
-        owner=membership.constellation.created_by,
+        owner=create_user(),
         constellation=constellation,
         allow_auto_traceroute=True,
     )
@@ -84,20 +82,15 @@ def editor_managed_node(editor_user, create_constellation, create_managed_node, 
 
 
 @pytest.fixture
-def viewer_user(create_user, create_constellation):
-    """User with viewer role only (no admin/editor)."""
-    creator = create_user()
-    constellation = create_constellation(created_by=creator)
-    viewer = create_user()
-    ConstellationUserMembership.objects.create(user=viewer, constellation=constellation, role="viewer")
-    return viewer
+def plain_user(create_user):
+    return create_user()
 
 
 @pytest.mark.django_db
 class TestTracerouteList:
-    def test_list_requires_auth(self, api_client):
+    def test_list_allows_guest_read(self, api_client):
         resp = api_client.get("/api/traceroutes/")
-        assert resp.status_code == 401
+        assert resp.status_code == 200
 
     def test_list_returns_200_for_authenticated(self, api_client, create_user, create_auto_traceroute):
         user = create_user()
@@ -269,10 +262,11 @@ class TestTracerouteList:
 
 @pytest.mark.django_db
 class TestTracerouteDetail:
-    def test_detail_requires_auth(self, api_client, create_auto_traceroute):
+    def test_detail_allows_guest_read(self, api_client, create_auto_traceroute):
         tr = create_auto_traceroute()
         resp = api_client.get(f"/api/traceroutes/{tr.id}/")
-        assert resp.status_code == 401
+        assert resp.status_code == 200
+        assert resp.json()["id"] == tr.id
 
     def test_detail_returns_200_for_authenticated(self, api_client, create_user, create_auto_traceroute):
         user = create_user()
@@ -314,23 +308,24 @@ class TestTracerouteCanTrigger:
         assert resp.status_code == 200
         assert resp.json()["can_trigger"] is True
 
-    def test_can_trigger_true_for_editor(self, api_client, editor_user, editor_managed_node):
-        """Editor has can_trigger=True when they have triggerable nodes in their constellation."""
-        api_client.force_authenticate(user=editor_user)
+    def test_can_trigger_true_for_feeder(self, api_client, feeder_user, feeder_managed_node):
+        """Feeder has can_trigger=True when eligible sources exist."""
+        api_client.force_authenticate(user=feeder_user)
         resp = api_client.get("/api/traceroutes/can_trigger/")
         assert resp.status_code == 200
         assert resp.json()["can_trigger"] is True
 
-    def test_can_trigger_true_for_owner(self, api_client, owner_managed_node):
-        """Owner of a node with allow_auto_traceroute can trigger."""
+    def test_can_trigger_true_for_owner_when_feeder(self, api_client, owner_managed_node):
+        """Managed-node owner needs feeder role to trigger."""
         owner = owner_managed_node.owner
+        grant_feeder_role(owner)
         api_client.force_authenticate(user=owner)
         resp = api_client.get("/api/traceroutes/can_trigger/")
         assert resp.status_code == 200
         assert resp.json()["can_trigger"] is True
 
-    def test_can_trigger_false_for_viewer(self, api_client, viewer_user):
-        api_client.force_authenticate(user=viewer_user)
+    def test_can_trigger_false_for_plain_user(self, api_client, plain_user):
+        api_client.force_authenticate(user=plain_user)
         resp = api_client.get("/api/traceroutes/can_trigger/")
         assert resp.status_code == 200
         assert resp.json()["can_trigger"] is False
@@ -355,43 +350,31 @@ class TestTracerouteTriggerableNodes:
         node_ids = [n["meshtastic_node_id"] for n in data]
         assert mn.meshtastic_node_id in node_ids
 
-    def test_triggerable_nodes_returns_owned_nodes_for_owner(self, api_client, owner_managed_node):
+    def test_triggerable_nodes_empty_for_owner_without_feeder_role(self, api_client, owner_managed_node):
         owner = owner_managed_node.owner
         api_client.force_authenticate(user=owner)
         resp = api_client.get("/api/traceroutes/triggerable-nodes/")
         assert resp.status_code == 200
-        data = resp.json()
-        assert isinstance(data, list)
-        node_ids = [n["meshtastic_node_id"] for n in data]
-        assert owner_managed_node.meshtastic_node_id in node_ids
+        node_ids = [n["meshtastic_node_id"] for n in resp.json()]
+        assert owner_managed_node.meshtastic_node_id not in node_ids
 
-    def test_triggerable_nodes_returns_constellation_nodes_for_editor(
-        self, api_client, editor_user, editor_managed_node
-    ):
-        api_client.force_authenticate(user=editor_user)
+    def test_triggerable_nodes_returns_eligible_nodes_for_feeder(self, api_client, feeder_user, feeder_managed_node):
+        api_client.force_authenticate(user=feeder_user)
         resp = api_client.get("/api/traceroutes/triggerable-nodes/")
         assert resp.status_code == 200
         data = resp.json()
         assert isinstance(data, list)
         node_ids = [n["meshtastic_node_id"] for n in data]
-        assert editor_managed_node.meshtastic_node_id in node_ids
+        assert feeder_managed_node.meshtastic_node_id in node_ids
 
-    def test_triggerable_nodes_empty_for_viewer(self, api_client, viewer_user, create_managed_node):
-        """Viewer has no triggerable nodes (viewer role is not admin/editor)."""
-        membership = ConstellationUserMembership.objects.filter(user=viewer_user, role="viewer").first()
-        constellation = membership.constellation
-        creator = constellation.created_by
-        mn = create_managed_node(owner=creator, constellation=constellation, allow_auto_traceroute=True)
-        api_client.force_authenticate(user=viewer_user)
+    def test_triggerable_nodes_empty_for_plain_user(self, api_client, plain_user):
+        api_client.force_authenticate(user=plain_user)
         resp = api_client.get("/api/traceroutes/triggerable-nodes/")
         assert resp.status_code == 200
-        data = resp.json()
-        assert isinstance(data, list)
-        node_ids = [n["meshtastic_node_id"] for n in data]
-        assert mn.meshtastic_node_id not in node_ids
+        assert resp.json() == []
 
-    def test_triggerable_nodes_response_shape(self, api_client, editor_user, editor_managed_node):
-        api_client.force_authenticate(user=editor_user)
+    def test_triggerable_nodes_response_shape(self, api_client, feeder_user, feeder_managed_node):
+        api_client.force_authenticate(user=feeder_user)
         resp = api_client.get("/api/traceroutes/triggerable-nodes/")
         assert resp.status_code == 200
         data = resp.json()
@@ -407,36 +390,36 @@ class TestTracerouteTriggerableNodes:
         assert set(node["position"].keys()) == {"latitude", "longitude"}
 
     def test_triggerable_nodes_position_prefers_latest_observed_location(
-        self, api_client, editor_user, editor_managed_node
+        self, api_client, feeder_user, feeder_managed_node
     ):
         """position is populated from NodeLatestStatus when the node has been heard."""
         from nodes.models import NodeLatestStatus, ObservedNode
 
         observed, _ = ObservedNode.objects.get_or_create(
-            meshtastic_node_id=editor_managed_node.meshtastic_node_id,
+            meshtastic_node_id=feeder_managed_node.meshtastic_node_id,
             defaults={
-                "long_name": editor_managed_node.name,
-                "short_name": editor_managed_node.name[:5],
+                "long_name": feeder_managed_node.name,
+                "short_name": feeder_managed_node.name[:5],
             },
         )
         NodeLatestStatus.objects.update_or_create(node=observed, defaults={"latitude": 55.86, "longitude": -4.25})
-        api_client.force_authenticate(user=editor_user)
+        api_client.force_authenticate(user=feeder_user)
         resp = api_client.get("/api/traceroutes/triggerable-nodes/")
         assert resp.status_code == 200
-        node = next(n for n in resp.json() if n["meshtastic_node_id"] == editor_managed_node.meshtastic_node_id)
+        node = next(n for n in resp.json() if n["meshtastic_node_id"] == feeder_managed_node.meshtastic_node_id)
         assert node["position"] == {"latitude": 55.86, "longitude": -4.25}
 
     def test_triggerable_nodes_position_falls_back_to_default_location(
-        self, api_client, editor_user, editor_managed_node
+        self, api_client, feeder_user, feeder_managed_node
     ):
         """When no latest-observed position exists, fall back to ManagedNode default_location_*."""
-        editor_managed_node.default_location_latitude = 51.5
-        editor_managed_node.default_location_longitude = -0.12
-        editor_managed_node.save(update_fields=["default_location_latitude", "default_location_longitude"])
-        api_client.force_authenticate(user=editor_user)
+        feeder_managed_node.default_location_latitude = 51.5
+        feeder_managed_node.default_location_longitude = -0.12
+        feeder_managed_node.save(update_fields=["default_location_latitude", "default_location_longitude"])
+        api_client.force_authenticate(user=feeder_user)
         resp = api_client.get("/api/traceroutes/triggerable-nodes/")
         assert resp.status_code == 200
-        node = next(n for n in resp.json() if n["meshtastic_node_id"] == editor_managed_node.meshtastic_node_id)
+        node = next(n for n in resp.json() if n["meshtastic_node_id"] == feeder_managed_node.meshtastic_node_id)
         assert node["position"] == {"latitude": 51.5, "longitude": -0.12}
 
     def test_triggerable_nodes_excludes_without_recent_ingestion(self, api_client, staff_user, create_managed_node):
@@ -461,10 +444,10 @@ class TestTracerouteTrigger:
         )
         assert resp.status_code == 401
 
-    def test_trigger_requires_permission(self, api_client, viewer_user, create_managed_node, create_observed_node):
+    def test_trigger_requires_permission(self, api_client, plain_user, create_managed_node, create_observed_node):
         mn = create_managed_node()
         on = create_observed_node()
-        api_client.force_authenticate(user=viewer_user)
+        api_client.force_authenticate(user=plain_user)
         resp = api_client.post(
             "/api/traceroutes/trigger/",
             {"managed_node_id": mn.meshtastic_node_id, "target_node_id": on.meshtastic_node_id},
@@ -472,10 +455,10 @@ class TestTracerouteTrigger:
         )
         assert resp.status_code == 403
 
-    def test_trigger_creates_auto_traceroute(self, api_client, editor_user, editor_managed_node, create_observed_node):
-        mn = editor_managed_node
+    def test_trigger_creates_auto_traceroute(self, api_client, feeder_user, feeder_managed_node, create_observed_node):
+        mn = feeder_managed_node
         on = create_observed_node()
-        api_client.force_authenticate(user=editor_user)
+        api_client.force_authenticate(user=feeder_user)
         resp = api_client.post(
             "/api/traceroutes/trigger/",
             {"managed_node_id": mn.meshtastic_node_id, "target_node_id": on.meshtastic_node_id},
@@ -492,12 +475,12 @@ class TestTracerouteTrigger:
         assert AutoTraceRoute.objects.filter(id=data["id"]).exists()
 
     def test_trigger_manual_target_ignores_client_target_strategy(
-        self, api_client, editor_user, editor_managed_node, create_observed_node
+        self, api_client, feeder_user, feeder_managed_node, create_observed_node
     ):
         """Explicit target always persists strategy=manual even if client sends a hypothesis."""
-        mn = editor_managed_node
+        mn = feeder_managed_node
         on = create_observed_node()
-        api_client.force_authenticate(user=editor_user)
+        api_client.force_authenticate(user=feeder_user)
         resp = api_client.post(
             "/api/traceroutes/trigger/",
             {
@@ -511,12 +494,12 @@ class TestTracerouteTrigger:
         assert resp.json()["target_strategy"] == AutoTraceRoute.TARGET_STRATEGY_MANUAL
 
     def test_trigger_auto_persists_resolved_strategy_when_none_requested(
-        self, api_client, editor_user, editor_managed_node, create_observed_node
+        self, api_client, feeder_user, feeder_managed_node, create_observed_node
     ):
         """Auto target without target_strategy uses pick_strategy_for_feeder and persists it."""
-        mn = editor_managed_node
+        mn = feeder_managed_node
         on = create_observed_node()
-        api_client.force_authenticate(user=editor_user)
+        api_client.force_authenticate(user=feeder_user)
         with patch(
             "traceroute.strategy_rotation.pick_strategy_for_feeder",
             return_value=AutoTraceRoute.TARGET_STRATEGY_DX_ACROSS,
@@ -533,12 +516,12 @@ class TestTracerouteTrigger:
         assert mock_pick.call_args.kwargs.get("strategy") == AutoTraceRoute.TARGET_STRATEGY_DX_ACROSS
 
     def test_trigger_auto_explicit_strategy_persisted(
-        self, api_client, editor_user, editor_managed_node, create_observed_node
+        self, api_client, feeder_user, feeder_managed_node, create_observed_node
     ):
         """Auto target with explicit target_strategy keeps that value on the row."""
-        mn = editor_managed_node
+        mn = feeder_managed_node
         on = create_observed_node()
-        api_client.force_authenticate(user=editor_user)
+        api_client.force_authenticate(user=feeder_user)
         with patch("traceroute.views.pick_traceroute_target", return_value=on) as mock_pick:
             resp = api_client.post(
                 "/api/traceroutes/trigger/",
@@ -554,12 +537,12 @@ class TestTracerouteTrigger:
         assert mock_pick.call_args.kwargs.get("strategy") == AutoTraceRoute.TARGET_STRATEGY_INTRA_ZONE
 
     def test_trigger_auto_when_pick_strategy_returns_none_persists_null(
-        self, api_client, editor_user, editor_managed_node, create_observed_node
+        self, api_client, feeder_user, feeder_managed_node, create_observed_node
     ):
         """If no feeder strategy applies, auto path may still pick a legacy target with null strategy."""
-        mn = editor_managed_node
+        mn = feeder_managed_node
         on = create_observed_node()
-        api_client.force_authenticate(user=editor_user)
+        api_client.force_authenticate(user=feeder_user)
         with patch("traceroute.strategy_rotation.pick_strategy_for_feeder", return_value=None):
             with patch("traceroute.views.pick_traceroute_target", return_value=on):
                 resp = api_client.post(
@@ -573,24 +556,24 @@ class TestTracerouteTrigger:
     def test_trigger_rejects_when_allow_auto_traceroute_disabled(
         self,
         api_client,
-        editor_user,
-        editor_managed_node,
+        feeder_user,
+        feeder_managed_node,
         create_managed_node,
         create_observed_node,
     ):
         """Trigger returns 400 when managed node has allow_auto_traceroute=False."""
-        # editor_managed_node gives editor permission (triggerable node); create a second node
+        # feeder_managed_node gives editor permission (triggerable node); create a second node
         # in same constellation with allow_auto_traceroute=False
-        constellation = editor_managed_node.constellation
+        constellation = feeder_managed_node.constellation
         creator = constellation.created_by
         mn_disabled = create_managed_node(
-            meshtastic_node_id=editor_managed_node.meshtastic_node_id + 1,
+            meshtastic_node_id=feeder_managed_node.meshtastic_node_id + 1,
             owner=creator,
             constellation=constellation,
             allow_auto_traceroute=False,
         )
         on = create_observed_node()
-        api_client.force_authenticate(user=editor_user)
+        api_client.force_authenticate(user=feeder_user)
         resp = api_client.post(
             "/api/traceroutes/trigger/",
             {"managed_node_id": mn_disabled.meshtastic_node_id, "target_node_id": on.meshtastic_node_id},
@@ -600,12 +583,12 @@ class TestTracerouteTrigger:
         assert "allow_auto_traceroute" in resp.json().get("detail", "").lower()
 
     def test_trigger_rejects_when_rate_limited(
-        self, api_client, editor_user, editor_managed_node, create_observed_node
+        self, api_client, feeder_user, feeder_managed_node, create_observed_node
     ):
         """Trigger returns 429 when node's last traceroute was within 30s."""
-        mn = editor_managed_node
+        mn = feeder_managed_node
         on = create_observed_node()
-        api_client.force_authenticate(user=editor_user)
+        api_client.force_authenticate(user=feeder_user)
         resp1 = api_client.post(
             "/api/traceroutes/trigger/",
             {"managed_node_id": mn.meshtastic_node_id, "target_node_id": on.meshtastic_node_id},
@@ -636,10 +619,13 @@ class TestTracerouteTrigger:
         assert resp.status_code == 201
         assert resp.json()["source_node"]["meshtastic_node_id"] == mn.meshtastic_node_id
 
-    def test_trigger_owner_can_trigger_from_own_node(self, api_client, owner_managed_node, create_observed_node):
-        """Owner can trigger from their own ManagedNode."""
+    def test_trigger_owner_can_trigger_from_own_node_when_feeder(
+        self, api_client, owner_managed_node, create_observed_node
+    ):
+        """Owner with feeder role can trigger from their own ManagedNode."""
         mn = owner_managed_node
         owner = mn.owner
+        grant_feeder_role(owner)
         on = create_observed_node()
         api_client.force_authenticate(user=owner)
         resp = api_client.post(
@@ -651,12 +637,12 @@ class TestTracerouteTrigger:
         assert resp.json()["source_node"]["meshtastic_node_id"] == mn.meshtastic_node_id
 
     def test_trigger_forbidden_when_no_permission(
-        self, api_client, viewer_user, owner_managed_node, create_observed_node
+        self, api_client, plain_user, owner_managed_node, create_observed_node
     ):
         """User gets 403 when trying to trigger from a node they don't have permission for."""
         mn = owner_managed_node
         on = create_observed_node()
-        api_client.force_authenticate(user=viewer_user)
+        api_client.force_authenticate(user=plain_user)
         resp = api_client.post(
             "/api/traceroutes/trigger/",
             {"managed_node_id": mn.meshtastic_node_id, "target_node_id": on.meshtastic_node_id},
@@ -667,22 +653,17 @@ class TestTracerouteTrigger:
     def test_trigger_rejects_without_recent_ingestion(
         self,
         api_client,
-        editor_user,
+        feeder_user,
         create_managed_node,
         create_observed_node,
     ):
         """Trigger returns 400 when source has permission but ManagedNodeStatus is not actively feeding."""
-        membership = ConstellationUserMembership.objects.filter(user=editor_user, role="editor").first()
-        constellation = membership.constellation
-        creator = constellation.created_by
         mn = create_managed_node(
-            owner=creator,
-            constellation=constellation,
             allow_auto_traceroute=True,
             meshtastic_node_id=888_777_666,
         )
         on = create_observed_node()
-        api_client.force_authenticate(user=editor_user)
+        api_client.force_authenticate(user=feeder_user)
         resp = api_client.post(
             "/api/traceroutes/trigger/",
             {"managed_node_id": mn.meshtastic_node_id, "target_node_id": on.meshtastic_node_id},

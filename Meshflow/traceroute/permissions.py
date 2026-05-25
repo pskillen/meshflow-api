@@ -11,9 +11,13 @@ class CanTriggerTraceroute(permissions.BasePermission):
     Recent ingestion is enforced in the view (400), not here, so offline sources get a clear error.
     """
 
-    message = "You do not have permission to trigger traceroutes."
+    message = "Feeder or admin access required to trigger traceroutes."
 
     def has_permission(self, request, view):
         if not request.user or not request.user.is_authenticated:
+            return False
+        from common.access import user_is_feeder_or_admin
+
+        if not user_is_feeder_or_admin(request.user):
             return False
         return get_nodes_permitted_for_trigger_queryset(request.user).exists()
