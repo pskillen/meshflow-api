@@ -21,9 +21,9 @@ def api_client():
 
 @pytest.mark.django_db
 class TestTracerouteStats:
-    def test_stats_requires_auth(self, api_client):
+    def test_stats_allows_guest_read(self, api_client):
         resp = api_client.get("/api/traceroutes/stats/")
-        assert resp.status_code == 401
+        assert resp.status_code == 200
 
     def test_stats_includes_by_source_for_two_sources(
         self,
@@ -437,9 +437,9 @@ class TestTracerouteStats:
 
 @pytest.mark.django_db
 class TestFeederReach:
-    def test_requires_auth(self, api_client):
+    def test_allows_guest_read_unknown_feeder_returns_404(self, api_client):
         resp = api_client.get("/api/traceroutes/feeder-reach/", {"feeder_id": "1"})
-        assert resp.status_code == 401
+        assert resp.status_code == 404
 
     def test_missing_feeder_id_returns_400(self, api_client, create_user):
         api_client.force_authenticate(user=create_user())
@@ -556,9 +556,9 @@ class TestFeederReach:
 
 @pytest.mark.django_db
 class TestConstellationCoverage:
-    def test_requires_auth(self, api_client):
+    def test_allows_guest_read(self, api_client):
         resp = api_client.get("/api/traceroutes/constellation-coverage/", {"constellation_id": "1"})
-        assert resp.status_code == 401
+        assert resp.status_code == 200
 
     def test_missing_constellation_id_returns_400(self, api_client, create_user):
         api_client.force_authenticate(user=create_user())
