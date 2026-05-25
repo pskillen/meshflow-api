@@ -26,6 +26,7 @@ load_dotenv()
 django_asgi_app = get_asgi_application()
 
 import Meshflow.routing  # noqa
+from Meshflow.asgi_client_disconnect import ClientDisconnectLoggingMiddleware  # noqa: E402
 
 application = ProtocolTypeRouter(
     {
@@ -41,3 +42,5 @@ if settings.SERVE_STATIC_FILES:
     from django.contrib.staticfiles.handlers import ASGIStaticFilesHandler
 
     application = ASGIStaticFilesHandler(application)
+
+application = ClientDisconnectLoggingMiddleware(application)
