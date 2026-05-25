@@ -1,19 +1,15 @@
 # Traceroute Permissions
 
-Canonical reference for who can see traceroutes and who can trigger them. If the
-OpenAPI spec or code drifts from this document, the rules here are the intended
-contract; update the code (or this document) until they agree.
+Delta on the global model in **[permissions/README.md](../../permissions/README.md)**.
+If this file or OpenAPI drifts from code, update until they agree.
 
 ## Principles
 
-1. **Visibility is open to any authenticated user.** Any logged-in user can
-   browse the traceroute list, fetch detail records, and view the heatmap. This
-   mirrors how observed packets are treated: once a traceroute has happened on
-   the mesh, it is considered public mesh telemetry.
-2. **Triggering is privileged and tied to a source node.** A user may trigger a
-   traceroute only from a `ManagedNode` they have a meaningful relationship
-   with (they own it, they administer the constellation it belongs to, or they
-   are a system administrator).
+1. **Visibility is public (guest read).** Anyone may browse the traceroute list,
+   detail, and heatmap endpoints without login.
+2. **Triggering requires feeder or admin.** A user must be in the **`feeder`**
+   group or be Django staff. They may trigger from any **eligible** `ManagedNode`
+   (not only nodes they own).
 3. **A source node must be capable of sourcing a traceroute.** It must have
    `allow_auto_traceroute=True` and must have been recently seen reporting
    packets (i.e. the bot behind it is online). Nodes that are offline or have
@@ -27,14 +23,12 @@ contract; update the code (or this document) until they agree.
 
 ## Roles and who may trigger
 
-| Role                            | May trigger from                                                                            |
-| ------------------------------- | ------------------------------------------------------------------------------------------- |
-| System administrator (`is_staff`) | Any `ManagedNode` that is eligible (allow_auto_traceroute and recently heard)             |
-| `ManagedNode` owner             | Nodes they own (`ManagedNode.owner == user`), subject to eligibility                        |
-| Constellation admin / editor    | Nodes in constellations where the user has `admin` or `editor` role, subject to eligibility |
-| Constellation viewer            | Cannot trigger                                                                              |
-| Authenticated but none of above | Cannot trigger                                                                              |
-| Anonymous                       | Cannot view or trigger                                                                      |
+| Role | Read | Trigger |
+|------|------|---------|
+| Guest | yes | no |
+| User (JWT, not feeder) | yes | no |
+| Feeder | yes | yes, from any eligible source |
+| Admin (`is_staff`) | yes | yes, from any eligible source |
 
 "Eligibility" for a source node means:
 
@@ -46,16 +40,14 @@ contract; update the code (or this document) until they agree.
 
 ## Endpoints
 
-All endpoints require authentication unless otherwise stated.
-
 | Endpoint                              | Method | Permission                                                                                                                             |
 | ------------------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `/api/traceroutes/`                   | GET    | Any authenticated user. Supports filters: `managed_node`, `source_node`, `target_node`, `status`, `trigger_type`, `triggered_after/before`. |
-| `/api/traceroutes/<pk>/`              | GET    | Any authenticated user.                                                                                                                |
-| `/api/traceroutes/trigger/`           | POST   | Authenticated user who passes `CanTriggerTraceroute` (see below).                                                                       |
-| `/api/traceroutes/can_trigger/`       | GET    | Any authenticated user. Returns `{"can_trigger": bool}`.                                                                               |
-| `/api/traceroutes/triggerable-nodes/` | GET    | Any authenticated user. Returns the user's triggerable `ManagedNode` set (may be empty).                                               |
-| `/api/traceroutes/heatmap-edges/`     | GET    | Any authenticated user.                                                                                                                |
+| `/api/traceroutes/`                   | GET    | Guest or authenticated.                                                                                                                |
+| `/api/traceroutes/<pk>/`              | GET    | Guest or authenticated.                                                                                                                |
+| `/api/traceroutes/trigger/`           | POST   | Feeder or admin; passes `CanTriggerTraceroute` and per-node checks (see below).                                                        |
+| `/api/traceroutes/can_trigger/`       | GET    | Authenticated. `true` for feeder/admin when eligible sources exist.                                                                    |
+| `/api/traceroutes/triggerable-nodes/` | GET    | Authenticated feeder/admin only (empty for plain users).                                                                               |
+| `/api/traceroutes/heatmap-edges/`     | GET    | Guest or authenticated.                                                                                                                |
 
 ### Payload: `POST /api/traceroutes/trigger/`
 

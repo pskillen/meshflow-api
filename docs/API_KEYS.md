@@ -10,6 +10,12 @@ This document describes how Node API keys work in the Meshflow system: the model
 - Each NodeAuth record associates `(api_key, node)` with a unique constraint
 - Keys are used for packet ingest and WebSocket commands (e.g. traceroute)
 
+## Who may create API keys
+
+Users in the Django **`feeder`** group (or staff) may create keys for **any** constellation. Trust is placed on the operator, not constellation membership.
+
+Managed-node owners are granted the feeder group via migration when the membership model was removed.
+
 ## One Key per Node vs One per User
 
 Both patterns are supported:

@@ -41,11 +41,11 @@ When claim removal is implemented:
 - Django staff do not get a REST endpoint to release another user's valid claim.
 - If an administrator needs to correct ownership, they can use Django Admin or a future purpose-built admin flow.
 
-## Constellation Membership
+## Constellation access
 
-When a user claims a node, they are added to the relevant constellation as a viewer. Viewer membership is enough to observe constellation data, but it is not currently enough to complete managed-node setup. The UI still lets the user try to convert the node to managed, which fails later during API-key setup.
+Constellations are **public for read** (no membership required). Claiming a node does not create constellation membership rows.
 
-That onboarding bug is tracked separately in meshtastic-bot-ui issue #205.
+Managed-node setup requires the **feeder** role for API key creation (see [API_KEYS.md](../../API_KEYS.md) and [permissions/README.md](../../permissions/README.md)).
 
 ## Observed Node Retention
 
