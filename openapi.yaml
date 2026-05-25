@@ -4086,13 +4086,23 @@ paths:
   /constellations/:
     get:
       summary: List constellations
-      description: Returns a list of any constellation for which the user is a member (regardless of role)
+      description: >
+        Returns constellations the authenticated user is a member of (any role), including both Meshtastic and
+        MeshCore protocol rows. Omit `protocol` to return all protocols; pass `protocol=meshtastic` or
+        `protocol=meshcore` to filter by `Constellation.protocol`. Embedded `channels` respect the same optional
+        filter.
       tags: [Constellations]
       security:
         - BearerAuth: []
       parameters:
         - $ref: '#/components/parameters/PaginationPage'
         - $ref: '#/components/parameters/PaginationPageSize'
+        - name: protocol
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/MeshProtocol'
+          description: Optional filter by mesh protocol (meshtastic or meshcore). Omit to include all protocols.
       responses:
         '200':
           description: List of constellations
@@ -4341,7 +4351,9 @@ paths:
   /constellations/{id}/channels/:
     get:
       summary: List message channels for a constellation
-      description: User must be a member of the constellation (any role)
+      description: >
+        User must be a member of the constellation (any role). Omit `protocol` to return all channel rows; pass
+        `protocol=meshtastic` or `protocol=meshcore` to filter by `MessageChannel.protocol`.
       tags: [Constellations]
       security:
         - BearerAuth: []
@@ -4351,6 +4363,12 @@ paths:
           required: true
           schema:
             type: integer
+        - name: protocol
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/MeshProtocol'
+          description: Optional filter by mesh protocol. Omit to return all channels for the constellation.
       responses:
         '200':
           description: List of message channels for the constellation

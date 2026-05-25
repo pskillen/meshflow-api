@@ -3,6 +3,7 @@ from django.shortcuts import get_object_or_404
 from rest_framework import mixins, permissions, status, viewsets
 from rest_framework.response import Response
 
+from common.protocol import protocol_from_query_param
 from Meshflow.permissions import NoPermission
 
 from .models import Constellation, ConstellationUserMembership, MessageChannel
@@ -31,7 +32,7 @@ class ConstellationViewSet(viewsets.ModelViewSet):
         if self.action == "create":
             return [admin_permission]
         elif self.action == "list":
-            return [permissions.AllowAny()]
+            return [permissions.IsAuthenticated()]
         elif self.action == "retrieve":
             return [permissions.OR(admin_permission, IsConstellationMember())]
         elif self.action in ["update", "partial_update"]:
@@ -41,18 +42,27 @@ class ConstellationViewSet(viewsets.ModelViewSet):
         else:
             return [NoPermission()]
 
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        if self.action == "list":
+            context["channel_protocol_filter"] = protocol_from_query_param(self.request.query_params.get("protocol"))
+        return context
+
     def get_queryset(self):
         """
-        Return constellations that the user is a member of.
+        Return constellations the user is a member of.
+        Optional ?protocol=meshtastic|meshcore filters by constellation.protocol; omit to return all protocols.
         """
         if self.action == "retrieve":
             # For single object retrieval, return all constellations to let permission classes handle access
             return Constellation.objects.all().order_by("id")
 
-        # For list view, only return constellations the user is a member of
-        return (
-            Constellation.objects.filter(constellationusermembership__user=self.request.user).distinct().order_by("id")
-        )
+        qs = Constellation.objects.filter(constellationusermembership__user=self.request.user).distinct().order_by("id")
+        if self.action == "list":
+            protocol_val = protocol_from_query_param(self.request.query_params.get("protocol"))
+            if protocol_val is not None:
+                qs = qs.filter(protocol=protocol_val)
+        return qs
 
     def perform_create(self, serializer):
         """
@@ -156,7 +166,11 @@ class ConstellationMessageChannelsViewSet(
     def get_queryset(self):
         constellation_id = self.kwargs.get("constellation_id")
         constellation = get_object_or_404(Constellation, pk=constellation_id)
-        return MessageChannel.objects.filter(constellation=constellation).order_by("id")
+        qs = MessageChannel.objects.filter(constellation=constellation).order_by("id")
+        protocol_val = protocol_from_query_param(self.request.query_params.get("protocol"))
+        if protocol_val is not None:
+            qs = qs.filter(protocol=protocol_val)
+        return qs
 
     def get_permissions(self):
         admin_permission = permissions.IsAdminUser()
