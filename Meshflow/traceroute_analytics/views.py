@@ -505,7 +505,8 @@ def traceroute_stats(request):
     by_target = []
     for row in by_target_rows:
         on = observed_by_internal_id.get(row["target_node_id"])
-        if on is None:
+        if on is None or on.meshtastic_node_id is None:
+            # MeshCore targets have no Meshtastic numeric id; stats UI links by meshtastic_node_id.
             continue
         completed_n = row["completed"]
         failed_n = row["failed"]
@@ -514,7 +515,7 @@ def traceroute_stats(request):
         by_target.append(
             {
                 "meshtastic_node_id": on.meshtastic_node_id,
-                "node_id_str": meshtastic_id_to_hex(on.meshtastic_node_id),
+                "node_id_str": on.node_id_str,
                 "short_name": on.short_name,
                 "long_name": on.long_name,
                 "total": row["total"],
