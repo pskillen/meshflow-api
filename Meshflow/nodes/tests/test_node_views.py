@@ -145,6 +145,25 @@ def test_managed_nodes_status_fields_meshcore_feeder(create_managed_node, create
 
 
 @pytest.mark.django_db
+def test_observed_node_mine_returns_claimed_nodes(create_observed_node, create_user):
+    """GET observed-nodes/mine/ must not order_by computed node_id_str (removed DB column)."""
+    client = APIClient()
+    owner = create_user()
+    other = create_user()
+    client.force_authenticate(user=owner)
+
+    claimed = create_observed_node(claimed_by=owner, meshtastic_node_id=11111111)
+    create_observed_node(claimed_by=other, meshtastic_node_id=22222222)
+    create_observed_node(claimed_by=None, meshtastic_node_id=33333333)
+
+    response = client.get(reverse("observed-node-mine"))
+    assert response.status_code == status.HTTP_200_OK
+    assert len(response.data["results"]) == 1
+    assert response.data["results"][0]["meshtastic_node_id"] == claimed.meshtastic_node_id
+    assert response.data["results"][0]["node_id_str"] == claimed.node_id_str
+
+
+@pytest.mark.django_db
 def test_observed_node_list_view(create_observed_node, create_user):
     """Test observed node list view."""
     client = APIClient()

@@ -301,7 +301,7 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
         """
         nodes = (
             ObservedNode.objects.filter(claimed_by=request.user)
-            .order_by("protocol", "-last_heard", "node_id_str")
+            .order_by("protocol", "-last_heard", "meshtastic_node_id", "mc_pubkey_prefix")
             .select_related("latest_status")
         )
 
