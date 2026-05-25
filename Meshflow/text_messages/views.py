@@ -2,8 +2,8 @@ from django.db import models
 from django.db.models import Q
 
 from rest_framework import viewsets
-from rest_framework.permissions import IsAuthenticated
 
+from common.drf_permissions import AllowGuestReadOnly, IsAuthenticatedUser
 from common.mesh_node_helpers import MESHTASTIC_BROADCAST_ID
 from common.protocol import Protocol
 from nodes.models import ManagedNode, ObservedNode
@@ -15,8 +15,12 @@ from .serializers import TextMessageSerializer
 
 class TextMessageViewSet(viewsets.ModelViewSet):
     serializer_class = TextMessageSerializer
-    permission_classes = [IsAuthenticated]
     http_method_names = ["get", "delete", "head", "options"]
+
+    def get_permissions(self):
+        if self.action in ("list", "retrieve"):
+            return [AllowGuestReadOnly()]
+        return [IsAuthenticatedUser()]
 
     def get_queryset(self):
         queryset = (
