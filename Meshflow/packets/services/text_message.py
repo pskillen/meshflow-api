@@ -1,16 +1,13 @@
 """Service for processing message packets."""
 
 import logging
-import re
-
-from django.utils import timezone
 
 from common.mesh_node_helpers import MESHTASTIC_BROADCAST_ID
 from common.protocol import Protocol
-from nodes.models import NodeOwnerClaim
+from nodes.claim_authorization import try_accept_node_claim
 from packets.models import MessagePacket
 from packets.services.base import BasePacketService
-from packets.signals import node_claim_authorized, text_message_received
+from packets.signals import text_message_received
 from text_messages.models import TextMessage
 
 logger = logging.getLogger(__name__)
@@ -18,9 +15,6 @@ logger = logging.getLogger(__name__)
 
 class TextMessagePacketService(BasePacketService):
     """Service for processing message packets."""
-
-    # regex for a claim key (2-3 words and 2-3 digits)
-    _CLAIM_KEY_REGEX = r"^\s*(\w+\s+){2,3}\d{2,3}\s*$"
 
     def _process_packet(self) -> None:
         """Process the message packet and create a Message record."""
@@ -56,38 +50,12 @@ class TextMessagePacketService(BasePacketService):
 
     def _authorize_node_claim(self) -> None:
         """Authorize a user's claim to a node via the claim key in the message."""
-
-        # Only accept claims via direct messages
         if self.packet.to_int == MESHTASTIC_BROADCAST_ID:
             return
 
-        # check whether this looks like a claim key (2-3 words and 2-3 digits)
-        # reduces unnecessary database queries
-        if not re.match(self._CLAIM_KEY_REGEX, self.packet.message_text):
-            return
-
-        # remove whitespace from the claim key
-        claim_key = " ".join(self.packet.message_text.strip().split()).lower()
-        logger.info(f"Checking node claim for {self.from_node.node_id_str}: {claim_key}")
-
-        # check if this key matches a claim
-        claim = NodeOwnerClaim.objects.filter(
-            node=self.from_node,
-            claim_key=claim_key,
-            accepted_at__isnull=True,
-        ).first()
-        if claim is None:
-            return
-
-        logger.info(f"Authorizing node claim for {self.from_node.node_id_str} by {claim.user.username}")
-
-        # update the node's owner
-        self.from_node.claimed_by = claim.user
-        self.from_node.save(update_fields=["claimed_by"])
-
-        # delete the claim
-        claim.accepted_at = timezone.now()
-        claim.save(update_fields=["accepted_at"])
-
-        # send the node claim authorized signal
-        node_claim_authorized.send(sender=self, node=self.from_node, claim=claim, observer=self.observer)
+        try_accept_node_claim(
+            sender=self.from_node,
+            message_text=self.packet.message_text,
+            observer=self.observer,
+            sender_service=self,
+        )

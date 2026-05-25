@@ -7087,7 +7087,18 @@ paths:
                 $ref: '#/components/schemas/Error'
     post:
       summary: Create claim for observed node
-      description: Create a claim for the current user for the specified observed node.
+      description: >
+        Create a claim for the current user for the specified observed node. Returns a
+        `claim_key` the user must send from the radio to prove ownership.
+
+        **Meshtastic:** send the claim key as the body of a **direct message** to any
+        Meshflow managed (feeder) node. Broadcast channel messages are ignored.
+
+        **MeshCore:** send the claim key as the body of a **contact/DM** (not channel
+        broadcast) to a MeshCore feeder. On acceptance the API sets `claimed_by` and
+        pushes `node_claim_accepted` to the claimant over `ws/claims/` (JWT).
+
+        The observed node must already exist (discovered via packet ingest).
       tags: [Nodes]
       security:
         - BearerAuth: []

@@ -15,6 +15,7 @@ Configuration lives in [`Meshflow/Meshflow/settings/base.py`](../Meshflow/Meshfl
     - **`NodeConsumer`** (`ws/nodes/?api_key=…`) — feeder bots join group `node_{meshtastic_node_id}` or **`node_mc_{managed_node.internal_id}`** (MeshCore); receives **`node_command`** events (e.g. traceroute, `apply_mc_channel_config`). Any API/ASGI worker can `group_send`; membership is cluster-wide in Redis DB 0. Emitters include traceroute views/tasks, `meshcore_packets` apply-channel, and management commands.
     - **`TextMessageConsumer`** — authenticated UI clients join group **`text_messages`**; receives **`text_message`** events for mesh text broadcasts ([`Meshflow/ws/services/text_message.py`](../Meshflow/ws/services/text_message.py)).
     - **`TracerouteConsumer`** (`ws/traceroutes/?token=…`) — clients join group **`traceroutes`**; receives **`traceroute_update`** events ([`Meshflow/traceroute/ws_notify.py`](../Meshflow/traceroute/ws_notify.py)).
+    - **`NodeClaimConsumer`** (`ws/claims/?token=…`) — clients join group **`user_claims_{user_id}`**; receives **`node_claim_update`** / `node_claim_accepted` when ownership proof succeeds ([`Meshflow/nodes/ws_notify.py`](../Meshflow/nodes/ws_notify.py), signal `node_claim_authorized`).
   - **TTL:** Connection/session lifetime; Channels manages internal keys.
 
 - **DB 1 — Celery broker + result backend**  

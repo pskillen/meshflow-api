@@ -14,6 +14,7 @@ Cross-repo MeshCore work is tracked on GitHub epics [#264](https://github.com/ps
 
 - [feeder-bootstrap.md](./feeder-bootstrap.md) — first MC feeder + API key + `mc_pubkey`
 - [text-message-channels.md](./text-message-channels.md) — Phase 2.2 text + channels (device → API sync, apply-to-radio, ops troubleshooting)
+- [../node-lifecycle/node-claims-meshcore.md](../node-lifecycle/node-claims-meshcore.md) — ownership claims via contact/DM proof
 
 **Recent follow-up (post–#295 / staging):** see [phase-2-progress.md](./phase-2-progress.md) § “Feeder identity & apply fixes” and [phase-2-outstanding.md](./phase-2-outstanding.md) § “Phase 2.2 — staging & ops”.
 

@@ -1,9 +1,9 @@
 # Node Lifecycle
 
-This feature area describes how Meshtastic radio nodes move through Meshflow:
+This feature area describes how mesh radio nodes (Meshtastic and MeshCore) move through Meshflow:
 
 1. An observed node is discovered from ingested packets.
-2. A user proves ownership by claiming the observed node.
+2. A user proves ownership by claiming the observed node (protocol-specific proof message).
 3. The owner can convert that node into a managed node so it can feed packets into Meshflow.
 4. The owner can later release the claim or remove the managed-node role without deleting the observed node.
 
@@ -13,13 +13,15 @@ On **first** creation of an `ObservedNode`, the API may queue one **new-node bas
 
 ## Lifecycle Documents
 
-- [Node claims](node-claims.md): how users prove ownership of an observed node.
+- [Node claims](node-claims.md): shared claim model, permissions, WebSocket push.
+- [Meshtastic claims](node-claims-meshtastic.md): DM proof via Meshtastic feeders.
+- [MeshCore claims](node-claims-meshcore.md): contact/DM proof via MeshCore feeders.
 - [Managed nodes](managed-nodes.md): how claimed nodes become feeder nodes.
 - [Removal](removal.md): how ownership and managed-node status are removed.
 
 ## Core Models
 
-- `ObservedNode`: a Meshtastic radio node seen on the mesh.
+- `ObservedNode`: a Meshtastic or MeshCore radio node seen on the mesh (`protocol` discriminates).
 - `NodeLatestStatus`: denormalized latest position and metrics for an observed node.
 - `NodeOwnerClaim`: a pending or accepted ownership proof for an observed node.
 - `ManagedNode`: a Meshflow feeder node operated by a user.

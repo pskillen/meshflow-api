@@ -269,3 +269,68 @@ class TracerouteConsumer(AsyncWebsocketConsumer):
             return User.objects.get(id=user_id)
         except User.DoesNotExist:
             return AnonymousUser()
+
+
+class NodeClaimConsumer(AsyncWebsocketConsumer):
+    """
+    WebSocket consumer for node-claim acceptance (ownership proof).
+
+    Authenticated users connect with JWT via query param: ws/claims/?token=<jwt>
+    On connect, join group user_claims_{user_id}. Receive node_claim_update when
+    a pending claim is accepted via mesh DM proof.
+    """
+
+    async def connect(self):
+        self.user = self.scope.get("user", AnonymousUser())
+
+        query_string = self.scope.get("query_string", b"").decode("utf-8")
+        query_params = dict(param.split("=", 1) for param in query_string.split("&") if "=" in param)
+        token = query_params.get("token")
+
+        if token:
+            try:
+                access_token = AccessToken(token)
+                user_id = access_token.get("user_id")
+                if user_id:
+                    self.user = await self.get_user_from_id(user_id)
+            except (TokenError, InvalidToken) as e:
+                logger.warning("NodeClaimConsumer: invalid token: %s", e)
+                await self.close()
+                return
+
+        if self.user.is_anonymous:
+            logger.warning("NodeClaimConsumer: anonymous user tried to connect")
+            await self.close()
+            return
+
+        from common.ws_groups import user_claims_ws_group
+
+        self.claims_group = user_claims_ws_group(self.user.id)
+        await self.channel_layer.group_add(self.claims_group, self.channel_name)
+        await self.accept()
+        logger.info("NodeClaimConsumer: user %s connected", self.user.username)
+
+    async def disconnect(self, close_code):
+        if hasattr(self, "claims_group"):
+            await self.channel_layer.group_discard(self.claims_group, self.channel_name)
+        logger.info(
+            "NodeClaimConsumer: user %s disconnected",
+            getattr(self.user, "username", "unknown"),
+        )
+
+    async def receive(self, text_data):
+        pass
+
+    async def node_claim_update(self, event):
+        """Handle node_claim_update from channel layer."""
+        await self.send(text_data=json.dumps(event["payload"]))
+
+    @database_sync_to_async
+    def get_user_from_id(self, user_id):
+        from django.contrib.auth import get_user_model
+
+        User = get_user_model()
+        try:
+            return User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return AnonymousUser()

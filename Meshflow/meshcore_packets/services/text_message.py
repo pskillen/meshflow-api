@@ -5,6 +5,7 @@ import logging
 from common.meshcore_node_helpers import resolve_or_create_mc_observed_node
 from common.protocol import Protocol
 from meshcore_packets.models import MeshCorePayloadType, MeshCoreTextPacket
+from nodes.claim_authorization import try_accept_node_claim
 from packets.signals import text_message_received
 from text_messages.models import TextMessage
 
@@ -21,7 +22,7 @@ class MeshCoreTextMessageService:
         if packet.payload_type == MeshCorePayloadType.CHANNEL_TEXT:
             return self._create_channel_message(packet, observation)
         if packet.payload_type == MeshCorePayloadType.CONTACT_TEXT:
-            return self._create_contact_message(packet)
+            return self._create_contact_message(packet, observer)
         return None
 
     def _create_channel_message(self, packet: MeshCoreTextPacket, observation) -> TextMessage | None:
@@ -38,7 +39,7 @@ class MeshCoreTextMessageService:
         text_message_received.send(sender=self, message=message, observer=observation.observer)
         return message
 
-    def _create_contact_message(self, packet: MeshCoreTextPacket) -> TextMessage | None:
+    def _create_contact_message(self, packet: MeshCoreTextPacket, observer) -> TextMessage | None:
         prefix = packet.from_pubkey_prefix
         if not prefix and packet.from_pubkey:
             prefix = packet.from_pubkey[:12]
@@ -51,7 +52,7 @@ class MeshCoreTextMessageService:
                 last_heard=packet.rx_time,
             )
 
-        return TextMessage.objects.create(
+        message = TextMessage.objects.create(
             protocol=Protocol.MESHCORE,
             original_mc_packet=packet,
             sender=sender,
@@ -61,6 +62,16 @@ class MeshCoreTextMessageService:
             message_text=packet.text,
             is_emoji=False,
         )
+
+        if sender is not None:
+            try_accept_node_claim(
+                sender=sender,
+                message_text=packet.text,
+                observer=observer,
+                sender_service=self,
+            )
+
+        return message
 
 
 def handle_meshcore_text_packet(sender, packet, observer, observation, **kwargs):
