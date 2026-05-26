@@ -20,7 +20,7 @@ Items **skipped**, **incomplete**, or **discovered during execution** — not th
 
 ## Implementation (#329 — UI Task 3, meshflow-ui)
 
-- [ ] Main dashboard overlay + protocol dashboard pages + nav (meshflow-ui PR)
+- [x] Main dashboard overlay + protocol dashboard pages + nav — [meshflow-ui#306](https://github.com/pskillen/meshflow-ui/pull/306)
 
 ## Bug (#365)
 

@@ -8,7 +8,11 @@
 
 ## Overall status
 
-**Status:** In progress (API + UI ready for PR)
+**Status:** Complete (pending merge + deploy)
+
+**PR (API):** https://github.com/pskillen/meshflow-api/pull/366 — closes #329, #365
+
+**PR (UI):** https://github.com/pskillen/meshflow-ui/pull/306
 
 **Branch (API):** `api-329/pskillen/packet-stats-docs`
 
