@@ -32,7 +32,23 @@ See [#295](https://github.com/pskillen/meshflow-api/issues/295). Optional follow
 
 ## 1. Create MC ManagedNode
 
-1. Open **Django admin** → **Managed nodes** → **Add** (or use the enrollment wizard when available).
+### Primary: UI enrollment wizard
+
+1. **Claim** the MeshCore observed node ([node claims — MeshCore](../node-lifecycle/node-claims-meshcore.md)).
+2. Open **Node Settings** (or **My Nodes**) → **Convert to managed node** / **Run as managed node**.
+3. Wizard steps (MeshCore constellations only):
+   - Constellation (MC)
+   - **Feeder pubkey** — 64-char hex; pre-filled from claim when known (otherwise from bot `SELF_INFO` logs)
+   - Default map location
+   - API key (create or reuse; linked via `managed_node_internal_id`)
+   - **Bot setup instructions** — `RADIO_PROTOCOL=meshcore`, `STORAGE_API_VERSION=3`, feeder ingest URL
+4. Channels sync on first bot connect (`mc-channel-sync`); no Meshtastic 8-slot mapping in the wizard.
+
+See [meshflow-ui#293](https://github.com/pskillen/meshflow-ui/issues/293).
+
+### Fallback: Django admin or REST
+
+1. Open **Django admin** → **Managed nodes** → **Add**, or `POST /api/nodes/managed-nodes/` with `protocol=meshcore`, `mc_pubkey`, default location.
 2. Set:
    - **Protocol**: MeshCore
    - **`mc_pubkey`**: full **64-char lowercase hex** from bot connect logs (`SELF_INFO`) — required at save
