@@ -356,7 +356,15 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
         Get node counts by time window (nodes seen since each threshold).
 
         Returns counts for: 2h, 24h, 7d, 30d, 90d, and all time.
+        Optional ?protocol=meshtastic|meshcore filters ObservedNode rows.
         """
+        from common.protocol import protocol_from_query_param
+
+        protocol = protocol_from_query_param(request.query_params.get("protocol"))
+        base_qs = ObservedNode.objects.all()
+        if protocol is not None:
+            base_qs = base_qs.filter(protocol=protocol)
+
         now = timezone.now()
         windows = [
             ("2", now - timedelta(hours=2)),
@@ -367,8 +375,8 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
         ]
         result = {}
         for key, threshold in windows:
-            result[key] = ObservedNode.objects.filter(last_heard__gte=threshold).count()
-        result["all"] = ObservedNode.objects.count()
+            result[key] = base_qs.filter(last_heard__gte=threshold).count()
+        result["all"] = base_qs.count()
         return Response(result)
 
     @action(detail=False, methods=["get"], url_path="search")
@@ -623,16 +631,26 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
         """
         Get observed nodes whose role is infrastructure (router, repeater, etc.).
 
-        Query params: last_heard_after, page, page_size, include_client_base (default false)
+        Query params: last_heard_after, page, page_size, include_client_base (default false),
+        protocol (meshtastic | meshcore). Meshtastic: infrastructure meshtastic roles.
+        MeshCore: all observed MeshCore nodes (no Meshtastic role filter).
         """
-        include_client_base = request.query_params.get("include_client_base", "false").lower() == "true"
-        roles = INFRASTRUCTURE_ROLES + ([RoleSource.CLIENT_BASE] if include_client_base else [])
+        from common.protocol import Protocol, protocol_from_query_param
 
-        qs = (
-            ObservedNode.objects.filter(meshtastic_role__in=roles)
-            .order_by("-last_heard", "meshtastic_node_id")
-            .select_related("latest_status", "monitoring_config", "mesh_presence")
-        )
+        protocol = protocol_from_query_param(request.query_params.get("protocol"))
+        if protocol is None:
+            protocol = Protocol.MESHTASTIC
+
+        qs = ObservedNode.objects.all().order_by("-last_heard", "meshtastic_node_id")
+
+        if protocol == Protocol.MESHCORE:
+            qs = qs.filter(protocol=Protocol.MESHCORE)
+        else:
+            include_client_base = request.query_params.get("include_client_base", "false").lower() == "true"
+            roles = INFRASTRUCTURE_ROLES + ([RoleSource.CLIENT_BASE] if include_client_base else [])
+            qs = qs.filter(protocol=Protocol.MESHTASTIC, meshtastic_role__in=roles)
+
+        qs = qs.select_related("latest_status", "monitoring_config", "mesh_presence")
 
         last_heard_after = request.query_params.get("last_heard_after")
         if last_heard_after:

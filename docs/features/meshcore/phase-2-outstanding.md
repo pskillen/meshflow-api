@@ -54,7 +54,7 @@ Items **skipped**, **incomplete**, or **discovered during Phase 2 / rename execu
 - [ ] Test factories — legacy kwargs (`node_id`, `hw_model`, …) remain aliases in `create_observed_node`.
 - [x] **UI nav parity** — [ui#269](https://github.com/pskillen/meshflow-ui/issues/269) (in PR; see [phase-2-progress.md](./phase-2-progress.md) § UI nav & map parity).
 - [x] **MeshCore managed-nodes live status** — `include=status` MC annotations + UI table (api branch; see progress § MeshCore managed-node live status). **Still ship**; does not close [#329](https://github.com/pskillen/meshflow-api/issues/329).
-- [ ] **Hourly MC stats snapshots** — [#329](https://github.com/pskillen/meshflow-api/issues/329): `collect_stats_snapshots` / `StatsSnapshot` / dashboard charts; document Meshtastic path first (`docs/features/stats/meshtastic_packets.md`).
+- [x] **Hourly MC stats snapshots (API)** — [#329](https://github.com/pskillen/meshflow-api/issues/329): `mc_*` collectors + OpenAPI; UI in meshflow-ui same initiative.
 - [ ] **UI out of scope for #269** — `/meshtastic/*` URL migration; MeshCore traceroutes / weather screens; server-side `protocol` filter on `GET /nodes/managed-nodes/`.
 - [x] **MeshCore channel messages UI** — [ui#275](https://github.com/pskillen/meshflow-ui/issues/275) (in PR; see progress § MeshCore messages UI). MC DM history still open below.
 - [ ] **Node search** still Meshtastic-centric (global sidebar search).
