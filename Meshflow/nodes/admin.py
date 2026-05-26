@@ -371,21 +371,18 @@ class ManagedNodeAdminForm(forms.ModelForm):
         self.initial["latlong"] = [lat, lng]
 
         self.fields["protocol"].help_text = _(
-            "MeshCore feeders use protocol MeshCore and node id 0; Meshtastic feeders use Meshtastic."
+            "Meshtastic feeders require a radio node ID. MeshCore feeders require mc_pubkey (no Meshtastic node ID)."
         )
 
         if self._submitted_protocol() == Protocol.MESHCORE:
-            initial = self.instance.meshtastic_node_id if not self.instance._state.adding else 0
-            self.fields["meshtastic_node_id"] = forms.IntegerField(
-                label=_("Node ID (placeholder)"),
-                required=False,
-                initial=initial,
-                min_value=0,
-                help_text=_(
-                    "Use 0 for MeshCore feeders (not used on the wire). "
-                    "Display id is mc:feeder:<internal id> after save."
-                ),
-            )
+            if "meshtastic_node_id" in self.fields:
+                self.fields["meshtastic_node_id"].widget = forms.HiddenInput()
+                self.fields["meshtastic_node_id"].required = False
+            if "mc_pubkey" in self.fields:
+                self.fields["mc_pubkey"].required = True
+                self.fields["mc_pubkey"].help_text = _(
+                    "64-char lowercase hex from bot connect logs (SELF_INFO). Required before save."
+                )
         elif not self.instance._state.adding and self.instance.protocol == Protocol.MESHTASTIC:
             self.fields["meshtastic_node_id"].initial = meshtastic_id_to_hex(self.instance.meshtastic_node_id)
 
@@ -413,12 +410,7 @@ class ManagedNodeAdminForm(forms.ModelForm):
         protocol = self._protocol_from_form()
 
         if protocol == Protocol.MESHCORE:
-            if raw in (None, ""):
-                return 0
-            try:
-                return int(raw)
-            except TypeError, ValueError:
-                raise forms.ValidationError(_("Enter 0 for MeshCore feeders."))
+            return None
 
         text = str(raw).strip() if raw is not None else ""
         if not text:
@@ -455,6 +447,8 @@ class ManagedNodeAdminForm(forms.ModelForm):
         if latlong:
             cleaned_data["default_location_latitude"] = latlong[0]
             cleaned_data["default_location_longitude"] = latlong[1]
+        if self._protocol_from_form() == Protocol.MESHCORE and not cleaned_data.get("mc_pubkey"):
+            raise forms.ValidationError({"mc_pubkey": _("mc_pubkey is required for MeshCore feeders.")})
         return cleaned_data
 
     def save(self, commit=True):

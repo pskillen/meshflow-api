@@ -21,7 +21,7 @@ MeshCore uses the same pattern as Meshtastic: **device identity in the URL**, pl
 | **What the bot sends** | `node_id` in URL = device nodenum | **12-hex pubkey prefix** in URL (from `mc:` id after connect) |
 | **Optional header** | — | `X-MeshCore-Feeder-Pubkey` (64 hex) must match `ManagedNode.mc_pubkey` when set |
 | **How the API picks the observer** | `NodeAuth` + URL `node_id` | `NodeAuth` + URL prefix matches `pubkey_to_prefix(mc_pubkey)` |
-| **`ManagedNode.meshtastic_node_id`** | Must match the radio | Placeholder **`0`** only |
+| **`ManagedNode.meshtastic_node_id`** | Must match the radio | **`NULL`** (not used on the wire) |
 | **Payload `from_pubkey`** | Packet sender on the mesh | Remote node in the heard packet; not the feeder |
 
 **Shared constellation API keys:** multiple MeshCore feeders may use the same `NodeAPIKey` if each `ManagedNode` has a distinct **`mc_pubkey`** (full 64-hex from bot logs). The bot disambiguates via the URL prefix, like Meshtastic `{node_id}`.
@@ -32,22 +32,21 @@ See [#295](https://github.com/pskillen/meshflow-api/issues/295). Optional follow
 
 ## 1. Create MC ManagedNode
 
-1. Open **Django admin** → **Managed nodes** → **Add**.
+1. Open **Django admin** → **Managed nodes** → **Add** (or use the enrollment wizard when available).
 2. Set:
    - **Protocol**: MeshCore
-   - **Node ID (placeholder)**: `0`
+   - **`mc_pubkey`**: full **64-char lowercase hex** from bot connect logs (`SELF_INFO`) — required at save
    - **Name**: e.g. `Scottish Mesh MC Feeder`
    - **Owner** / **Constellation**: your MC constellation
    - **Default location** (optional): lat/lon for map display
-3. Save.
+3. Save. **Display ID** is `mc:{12-hex-prefix}`.
 
-## 2. Set feeder pubkey and API key
+## 2. API key
 
-1. Start **meshflow-bot** once with `RADIO_PROTOCOL=meshcore` and note the **full 64-hex pubkey** from connect logs (or `SELF_INFO`).
-2. Edit the ManagedNode → **MeshCore identity** → paste into **`mc_pubkey`** (lowercase hex). Save. **Display ID** becomes `mc:{12-hex-prefix}`.
-3. **Node API keys** → create or reuse a constellation key.
-4. **Node authentications** → link the key to this MC ManagedNode (multiple feeders may share one key if each has a unique `mc_pubkey`).
-5. Put the key in the bot env as `STORAGE_API_TOKEN`.
+1. **Node API keys** → create or reuse a constellation key.
+2. **Node authentications** → link the key to this MC ManagedNode, or `POST …/api-keys/{id}/add_node/` with `managed_node_internal_id` (UUID from the managed node row).
+3. Multiple feeders may share one key if each has a unique `mc_pubkey`.
+4. Put the key in the bot env as `STORAGE_API_TOKEN`.
 
 ## 3. Configure meshflow-bot
 
@@ -57,7 +56,7 @@ MESHCORE_SERIAL_DEVICE=/dev/ttyUSB0   # or MESHCORE_BLE_ADDRESS=...
 MESHCORE_UPLOAD_ENABLED=true
 STORAGE_API_ROOT=https://your-api.example/api
 STORAGE_API_TOKEN=<key from step 2>
-STORAGE_API_VERSION=2
+STORAGE_API_VERSION=3
 ```
 
 Restart the bot. Confirm logs show feeder-scoped paths, e.g. `POST /api/meshcore/feeders/{prefix}/packets/ingest/`. Do **not** use `/api/packets/0/bot-version/` for MeshCore.
