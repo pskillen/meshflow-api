@@ -10,9 +10,11 @@
 
 ## Overall status
 
-**Status:** Complete (pending PR + deploy)
+**Status:** Complete (pending merge + deploy)
 
-**Branch:** `api-362/managed-node-protocol-identity` (to push)
+**PR:** [meshflow-api#363](https://github.com/pskillen/meshflow-api/pull/363)
+
+**Branch:** `api-362/pskillen/managed-node-protocol-identity`
 
 ---
 
