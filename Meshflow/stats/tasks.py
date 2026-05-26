@@ -14,7 +14,7 @@ from tqdm import tqdm
 
 from common.protocol import Protocol
 from constellations.models import Constellation
-from meshcore_packets.models import MeshCorePayloadType, MeshCorePacketObservation, MeshCoreRawPacket
+from meshcore_packets.models import MeshCorePacketObservation, MeshCorePayloadType, MeshCoreRawPacket
 from nodes.models import ObservedNode
 from packets.models import MtRawPacket, PacketObservation
 
@@ -555,9 +555,7 @@ def backfill_stats_snapshots(days: int = 30):
         created += c3
         skipped += s3
 
-        c4, s4 = _collect_mc_online_nodes(
-            hour, run_id=run_id, skip_existing=True, use_raw_packet_for_global=True
-        )
+        c4, s4 = _collect_mc_online_nodes(hour, run_id=run_id, skip_existing=True, use_raw_packet_for_global=True)
         created += c4
         skipped += s4
 

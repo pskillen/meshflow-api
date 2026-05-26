@@ -170,3 +170,25 @@ def mark_constellation_managed_nodes_feeding(mark_managed_node_feeding):
             mark_managed_node_feeding(mn, sending=True)
 
     return _mark
+
+
+FEEDER_MC_PUBKEY = "a" * 64
+FEEDER_MC_PUBKEY_PREFIX = "a" * 12
+
+
+@pytest.fixture
+def meshcore_feeder(create_managed_node, create_node_api_key):
+    """MC ManagedNode + API key + NodeAuth for ingest and stats tests."""
+    node = create_managed_node(
+        meshtastic_node_id=None,
+        protocol=Protocol.MESHCORE,
+        name="MC Feeder",
+        mc_pubkey=FEEDER_MC_PUBKEY,
+    )
+    api_key = create_node_api_key(constellation=node.constellation)
+    NodeAuth.objects.create(api_key=api_key, node=node)
+    return {
+        "node": node,
+        "api_key": api_key,
+        "feeder_pubkey_prefix": FEEDER_MC_PUBKEY_PREFIX,
+    }

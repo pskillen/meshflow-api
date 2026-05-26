@@ -7,12 +7,12 @@ from django.utils import timezone
 import pytest
 
 from common.protocol import Protocol
-from meshcore_packets.models import MeshCorePayloadType, MeshCorePacketObservation, MeshCoreRawPacket
+from meshcore_packets.models import MeshCorePacketObservation, MeshCorePayloadType, MeshCoreRawPacket
 from stats.models import StatsSnapshot
 from stats.tasks import (
+    _collect_mc_new_nodes,
     _collect_mc_online_nodes,
     _collect_mc_packet_volume,
-    _collect_mc_new_nodes,
     _collect_online_nodes,
 )
 
@@ -102,9 +102,7 @@ def test_mc_online_nodes_global_and_constellation(meshcore_feeder, create_observ
 
     _collect_mc_online_nodes(hour, run_id=None)
 
-    global_snap = StatsSnapshot.objects.get(
-        stat_type="mc_online_nodes", constellation__isnull=True, recorded_at=hour
-    )
+    global_snap = StatsSnapshot.objects.get(stat_type="mc_online_nodes", constellation__isnull=True, recorded_at=hour)
     assert global_snap.value["count"] == 1
 
     const_snap = StatsSnapshot.objects.get(

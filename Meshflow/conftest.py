@@ -3,5 +3,4 @@
 pytest_plugins = [
     "nodes.tests.conftest",
     "packets.tests.conftest",
-    "meshcore_packets.tests.conftest",
 ]
