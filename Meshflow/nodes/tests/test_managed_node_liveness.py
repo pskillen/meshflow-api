@@ -47,7 +47,7 @@ def test_refresh_task_aligns_with_eligibility(monkeypatch, create_managed_node, 
     monkeypatch.setenv("SCHEDULE_TRACEROUTE_SOURCE_RECENCY_SECONDS", "600")
     from nodes.tasks import update_managed_node_statuses
 
-    mn = create_managed_node(allow_auto_traceroute=True)
+    mn = create_managed_node(allow_auto_traceroute=True, meshtastic_node_id=0xA1000005)
     create_packet_observation(observer=mn)
     update_managed_node_statuses()
     assert ManagedNodeStatus.objects.get(node=mn).is_sending_data is True

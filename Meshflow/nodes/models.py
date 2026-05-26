@@ -58,7 +58,7 @@ class ManagedNode(models.Model):
     """User-owned feeder / infrastructure node (Meshtastic today; MeshCore in a later phase)."""
 
     internal_id = models.UUIDField(primary_key=True, null=False, default=uuid.uuid4, editable=False)
-    meshtastic_node_id = models.BigIntegerField(null=False, db_index=True)
+    meshtastic_node_id = models.BigIntegerField(null=True, blank=True, db_index=True)
     protocol = models.PositiveSmallIntegerField(
         choices=Protocol.choices,
         default=Protocol.MESHTASTIC,
@@ -203,6 +203,22 @@ class ManagedNode(models.Model):
         verbose_name = _("Managed node")
         verbose_name_plural = _("Managed nodes")
         constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(protocol=Protocol.MESHTASTIC, meshtastic_node_id__isnull=False, mc_pubkey__isnull=True)
+                    | models.Q(
+                        protocol=Protocol.MESHCORE,
+                        meshtastic_node_id__isnull=True,
+                        mc_pubkey__isnull=False,
+                    )
+                ),
+                name="managednode_protocol_identity",
+            ),
+            models.UniqueConstraint(
+                fields=["meshtastic_node_id"],
+                condition=models.Q(protocol=Protocol.MESHTASTIC, deleted_at__isnull=True),
+                name="managednode_unique_meshtastic_node_id_active",
+            ),
             models.UniqueConstraint(
                 fields=["constellation", "mc_pubkey"],
                 condition=models.Q(protocol=Protocol.MESHCORE) & models.Q(mc_pubkey__isnull=False),

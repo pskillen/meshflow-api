@@ -13,7 +13,7 @@ FEEDER_B_MC_PUBKEY_PREFIX = "c" * 12
 def meshcore_feeder(create_managed_node, create_node_api_key):
     """MC ManagedNode + API key + NodeAuth for ingest tests."""
     node = create_managed_node(
-        meshtastic_node_id=0,
+        meshtastic_node_id=None,
         protocol=Protocol.MESHCORE,
         name="MC Feeder",
         mc_pubkey=FEEDER_MC_PUBKEY,

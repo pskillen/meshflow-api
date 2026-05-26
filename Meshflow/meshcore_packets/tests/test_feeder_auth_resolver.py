@@ -1,5 +1,7 @@
 """Unit tests for MeshCore feeder resolution."""
 
+from unittest.mock import MagicMock, patch
+
 import pytest
 
 from common.meshcore_feeder_auth import MeshCoreFeederResolutionError, resolve_meshcore_feeder
@@ -45,8 +47,8 @@ def test_resolve_pubkey_mismatch(meshcore_feeder):
 
 
 @pytest.mark.django_db
-def test_shared_key_two_feeders(create_managed_node, create_node_api_key):
-    constellation = create_managed_node(protocol=Protocol.MESHCORE).constellation
+def test_shared_key_two_feeders(create_managed_node, create_constellation, create_node_api_key):
+    constellation = create_constellation(protocol=Protocol.MESHCORE)
     node_a = create_managed_node(
         meshtastic_node_id=0,
         protocol=Protocol.MESHCORE,
@@ -82,27 +84,31 @@ def test_shared_key_two_feeders(create_managed_node, create_node_api_key):
 
 
 @pytest.mark.django_db
-def test_shared_key_missing_mc_pubkey(create_managed_node, create_node_api_key):
-    constellation = create_managed_node(protocol=Protocol.MESHCORE).constellation
+def test_shared_key_missing_mc_pubkey(create_managed_node, create_constellation, create_node_api_key):
+    """Resolver rejects ambiguous shared keys when a linked feeder lacks mc_pubkey (in-memory)."""
+    constellation = create_constellation(protocol=Protocol.MESHCORE)
     node_a = create_managed_node(
-        meshtastic_node_id=0,
         protocol=Protocol.MESHCORE,
         constellation=constellation,
         mc_pubkey=FEEDER_MC_PUBKEY,
     )
     node_b = create_managed_node(
-        meshtastic_node_id=0,
         protocol=Protocol.MESHCORE,
         constellation=constellation,
-        mc_pubkey=None,
+        mc_pubkey=FEEDER_B_MC_PUBKEY,
     )
     api_key = create_node_api_key(constellation=constellation)
-    NodeAuth.objects.create(api_key=api_key, node=node_a)
-    NodeAuth.objects.create(api_key=api_key, node=node_b)
+    auth_a = NodeAuth.objects.create(api_key=api_key, node=node_a)
+    auth_b = NodeAuth.objects.create(api_key=api_key, node=node_b)
+    auth_b.node.mc_pubkey = None
 
-    with pytest.raises(MeshCoreFeederResolutionError) as exc:
-        resolve_meshcore_feeder(
-            api_key=api_key,
-            feeder_pubkey_prefix=FEEDER_MC_PUBKEY_PREFIX,
-        )
+    mock_qs = MagicMock()
+    mock_qs.select_related.return_value = [auth_a, auth_b]
+
+    with patch.object(NodeAuth.objects, "filter", return_value=mock_qs):
+        with pytest.raises(MeshCoreFeederResolutionError) as exc:
+            resolve_meshcore_feeder(
+                api_key=api_key,
+                feeder_pubkey_prefix=FEEDER_MC_PUBKEY_PREFIX,
+            )
     assert exc.value.code == "feeder_pubkey_not_configured"

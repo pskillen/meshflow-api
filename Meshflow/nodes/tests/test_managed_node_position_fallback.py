@@ -29,7 +29,7 @@ def test_managed_node_position_falls_back_to_default_location(create_managed_nod
     assert row["position"]["latitude"] == 55.95
     assert row["position"]["longitude"] == -3.19
 
-    detail_url = reverse("managed-nodes-detail", kwargs={"node_id": managed.meshtastic_node_id})
+    detail_url = reverse("managed-nodes-detail", kwargs={"internal_id": managed.meshtastic_node_id})
     detail_resp = client.get(detail_url)
     assert detail_resp.status_code == status.HTTP_200_OK
     assert detail_resp.data["position"]["latitude"] == 55.95
@@ -55,7 +55,7 @@ def test_managed_node_position_prefers_observed_over_default(create_managed_node
 
     client = APIClient()
     client.force_authenticate(user=user)
-    detail_resp = client.get(reverse("managed-nodes-detail", kwargs={"node_id": managed.meshtastic_node_id}))
+    detail_resp = client.get(reverse("managed-nodes-detail", kwargs={"internal_id": managed.meshtastic_node_id}))
     assert detail_resp.status_code == status.HTTP_200_OK
     assert detail_resp.data["position"]["latitude"] == 56.1
     assert detail_resp.data["position"]["longitude"] == -3.5
@@ -68,6 +68,6 @@ def test_managed_node_position_null_without_observed_or_default(create_managed_n
 
     client = APIClient()
     client.force_authenticate(user=user)
-    detail_resp = client.get(reverse("managed-nodes-detail", kwargs={"node_id": managed.meshtastic_node_id}))
+    detail_resp = client.get(reverse("managed-nodes-detail", kwargs={"internal_id": managed.meshtastic_node_id}))
     assert detail_resp.status_code == status.HTTP_200_OK
     assert detail_resp.data["position"] is None

@@ -1648,10 +1648,31 @@ components:
           description: Whether the API key is active
         nodes:
           type: array
-          description: The nodes that are associated with the API key
+          description: Legacy Meshtastic numeric node ids linked to this key (MeshCore feeders omitted)
           readOnly: true
           items:
             type: integer
+        linked_managed_nodes:
+          type: array
+          readOnly: true
+          description: All linked managed nodes with stable internal_id (preferred for MeshCore)
+          items:
+            $ref: '#/components/schemas/LinkedManagedNode'
+
+    LinkedManagedNode:
+      type: object
+      properties:
+        internal_id:
+          type: string
+          format: uuid
+        node_id_str:
+          type: string
+        protocol:
+          $ref: '#/components/schemas/MeshProtocol'
+        meshtastic_node_id:
+          type: integer
+          format: int64
+          nullable: true
 
     NodeOwnerClaim:
       type: object
@@ -1764,7 +1785,21 @@ components:
         meshtastic_node_id:
           type: integer
           format: int64
-          description: Meshtastic numeric node id for this managed feeder
+          nullable: true
+          description: Meshtastic numeric node id (null for MeshCore feeders)
+        mc_pubkey:
+          type: string
+          nullable: true
+          maxLength: 64
+          description: MeshCore feeder device pubkey (64-char lowercase hex; required when protocol=meshcore)
+        default_location_latitude:
+          type: number
+          format: double
+          nullable: true
+        default_location_longitude:
+          type: number
+          format: double
+          nullable: true
         protocol:
           $ref: '#/components/schemas/MeshProtocol'
           description: Mesh protocol for this managed node
@@ -5394,7 +5429,7 @@ paths:
                           $ref: '#/components/schemas/OwnedManagedNode'
 
 
-  /nodes/managed-nodes/{node_id}/:
+  /nodes/managed-nodes/{internal_id}/:
     get:
       summary: Get managed node details
       description: >-
@@ -5408,7 +5443,9 @@ paths:
           in: path
           required: true
           schema:
-            type: integer
+            type: string
+            format: uuid
+          description: Managed node UUID (Meshtastic numeric id accepted but deprecated)
         - name: include
           in: query
           required: false
@@ -5440,7 +5477,8 @@ paths:
           in: path
           required: true
           schema:
-            type: integer
+            type: string
+            format: uuid
       requestBody:
         required: true
         content:
@@ -5469,7 +5507,8 @@ paths:
           in: path
           required: true
           schema:
-            type: integer
+            type: string
+            format: uuid
       requestBody:
         required: true
         content:
@@ -5494,7 +5533,7 @@ paths:
     delete:
       summary: Soft-delete managed node (un-manage)
       description: >
-        Soft-deletes the managed node for the given mesh `node_id`: sets `deleted_at`, removes all
+        Soft-deletes the managed node for the given `internal_id`: sets `deleted_at`, removes all
         `NodeAuth` links for that managed node, and excludes the row from managed-node listings and
         detail lookups (404). Allowed for the node owner or Django staff only; constellation admins
         cannot un-manage on behalf of others. Does not clear `ObservedNode.claimed_by`.
@@ -5506,7 +5545,8 @@ paths:
           in: path
           required: true
           schema:
-            type: integer
+            type: string
+            format: uuid
       responses:
         '204':
           description: Managed node soft-deleted successfully
@@ -5651,11 +5691,15 @@ paths:
             schema:
               type: object
               properties:
+                managed_node_internal_id:
+                  type: string
+                  format: uuid
+                  description: Preferred — managed node UUID to link
                 meshtastic_node_id:
                   type: integer
-                  description: Meshtastic numeric node id of the managed node to link
+                  description: Meshtastic numeric node id (Meshtastic feeders only)
       responses:
-        '200':
+        '201':
           description: Node added successfully
           content:
             application/json:
@@ -5681,9 +5725,13 @@ paths:
             schema:
               type: object
               properties:
+                managed_node_internal_id:
+                  type: string
+                  format: uuid
+                  description: Preferred — managed node UUID to unlink
                 meshtastic_node_id:
                   type: integer
-                  description: Meshtastic numeric node id of the managed node to unlink
+                  description: Meshtastic numeric node id (Meshtastic feeders only)
       responses:
         '200':
           description: Node removed successfully

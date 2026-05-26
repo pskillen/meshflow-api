@@ -1,19 +1,33 @@
+from itertools import count
+
 from django.utils import timezone
 
 import pytest
 
+from common.protocol import Protocol
 from constellations.models import MessageChannel
 from constellations.tests.conftest import create_constellation  # noqa: F401
 from nodes.models import ManagedNode, ManagedNodeStatus, NodeAPIKey, NodeAuth, ObservedNode
 from users.tests.conftest import create_user  # noqa: F401
 
+_mt_managed_node_id_seq = count(0x10000000)
 
-def _coerce_meshtastic_node_id_kwargs(data: dict) -> dict:
+
+def _coerce_meshtastic_node_id_kwargs(data: dict, explicit_keys: set, *, managed: bool = False) -> dict:
     """Map legacy test kwarg ``node_id`` to ``meshtastic_node_id`` (SP-03)."""
     if "node_id" in data:
         if "meshtastic_node_id" in data:
             raise ValueError("Pass only one of node_id or meshtastic_node_id")
         data["meshtastic_node_id"] = data.pop("node_id")
+        explicit_keys = set(explicit_keys) | {"meshtastic_node_id"}
+    protocol = data.get("protocol", Protocol.MESHTASTIC)
+    if protocol == Protocol.MESHCORE:
+        if "meshtastic_node_id" not in explicit_keys or data.get("meshtastic_node_id") == 0:
+            data["meshtastic_node_id"] = None
+        if not data.get("mc_pubkey"):
+            data["mc_pubkey"] = "a" * 64
+    elif managed and "meshtastic_node_id" not in explicit_keys:
+        data["meshtastic_node_id"] = next(_mt_managed_node_id_seq)
     return data
 
 
@@ -28,7 +42,7 @@ _LEGACY_OBSERVED_NODE_FIELD_ALIASES = {
 
 def _coerce_observed_node_legacy_kwargs(data: dict) -> dict:
     """Map legacy test kwargs to ``meshtastic_*`` field names (SP-04)."""
-    _coerce_meshtastic_node_id_kwargs(data)
+    _coerce_meshtastic_node_id_kwargs(data, set(), managed=False)
     for old, new in _LEGACY_OBSERVED_NODE_FIELD_ALIASES.items():
         if old in data:
             if new in data:
@@ -69,7 +83,7 @@ def create_managed_node(managed_node_data, create_user, create_constellation):  
     def make_managed_node(**kwargs):
         data = managed_node_data.copy()
         data.update(kwargs)
-        _coerce_meshtastic_node_id_kwargs(data)
+        _coerce_meshtastic_node_id_kwargs(data, set(kwargs.keys()), managed=True)
         if "owner" not in data:
             data["owner"] = create_user()
         if "constellation" not in data:

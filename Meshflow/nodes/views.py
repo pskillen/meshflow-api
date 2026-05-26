@@ -1,5 +1,6 @@
 import logging
 import re
+import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -139,25 +140,58 @@ class APIKeyViewSet(viewsets.ModelViewSet):
             raise PermissionDenied("Feeder or admin access required to create API keys.")
         serializer.save(owner=self.request.user)
 
+    @staticmethod
+    def _resolve_managed_node_for_link(meshtastic_node_id, managed_node_internal_id):
+        from common.protocol import Protocol
+
+        if managed_node_internal_id:
+            try:
+                node_uuid = uuid.UUID(str(managed_node_internal_id))
+            except ValueError:
+                return None, "managed_node_internal_id must be a valid UUID"
+            try:
+                return (
+                    ManagedNode.objects.get(internal_id=node_uuid, deleted_at__isnull=True),
+                    None,
+                )
+            except ManagedNode.DoesNotExist:
+                return None, f"Managed node {managed_node_internal_id} does not exist"
+
+        if meshtastic_node_id is None:
+            return None, "managed_node_internal_id or meshtastic_node_id is required"
+
+        try:
+            return (
+                ManagedNode.objects.get(
+                    meshtastic_node_id=meshtastic_node_id,
+                    protocol=Protocol.MESHTASTIC,
+                    deleted_at__isnull=True,
+                ),
+                None,
+            )
+        except ManagedNode.DoesNotExist:
+            return None, f"Node with ID {meshtastic_node_id} does not exist"
+
     @action(detail=True, methods=["post"])
     def add_node(self, request, pk=None):
         """Add a node to an API key."""
         api_key = self.get_object()
         meshtastic_node_id = request.data.get("meshtastic_node_id")
+        managed_node_internal_id = request.data.get("managed_node_internal_id")
 
-        if not meshtastic_node_id:
-            return Response(
-                {"error": "meshtastic_node_id is required"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        if meshtastic_node_id is not None:
+            try:
+                meshtastic_node_id = int(meshtastic_node_id)
+            except TypeError, ValueError:
+                return Response(
+                    {"error": "meshtastic_node_id must be an integer"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
-        try:
-            node = ManagedNode.objects.get(meshtastic_node_id=meshtastic_node_id, deleted_at__isnull=True)
-        except ManagedNode.DoesNotExist:
-            return Response(
-                {"error": f"Node with ID {meshtastic_node_id} does not exist"},
-                status=status.HTTP_404_NOT_FOUND,
-            )
+        node, error = self._resolve_managed_node_for_link(meshtastic_node_id, managed_node_internal_id)
+        if error:
+            status_code = status.HTTP_404_NOT_FOUND if "does not exist" in error else status.HTTP_400_BAD_REQUEST
+            return Response({"error": error}, status=status_code)
 
         # Check if the node belongs to the same constellation as the API key
         if node.constellation != api_key.constellation:
@@ -183,20 +217,21 @@ class APIKeyViewSet(viewsets.ModelViewSet):
         """Remove a node from an API key."""
         api_key = self.get_object()
         meshtastic_node_id = request.data.get("meshtastic_node_id")
+        managed_node_internal_id = request.data.get("managed_node_internal_id")
 
-        if not meshtastic_node_id:
-            return Response(
-                {"error": "meshtastic_node_id is required"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        if meshtastic_node_id is not None:
+            try:
+                meshtastic_node_id = int(meshtastic_node_id)
+            except TypeError, ValueError:
+                return Response(
+                    {"error": "meshtastic_node_id must be an integer"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
-        try:
-            node = ManagedNode.objects.get(meshtastic_node_id=meshtastic_node_id, deleted_at__isnull=True)
-        except ManagedNode.DoesNotExist:
-            return Response(
-                {"error": f"Node with ID {meshtastic_node_id} does not exist"},
-                status=status.HTTP_404_NOT_FOUND,
-            )
+        node, error = self._resolve_managed_node_for_link(meshtastic_node_id, managed_node_internal_id)
+        if error:
+            status_code = status.HTTP_404_NOT_FOUND if "does not exist" in error else status.HTTP_400_BAD_REQUEST
+            return Response({"error": error}, status=status_code)
 
         # Check if the node is linked to this API key
         link = NodeAuth.objects.filter(api_key=api_key, node=node).first()
@@ -1039,13 +1074,42 @@ class EnvironmentMetricsBulkView(APIView):
 class ManagedNodeViewSet(viewsets.ModelViewSet):
     """
     ViewSet for managing managed nodes.
+
+    Detail lookup uses ``internal_id`` (UUID). Numeric ``meshtastic_node_id`` in the path
+    is accepted for Meshtastic nodes only (deprecated).
     """
 
-    queryset = ManagedNode.objects.filter(deleted_at__isnull=True).order_by("meshtastic_node_id")
+    queryset = ManagedNode.objects.filter(deleted_at__isnull=True).order_by("protocol", "name", "internal_id")
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = ManagedNodeSerializer
-    lookup_field = "meshtastic_node_id"
-    lookup_url_kwarg = "node_id"
+    lookup_field = "internal_id"
+    lookup_url_kwarg = "internal_id"
+
+    def get_object(self):
+        lookup = self.kwargs.get(self.lookup_url_kwarg, "")
+        queryset = self.filter_queryset(self.get_queryset())
+        try:
+            node_uuid = uuid.UUID(str(lookup))
+        except ValueError:
+            node_uuid = None
+        if node_uuid is not None:
+            return get_object_or_404(queryset, internal_id=node_uuid)
+
+        try:
+            meshtastic_node_id = int(lookup)
+        except TypeError, ValueError:
+            raise Http404
+
+        from common.protocol import Protocol
+
+        compat_qs = queryset.filter(protocol=Protocol.MESHTASTIC, meshtastic_node_id=meshtastic_node_id)
+        if compat_qs.count() == 1:
+            logger.warning(
+                "Managed node detail lookup by meshtastic_node_id is deprecated; use internal_id (path=%s)",
+                lookup,
+            )
+            return compat_qs.get()
+        raise Http404
 
     def _status_requested(self):
         include_values = _multi_query_strings(self.request, "include")
@@ -1158,7 +1222,7 @@ class ManagedNodeViewSet(viewsets.ModelViewSet):
         )
 
     def _managed_nodes_queryset(self, owner=None):
-        queryset = ManagedNode.objects.filter(deleted_at__isnull=True).order_by("meshtastic_node_id")
+        queryset = ManagedNode.objects.filter(deleted_at__isnull=True).order_by("protocol", "name", "internal_id")
         if owner is not None:
             queryset = queryset.filter(owner=owner)
         queryset = self._annotate_common_fields(queryset)
