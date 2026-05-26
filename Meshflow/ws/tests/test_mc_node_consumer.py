@@ -17,12 +17,14 @@ FEEDER_PREFIX = "1a37f5aea4a1"
 
 @pytest.mark.django_db
 @pytest.mark.asyncio
-async def test_mc_consumer_requires_prefix_when_multiple_feeders(create_managed_node, create_node_api_key):
+async def test_mc_consumer_requires_prefix_when_multiple_feeders(
+    create_managed_node, create_constellation, create_node_api_key
+):
     from nodes.models import NodeAuth
 
     @database_sync_to_async
     def setup():
-        constellation = create_managed_node(protocol=Protocol.MESHCORE).constellation
+        constellation = create_constellation(protocol=Protocol.MESHCORE)
         node_a = create_managed_node(
             meshtastic_node_id=0,
             protocol=Protocol.MESHCORE,

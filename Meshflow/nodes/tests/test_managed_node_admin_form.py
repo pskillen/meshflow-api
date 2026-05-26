@@ -6,7 +6,28 @@ from nodes.models import ManagedNode
 
 
 @pytest.mark.django_db
-def test_managed_node_admin_form_meshcore_node_id_defaults_to_zero(create_user, create_constellation):
+def test_managed_node_admin_form_meshcore_clears_meshtastic_node_id(create_user, create_constellation):
+    owner = create_user()
+    constellation = create_constellation(created_by=owner)
+    form = ManagedNodeAdminForm(
+        data={
+            "protocol": str(Protocol.MESHCORE),
+            "meshtastic_node_id": "",
+            "mc_pubkey": "a" * 64,
+            "name": "MC Feeder",
+            "owner": owner.pk,
+            "constellation": constellation.pk,
+            "allow_auto_traceroute": False,
+            "latlong_0": "",
+            "latlong_1": "",
+        }
+    )
+    assert form.is_valid(), form.errors
+    assert form.cleaned_data["meshtastic_node_id"] is None
+
+
+@pytest.mark.django_db
+def test_managed_node_admin_form_meshcore_requires_mc_pubkey(create_user, create_constellation):
     owner = create_user()
     constellation = create_constellation(created_by=owner)
     form = ManagedNodeAdminForm(
@@ -21,8 +42,8 @@ def test_managed_node_admin_form_meshcore_node_id_defaults_to_zero(create_user, 
             "latlong_1": "",
         }
     )
-    assert form.is_valid(), form.errors
-    assert form.cleaned_data["meshtastic_node_id"] == 0
+    assert not form.is_valid()
+    assert "mc_pubkey" in form.errors
 
 
 def test_managed_node_channel_admin_fields_match_model():

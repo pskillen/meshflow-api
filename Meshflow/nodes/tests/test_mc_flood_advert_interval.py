@@ -21,7 +21,7 @@ def test_patch_interval_dispatches_refresh(create_user, create_managed_node):
     )
     client = APIClient()
     client.force_authenticate(user=user)
-    url = reverse("managed-nodes-detail", kwargs={"node_id": node.meshtastic_node_id})
+    url = reverse("managed-nodes-detail", kwargs={"internal_id": node.internal_id})
 
     with patch(
         "meshcore_packets.services.feeder_config.dispatch_feeder_config_refresh",
@@ -51,7 +51,7 @@ def test_patch_same_interval_skips_dispatch(create_user, create_managed_node):
     )
     client = APIClient()
     client.force_authenticate(user=user)
-    url = reverse("managed-nodes-detail", kwargs={"node_id": node.meshtastic_node_id})
+    url = reverse("managed-nodes-detail", kwargs={"internal_id": node.internal_id})
 
     with patch(
         "meshcore_packets.services.feeder_config.dispatch_feeder_config_refresh",
@@ -68,7 +68,7 @@ def test_patch_interval_rejected_on_meshtastic(create_user, create_managed_node)
     node = create_managed_node(owner=user, protocol=Protocol.MESHTASTIC)
     client = APIClient()
     client.force_authenticate(user=user)
-    url = reverse("managed-nodes-detail", kwargs={"node_id": node.meshtastic_node_id})
+    url = reverse("managed-nodes-detail", kwargs={"internal_id": node.internal_id})
 
     response = client.patch(
         url,

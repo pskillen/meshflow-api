@@ -17,8 +17,8 @@ def test_managed_node_list_view(create_managed_node, create_user):
     client.force_authenticate(user=user)
 
     # Create some test nodes
-    node1 = create_managed_node(owner=user)  # noqa: F841
-    node2 = create_managed_node(owner=user)  # noqa: F841
+    node1 = create_managed_node(owner=user, meshtastic_node_id=123456789)  # noqa: F841
+    node2 = create_managed_node(owner=user, meshtastic_node_id=123456790)  # noqa: F841
 
     # Test GET request
     response = client.get(reverse("managed-nodes-list"))
@@ -37,7 +37,7 @@ def test_managed_node_detail_view(create_managed_node, create_user):
     node = create_managed_node(owner=user)
 
     # Test GET request
-    response = client.get(reverse("managed-nodes-detail", kwargs={"node_id": node.meshtastic_node_id}))
+    response = client.get(reverse("managed-nodes-detail", kwargs={"internal_id": node.meshtastic_node_id}))
     assert response.status_code == status.HTTP_200_OK
     assert response.data["meshtastic_node_id"] == node.meshtastic_node_id
 
@@ -84,7 +84,7 @@ def test_managed_nodes_status_fields_only_returned_with_include_status(
     assert first_with_status["radio_last_heard"] is not None
     assert first_with_status["is_eligible_traceroute_source"] is True
 
-    detail_url = reverse("managed-nodes-detail", kwargs={"node_id": managed.meshtastic_node_id})
+    detail_url = reverse("managed-nodes-detail", kwargs={"internal_id": managed.meshtastic_node_id})
     detail_response = client.get(detail_url, {"include": "status"})
     assert detail_response.status_code == status.HTTP_200_OK
     assert detail_response.data["packets_last_hour"] == 1
@@ -453,7 +453,7 @@ def test_managed_node_soft_delete_owner_removes_node_auth_and_excludes_from_list
 
     client = APIClient()
     client.force_authenticate(user=owner)
-    url = reverse("managed-nodes-detail", kwargs={"node_id": mn.meshtastic_node_id})
+    url = reverse("managed-nodes-detail", kwargs={"internal_id": mn.meshtastic_node_id})
     assert client.delete(url).status_code == status.HTTP_204_NO_CONTENT
 
     assert not NodeAuth.objects.filter(node=mn).exists()
@@ -490,7 +490,7 @@ def test_managed_node_soft_delete_staff(create_user, create_constellation, creat
 
     client = APIClient()
     client.force_authenticate(user=staff)
-    url = reverse("managed-nodes-detail", kwargs={"node_id": mn.meshtastic_node_id})
+    url = reverse("managed-nodes-detail", kwargs={"internal_id": mn.meshtastic_node_id})
     assert client.delete(url).status_code == status.HTTP_204_NO_CONTENT
     mn.refresh_from_db()
     assert mn.deleted_at is not None
@@ -515,7 +515,7 @@ def test_managed_node_delete_forbidden_for_non_owner_non_staff(create_user, crea
 
     client = APIClient()
     client.force_authenticate(user=other)
-    url = reverse("managed-nodes-detail", kwargs={"node_id": mn.meshtastic_node_id})
+    url = reverse("managed-nodes-detail", kwargs={"internal_id": mn.meshtastic_node_id})
     assert client.delete(url).status_code == status.HTTP_403_FORBIDDEN
     mn.refresh_from_db()
     assert mn.deleted_at is None

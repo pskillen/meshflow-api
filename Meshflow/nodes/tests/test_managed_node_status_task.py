@@ -19,7 +19,7 @@ def test_update_managed_node_statuses_creates_and_sets_sending(
     create_packet_observation,
 ):
     monkeypatch.setenv("SCHEDULE_TRACEROUTE_SOURCE_RECENCY_SECONDS", "600")
-    mn = create_managed_node()
+    mn = create_managed_node(meshtastic_node_id=123456801)
     ManagedNodeStatus.objects.filter(node=mn).delete()
 
     create_packet_observation(observer=mn)
@@ -40,7 +40,7 @@ def test_update_managed_node_statuses_stale_observation_not_sending(
     create_packet_observation,
 ):
     monkeypatch.setenv("SCHEDULE_TRACEROUTE_SOURCE_RECENCY_SECONDS", "600")
-    mn = create_managed_node()
+    mn = create_managed_node(meshtastic_node_id=123456802)
     ManagedNodeStatus.objects.filter(node=mn).delete()
 
     obs = create_packet_observation(observer=mn)
@@ -60,7 +60,7 @@ def test_update_managed_node_statuses_no_observations(
     create_managed_node,
 ):
     monkeypatch.setenv("SCHEDULE_TRACEROUTE_SOURCE_RECENCY_SECONDS", "600")
-    mn = create_managed_node()
+    mn = create_managed_node(meshtastic_node_id=123456803)
     ManagedNodeStatus.objects.filter(node=mn).delete()
 
     result = update_managed_node_statuses()
@@ -78,7 +78,7 @@ def test_update_managed_node_statuses_updates_existing_row(
     create_packet_observation,
 ):
     monkeypatch.setenv("SCHEDULE_TRACEROUTE_SOURCE_RECENCY_SECONDS", "600")
-    mn = create_managed_node()
+    mn = create_managed_node(meshtastic_node_id=123456804)
     ManagedNodeStatus.objects.update_or_create(
         node=mn,
         defaults={

@@ -16,8 +16,9 @@ def test_managed_node_creation(create_managed_node):
 
 @pytest.mark.django_db
 def test_managed_meshcore_feeder_node_id_str(create_managed_node):
-    node = create_managed_node(protocol=Protocol.MESHCORE, meshtastic_node_id=0)
-    assert node.node_id_str == f"mc:feeder:{node.internal_id.hex[:12]}"
+    pubkey = "b" * 64
+    node = create_managed_node(protocol=Protocol.MESHCORE, meshtastic_node_id=None, mc_pubkey=pubkey)
+    assert node.node_id_str == f"mc:{pubkey[:12]}"
 
 
 @pytest.mark.django_db

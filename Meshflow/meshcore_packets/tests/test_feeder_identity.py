@@ -15,8 +15,8 @@ from nodes.models import NodeAuth
 
 
 @pytest.fixture
-def shared_key_two_feeders(create_managed_node, create_node_api_key):
-    constellation = create_managed_node(protocol=Protocol.MESHCORE).constellation
+def shared_key_two_feeders(create_managed_node, create_constellation, create_node_api_key):
+    constellation = create_constellation(protocol=Protocol.MESHCORE)
     node_a = create_managed_node(
         meshtastic_node_id=0,
         protocol=Protocol.MESHCORE,
