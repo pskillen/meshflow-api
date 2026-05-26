@@ -10,7 +10,7 @@
 
 **Status:** In progress (Task 1 doc largely complete)
 
-**Branch:** _(not created yet)_
+**Branch:** `api-329/pskillen/packet-stats-docs`
 
 ---
 
