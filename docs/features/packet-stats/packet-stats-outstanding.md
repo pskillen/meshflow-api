@@ -13,15 +13,15 @@ Items **skipped**, **incomplete**, or **discovered during execution** — not th
 
 ## Implementation (#329 — API Task 2)
 
-- [ ] Hourly `mc_packet_volume`, `mc_online_nodes`, `mc_new_nodes` collectors
-- [ ] OpenAPI `stat_type` enum extension
-- [ ] Unit tests mirroring `stats/tests/test_tasks.py`
-- [ ] (Optional) `recent_counts?protocol=` for main dashboard MT/MC table
+- [x] Hourly `mc_packet_volume`, `mc_online_nodes`, `mc_new_nodes` collectors
+- [x] OpenAPI `stat_type` enum extension
+- [x] Unit tests in `stats/tests/test_mc_snapshots.py`
+- [x] `recent_counts?protocol=` for main dashboard MT/MC table
 
 ## Implementation (#329 — UI Task 3, meshflow-ui)
 
-See plan § Task 3: main dashboard overlay, protocol dashboards, nav reorder (MC Managed nodes under Nodes; no MC traceroutes).
+- [ ] Main dashboard overlay + protocol dashboard pages + nav (meshflow-ui PR)
 
-## Bug (fix in #329 PR)
+## Bug (#365)
 
-- [ ] [#365](https://github.com/pskillen/meshflow-api/issues/365) — MT `online_nodes` / `new_nodes` snapshots must filter `ObservedNode` to `protocol=MESHTASTIC` (tracked in plan + #329)
+- [x] MT `online_nodes` / `new_nodes` filter `protocol=MESHTASTIC`
