@@ -5,7 +5,7 @@ from django.urls import reverse
 from rest_framework import serializers
 
 from common.access import AccessLevel, get_access_level, user_can_manage_api_keys
-from common.mesh_node_helpers import meshtastic_id_to_hex, observed_node_id_str
+from common.mesh_node_helpers import observed_node_id_str
 from common.protocol import Protocol
 from constellations.models import Constellation, MessageChannel
 from meshcore_packets.serializers_channel import MessageChannelMcSerializer
@@ -254,29 +254,76 @@ class APIKeyNodeSerializer(serializers.ModelSerializer):
         fields = ["id", "api_key", "node"]
 
 
+class LinkedManagedNodeSerializer(serializers.Serializer):
+    """Stable managed-node reference for API key detail (MT + MC)."""
+
+    internal_id = serializers.UUIDField(read_only=True)
+    node_id_str = serializers.CharField(read_only=True)
+    protocol = serializers.IntegerField(read_only=True)
+    meshtastic_node_id = serializers.IntegerField(read_only=True, allow_null=True)
+
+
 class APIKeyDetailSerializer(APIKeySerializer):
     """Serializer for API keys with node links."""
 
     nodes = serializers.SerializerMethodField()
+    linked_managed_nodes = serializers.SerializerMethodField()
 
     class Meta(APIKeySerializer.Meta):
-        fields = APIKeySerializer.Meta.fields + ["nodes"]
+        fields = APIKeySerializer.Meta.fields + ["nodes", "linked_managed_nodes"]
 
     def get_nodes(self, obj):
-        """Get the nodes linked to this API key."""
-        return [link.node.meshtastic_node_id for link in obj.node_links.all()]
+        """Legacy Meshtastic numeric ids only (omits MeshCore feeders)."""
+        from common.protocol import Protocol
+
+        return [
+            link.node.meshtastic_node_id
+            for link in obj.node_links.select_related("node").all()
+            if link.node.protocol == Protocol.MESHTASTIC and link.node.meshtastic_node_id is not None
+        ]
+
+    def get_linked_managed_nodes(self, obj):
+        links = obj.node_links.select_related("node").all()
+        return LinkedManagedNodeSerializer(
+            [
+                {
+                    "internal_id": link.node.internal_id,
+                    "node_id_str": link.node.node_id_str,
+                    "protocol": link.node.protocol,
+                    "meshtastic_node_id": link.node.meshtastic_node_id,
+                }
+                for link in links
+            ],
+            many=True,
+        ).data
 
 
 class APIKeyCreateSerializer(serializers.ModelSerializer):
     """Serializer for creating API keys."""
 
     nodes = serializers.ListField(child=serializers.IntegerField(), required=False, write_only=True)
+    managed_node_internal_ids = serializers.ListField(
+        child=serializers.UUIDField(),
+        required=False,
+        write_only=True,
+    )
     owner = serializers.PrimaryKeyRelatedField(read_only=True)
     key = serializers.CharField(read_only=True)
 
     class Meta:
         model = NodeAPIKey
-        fields = ["id", "name", "constellation", "nodes", "owner", "created_at", "last_used", "is_active", "key"]
+        fields = [
+            "id",
+            "name",
+            "constellation",
+            "nodes",
+            "managed_node_internal_ids",
+            "owner",
+            "created_at",
+            "last_used",
+            "is_active",
+            "key",
+        ]
 
     def validate_constellation(self, value):
         user = self.context["request"].user
@@ -286,29 +333,32 @@ class APIKeyCreateSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         """Create a new API key with a randomly generated key and link it to nodes."""
-        # Extract nodes from validated data
+        from common.protocol import Protocol
+
         nodes = validated_data.pop("nodes", [])
+        internal_ids = validated_data.pop("managed_node_internal_ids", [])
 
-        # Generate a random key
-        key = secrets.token_hex(32)  # 64 character hex string
-
-        # Add the key to the validated data
+        key = secrets.token_hex(32)
         validated_data["key"] = key
-
-        # Add the current user as the owner
-        user = self.context["request"].user
-        validated_data["owner"] = user
-
-        # Create the API key
+        validated_data["owner"] = self.context["request"].user
         api_key = NodeAPIKey.objects.create(**validated_data)
 
-        # Link the API key to nodes
         for meshtastic_node_id in nodes:
             try:
-                node = ManagedNode.objects.get(meshtastic_node_id=meshtastic_node_id, deleted_at__isnull=True)
-                NodeAuth.objects.create(api_key=api_key, node=node)
+                node = ManagedNode.objects.get(
+                    meshtastic_node_id=meshtastic_node_id,
+                    protocol=Protocol.MESHTASTIC,
+                    deleted_at__isnull=True,
+                )
+                NodeAuth.objects.get_or_create(api_key=api_key, node=node)
             except ManagedNode.DoesNotExist:
-                # Skip nodes that don't exist
+                pass
+
+        for node_uuid in internal_ids:
+            try:
+                node = ManagedNode.objects.get(internal_id=node_uuid, deleted_at__isnull=True)
+                NodeAuth.objects.get_or_create(api_key=api_key, node=node)
+            except ManagedNode.DoesNotExist:
                 pass
 
         return api_key
@@ -346,7 +396,7 @@ class ManagedNodeSerializer(serializers.ModelSerializer):
             ]
 
     owner_id = serializers.PrimaryKeyRelatedField(
-        queryset=User.objects.all(), source="owner", write_only=True, required=True
+        queryset=User.objects.all(), source="owner", write_only=True, required=False
     )
     constellation_id = serializers.PrimaryKeyRelatedField(
         queryset=Constellation.objects.all(), source="constellation", write_only=True, required=True
@@ -378,7 +428,10 @@ class ManagedNodeSerializer(serializers.ModelSerializer):
         fields = [
             "internal_id",
             "meshtastic_node_id",
+            "mc_pubkey",
             "protocol",
+            "default_location_latitude",
+            "default_location_longitude",
             "name",
             "long_name",
             "short_name",
@@ -445,9 +498,7 @@ class ManagedNodeSerializer(serializers.ModelSerializer):
         return build_geo_classification(obj)
 
     def get_node_id_str(self, obj):
-        if hasattr(obj, "node_id_str") and obj.node_id_str:
-            return obj.node_id_str
-        return meshtastic_id_to_hex(obj.meshtastic_node_id)
+        return obj.node_id_str
 
     def get_long_name(self, obj):
         if hasattr(obj, "long_name") and obj.long_name:
@@ -684,16 +735,42 @@ class OwnedManagedNodeSerializer(ManagedNodeSerializer):
         queryset=MessageChannel.objects.all(), required=False, allow_null=True
     )
 
+    def _effective_protocol(self, attrs):
+        protocol = attrs.get("protocol")
+        if protocol is not None:
+            return protocol
+        if self.instance is not None:
+            return self.instance.protocol
+        constellation = attrs.get("constellation")
+        if constellation is not None:
+            return constellation.protocol
+        return Protocol.MESHTASTIC
+
     def validate(self, attrs):
+        from common.meshcore_node_helpers import normalize_mc_pubkey
+
         attrs = super().validate(attrs)
+        protocol = self._effective_protocol(attrs)
+
         if self.instance is None:
-            meshtastic_node_id = attrs.get("meshtastic_node_id")
-            if meshtastic_node_id is not None:
-                if ManagedNode.objects.filter(meshtastic_node_id=meshtastic_node_id, deleted_at__isnull=True).exists():
+            if protocol == Protocol.MESHTASTIC:
+                meshtastic_node_id = attrs.get("meshtastic_node_id")
+                if meshtastic_node_id is None:
+                    raise serializers.ValidationError({"meshtastic_node_id": "Required for Meshtastic managed nodes."})
+                attrs["mc_pubkey"] = None
+                if ManagedNode.objects.filter(
+                    meshtastic_node_id=meshtastic_node_id,
+                    protocol=Protocol.MESHTASTIC,
+                    deleted_at__isnull=True,
+                ).exists():
                     raise serializers.ValidationError(
                         {"meshtastic_node_id": "A managed node already exists for this mesh node."}
                     )
-                if ManagedNode.objects.filter(meshtastic_node_id=meshtastic_node_id, deleted_at__isnull=False).exists():
+                if ManagedNode.objects.filter(
+                    meshtastic_node_id=meshtastic_node_id,
+                    protocol=Protocol.MESHTASTIC,
+                    deleted_at__isnull=False,
+                ).exists():
                     raise serializers.ValidationError(
                         {
                             "meshtastic_node_id": (
@@ -702,6 +779,16 @@ class OwnedManagedNodeSerializer(ManagedNodeSerializer):
                             )
                         }
                     )
+            elif protocol == Protocol.MESHCORE:
+                attrs["meshtastic_node_id"] = None
+                raw_pubkey = attrs.get("mc_pubkey")
+                if not raw_pubkey:
+                    raise serializers.ValidationError({"mc_pubkey": "Required for MeshCore managed nodes."})
+                try:
+                    attrs["mc_pubkey"] = normalize_mc_pubkey(raw_pubkey)
+                except ValueError as exc:
+                    raise serializers.ValidationError({"mc_pubkey": str(exc)})
+
         constellation = attrs.get("constellation")
         if constellation is None and self.instance is not None:
             constellation = self.instance.constellation
