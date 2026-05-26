@@ -236,6 +236,8 @@ current default of **21600** (6 h). The 6 h default is canonical — treat the
 Hourly snapshots captured at **:05 UTC** for the **previous completed hour**.
 Implemented in [`Meshflow/stats/tasks.py`](../Meshflow/stats/tasks.py).
 
+**Feature documentation:** [docs/features/packet-stats/](features/packet-stats/README.md) (Meshtastic reverse-engineered in [meshtastic.md](features/packet-stats/meshtastic.md); MeshCore [#329](https://github.com/pskillen/meshflow-api/issues/329) in [meshcore.md](features/packet-stats/meshcore.md)).
+
 | Item | Default | Env | Purpose |
 | --- | --- | --- | --- |
 | `ONLINE_NODE_WINDOW_HOURS` | **2 h** | yes | `online_nodes` snapshot window against `last_heard` / `rx_time` / `first_reported_time` |

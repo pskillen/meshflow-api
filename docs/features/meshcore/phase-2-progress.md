@@ -194,7 +194,7 @@ Deploy api #325 before bot fleet upgrade.
 
 **Overlap:** both touch MC packet volume over time. **Not a substitute:** #329 remains required for historical hourly snapshots and stats API parity; this fix only unblocks the operational managed-feeder table and reuses the same observation rows #329 will eventually aggregate.
 
-**Docs:** [RECENCY.md](../../RECENCY.md) § managed-node annotations (protocol split). Task 1 of #329 (Meshtastic stats doc) is still open.
+**Docs:** [RECENCY.md](../../RECENCY.md) § managed-node annotations (protocol split). Task 1 of #329: [packet-stats/meshtastic.md](../packet-stats/meshtastic.md) (see [packet-stats-progress.md](../packet-stats/packet-stats-progress.md)).
 
 ---
 

@@ -176,6 +176,9 @@ The dashboard surfaces recent node counts across rolling windows, constellation
 maps, and packet/throughput stats. The `stats` app produces the aggregated
 counters; the SPA's `Dashboard` page is the primary consumer.
 
+Reference: [packet-stats/](packet-stats/) — hourly `StatsSnapshot` collection,
+live Meshtastic stats API, and MeshCore snapshot parity ([#329](https://github.com/pskillen/meshflow-api/issues/329)).
+
 ### Realtime (WebSocket)
 
 The `ws` app exposes Channels consumers used for two distinct things:
