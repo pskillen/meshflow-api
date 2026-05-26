@@ -2,61 +2,66 @@
 
 **Tracking:** [meshflow-api#329](https://github.com/pskillen/meshflow-api/issues/329) (parent [#266](https://github.com/pskillen/meshflow-api/issues/266))  
 **Plan:** `.cursor/plans/#329_mc_stats_snapshots_94705979.plan.md`  
-**Repos:** meshflow-api (this work); meshflow-ui deferred
+**Repos:** meshflow-api, meshflow-ui
 
 ---
 
 ## Overall status
 
-**Status:** In progress (Task 1 doc largely complete)
+**Status:** In progress (API + UI ready for PR)
 
-**Branch:** `api-329/pskillen/packet-stats-docs`
+**Branch (API):** `api-329/pskillen/packet-stats-docs`
+
+**Branch (UI):** `api-329/pskillen/mc-stats-ui`
 
 ---
 
 ## Task 1 — Document Meshtastic stats
 
-**Status:** In progress
+**Status:** Complete
 
 **Delivered**
 
-- Feature doc hub: [README.md](README.md)
-- Reverse-engineered MT behaviour: [meshtastic.md](meshtastic.md)
-- Feature-docs skill: [.cursor/rules/mf-feature-docs/SKILL.md](../../../.cursor/rules/mf-feature-docs/SKILL.md)
-- Nascent MC plan doc: [meshcore.md](meshcore.md)
-- Progress / outstanding pair (this file + [packet-stats-outstanding.md](packet-stats-outstanding.md))
-
-**Still to do**
-
-- Optional: trim duplicate #329 path `docs/features/stats/meshtastic_packets.md` if we standardize on `packet-stats/` only
-
-**Cross-links done:** [RECENCY.md](../../RECENCY.md) § `stats/`, [features/README.md](../README.md), [phase-2-outstanding.md](../meshcore/phase-2-outstanding.md) (#329 doc path)
+- [docs/features/packet-stats/](README.md) hub + [meshtastic.md](meshtastic.md) + [meshcore.md](meshcore.md)
+- RECENCY + features README cross-links
 
 ---
 
-## Related bug
+## Task 2 — API
 
-**[#365](https://github.com/pskillen/meshflow-api/issues/365)** — MT `online_nodes` / `new_nodes` include MC `ObservedNode` rows; fix in #329 implementation pass (see plan § MT protocol filter).
-
----
-
-## Task 2 — MeshCore snapshot collectors
-
-**Status:** Not started
+**Status:** Complete (pending PR merge)
 
 **Delivered**
 
-- _(none)_
+- [#365](https://github.com/pskillen/meshflow-api/issues/365): `protocol=MESHTASTIC` on MT `online_nodes` / `new_nodes`
+- `mc_packet_volume`, `mc_online_nodes`, `mc_new_nodes` collectors + backfill
+- `recent_counts?protocol=` on observed nodes
+- OpenAPI `stat_type` enum extended
+- Tests: `Meshflow/stats/tests/test_mc_snapshots.py`
 
-**Deploy / verify**
+**Verify**
 
-- After implementation: `python -m pytest Meshflow/stats/ -v`
-- Ops: `python manage.py backfill_stats_snapshots` for MC history
+```bash
+cd Meshflow && source ../venv/bin/activate
+python -m pytest Meshflow/stats/ -v
+```
+
+---
+
+## Task 3 — UI (meshflow-ui)
+
+**Status:** Complete (pending PR)
+
+**Delivered**
+
+- Main `/` dashboard: MT+MC recent counts, overlaid Mesh Stats, node activity removed
+- `/meshtastic/dashboard`, `/meshcore/dashboard`
+- Nav: protocol dashboards first; MC Managed nodes under Nodes
 
 ---
 
 ## Next
 
-1. Finish Task 1 cross-links (RECENCY, features README).
-2. Branch `api-329/<author>/mc-stats-snapshots` from `origin/main`.
-3. Implement `mc_*` collectors in `stats/tasks.py` + tests + OpenAPI + update [meshcore.md](meshcore.md) when shipped.
+1. Push API + UI branches; open PRs (closes #329, #365 on API).
+2. Deploy API; run `backfill_stats_snapshots` for MC history.
+3. Deploy UI after API.
