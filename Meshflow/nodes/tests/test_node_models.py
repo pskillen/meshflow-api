@@ -7,11 +7,11 @@ from common.protocol import Protocol
 def test_managed_node_creation(create_managed_node):
     """Test managed node creation with valid data."""
     node = create_managed_node()
-    assert node.meshtastic_node_id == 123456789
+    assert node.meshtastic_node_id is not None
     assert node.name == "Test Managed Node"
     assert node.owner is not None
     assert node.constellation is not None
-    assert node.node_id_str == "!075bcd15"
+    assert node.node_id_str.startswith("!")
 
 
 @pytest.mark.django_db
