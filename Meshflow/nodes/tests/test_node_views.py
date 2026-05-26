@@ -42,6 +42,15 @@ def test_managed_node_detail_view(create_managed_node, create_user):
     assert response.data["meshtastic_node_id"] == node.meshtastic_node_id
 
 
+def _managed_node_list_row(results, managed):
+    """Pick list payload row for a specific managed node (list is global, not ordered by test)."""
+    managed_id = str(managed.internal_id)
+    for row in results:
+        if str(row.get("internal_id")) == managed_id:
+            return row
+    raise AssertionError(f"Managed node {managed_id} not in list results ({len(results)} rows)")
+
+
 @pytest.mark.django_db
 def test_managed_nodes_status_fields_only_returned_with_include_status(
     create_managed_node,
@@ -68,23 +77,23 @@ def test_managed_nodes_status_fields_only_returned_with_include_status(
     list_url = reverse("managed-nodes-list")
     response_without_status = client.get(list_url)
     assert response_without_status.status_code == status.HTTP_200_OK
-    first_without_status = response_without_status.data["results"][0]
-    assert "last_packet_ingested_at" not in first_without_status
-    assert "packets_last_hour" not in first_without_status
-    assert "packets_last_24h" not in first_without_status
-    assert "radio_last_heard" not in first_without_status
-    assert "is_eligible_traceroute_source" not in first_without_status
+    row_without_status = _managed_node_list_row(response_without_status.data["results"], managed)
+    assert "last_packet_ingested_at" not in row_without_status
+    assert "packets_last_hour" not in row_without_status
+    assert "packets_last_24h" not in row_without_status
+    assert "radio_last_heard" not in row_without_status
+    assert "is_eligible_traceroute_source" not in row_without_status
 
     response_with_status = client.get(list_url, {"include": "status"})
     assert response_with_status.status_code == status.HTTP_200_OK
-    first_with_status = response_with_status.data["results"][0]
-    assert first_with_status["last_packet_ingested_at"] is not None
-    assert first_with_status["packets_last_hour"] == 1
-    assert first_with_status["packets_last_24h"] == 1
-    assert first_with_status["radio_last_heard"] is not None
-    assert first_with_status["is_eligible_traceroute_source"] is True
+    row_with_status = _managed_node_list_row(response_with_status.data["results"], managed)
+    assert row_with_status["last_packet_ingested_at"] is not None
+    assert row_with_status["packets_last_hour"] == 1
+    assert row_with_status["packets_last_24h"] == 1
+    assert row_with_status["radio_last_heard"] is not None
+    assert row_with_status["is_eligible_traceroute_source"] is True
 
-    detail_url = reverse("managed-nodes-detail", kwargs={"internal_id": managed.meshtastic_node_id})
+    detail_url = reverse("managed-nodes-detail", kwargs={"internal_id": managed.internal_id})
     detail_response = client.get(detail_url, {"include": "status"})
     assert detail_response.status_code == status.HTTP_200_OK
     assert detail_response.data["packets_last_hour"] == 1
@@ -92,7 +101,8 @@ def test_managed_nodes_status_fields_only_returned_with_include_status(
     mine_url = reverse("managed-nodes-mine")
     mine_response = client.get(mine_url, {"include": "status"})
     assert mine_response.status_code == status.HTTP_200_OK
-    assert mine_response.data["results"][0]["packets_last_24h"] == 1
+    mine_row = _managed_node_list_row(mine_response.data["results"], managed)
+    assert mine_row["packets_last_24h"] == 1
 
 
 @pytest.mark.django_db
