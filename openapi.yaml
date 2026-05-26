@@ -4562,6 +4562,16 @@ paths:
             type: boolean
             default: false
             description: Include CLIENT_BASE role nodes
+        - name: protocol
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [meshtastic, meshcore]
+            default: meshtastic
+            description: >
+              Meshtastic (default) returns nodes with infrastructure meshtastic roles.
+              MeshCore returns all observed MeshCore nodes in the time window.
       responses:
         '200':
           description: List of infrastructure nodes

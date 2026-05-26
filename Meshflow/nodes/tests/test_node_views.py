@@ -593,3 +593,28 @@ def test_managed_node_create_rejected_when_active_row_exists(create_user, create
     )
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert "already exists" in str(response.data).lower()
+
+
+@pytest.mark.django_db
+def test_infrastructure_list_filters_by_protocol(create_observed_node, create_user):
+    from nodes.models import RoleSource
+
+    client = APIClient()
+    client.force_authenticate(user=create_user())
+
+    mt = create_observed_node(meshtastic_role=RoleSource.ROUTER, protocol=1)
+    mc = create_observed_node(protocol=2, meshtastic_role=None)
+
+    infra_url = "/api/nodes/observed-nodes/infrastructure/"
+
+    mt_resp = client.get(infra_url, {"protocol": "meshtastic"})
+    assert mt_resp.status_code == status.HTTP_200_OK
+    mt_ids = {r["node_id_str"] for r in mt_resp.data["results"]}
+    assert mt.node_id_str in mt_ids
+    assert mc.node_id_str not in mt_ids
+
+    mc_resp = client.get(infra_url, {"protocol": "meshcore"})
+    assert mc_resp.status_code == status.HTTP_200_OK
+    mc_ids = {r["node_id_str"] for r in mc_resp.data["results"]}
+    assert mc.node_id_str in mc_ids
+    assert mt.node_id_str not in mc_ids
