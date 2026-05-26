@@ -11,12 +11,16 @@ Items **skipped**, **incomplete**, or **discovered during execution** — not th
 - [x] **RECENCY.md** § `stats/` — link to [packet-stats/README.md](README.md)
 - [x] **features/README.md** — packet-stats under Stats & dashboard
 
-## Implementation (#329 Task 2+)
+## Implementation (#329 — API Task 2)
 
 - [ ] Hourly `mc_packet_volume`, `mc_online_nodes`, `mc_new_nodes` collectors
 - [ ] OpenAPI `stat_type` enum extension
 - [ ] Unit tests mirroring `stats/tests/test_tasks.py`
-- [ ] meshflow-ui dashboard protocol / MC charts (separate UI issue)
+- [ ] (Optional) `recent_counts?protocol=` for main dashboard MT/MC table
+
+## Implementation (#329 — UI Task 3, meshflow-ui)
+
+See plan § Task 3: main dashboard overlay, protocol dashboards, nav reorder (MC Managed nodes under Nodes; no MC traceroutes).
 
 ## Bug (fix in #329 PR)
 

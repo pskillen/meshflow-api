@@ -1,6 +1,6 @@
 # MeshCore packet statistics (planned)
 
-**Status:** Not implemented — design target for [#329](https://github.com/pskillen/meshflow-api/issues/329). Use [meshtastic.md](meshtastic.md) as the template for behaviour and JSON shapes.
+**Status:** Implemented in `stats.tasks` ([#329](https://github.com/pskillen/meshflow-api/issues/329)). Use [meshtastic.md](meshtastic.md) as the template for behaviour and JSON shapes.
 
 ## Goal
 

@@ -356,7 +356,15 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
         Get node counts by time window (nodes seen since each threshold).
 
         Returns counts for: 2h, 24h, 7d, 30d, 90d, and all time.
+        Optional ?protocol=meshtastic|meshcore filters ObservedNode rows.
         """
+        from common.protocol import protocol_from_query_param
+
+        protocol = protocol_from_query_param(request.query_params.get("protocol"))
+        base_qs = ObservedNode.objects.all()
+        if protocol is not None:
+            base_qs = base_qs.filter(protocol=protocol)
+
         now = timezone.now()
         windows = [
             ("2", now - timedelta(hours=2)),
@@ -367,8 +375,8 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
         ]
         result = {}
         for key, threshold in windows:
-            result[key] = ObservedNode.objects.filter(last_heard__gte=threshold).count()
-        result["all"] = ObservedNode.objects.count()
+            result[key] = base_qs.filter(last_heard__gte=threshold).count()
+        result["all"] = base_qs.count()
         return Response(result)
 
     @action(detail=False, methods=["get"], url_path="search")

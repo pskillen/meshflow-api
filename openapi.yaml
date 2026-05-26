@@ -2483,8 +2483,8 @@ components:
           description: When the snapshot was taken
         stat_type:
           type: string
-          enum: [online_nodes, new_nodes, packet_volume]
-          description: Type of stat
+          enum: [online_nodes, new_nodes, packet_volume, mc_online_nodes, mc_new_nodes, mc_packet_volume]
+          description: Type of stat (mc_* are MeshCore hourly snapshots)
         constellation_id:
           type: integer
           nullable: true
@@ -4470,7 +4470,7 @@ paths:
           required: false
           schema:
             $ref: '#/components/schemas/MeshProtocol'
-          description: Filter by mesh protocol (meshtastic or meshcore). recent_counts remains Meshtastic-only.
+          description: Filter by mesh protocol (meshtastic or meshcore). Applies to list; use on recent_counts for per-protocol dashboard counts.
         - name: last_heard_after
           in: query
           required: false
@@ -5915,7 +5915,7 @@ paths:
           required: false
           schema:
             type: string
-            enum: [online_nodes, new_nodes, packet_volume]
+            enum: [online_nodes, new_nodes, packet_volume, mc_online_nodes, mc_new_nodes, mc_packet_volume]
             description: Filter by stat type
         - name: constellation_id
           in: query

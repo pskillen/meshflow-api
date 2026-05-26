@@ -187,7 +187,7 @@ print(StatsSnapshot.objects.order_by('-recorded_at')[:5].values('recorded_at','s
 
 ## Known gaps (Meshtastic doc scope)
 
-- Global `online_nodes` / `new_nodes` counts are not filtered to `protocol=MESHTASTIC` — MeshCore observed nodes can appear once they have `last_heard` / `created_at`. **Bug:** [#365](https://github.com/pskillen/meshflow-api/issues/365) (fix planned in [#329](https://github.com/pskillen/meshflow-api/issues/329)).
+- ~~Global `online_nodes` / `new_nodes` included MeshCore rows~~ — fixed ([#365](https://github.com/pskillen/meshflow-api/issues/365)) via `protocol=MESHTASTIC` filter on global ObservedNode queries.
 - Live stats views do not accept MeshCore identity (pubkey / `internal_id`).
 - `packet_volume` has no constellation-scoped snapshots.
 - Traceroute success daily stats use a different `stat_type` (`tr_success_daily`) — not covered here.
