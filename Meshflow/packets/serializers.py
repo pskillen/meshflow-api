@@ -1614,17 +1614,29 @@ class PrefetchedPacketObservationSerializer(serializers.ModelSerializer):
     observer = ObserverSerializer(read_only=True)
     direct_from_sender = serializers.SerializerMethodField()
     hop_count = serializers.SerializerMethodField()
+    observer_position = serializers.SerializerMethodField()
+    path_known = serializers.SerializerMethodField()
 
     class Meta:
         model = PacketObservation
         fields = [
             "observer",
+            "observer_position",
             "rx_time",
             "rx_rssi",
             "rx_snr",
             "direct_from_sender",
             "hop_count",
+            "path_known",
         ]
+
+    def get_observer_position(self, obj):
+        from text_messages.map_helpers import managed_node_map_position
+
+        return managed_node_map_position(obj.observer)
+
+    def get_path_known(self, obj):
+        return False
 
     def get_direct_from_sender(self, obj):
         """Return True if the packet was heard directly from the sender."""
