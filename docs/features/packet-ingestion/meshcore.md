@@ -42,7 +42,7 @@ Code: `meshflow-bot/src/meshcore/serializers.py`, `src/api/StorageAPI.py` (`stor
 | `contact_text` | `CONTACT_TEXT` (3) | `MeshCoreTextPacket` | `TextMessage` + sender `ObservedNode` from `from_pubkey_prefix`; node-claim path |
 | `raw` | `RAW` (99) | `MeshCoreRawPacket` | **Serializer supports it; bot does not upload `raw` today** |
 
-Also creates **`MeshCorePacketObservation`** per `(packet, observer)` (deduped).
+Also creates or updates **`MeshCorePacketObservation`** per `(packet, observer)` (deduped). Repeater **`path_hashes`** are stored on the observation row only (not on deduped `MeshCoreRawPacket`), so two feeders reporting the same `pkt_hash` can keep different paths. See [ADR-0001 (path hash resolution)](../traceroute/adr/0001-mc-path-hash-resolution.md).
 
 Dedup: `meshcore_packets/services/dedup.py` — `pkt_hash` + time window (see [adr/0004-mc-dedup-key.md](adr/0004-mc-dedup-key.md)).
 
