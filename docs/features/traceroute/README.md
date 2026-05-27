@@ -6,7 +6,7 @@ The traceroute feature tracks path discovery between Meshtastic nodes on the mes
 
 MeshCore does not use Meshtastic `TRACEROUTE_APP` / numeric hop lists on the wire. Phase 3 work ([#267](https://github.com/pskillen/meshflow-api/issues/267)) splits into:
 
-- **Passive path** — repeater `path_hashes` on forwarded packets (ingest → per-feeder observations → resolve to `ObservedNode` → UI). Execution tracking: [meshcore-path-progress.md](meshcore-path-progress.md), [meshcore-path-outstanding.md](meshcore-path-outstanding.md). Ingest context: [packet-ingestion/meshcore.md](../packet-ingestion/meshcore.md).
+- **Passive path** — repeater `path_hashes` on forwarded packets (ingest → per-feeder observations → display hops → UI). ADR: [adr/0001-mc-path-hash-resolution.md](adr/0001-mc-path-hash-resolution.md). Tracking: [meshcore-path-progress.md](meshcore-path-progress.md), [meshcore-path-outstanding.md](meshcore-path-outstanding.md). Ingest: [packet-ingestion/meshcore.md](../packet-ingestion/meshcore.md).
 - **Active traceroute** (later) — MC analog of `AutoTraceRoute`, scheduler protocol guards, Neo4j edges labelled by protocol.
 
 Meshtastic sections below remain the reference for the **active** traceroute system today.
