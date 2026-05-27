@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from common.protocol import Protocol
 from nodes.models import ManagedNode, ObservedNode
-from nodes.positioning import managed_node_lat_lon
+from nodes.positioning import managed_node_lat_lon, observed_node_lat_lon
 
 
 def map_position_dict(latitude, longitude) -> dict | None:
@@ -16,12 +16,9 @@ def map_position_dict(latitude, longitude) -> dict | None:
 def observed_node_map_position(node: ObservedNode | None) -> dict | None:
     if node is None:
         return None
-    try:
-        status = node.latest_status
-    except ObservedNode.latest_status.RelatedObjectDoesNotExist:
-        return None
-    if status.latitude is not None and status.longitude is not None:
-        return map_position_dict(status.latitude, status.longitude)
+    coords = observed_node_lat_lon(node)
+    if coords:
+        return map_position_dict(coords[0], coords[1])
     return None
 
 

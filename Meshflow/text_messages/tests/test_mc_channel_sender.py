@@ -1,9 +1,11 @@
 """MeshCore channel sender label parsing and candidate lookup."""
 
+from django.utils import timezone
+
 import pytest
 
 from common.protocol import Protocol
-from nodes.models import NodeLatestStatus, ObservedNode
+from nodes.models import MeshCoreLocationSource, NodeLatestStatus, ObservedNode, Position
 from text_messages.mc_channel_sender import (
     bulk_mc_sender_candidates_by_label,
     mc_sender_candidates_for_message,
@@ -57,6 +59,32 @@ def test_mc_sender_candidates_match_long_and_short_name():
     assert str(dup.internal_id) in ids
     assert len(candidates) == 2
     assert candidates[0]["position"] is not None or candidates[1]["position"] is not None
+
+
+@pytest.mark.django_db
+def test_mc_sender_candidate_position_from_latest_position_row():
+    """Position when only Position history exists (NodeLatestStatus empty)."""
+    node = ObservedNode.objects.create(
+        protocol=Protocol.MESHCORE,
+        mc_pubkey="e" * 64,
+        mc_pubkey_prefix="e" * 12,
+        long_name="MapNode",
+        short_name="MAP",
+        last_heard=None,
+    )
+    NodeLatestStatus.objects.create(node=node, latitude=None, longitude=None)
+    now = timezone.now()
+    Position.objects.create(
+        node=node,
+        reported_time=now,
+        logged_time=now,
+        latitude=55.99,
+        longitude=-4.09,
+        meshcore_location_source=MeshCoreLocationSource.ADVERT,
+    )
+    candidates = mc_sender_candidates_for_message("MapNode: test")
+    assert len(candidates) == 1
+    assert candidates[0]["position"] == {"latitude": 55.99, "longitude": -4.09}
 
 
 @pytest.mark.django_db

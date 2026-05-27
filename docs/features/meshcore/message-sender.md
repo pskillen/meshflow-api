@@ -32,7 +32,7 @@ On `GET /api/messages/text/` for MeshCore channel rows (`sender` null):
 | `mc_sender_candidates` | `ObservedNode` rows where `long_name` or `short_name` equals the label (case-insensitive). Often one node; duplicate display names return multiple. |
 | `sender_position` | Position from `sender` when set; else position of the **only** candidate with known coordinates |
 
-Each candidate includes: `internal_id`, `node_id_str`, `long_name`, `short_name`, `position` (from `NodeLatestStatus` when known).
+Each candidate includes: `internal_id`, `node_id_str`, `long_name`, `short_name`, `position` (from `NodeLatestStatus` when set, else the latest `Position` row — same rule as the node detail `latest_position` field).
 
 Implementation: `text_messages/mc_channel_sender.py`; list responses bulk-load candidates per page.
 

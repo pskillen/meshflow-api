@@ -6,6 +6,7 @@ from django.db.models import Q
 
 from common.protocol import Protocol
 from nodes.models import ObservedNode
+from nodes.positioning import prefetch_observed_node_positions
 
 from .map_helpers import observed_node_map_position
 
@@ -51,6 +52,7 @@ def mc_sender_candidates_for_label(label: str) -> list[ObservedNode]:
 
 
 def _candidates_for_nodes(nodes: list[ObservedNode]) -> list[dict]:
+    prefetch_observed_node_positions(nodes)
     seen: set[str] = set()
     out: list[dict] = []
     for node in nodes:
