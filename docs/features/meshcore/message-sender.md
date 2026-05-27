@@ -36,9 +36,23 @@ Each candidate includes: `internal_id`, `node_id_str`, `long_name`, `short_name`
 
 Implementation: `text_messages/mc_channel_sender.py`; list responses bulk-load candidates per page.
 
-## UI (heard map)
+## UI
 
-The message heard map uses `sender_position` when unambiguous. For MC channel text, the UI reads `mc_sender_candidates` and places the sender marker when exactly one candidate has `position`. Multiple matches: list still works; map may omit sender until the user disambiguates (future).
+### Message list header (`message-display-sender.ts`)
+
+MeshCore channel rows have `sender` null. The header label uses `mc_sender_candidates`:
+
+| Candidates | Header | Node link |
+| --- | --- | --- |
+| 0 | Anonymous | none |
+| 1 | Candidate short/long name | MeshCore node detail |
+| >1 | Parsed `mc_sender_label` + “N matches” badge (tooltip lists names) | none |
+
+Consecutive-message grouping uses the single candidate’s `node_id_str`, or `mc-ambiguous:{label}` when multiple.
+
+### Heard map
+
+The heard map uses `sender_position` when unambiguous. For MC channel text, the UI reads `mc_sender_candidates` and places the sender marker when exactly one candidate has `position`. Multiple matches: feeder markers and path lines still render; sender pin omitted with an explanatory overlay.
 
 ## Limitations
 
