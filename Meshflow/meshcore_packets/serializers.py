@@ -106,7 +106,6 @@ class MeshCorePacketIngestSerializer(serializers.Serializer):
             "rx_rssi": validated_data.get("rx_rssi"),
             "rx_snr": validated_data.get("rx_snr"),
             "route_typename": validated_data.get("route_typename"),
-            "path_hashes": validated_data.get("path_hashes"),
             "raw_json": validated_data,
         }
 
@@ -130,7 +129,8 @@ class MeshCorePacketIngestSerializer(serializers.Serializer):
     def _ensure_observation(self, packet, observer, validated_data, rx_time):
         channel_idx = validated_data.get("channel_idx")
         channel = resolve_mc_channel(observer, channel_idx) if channel_idx is not None else None
-        obs, _ = MeshCorePacketObservation.objects.get_or_create(
+        path_hashes = validated_data.get("path_hashes")
+        obs, _ = MeshCorePacketObservation.objects.update_or_create(
             packet=packet,
             observer=observer,
             defaults={
@@ -138,7 +138,7 @@ class MeshCorePacketIngestSerializer(serializers.Serializer):
                 "rx_time": rx_time,
                 "rx_rssi": validated_data.get("rx_rssi"),
                 "rx_snr": validated_data.get("rx_snr"),
-                "path_hashes": validated_data.get("path_hashes"),
+                "path_hashes": path_hashes,
             },
         )
         self.observation = obs

@@ -143,6 +143,9 @@ components:
           type: array
           items:
             type: string
+          description: >
+            Repeater path segments for this feeder observation (stored on MeshCorePacketObservation only;
+            not on deduped MeshCoreRawPacket).
         channel_idx:
           type: integer
           nullable: true
@@ -2594,6 +2597,118 @@ components:
           type: integer
           description: The number of hops the packet took to reach the observer
           nullable: true
+        observer_position:
+          $ref: '#/components/schemas/MapPosition'
+          nullable: true
+          description: Feeder map position (default location or linked ObservedNode)
+        path_known:
+          type: boolean
+          description: True when hop positions are known end-to-end (Meshtastic messages always false in v1)
+
+    MapPosition:
+      type: object
+      required: [latitude, longitude]
+      properties:
+        latitude:
+          type: number
+          format: double
+        longitude:
+          type: number
+          format: double
+
+    ResolvedHop:
+      type: object
+      required: [hash, status, ambiguous]
+      properties:
+        hash:
+          type: string
+          description: Lowercase hex path segment from the wire
+        status:
+          type: string
+          enum: [unknown, ambiguous, resolved]
+          description: v1 passive path uses unknown unless a proven matcher resolves the hop
+        node_id_str:
+          type: string
+          nullable: true
+        internal_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: ObservedNode id when status is resolved
+        long_name:
+          type: string
+          nullable: true
+        ambiguous:
+          type: boolean
+
+    HeardObserver:
+      type: object
+      description: MeshCore feeder that heard a message (ManagedNode + optional ObservedNode enrichment)
+      properties:
+        node_id_str:
+          type: string
+        internal_id:
+          type: string
+          format: uuid
+          nullable: true
+        long_name:
+          type: string
+          nullable: true
+        short_name:
+          type: string
+          nullable: true
+        position:
+          $ref: '#/components/schemas/MapPosition'
+          nullable: true
+
+    McSenderCandidate:
+      type: object
+      description: >
+        ObservedNode matched from MeshCore channel text prefix ``{name}: {body}`` when wire sender id is absent.
+      properties:
+        internal_id:
+          type: string
+          format: uuid
+        node_id_str:
+          type: string
+        long_name:
+          type: string
+          nullable: true
+        short_name:
+          type: string
+          nullable: true
+        position:
+          $ref: '#/components/schemas/MapPosition'
+          nullable: true
+
+    MeshCoreHeardObservation:
+      type: object
+      properties:
+        observer:
+          $ref: '#/components/schemas/HeardObserver'
+        rx_time:
+          type: string
+          format: date-time
+        rx_rssi:
+          type: number
+          format: float
+          nullable: true
+        rx_snr:
+          type: number
+          format: float
+          nullable: true
+        path_hashes:
+          type: array
+          items:
+            type: string
+          nullable: true
+        resolved_path:
+          type: array
+          items:
+            $ref: '#/components/schemas/ResolvedHop'
+        path_known:
+          type: boolean
+          description: False in v1 (hop positions not linked to map coordinates)
 
     TextMessage:
       type: object
@@ -2664,12 +2779,34 @@ components:
           nullable: true
           description: The packet_id of the message being replied to
           readOnly: true
+        sender_position:
+          $ref: '#/components/schemas/MapPosition'
+          nullable: true
+          readOnly: true
+          description: >
+            Sender map position from linked ObservedNode, or sole MC candidate when exactly one match has coordinates.
+        mc_sender_label:
+          type: string
+          nullable: true
+          readOnly: true
+          description: Name parsed from MC channel text ``{name}: {body}``; null for MT or contact/DM rows.
+        mc_sender_candidates:
+          type: array
+          readOnly: true
+          description: >
+            MC channel messages only — ObservedNodes whose long_name or short_name matches mc_sender_label (0–N).
+          items:
+            $ref: '#/components/schemas/McSenderCandidate'
         heard:
           type: array
-          description: List of nodes that heard this message
-          items:
-            $ref: '#/components/schemas/PacketObservation'
+          description: >
+            Feeders that heard this message. Meshtastic items match PacketObservation (with observer_position).
+            MeshCore items match MeshCoreHeardObservation (path_hashes + resolved_path display hops).
           readOnly: true
+          items:
+            oneOf:
+              - $ref: '#/components/schemas/PacketObservation'
+              - $ref: '#/components/schemas/MeshCoreHeardObservation'
 
     MessageChannel:
       type: object

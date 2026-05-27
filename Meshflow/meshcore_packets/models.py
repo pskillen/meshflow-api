@@ -37,7 +37,6 @@ class MeshCoreRawPacket(models.Model):
     rx_rssi = models.FloatField(null=True, blank=True)
     rx_snr = models.FloatField(null=True, blank=True)
     route_typename = models.CharField(max_length=32, null=True, blank=True)
-    path_hashes = models.JSONField(null=True, blank=True)
     raw_json = models.JSONField()
     first_reported_time = models.DateTimeField(default=timezone.now, db_index=True)
 
