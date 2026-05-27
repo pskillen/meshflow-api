@@ -2661,6 +2661,26 @@ components:
           $ref: '#/components/schemas/MapPosition'
           nullable: true
 
+    McSenderCandidate:
+      type: object
+      description: >
+        ObservedNode matched from MeshCore channel text prefix ``{name}: {body}`` when wire sender id is absent.
+      properties:
+        internal_id:
+          type: string
+          format: uuid
+        node_id_str:
+          type: string
+        long_name:
+          type: string
+          nullable: true
+        short_name:
+          type: string
+          nullable: true
+        position:
+          $ref: '#/components/schemas/MapPosition'
+          nullable: true
+
     MeshCoreHeardObservation:
       type: object
       properties:
@@ -2763,7 +2783,20 @@ components:
           $ref: '#/components/schemas/MapPosition'
           nullable: true
           readOnly: true
-          description: Sender map position from NodeLatestStatus when known
+          description: >
+            Sender map position from linked ObservedNode, or sole MC candidate when exactly one match has coordinates.
+        mc_sender_label:
+          type: string
+          nullable: true
+          readOnly: true
+          description: Name parsed from MC channel text ``{name}: {body}``; null for MT or contact/DM rows.
+        mc_sender_candidates:
+          type: array
+          readOnly: true
+          description: >
+            MC channel messages only — ObservedNodes whose long_name or short_name matches mc_sender_label (0–N).
+          items:
+            $ref: '#/components/schemas/McSenderCandidate'
         heard:
           type: array
           description: >

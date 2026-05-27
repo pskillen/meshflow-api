@@ -8,6 +8,7 @@ from nodes.models import ManagedNode, ObservedNode
 from packets.serializers import PrefetchedPacketObservationSerializer
 
 from .map_helpers import managed_node_map_position, observed_node_map_position
+from .mc_channel_sender import parse_mc_channel_sender_label
 from .models import TextMessage
 
 
@@ -34,7 +35,7 @@ def _mc_heard_observer(managed_node: ManagedNode, mc_observed_by_pubkey: dict) -
         observed = mc_observed_by_pubkey.get(managed_node.mc_pubkey.lower())
     return {
         "node_id_str": managed_node.node_id_str,
-        "internal_id": str(observed.id) if observed else None,
+        "internal_id": str(observed.internal_id) if observed else None,
         "long_name": observed.long_name if observed else managed_node.name,
         "short_name": observed.short_name if observed else managed_node.node_id_str,
         "position": managed_node_map_position(managed_node),
@@ -51,6 +52,8 @@ class TextMessageSerializer(serializers.ModelSerializer):
 
     sender = ObservedNodeSerializer(read_only=True, allow_null=True)
     sender_position = serializers.SerializerMethodField()
+    mc_sender_label = serializers.SerializerMethodField()
+    mc_sender_candidates = serializers.SerializerMethodField()
     channel = serializers.PrimaryKeyRelatedField(queryset=MessageChannel.objects.all())
     heard = serializers.SerializerMethodField()
     packet_id = serializers.SerializerMethodField()
@@ -60,7 +63,31 @@ class TextMessageSerializer(serializers.ModelSerializer):
         return Protocol(obj.protocol).label.lower()
 
     def get_sender_position(self, obj):
-        return observed_node_map_position(obj.sender) if obj.sender_id else None
+        if obj.sender_id:
+            return observed_node_map_position(obj.sender)
+        if obj.protocol == Protocol.MESHCORE:
+            candidates = self.get_mc_sender_candidates(obj)
+            if len(candidates) == 1 and candidates[0].get("position"):
+                return candidates[0]["position"]
+        return None
+
+    def get_mc_sender_label(self, obj):
+        if obj.protocol != Protocol.MESHCORE or obj.sender_id:
+            return None
+        return parse_mc_channel_sender_label(obj.message_text)
+
+    def get_mc_sender_candidates(self, obj):
+        if obj.protocol != Protocol.MESHCORE or obj.sender_id:
+            return []
+        cache = self.context.get("mc_sender_candidates_by_label")
+        if cache is not None:
+            label = parse_mc_channel_sender_label(obj.message_text)
+            if not label:
+                return []
+            return cache.get(label, [])
+        from .mc_channel_sender import mc_sender_candidates_for_message
+
+        return mc_sender_candidates_for_message(obj.message_text)
 
     def get_packet_id(self, obj):
         if obj.original_packet_id:
@@ -80,6 +107,8 @@ class TextMessageSerializer(serializers.ModelSerializer):
             "packet_id",
             "sender",
             "sender_position",
+            "mc_sender_label",
+            "mc_sender_candidates",
             "recipient_meshtastic_node_id",
             "channel",
             "sent_at",

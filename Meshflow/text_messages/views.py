@@ -12,6 +12,7 @@ from meshcore_packets.services.path_resolution import bulk_format_path_hops
 from nodes.models import ManagedNode, ObservedNode
 from packets.models import PacketObservation
 
+from .mc_channel_sender import bulk_mc_sender_candidates_by_label, parse_mc_channel_sender_label
 from .models import TextMessage
 from .serializers import TextMessageSerializer, _normalize_path_segment
 
@@ -78,6 +79,15 @@ class TextMessageViewSet(viewsets.ModelViewSet):
 
         return queryset
 
+    def _mc_sender_labels_for_messages(self, messages):
+        labels = set()
+        for msg in messages:
+            if msg.protocol == Protocol.MESHCORE and not msg.sender_id:
+                label = parse_mc_channel_sender_label(msg.message_text)
+                if label:
+                    labels.add(label)
+        return labels
+
     def _path_segments_for_messages(self, messages):
         segments = []
         for msg in messages:
@@ -96,6 +106,9 @@ class TextMessageViewSet(viewsets.ModelViewSet):
         messages = page if page is not None else list(queryset)
         context = self.get_serializer_context()
         context["path_hop_cache"] = bulk_format_path_hops(self._path_segments_for_messages(messages))
+        context["mc_sender_candidates_by_label"] = bulk_mc_sender_candidates_by_label(
+            self._mc_sender_labels_for_messages(messages)
+        )
         serializer = self.get_serializer(messages, many=True, context=context)
         if page is not None:
             return self.get_paginated_response(serializer.data)
