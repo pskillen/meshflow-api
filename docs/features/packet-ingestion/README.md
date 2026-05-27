@@ -18,39 +18,32 @@ signals emitted here and do their own normalisation. Refer to those features'
 own documentation for what they do with the packets — this README intentionally
 stops at "signal emitted".
 
-## Reference docs
+## Documentation map
 
-- [PACKET_FIELDS.md](PACKET_FIELDS.md) — wire-level field reference for every
-packet type accepted by ingestion.
-- [DEDUPLICATION.md](DEDUPLICATION.md) — the rules that decide when two
-ingested packets describe the same on-air transmission.
+| Doc | Contents |
+| --- | --- |
+| **[meshtastic.md](meshtastic.md)** | MT packet-type inventory, bot → API → `MtRawPacket` → business models |
+| **[meshcore.md](meshcore.md)** | MC upload scope, ingest path, Phase 2 gap vs [#266](https://github.com/pskillen/meshflow-api/issues/266) |
+| [PACKET_FIELDS.md](PACKET_FIELDS.md) | MT wire-level fields per portnum / telemetry variant |
+| [MESHCORE_PACKET_FIELDS.md](MESHCORE_PACKET_FIELDS.md) | MC capture-verified dump shapes |
+| [DEDUPLICATION.md](DEDUPLICATION.md) | MT dedup window; MC see [adr/0004](adr/0004-mc-dedup-key.md) |
+| [signals.md](signals.md) | MT post-processing signals (MC uses `meshcore_packet_received` in-app) |
+| [adr/](adr/README.md) | MC identity, channels, broadcast, dedup |
 
-Sample raw packet payloads (one per port number) live in
-`[docs/packets/](../../packets/)` at the top of `docs/`.
+Sample JSON: [docs/packets/](../../packets/) (MT by portnum), [docs/packets/meshcore/](../../packets/meshcore/README.md).
 
-## MeshCore (Phase 0.5 — design only)
+## Implementation status
 
-MeshCore (MC) is being added as a second first-class protocol alongside
-Meshtastic (MT). The wire shape is different — Ed25519 pubkeys instead of
-32-bit node ids, no `packet_id`, channel index without a channel hash — so
-the API gets a parallel ingest path rather than coercing MC into the MT
-schema.
+| Protocol | Ingest app | Endpoint | Phase |
+| --- | --- | --- | --- |
+| Meshtastic | `packets` | `POST /api/packets/{node_id}/ingest/` | Production |
+| MeshCore | `meshcore_packets` | `POST /api/meshcore/feeders/{prefix}/packets/ingest/` | Phase 1 MVP (advert + text); [#266](https://github.com/pskillen/meshflow-api/issues/266) for full types |
 
-Phase 0.5 lands the schema decisions only; no models, endpoints, or
-`openapi.yaml` changes yet (those are Phase 1, tracked under
-[meshflow-api#265](https://github.com/pskillen/meshflow-api/issues/265)).
+MeshCore uses a **parallel** schema (pubkeys, `pkt_hash`, no Meshtastic `packet_id`) — see [meshcore.md](meshcore.md) and ADRs under [adr/](adr/README.md).
 
-- [MESHCORE_PACKET_FIELDS.md](MESHCORE_PACKET_FIELDS.md) — capture-verified
-field reference, derivative of the Phase 0.4 bundle in
-[meshflow-bot/docs/meshcore_packets/](https://github.com/pskillen/meshflow-bot/tree/main/docs/meshcore_packets).
-- [adr/](adr/README.md) — ADRs covering MC node identity, channels,
-broadcast semantics, and dedup key. Tracked in
-[meshflow-api#276](https://github.com/pskillen/meshflow-api/issues/276)
-(epic [#264](https://github.com/pskillen/meshflow-api/issues/264)).
-- Representative MC sample JSONs (one per event shape) live in
-[`docs/packets/meshcore/`](../../packets/meshcore/README.md).
+## End-to-end flow (Meshtastic)
 
-## End-to-end Flow
+Protocol-specific tables and diagrams: **[meshtastic.md](meshtastic.md)** (MT), **[meshcore.md](meshcore.md)** (MC).
 
 ```mermaid
 sequenceDiagram

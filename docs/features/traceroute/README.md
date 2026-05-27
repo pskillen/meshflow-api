@@ -2,6 +2,15 @@
 
 The traceroute feature tracks path discovery between Meshtastic nodes on the mesh network. **Core lifecycle** (model, scheduling, dispatch, packet completion, WebSocket status) lives in the **`traceroute`** Django app. **Derived analytics** — Neo4j export and queries, reach/coverage pivots, stats and heatmap HTTP handlers — live in **`traceroute_analytics`**, while public URLs stay under `/api/traceroutes/` for compatibility (see [areas-of-concern](areas-of-concern.md)).
 
+## MeshCore path parity (Phase 3)
+
+MeshCore does not use Meshtastic `TRACEROUTE_APP` / numeric hop lists on the wire. Phase 3 work ([#267](https://github.com/pskillen/meshflow-api/issues/267)) splits into:
+
+- **Passive path** — repeater `path_hashes` on forwarded packets (ingest → per-feeder observations → resolve to `ObservedNode` → UI). Execution tracking: [meshcore-path-progress.md](meshcore-path-progress.md), [meshcore-path-outstanding.md](meshcore-path-outstanding.md). Ingest context: [packet-ingestion/meshcore.md](../packet-ingestion/meshcore.md).
+- **Active traceroute** (later) — MC analog of `AutoTraceRoute`, scheduler protocol guards, Neo4j edges labelled by protocol.
+
+Meshtastic sections below remain the reference for the **active** traceroute system today.
+
 ## Overview
 
 - **AutoTraceRoute**: Django model recording each traceroute request (manual or scheduled) and its result.
@@ -79,6 +88,8 @@ Auto-scheduler and permission checks share one notion of a **live** source node 
 
 ## Related Documentation
 
+- [MeshCore path progress](meshcore-path-progress.md) – Phase 3 epic #267 execution log (passive + active TR)
+- [MeshCore path outstanding](meshcore-path-outstanding.md) – deferred / discovered debt for #267
 - [Areas of concern](areas-of-concern.md) – Ownership boundaries for core traceroute, monitoring, DX, analytics, and visualisation
 - [Algorithms](algorithms.md) – Source, strategy, and target selection (including auto reliability)
 - [Permissions](permissions.md) – Canonical rules for who may view and trigger traceroutes
