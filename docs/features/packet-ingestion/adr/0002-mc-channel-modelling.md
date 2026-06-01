@@ -45,7 +45,7 @@ We still need a way to:
 - **`mc_channels` M2M lets a managed node "subscribe" to an arbitrary subset of MC channels**, which fits the protocol better than 8 fixed slots. UI and admin screens for `ManagedNode` need a small per-protocol branch.
 - **If MC firmware later adds a channel hash on the wire**, we can add `mc_channel_hash` and a matching unique constraint without touching the dispatch path — `channel_idx` continues to be the primary dispatch key.
 - **Risk:** auto-creating `MessageChannel` rows on first sight could pollute the table if an attacker sends bogus channel indices via a compromised observer. Mitigation: limit to indices `0..63` (MC's plausible range) and require channel rows to be attached to the **observer's** `mc_channels` only on packets the observer authenticated for — which they already are.
-- **Out of scope:** UI for managing `mc_channels` per managed node; covered in Phase 1.7 (UI ticket).
+- **UI for managing feeder channels:** Node Settings dual-list editor + apply-to-radio ([#379](https://github.com/pskillen/meshflow-api/issues/379) / [ui #313](https://github.com/pskillen/meshflow-ui/pull/313)).
 
 ## Supplement (2026-05-20) — device as source of truth for operator metadata
 

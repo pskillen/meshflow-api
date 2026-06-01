@@ -21,7 +21,7 @@ How MeshCore **group text** and **channel configuration** flow from the radio th
 |---|----------------|--------------|
 | Channel on radio | Fixed slots 0–7, PSK + name in firmware | Arbitrary list on companion; **index** on wire, **name** only in device config |
 | Feeder channel config | API slot FKs → `MessageChannel` (operator maps slots in UI) | Device is source of truth; API **mirror** via bot `mc-channel-sync` on connect |
-| Feeder channel link in API | `meshtastic_channel_0..7` | `ManagedNode.mc_channels` M2M (reconciled from device snapshot) |
+| Feeder channel link in API | `meshtastic_channel_0..7` | `ManagedNodeMcChannelLink` (slot → canonical `MessageChannel`; reconciled from device snapshot) |
 | What a text packet carries | Channel index + sender node id | `channel_message`: **index + body only** (no sender pubkey); `contact_message`: **12-hex sender prefix** + body |
 | Broadcast vs DM | `to_int == 0xFFFFFFFF` vs directed node id | Broadcast = **no** `to_pubkey*` on wire; channel text is always broadcast on that index ([ADR-0003](../packet-ingestion/adr/0003-mc-broadcast-semantics.md)) |
 | UI today | Slot 0–7 mapping on [Node Settings](https://github.com/pskillen/meshflow-ui/blob/main/src/pages/user/NodeSettings.tsx) | MC feeders: mirror + **Apply to radio** on Node Settings |
@@ -374,6 +374,7 @@ Identity receiver **skips** channel text (no `from_pubkey` / prefix). Contact te
 | `TextMessage` + MC provenance ([#296](https://github.com/pskillen/meshflow-api/issues/296)) | **Done** |
 | Bot sync + WS apply ([#297](https://github.com/pskillen/meshflow-api/issues/297)) | **Done** |
 | UI mirror + apply-to-radio | **Done** |
+| Canonical channels + per-feeder links ([#379](https://github.com/pskillen/meshflow-api/issues/379)) | **Done** — [api #380](https://github.com/pskillen/meshflow-api/pull/380), [ui #313](https://github.com/pskillen/meshflow-ui/pull/313) |
 | Apply 503 / msgpack / WS group fixes | **Done** on [api #335](https://github.com/pskillen/meshflow-api/pull/335), [bot #108](https://github.com/pskillen/meshflow-bot/pull/108) (merge pending) |
 | Django admin MC channels + push action | **Done** (#335) |
 | Dual API channel sync (no WS on API 2) | **Done** (bot behaviour; documented) |
