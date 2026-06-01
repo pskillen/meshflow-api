@@ -91,3 +91,54 @@ def test_observation_path_hashes_updated_on_reingest(ingest_client, meshcore_fee
     packet = MeshCoreRawPacket.objects.get(pkt_hash=77702)
     obs = MeshCorePacketObservation.objects.get(packet=packet, observer=meshcore_feeder["node"])
     assert obs.path_hashes == ["22", "33"]
+
+
+@pytest.mark.django_db
+def test_observation_path_hash_size_and_mode_persisted(ingest_client, meshcore_feeder):
+    now = timezone.now()
+    url = feeder_url("meshcore-feeder-packet-ingest", FEEDER_MC_PUBKEY_PREFIX)
+    payload = {
+        "event_type": "channel_message",
+        "payload_type": "channel_text",
+        "pkt_hash": 77703,
+        "rx_time": now.timestamp(),
+        "text": "path meta",
+        "channel_idx": 0,
+        "path_hashes": ["f3", "bc"],
+        "path_hash_size": 1,
+        "path_hash_mode": 2,
+        "raw": {},
+    }
+    ingest_client.post(url, payload, format="json")
+    packet = MeshCoreRawPacket.objects.get(pkt_hash=77703)
+    obs = MeshCorePacketObservation.objects.get(packet=packet, observer=meshcore_feeder["node"])
+    assert obs.path_hash_size == 1
+    assert obs.path_hash_mode == 2
+
+    ingest_client.post(
+        url,
+        {**payload, "path_hash_size": 3, "path_hash_mode": 4},
+        format="json",
+    )
+    obs.refresh_from_db()
+    assert obs.path_hash_size == 3
+    assert obs.path_hash_mode == 4
+
+
+@pytest.mark.django_db
+def test_observation_path_hash_size_mode_null_when_absent(ingest_client, meshcore_feeder):
+    now = timezone.now()
+    url = feeder_url("meshcore-feeder-packet-ingest", FEEDER_MC_PUBKEY_PREFIX)
+    payload = {
+        "event_type": "advertisement",
+        "payload_type": "advert",
+        "from_pubkey": FULL_PUBKEY,
+        "pkt_hash": 77704,
+        "rx_time": now.timestamp(),
+        "raw": {},
+    }
+    ingest_client.post(url, payload, format="json")
+    packet = MeshCoreRawPacket.objects.get(pkt_hash=77704)
+    obs = MeshCorePacketObservation.objects.get(packet=packet, observer=meshcore_feeder["node"])
+    assert obs.path_hash_size is None
+    assert obs.path_hash_mode is None
