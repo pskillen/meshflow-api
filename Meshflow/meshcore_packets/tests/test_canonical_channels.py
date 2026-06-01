@@ -5,17 +5,18 @@ from django.utils import timezone
 import pytest
 
 from common.protocol import Protocol
-from constellations.models import MeshCoreChannelType, MessageChannel
+from constellations.models import MessageChannel
 from meshcore_packets.models import MeshCorePayloadType, MeshCoreTextPacket
 from meshcore_packets.services.channel import resolve_mc_channel
 from meshcore_packets.services.channel_sync import reconcile_mc_channels
 from meshcore_packets.services.text_message import MeshCoreTextMessageService
 from nodes.models import NodeAuth
-from text_messages.models import TextMessage
 
 
 @pytest.mark.django_db
-def test_two_feeders_same_hashtag_different_indices_one_canonical(meshcore_feeder, create_managed_node, create_node_api_key):
+def test_two_feeders_same_hashtag_different_indices_one_canonical(
+    meshcore_feeder, create_managed_node, create_node_api_key
+):
     """Same logical hashtag on different device slots → one MessageChannel, two links."""
     constellation = meshcore_feeder["node"].constellation
     feeder_b = create_managed_node(

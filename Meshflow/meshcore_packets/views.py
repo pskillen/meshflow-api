@@ -168,7 +168,7 @@ class MeshCoreMcChannelSyncView(APIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            channels = reconcile_mc_channels(
+            reconcile_mc_channels(
                 managed_node,
                 serializer.validated_data["channels"],
                 synced_at=serializer.validated_data.get("synced_at"),

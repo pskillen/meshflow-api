@@ -10,6 +10,7 @@ from django.utils.translation import gettext_lazy as _
 from common.feeder_ws import COMMAND_DISPATCH_UNAVAILABLE, FEEDER_BOT_NOT_CONNECTED
 from common.mc_channel_labels import (
     managed_node_mc_channel_links,
+    managed_node_mc_channels_queryset,
     mc_channel_admin_label,
     mc_channel_type_name,
 )
