@@ -4,6 +4,9 @@
 ## Mac stuff
 .DS_Store
 
+### Local secrets (pre-prod DB skill — see .cursor/skills/preprod-database/)
+Meshflow/ai-env
+
 ### app outputs
 state.json
 nodes.json

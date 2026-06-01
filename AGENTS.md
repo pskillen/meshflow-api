@@ -65,6 +65,10 @@ Make sure to activate the venv `venv/bin/activate`
 
 See **tests/TESTING.md** for detailed instructions (unit tests, integration tests via Docker Compose or local Django).
 
+### Pre-production database (opt-in)
+
+Agents must **not** query pre-prod unless the user explicitly enables it. When enabled, follow **[.cursor/skills/preprod-database/SKILL.md](.cursor/skills/preprod-database/SKILL.md)** (`disable-model-invocation`; copy credentials to local `Meshflow/ai-env`, gitignored).
+
 ## Code Style
 
 - **Linting**: black, isort, flake8
