@@ -8,7 +8,7 @@ from common.access import AccessLevel, get_access_level, user_can_manage_api_key
 from common.mesh_node_helpers import observed_node_id_str
 from common.protocol import Protocol
 from constellations.models import Constellation, MessageChannel
-from meshcore_packets.serializers_channel import MessageChannelMcSerializer
+from meshcore_packets.serializers_channel import FeederMcChannelMirrorSerializer
 from users.models import User
 
 from .models import (
@@ -872,8 +872,10 @@ class OwnedManagedNodeSerializer(ManagedNodeSerializer):
         else:
             rep["meshtastic_channel_7"] = None
 
-        rep["mc_channels"] = MessageChannelMcSerializer(
-            instance.mc_channels.order_by("mc_channel_idx"),
+        from common.mc_channel_labels import managed_node_mc_channel_links
+
+        rep["mc_channels"] = FeederMcChannelMirrorSerializer(
+            managed_node_mc_channel_links(instance),
             many=True,
         ).data
 

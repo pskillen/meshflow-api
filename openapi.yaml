@@ -2115,7 +2115,7 @@ components:
               type: array
               description: MeshCore channels mirrored from device (protocol=MeshCore only)
               items:
-                $ref: '#/components/schemas/MessageChannel'
+                $ref: '#/components/schemas/FeederMcChannelMirror'
             mc_channels_synced_at:
               type: string
               format: date-time
@@ -2956,11 +2956,11 @@ components:
         protocol:
           $ref: '#/components/schemas/MeshProtocol'
           description: Mesh protocol for this channel row
-        mc_channel_idx:
-          type: integer
+        display_label:
+          type: string
           nullable: true
-          minimum: 0
-          description: MeshCore channel index when protocol is MeshCore; null for Meshtastic
+          readOnly: true
+          description: Operator-facing label (#hashtag for HASHTAG, plain name for PUBLIC). MeshCore only.
         mc_channel_type:
           type: string
           nullable: true
@@ -2973,6 +2973,28 @@ components:
         constellation:
           type: integer
           description: The ID of the constellation this channel belongs to
+
+    FeederMcChannelMirror:
+      type: object
+      description: Canonical MessageChannel plus device slot index for a MeshCore feeder.
+      properties:
+        id:
+          type: integer
+          description: Canonical MessageChannel ID
+        name:
+          type: string
+        mc_channel_idx:
+          type: integer
+          minimum: 0
+          maximum: 63
+          description: Device channel slot index on this feeder
+        mc_channel_type:
+          type: string
+          nullable: true
+          enum: [PUBLIC, HASHTAG]
+        mc_hashtag:
+          type: string
+          nullable: true
 
     McChannelSyncEntry:
       type: object
@@ -3016,7 +3038,7 @@ components:
         mc_channels:
           type: array
           items:
-            $ref: '#/components/schemas/MessageChannel'
+            $ref: '#/components/schemas/FeederMcChannelMirror'
 
     ConstellationMember:
       type: object

@@ -107,7 +107,6 @@ class MeshCoreMessageChannelAdmin(admin.ModelAdmin):
     """Constellation MC channel catalog (device slots). Push to radio from Managed node admin."""
 
     list_display = (
-        "mc_channel_idx",
         "admin_label",
         "mc_channel_type_display",
         "constellation",
@@ -118,10 +117,10 @@ class MeshCoreMessageChannelAdmin(admin.ModelAdmin):
         "constellation",
     )
     search_fields = ("name", "mc_hashtag", "constellation__name")
-    ordering = ("constellation__name", "mc_channel_idx")
+    ordering = ("constellation__name", "name")
     list_select_related = ("constellation",)
     fieldsets = (
-        (None, {"fields": ("constellation", "mc_channel_idx")}),
+        (None, {"fields": ("constellation",)}),
         (
             _("Channel"),
             {

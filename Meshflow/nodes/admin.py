@@ -9,7 +9,7 @@ from django.utils.translation import gettext_lazy as _
 
 from common.feeder_ws import COMMAND_DISPATCH_UNAVAILABLE, FEEDER_BOT_NOT_CONNECTED
 from common.mc_channel_labels import (
-    managed_node_mc_channels_queryset,
+    managed_node_mc_channel_links,
     mc_channel_admin_label,
     mc_channel_type_name,
 )
@@ -563,8 +563,8 @@ class ManagedNodeAdmin(admin.ModelAdmin):
     def mc_channels_mirror(self, obj):
         if obj is None or obj.protocol != Protocol.MESHCORE:
             return "—"
-        rows = list(managed_node_mc_channels_queryset(obj))
-        if not rows:
+        links = list(managed_node_mc_channel_links(obj))
+        if not links:
             return format_html(
                 "<p><em>{}</em></p>",
                 _("No channels synced from device yet. Connect the bot to populate this mirror."),
@@ -574,11 +574,11 @@ class ManagedNodeAdmin(admin.ModelAdmin):
             "<tr><td>{}</td><td>{}</td><td><strong>{}</strong></td></tr>",
             (
                 (
-                    ch.mc_channel_idx if ch.mc_channel_idx is not None else "—",
-                    mc_channel_type_name(ch),
-                    mc_channel_admin_label(ch),
+                    link.mc_channel_idx,
+                    mc_channel_type_name(link.message_channel),
+                    mc_channel_admin_label(link.message_channel),
                 )
-                for ch in rows
+                for link in links
             ),
         )
         return format_html(

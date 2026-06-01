@@ -3,6 +3,7 @@
 from rest_framework import serializers
 
 from constellations.models import MeshCoreChannelType, MessageChannel
+from nodes.models import ManagedNodeMcChannelLink
 
 # Wire/API strings (not gettext labels — lazy __proxy__ breaks Channels msgpack).
 MC_CHANNEL_TYPE_API_CHOICES = [
@@ -24,10 +25,39 @@ class McChannelSyncSerializer(serializers.Serializer):
 
 
 class MessageChannelMcSerializer(serializers.ModelSerializer):
+    """Canonical MessageChannel fields (no device index)."""
+
     mc_channel_type = serializers.SerializerMethodField()
 
     class Meta:
         model = MessageChannel
+        fields = [
+            "id",
+            "name",
+            "mc_channel_type",
+            "mc_hashtag",
+        ]
+
+    def get_mc_channel_type(self, obj):
+        if obj.mc_channel_type is None:
+            return None
+        return MeshCoreChannelType(obj.mc_channel_type).name
+
+
+class FeederMcChannelMirrorSerializer(serializers.ModelSerializer):
+    """Feeder device mirror: canonical channel plus slot index from the link row."""
+
+    id = serializers.IntegerField(source="message_channel.id", read_only=True)
+    name = serializers.CharField(source="message_channel.name", read_only=True)
+    mc_channel_type = serializers.SerializerMethodField()
+    mc_hashtag = serializers.CharField(
+        source="message_channel.mc_hashtag",
+        read_only=True,
+        allow_null=True,
+    )
+
+    class Meta:
+        model = ManagedNodeMcChannelLink
         fields = [
             "id",
             "name",
@@ -37,9 +67,10 @@ class MessageChannelMcSerializer(serializers.ModelSerializer):
         ]
 
     def get_mc_channel_type(self, obj):
-        if obj.mc_channel_type is None:
+        ch = obj.message_channel
+        if ch.mc_channel_type is None:
             return None
-        return MeshCoreChannelType(obj.mc_channel_type).name
+        return MeshCoreChannelType(ch.mc_channel_type).name
 
 
 class McChannelApplyEntrySerializer(serializers.Serializer):
