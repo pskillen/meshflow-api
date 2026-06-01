@@ -1,8 +1,8 @@
 # ADR-0002 — MeshCore channel modelling
 
-**Status:** Proposed
+**Status:** Accepted (amended 2026-06-01)
 **Date:** 2026-05-12
-**Tracking:** [meshflow-api#276](https://github.com/pskillen/meshflow-api/issues/276)
+**Tracking:** [meshflow-api#276](https://github.com/pskillen/meshflow-api/issues/276), [meshflow-api#379](https://github.com/pskillen/meshflow-api/issues/379)
 
 ## Context
 
@@ -24,18 +24,19 @@ We still need a way to:
 ## Decision
 
 1. **Add `MessageChannel.protocol`** (same enum as `ObservedNode.protocol`). Channels are single-protocol; an MT channel and an MC channel are distinct rows even if their names happen to match.
-2. **MC channel identifiers on `MessageChannel`:**
-   - `mc_channel_idx` — `PositiveSmallIntegerField`, nullable. Zero-based index as seen in `channel_message.channel_idx`.
-   - `name` — existing operator-set string (no change). For MC, populated out of band (admin UI / config) since the wire carries no name.
+2. **Canonical `MessageChannel` rows (constellation-scoped logical identity):**
+   - `name`, `mc_channel_type` (`PUBLIC` / `HASHTAG`), `mc_hashtag` (when HASHTAG).
+   - **No `mc_channel_idx` on `MessageChannel`.** Device slot index is per-feeder, not global.
+   - Uniqueness: `(constellation, protocol, mc_hashtag)` for HASHTAG rows; `(constellation, protocol, name)` for PUBLIC rows (normalized in services).
 3. **Defer `mc_channel_hash`.** Revisit if/when a firmware revision starts emitting one on the wire. No column added now.
-4. **Replace the fixed `channel_0..channel_7` slots, for MC managed nodes, with an M2M:**
-   - `ManagedNode.mc_channels` — `ManyToManyField(MessageChannel, related_name='managed_nodes_mc', blank=True)`.
-   - The existing `channel_0..channel_7` FKs stay MT-only and untouched. Single-protocol managed nodes only use one or the other side; the model does not need a CHECK constraint here because the existing `ManagedNode.protocol` (Phase 1) already determines which side is populated.
-5. **Channel resolution on `PacketObservation` stays an FK to `MessageChannel`.** For MC packets, the serializer resolves the channel as:
-   - look up the observer `ManagedNode`,
-   - filter `observer.mc_channels.filter(mc_channel_idx=<idx>)`,
-   - if not found, auto-create a `MessageChannel` row with `protocol=MESHCORE`, `mc_channel_idx=<idx>`, `name=f"MC channel {idx}"`, and attach it to the observer's `mc_channels`. An operator can rename it later.
-6. **Uniqueness:** `UniqueConstraint(fields=['protocol', 'mc_channel_idx', 'constellation'])` where applicable (matches the existing constellation-scoped uniqueness pattern on MT channels). MC channels are scoped to a constellation just like MT ones — channel index 0 in Scotland is not the same row as channel index 0 in another constellation.
+4. **Per-feeder slot mapping via `ManagedNodeMcChannelLink` (M2M through table):**
+   - `managed_node`, `message_channel` (canonical), `mc_channel_idx` (`0..63`, unique per managed node).
+   - `ManagedNode.mc_channels` — `ManyToManyField(MessageChannel, through='ManagedNodeMcChannelLink', ...)`.
+   - Meshtastic `meshtastic_channel_0..7` FKs stay MT-only and untouched.
+5. **Channel resolution on ingest** (`resolve_mc_channel(observer, channel_idx)`):
+   - Look up `ManagedNodeMcChannelLink` for `(observer, channel_idx)` → canonical `MessageChannel`.
+   - If missing (heard before sync), create placeholder canonical + link; overwritten when device sync supplies real metadata.
+6. **`TextMessage.channel` and packet FKs point at the canonical row** so the same logical channel (`#test`) is one row even when two feeders use different device indices.
 
 ## Consequences
 
@@ -48,9 +49,9 @@ We still need a way to:
 
 ## Supplement (2026-05-20) — device as source of truth for operator metadata
 
-ADR §5–6 still govern **ingest resolution** (`mc_channel_idx` → `MessageChannel` via feeder `mc_channels`). For **name**, **type** (public/hashtag), and **hashtag string**, Phase 2 ([#297](https://github.com/pskillen/meshflow-api/issues/297)) treats the **MeshCore companion channel table** as authoritative:
+ADR §5–6 still govern **ingest resolution** (`channel_idx` on wire → canonical `MessageChannel` via `ManagedNodeMcChannelLink`). For **name**, **type** (public/hashtag), and **hashtag string**, Phase 2 ([#297](https://github.com/pskillen/meshflow-api/issues/297)) treats the **MeshCore companion channel table** as authoritative:
 
-- On bot connect, the bot uploads a full device snapshot; the API **reconciles** `MessageChannel` rows and `ManagedNode.mc_channels` (see [`text-message-channels.md`](../../meshcore/text-message-channels.md)).
+- On bot connect, the bot uploads a full device snapshot; the API **reconciles** canonical `MessageChannel` rows and per-feeder links (see [`text-message-channels.md`](../../meshcore/text-message-channels.md)).
 - UI edits push to the device (WebSocket), then the bot re-syncs; the API does not rely on API-only CRUD as the long-term source of names.
 - Auto-created `"MC channel N"` placeholders at ingest (before first sync) remain; they are overwritten when sync supplies device metadata.
 
