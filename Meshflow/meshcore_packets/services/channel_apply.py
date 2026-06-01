@@ -12,7 +12,7 @@ from common.feeder_ws import (
     dispatch_node_command,
     feeder_ws_group_has_subscribers,
 )
-from common.mc_channel_labels import managed_node_mc_channels_queryset, message_channel_to_apply_entry
+from common.mc_channel_labels import managed_node_mc_channel_links, message_channel_to_apply_entry
 from common.protocol import Protocol
 from common.ws_groups import managed_node_ws_group
 from nodes.models import ManagedNode
@@ -24,7 +24,14 @@ def build_apply_channels_for_managed_node(managed_node: ManagedNode) -> list[dic
     """Snapshot entries for apply_mc_channel_config from the feeder mirror."""
     if managed_node.protocol != Protocol.MESHCORE:
         return []
-    return [message_channel_to_apply_entry(ch) for ch in managed_node_mc_channels_queryset(managed_node)]
+    return [
+        message_channel_to_apply_entry(
+            link.message_channel,
+            managed_node=managed_node,
+            mc_channel_idx=link.mc_channel_idx,
+        )
+        for link in managed_node_mc_channel_links(managed_node)
+    ]
 
 
 def dispatch_mc_channel_apply(managed_node: ManagedNode, channels: list[dict]) -> str:

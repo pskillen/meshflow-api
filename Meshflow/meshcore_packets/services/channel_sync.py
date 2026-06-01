@@ -7,23 +7,9 @@ from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
 from common.protocol import Protocol
-from constellations.models import MeshCoreChannelType, MessageChannel
-from nodes.models import ManagedNode
-
-MC_CHANNEL_IDX_MAX = 63
-
-
-def _parse_channel_type(value: str | int | None) -> int | None:
-    if value is None:
-        return MeshCoreChannelType.PUBLIC
-    if isinstance(value, int):
-        if value in MeshCoreChannelType.values:
-            return value
-        return None
-    key = str(value).strip().upper()
-    if key in MeshCoreChannelType.names:
-        return MeshCoreChannelType[key]
-    return None
+from constellations.models import MessageChannel
+from meshcore_packets.services.channel_identity import MC_CHANNEL_IDX_MAX, upsert_canonical_mc_channel
+from nodes.models import ManagedNode, ManagedNodeMcChannelLink
 
 
 def reconcile_mc_channels(
@@ -32,20 +18,21 @@ def reconcile_mc_channels(
     synced_at=None,
 ) -> list[MessageChannel]:
     """
-    Upsert constellation MC MessageChannel rows and set managed_node.mc_channels to match snapshot.
+    Upsert canonical MC MessageChannel rows and feeder slot links from a device snapshot.
 
     Each channel dict: mc_channel_idx, name, mc_channel_type (PUBLIC|HASHTAG), mc_hashtag (optional).
     """
     if managed_node.protocol != Protocol.MESHCORE:
         raise ValueError("mc-channel-sync is only valid for MeshCore managed nodes")
 
-    constellation = managed_node.constellation
     synced_dt = synced_at
     if synced_at is not None and not hasattr(synced_at, "isoformat"):
         synced_dt = parse_datetime(str(synced_at)) or timezone.now()
     elif synced_at is None:
         synced_dt = timezone.now()
 
+    constellation = managed_node.constellation
+    seen_indices: set[int] = set()
     attached: list[MessageChannel] = []
 
     with transaction.atomic():
@@ -57,32 +44,20 @@ def reconcile_mc_channels(
             if idx < 0 or idx > MC_CHANNEL_IDX_MAX:
                 raise ValueError(f"mc_channel_idx out of range: {idx}")
 
-            name = str(entry.get("name") or f"MC channel {idx}")[:100]
-            ch_type = _parse_channel_type(entry.get("mc_channel_type"))
-            if ch_type is None:
-                raise ValueError(f"invalid mc_channel_type: {entry.get('mc_channel_type')}")
-
-            hashtag = entry.get("mc_hashtag")
-            if hashtag is not None:
-                hashtag = str(hashtag).strip().lstrip("#")[:64] or None
-
-            if ch_type == MeshCoreChannelType.HASHTAG and not hashtag:
-                name_for_hash = name if name.startswith("#") else f"#{name}"
-                hashtag = name_for_hash.lstrip("#")[:64]
-
-            channel, _created = MessageChannel.objects.update_or_create(
-                constellation=constellation,
-                protocol=Protocol.MESHCORE,
+            canonical = upsert_canonical_mc_channel(constellation, entry)
+            ManagedNodeMcChannelLink.objects.update_or_create(
+                managed_node=managed_node,
                 mc_channel_idx=idx,
-                defaults={
-                    "name": name,
-                    "mc_channel_type": ch_type,
-                    "mc_hashtag": hashtag if ch_type == MeshCoreChannelType.HASHTAG else None,
-                },
+                defaults={"message_channel": canonical},
             )
-            attached.append(channel)
+            seen_indices.add(idx)
+            attached.append(canonical)
 
-        managed_node.mc_channels.set(attached)
+        if seen_indices:
+            managed_node.mc_channel_links.exclude(mc_channel_idx__in=seen_indices).delete()
+        else:
+            managed_node.mc_channel_links.all().delete()
+
         managed_node.mc_channels_synced_at = synced_dt
         managed_node.save(update_fields=["mc_channels_synced_at"])
 
