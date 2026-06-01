@@ -7,6 +7,7 @@ import pytest
 from common.protocol import Protocol
 from constellations.models import MeshCoreChannelType, MessageChannel
 from meshcore_packets.services.channel_apply import build_apply_channels_for_managed_node
+from nodes.models import ManagedNodeMcChannelLink
 
 
 @pytest.mark.django_db
@@ -17,11 +18,14 @@ def test_build_apply_channels_for_managed_node(meshcore_feeder):
         name="tag",
         constellation=constellation,
         protocol=Protocol.MESHCORE,
-        mc_channel_idx=2,
         mc_channel_type=MeshCoreChannelType.HASHTAG,
         mc_hashtag="meshflow",
     )
-    node.mc_channels.add(ch)
+    ManagedNodeMcChannelLink.objects.create(
+        managed_node=node,
+        message_channel=ch,
+        mc_channel_idx=2,
+    )
 
     payload = build_apply_channels_for_managed_node(node)
     assert len(payload) == 1

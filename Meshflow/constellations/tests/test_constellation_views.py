@@ -5,7 +5,7 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from common.protocol import Protocol
-from constellations.models import Constellation, MessageChannel
+from constellations.models import Constellation, MeshCoreChannelType, MessageChannel
 
 
 @pytest.mark.django_db
@@ -45,7 +45,7 @@ def test_constellation_list_protocol_filter(create_constellation, create_user):
         name="MC Ch",
         constellation=mc,
         protocol=Protocol.MESHCORE,
-        mc_channel_idx=1,
+        mc_channel_type=MeshCoreChannelType.PUBLIC,
     )
 
     response = client.get(reverse("constellation-list"), {"protocol": "meshcore"})
@@ -118,7 +118,7 @@ def test_guest_can_list_channels(create_constellation, create_user):
         name="MC",
         constellation=constellation,
         protocol=Protocol.MESHCORE,
-        mc_channel_idx=0,
+        mc_channel_type=MeshCoreChannelType.PUBLIC,
     )
 
     url = reverse("constellation-channels-list-create", kwargs={"constellation_id": constellation.id})

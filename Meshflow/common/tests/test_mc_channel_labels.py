@@ -17,7 +17,6 @@ def test_mc_channel_admin_label_public(create_constellation):
         name="Public",
         constellation=constellation,
         protocol=Protocol.MESHCORE,
-        mc_channel_idx=0,
         mc_channel_type=MeshCoreChannelType.PUBLIC,
     )
     assert mc_channel_admin_label(ch) == "Public"
@@ -30,7 +29,6 @@ def test_mc_channel_admin_label_hashtag_prefix(create_constellation):
         name="galloway",
         constellation=constellation,
         protocol=Protocol.MESHCORE,
-        mc_channel_idx=1,
         mc_channel_type=MeshCoreChannelType.HASHTAG,
         mc_hashtag="galloway",
     )
@@ -44,11 +42,10 @@ def test_message_channel_to_apply_entry_hashtag(create_constellation):
         name="galloway",
         constellation=constellation,
         protocol=Protocol.MESHCORE,
-        mc_channel_idx=1,
         mc_channel_type=MeshCoreChannelType.HASHTAG,
         mc_hashtag="galloway",
     )
-    entry = message_channel_to_apply_entry(ch)
+    entry = message_channel_to_apply_entry(ch, mc_channel_idx=1)
     assert entry["mc_channel_type"] == "HASHTAG"
     assert entry["mc_hashtag"] == "galloway"
     assert entry["name"] == "galloway"
