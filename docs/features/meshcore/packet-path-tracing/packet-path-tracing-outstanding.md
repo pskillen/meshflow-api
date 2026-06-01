@@ -15,6 +15,22 @@ Items **skipped**, **incomplete**, or **discovered during planning** — not the
 
 ---
 
+## Message heard map (UI — logical layout, not M7)
+
+- [ ] **[meshflow-ui#311](https://github.com/pskillen/meshflow-ui/issues/311)** — HeardPathMap logical path per feeder: dashed schematic hop chain (one node per hash segment), **not** placed at map coordinates; keep sender/feeder at geo positions when known. Feeder list below graph shows **each observer’s distinct path** beside its row. Uses existing `heard[]` `path_hashes` / `resolved_path` from #360; no new API.
+
+## Geographic path on maps (future milestone — plan explicitly)
+
+The logical heard-map slice above is **not** a substitute for placing hops at real coordinates. A later plan/milestone must cover:
+
+- [ ] **Geographic hop placement** — when M2/M3 (or manual segment annotation) yields `ObservedNode` positions for path segments, message heard map and/or M7 topology UI should render hops at **lat/lng** (and set `path_known` only when all hops are resolved per ADR).
+- [ ] **Wire message `heard[]` to segment resolution** — optional read path from `MeshCorePathSegmentResolution` (or resolver output) so the heard dialog benefits from staff annotations / proven matcher without duplicating rollup tables in the client.
+- [ ] **M7 realtime/history maps** ([meshflow-ui#309](https://github.com/pskillen/meshflow-ui/issues/309)) — edge-based geographic and logical topology; depends on API M5/M6.
+
+Until then, operators should assume heard-map paths are **list-order hash evidence**, not RF geography.
+
+---
+
 ## Carried from prior passive slice
 
 - [ ] **Proven hash → `ObservedNode` matcher** — still unproven; no production matcher until [traceroute ADR-0001 §A](../../traceroute/adr/0001-mc-path-hash-resolution.md) documents a safe rule. Gates M3. Tests must reject suffix/prefix/recency heuristics.
