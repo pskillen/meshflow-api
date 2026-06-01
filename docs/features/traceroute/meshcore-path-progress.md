@@ -2,6 +2,8 @@
 
 **Epic:** [meshflow-api#267](https://github.com/pskillen/meshflow-api/issues/267) — MeshCore Phase 3 traceroute / path parity (MC analog of Meshtastic `AutoTraceRoute` + analytics).
 
+**Phase index (meshcore/):** [phase-3-progress.md](../meshcore/phase-3-progress.md) · [phase-3-outstanding.md](../meshcore/phase-3-outstanding.md)
+
 **Repos:** meshflow-api (primary), meshflow-bot, meshflow-ui.
 
 **Related docs**
