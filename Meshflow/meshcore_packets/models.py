@@ -93,6 +93,8 @@ class MeshCorePacketObservation(models.Model):
     rx_rssi = models.FloatField(null=True, blank=True)
     rx_snr = models.FloatField(null=True, blank=True)
     path_hashes = models.JSONField(null=True, blank=True)
+    path_hash_size = models.PositiveSmallIntegerField(null=True, blank=True)
+    path_hash_mode = models.PositiveSmallIntegerField(null=True, blank=True)
     upload_time = models.DateTimeField(default=timezone.now)
 
     class Meta:

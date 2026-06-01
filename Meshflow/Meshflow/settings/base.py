@@ -76,6 +76,7 @@ INSTALLED_APPS = [
     "nodes",
     "packets",
     "meshcore_packets",
+    "meshcore_packet_path",
     "stats",
     "text_messages",
     "traceroute",
@@ -214,6 +215,8 @@ RF_PROPAGATION_SIGNAL_THRESHOLD_DBM = _rf_env_float("RF_PROPAGATION_SIGNAL_THRES
 RF_PROPAGATION_POLL_MAX_SECONDS = int(os.environ.get("RF_PROPAGATION_POLL_MAX_SECONDS", "300"))
 # Per-node retention: how many ``ready`` renders to keep on disk before GC.
 RF_PROPAGATION_READY_RETENTION = int(os.environ.get("RF_PROPAGATION_READY_RETENTION", "3"))
+
+MESHCORE_PATH_RETENTION_DAYS = int(os.environ.get("MESHCORE_PATH_RETENTION_DAYS", "183"))
 
 # Django cache (Redis DB 2; channels use DB 0, Celery broker DB 1)
 _cache_url = f"redis://:{_redis_password}@{_redis_host}:{_redis_port}/2"

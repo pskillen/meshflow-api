@@ -1,4 +1,4 @@
-from django.urls import path
+from django.urls import include, path
 
 from meshcore_packets.views import (
     ManagedNodeMcChannelApplyView,
@@ -31,6 +31,7 @@ urlpatterns = [
         name="meshcore-feeder-bot-version",
     ),
     path("packets/", MeshCorePacketListView.as_view(), name="meshcore-packet-list"),
+    path("path-tracing/", include("meshcore_packet_path.urls")),
     path(
         "managed-nodes/<uuid:internal_id>/apply-mc-channel-config/",
         ManagedNodeMcChannelApplyView.as_view(),

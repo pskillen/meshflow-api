@@ -8,9 +8,11 @@ Items **skipped**, **incomplete**, or **discovered during planning** for [#267](
 
 - [x] **#369** — observation-only `path_hashes` (API branch `api-267/pskillen/meshcore-path`).
 - [x] **#360 (narrowed)** — message `heard[]` path display + positions (not packet list API).
+- [ ] **Passive packet path subsystem** — proposed in [meshcore/packet-path-tracing ADR-0001](../meshcore/packet-path-tracing/adr/0001-meshcore-packet-path-tracing-subsystem.md): passive edge rollups, resolution table, Neo4j export, realtime/history UI. Progress/outstanding now tracked under [packet-path-tracing/](../meshcore/packet-path-tracing/packet-path-tracing-progress.md).
 - [ ] **Proven matcher** — implement hash segment → `ObservedNode` when [ADR §A](adr/0001-mc-path-hash-resolution.md) documents safe rules (no `iendswith` / `last_heard` heuristics in v1).
 - [ ] **`GET /meshcore/packets/`** — optional `resolved_path` on packet list/detail (deferred).
-- [ ] **#304** — UI `HeardPathMap` + heard dialog (meshflow-ui).
+- [x] **#304** — UI `HeardPathMap` + heard dialog (meshflow-ui, closed 2026-05-27).
+- [ ] **[meshflow-ui#311](https://github.com/pskillen/meshflow-ui/issues/311)** — HeardPathMap logical path per feeder (follow-up to #304): schematic hop chain, feeder list with path beside each row; not geographic hop placement.
 
 ---
 

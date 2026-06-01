@@ -43,6 +43,8 @@ class MeshCorePacketIngestSerializer(serializers.Serializer):
     to_pubkey_prefix = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     route_typename = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     path_hashes = serializers.JSONField(required=False, allow_null=True)
+    path_hash_size = serializers.IntegerField(required=False, allow_null=True, min_value=1, max_value=8)
+    path_hash_mode = serializers.IntegerField(required=False, allow_null=True, min_value=0, max_value=255)
     channel_idx = serializers.IntegerField(required=False, allow_null=True)
     text = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     adv_name = serializers.CharField(required=False, allow_null=True, allow_blank=True)
@@ -139,6 +141,8 @@ class MeshCorePacketIngestSerializer(serializers.Serializer):
                 "rx_rssi": validated_data.get("rx_rssi"),
                 "rx_snr": validated_data.get("rx_snr"),
                 "path_hashes": path_hashes,
+                "path_hash_size": validated_data.get("path_hash_size"),
+                "path_hash_mode": validated_data.get("path_hash_mode"),
             },
         )
         self.observation = obs

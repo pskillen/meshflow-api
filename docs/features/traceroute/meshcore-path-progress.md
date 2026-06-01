@@ -57,9 +57,10 @@ Meshtastic today: active TR drives most topology evidence; MC Phase 3 starts wit
 
 ### UI ([#304](https://github.com/pskillen/meshflow-ui/issues/304))
 
-**Status:** Not started
+**Status:** Done (2026-05-27) — follow-up **[meshflow-ui#311](https://github.com/pskillen/meshflow-ui/issues/311)** for logical hop layout per feeder
 
-- `HeardPathMap` + heard dialog (MT + MC).
+- `HeardPathMap` + heard dialog (MT + MC); v1 shows feeders geo + minimal dashed paths.
+- #311: schematic hop chain per observer, path detail beside each feeder row (not geographic hops).
 
 ---
 
