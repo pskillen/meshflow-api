@@ -21,7 +21,7 @@ How MeshCore **group text** and **channel configuration** flow from the radio th
 |---|----------------|--------------|
 | Channel on radio | Fixed slots 0–7, PSK + name in firmware | Arbitrary list on companion; **index** on wire, **name** only in device config |
 | Feeder channel config | API slot FKs → `MessageChannel` (operator maps slots in UI) | Device is source of truth; API **mirror** via bot `mc-channel-sync` on connect |
-| Feeder channel link in API | `meshtastic_channel_0..7` | `ManagedNode.mc_channels` M2M (reconciled from device snapshot) |
+| Feeder channel link in API | `meshtastic_channel_0..7` | `ManagedNodeMcChannelLink` (slot → canonical `MessageChannel`; reconciled from device snapshot) |
 | What a text packet carries | Channel index + sender node id | `channel_message`: **index + body only** (no sender pubkey); `contact_message`: **12-hex sender prefix** + body |
 | Broadcast vs DM | `to_int == 0xFFFFFFFF` vs directed node id | Broadcast = **no** `to_pubkey*` on wire; channel text is always broadcast on that index ([ADR-0003](../packet-ingestion/adr/0003-mc-broadcast-semantics.md)) |
 | UI today | Slot 0–7 mapping on [Node Settings](https://github.com/pskillen/meshflow-ui/blob/main/src/pages/user/NodeSettings.tsx) | MC feeders: mirror + **Apply to radio** on Node Settings |
@@ -229,11 +229,19 @@ The bot does **not** pull API channel config and push to device on startup. If t
 | `name` | Operator-facing label (UI/admin); not on wire |
 | `constellation` | FK |
 | `protocol` | `MESHCORE` for MC rows |
-| `mc_channel_idx` | Device slot `0..63`; unique per `(constellation, protocol)` |
 | `mc_channel_type` | `PUBLIC` / `HASHTAG` |
-| `mc_hashtag` | Hashtag string when type is `HASHTAG` (no leading `#` in DB) |
+| `mc_hashtag` | Hashtag string when type is `HASHTAG` (no leading `#` in DB); unique per constellation for HASHTAG |
+| *(no `mc_channel_idx`)* | Logical identity is name/hashtag, not device slot ([#379](https://github.com/pskillen/meshflow-api/issues/379)) |
 
 Meshtastic channels use PSK-backed slots on the managed node (`meshtastic_channel_0..7`). MeshCore does **not** use those slots.
+
+### `ManagedNodeMcChannelLink` (per-feeder device slot)
+
+| Field | Role |
+|-------|------|
+| `managed_node` | Feeder |
+| `message_channel` | Canonical `MessageChannel` for this slot’s logical channel |
+| `mc_channel_idx` | Device slot `0..63` (unique per managed node) |
 
 ### `ManagedNode` (feeder)
 
@@ -242,7 +250,7 @@ Meshtastic channels use PSK-backed slots on the managed node (`meshtastic_channe
 | `protocol` | `MESHCORE` for MC feeders |
 | `mc_pubkey` | Full 64-hex feeder identity ([#295](https://github.com/pskillen/meshflow-api/issues/295)) |
 | `meshtastic_channel_0..7` | Meshtastic only |
-| `mc_channels` | M2M mirror of device slots |
+| `mc_channels` | M2M to canonical channels **through** `ManagedNodeMcChannelLink` |
 | `mc_channels_synced_at` | Last successful bot `mc-channel-sync` |
 
 Authentication: Node API key via `NodeAuth`; feeder resolved by URL **`{feeder_pubkey_prefix}`** + optional **`X-MeshCore-Feeder-Pubkey`** header ([feeder-bootstrap.md](feeder-bootstrap.md)).
@@ -298,10 +306,10 @@ Flow for text packets:
 ### `resolve_mc_channel`
 
 1. Clamp `channel_idx` to `0..63`.
-2. Prefer `observer.mc_channels.filter(mc_channel_idx=idx).first()` (feeder mirror).
-3. If missing, auto-create placeholder `MessageChannel`, attach to `observer.mc_channels`.
+2. Look up `ManagedNodeMcChannelLink` for `(observer, channel_idx)` → canonical `MessageChannel`.
+3. If missing, auto-create placeholder canonical + link (overwritten on next device sync).
 
-Heard traffic links to configured channels without names on the wire.
+Heard traffic links to **logical** channels without names on the wire; multiple feeders with the same hashtag at different indices share one canonical row after sync.
 
 ### Signals
 
@@ -320,7 +328,7 @@ Identity receiver **skips** channel text (no `from_pubkey` / prefix). Contact te
 
 - **Caller:** meshflow-bot with Node API key, after reading the device.
 - **Body:** full channel list (`mc_channel_idx`, `name`, `mc_channel_type`, `mc_hashtag`); optional `synced_at`.
-- **Effect:** upsert `MessageChannel` rows; set `ManagedNode.mc_channels` to match snapshot ([`reconcile_mc_channels`](../../../Meshflow/meshcore_packets/services/channel_sync.py)).
+- **Effect:** upsert canonical `MessageChannel` rows by logical identity; set `ManagedNodeMcChannelLink` rows to match snapshot ([`reconcile_mc_channels`](../../../Meshflow/meshcore_packets/services/channel_sync.py)).
 - **Read:** managed node API returns nested `mc_channels` for UI.
 
 ### Secondary: push UI / admin intent → device
@@ -366,6 +374,7 @@ Identity receiver **skips** channel text (no `from_pubkey` / prefix). Contact te
 | `TextMessage` + MC provenance ([#296](https://github.com/pskillen/meshflow-api/issues/296)) | **Done** |
 | Bot sync + WS apply ([#297](https://github.com/pskillen/meshflow-api/issues/297)) | **Done** |
 | UI mirror + apply-to-radio | **Done** |
+| Canonical channels + per-feeder links ([#379](https://github.com/pskillen/meshflow-api/issues/379)) | **Done** — [api #380](https://github.com/pskillen/meshflow-api/pull/380), [ui #313](https://github.com/pskillen/meshflow-ui/pull/313) |
 | Apply 503 / msgpack / WS group fixes | **Done** on [api #335](https://github.com/pskillen/meshflow-api/pull/335), [bot #108](https://github.com/pskillen/meshflow-bot/pull/108) (merge pending) |
 | Django admin MC channels + push action | **Done** (#335) |
 | Dual API channel sync (no WS on API 2) | **Done** (bot behaviour; documented) |

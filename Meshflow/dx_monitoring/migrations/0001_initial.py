@@ -12,7 +12,7 @@ class Migration(migrations.Migration):
     dependencies = [
         ('constellations', '0005_add_bot_default_env_vars'),
         ('nodes', '0032_add_update_managed_node_statuses_periodic_task'),
-        ('packets', '0016_packetobservation_observer_upload_time_idx'),
+        ('packets', '0018_rename_packet_metrics_meshtastic_fields'),
     ]
 
     operations = [
@@ -62,7 +62,14 @@ class Migration(migrations.Migration):
                 ('event', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='observations', to='dx_monitoring.dxevent')),
                 ('observer', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='dx_event_observations', to='nodes.managednode')),
                 ('packet_observation', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='dx_event_observations', to='packets.packetobservation')),
-                ('raw_packet', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='dx_event_observations', to='packets.rawpacket')),
+                (
+                    'raw_packet',
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name='dx_event_observations',
+                        to='packets.mtrawpacket',
+                    ),
+                ),
             ],
             options={
                 'verbose_name': 'DX event observation',

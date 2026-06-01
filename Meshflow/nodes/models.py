@@ -154,6 +154,7 @@ class ManagedNode(models.Model):
 
     mc_channels = models.ManyToManyField(
         "constellations.MessageChannel",
+        through="ManagedNodeMcChannelLink",
         related_name="managed_nodes_mc",
         blank=True,
         help_text=_("MeshCore channels mirrored from the feeder device (protocol=MeshCore only)."),
@@ -256,6 +257,37 @@ class ManagedNode(models.Model):
             raise ValueError(f"Invalid channel index: {channel_idx}")
 
         return getattr(self, f"meshtastic_channel_{channel_idx}")
+
+
+class ManagedNodeMcChannelLink(models.Model):
+    """Maps a MeshCore feeder device slot index to a canonical MessageChannel."""
+
+    managed_node = models.ForeignKey(
+        ManagedNode,
+        on_delete=models.CASCADE,
+        related_name="mc_channel_links",
+    )
+    message_channel = models.ForeignKey(
+        MessageChannel,
+        on_delete=models.CASCADE,
+        related_name="feeder_links",
+    )
+    mc_channel_idx = models.PositiveSmallIntegerField(
+        help_text=_("MeshCore device channel index (0–63) for this feeder."),
+    )
+
+    class Meta:
+        verbose_name = _("MeshCore feeder channel link")
+        verbose_name_plural = _("MeshCore feeder channel links")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["managed_node", "mc_channel_idx"],
+                name="managednode_mc_channel_idx_unique",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.managed_node_id} slot {self.mc_channel_idx} → {self.message_channel_id}"
 
 
 class ManagedNodeStatus(models.Model):

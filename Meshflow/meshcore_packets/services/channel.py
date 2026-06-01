@@ -1,34 +1,37 @@
-"""Resolve MeshCore MessageChannel rows per ADR-0002."""
+"""Resolve MeshCore MessageChannel rows per ADR-0002 (canonical + per-feeder link)."""
 
-from common.protocol import Protocol
-from constellations.models import MeshCoreChannelType, MessageChannel
-from nodes.models import ManagedNode
-
-MC_CHANNEL_IDX_MAX = 63
+from constellations.models import MessageChannel
+from meshcore_packets.services.channel_identity import (
+    MC_CHANNEL_IDX_MAX,
+    placeholder_canonical_mc_channel,
+)
+from nodes.models import ManagedNode, ManagedNodeMcChannelLink
 
 
 def resolve_mc_channel(observer: ManagedNode, channel_idx: int | None) -> MessageChannel | None:
-    """Map (observer constellation, mc_channel_idx) to a MessageChannel; prefer feeder M2M."""
+    """Map (observer, wire channel_idx) to a canonical MessageChannel via feeder slot link."""
     if channel_idx is None:
         return None
     channel_idx = int(channel_idx)
     if channel_idx < 0 or channel_idx > MC_CHANNEL_IDX_MAX:
         return None
 
-    existing = observer.mc_channels.filter(mc_channel_idx=channel_idx).first()
-    if existing:
-        return existing
+    link = (
+        ManagedNodeMcChannelLink.objects.filter(
+            managed_node=observer,
+            mc_channel_idx=channel_idx,
+        )
+        .select_related("message_channel")
+        .first()
+    )
+    if link:
+        return link.message_channel
 
     constellation = observer.constellation
-    channel, created = MessageChannel.objects.get_or_create(
-        constellation=constellation,
-        protocol=Protocol.MESHCORE,
+    canonical = placeholder_canonical_mc_channel(constellation, channel_idx)
+    ManagedNodeMcChannelLink.objects.get_or_create(
+        managed_node=observer,
         mc_channel_idx=channel_idx,
-        defaults={
-            "name": f"MC channel {channel_idx}",
-            "mc_channel_type": MeshCoreChannelType.PUBLIC,
-        },
+        defaults={"message_channel": canonical},
     )
-    if created:
-        observer.mc_channels.add(channel)
-    return channel
+    return canonical

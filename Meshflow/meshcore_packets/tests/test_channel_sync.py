@@ -46,9 +46,10 @@ def test_reconcile_mc_channels_creates_and_links(meshcore_feeder):
     ch0 = MessageChannel.objects.get(
         constellation=node.constellation,
         protocol=Protocol.MESHCORE,
-        mc_channel_idx=0,
+        name="Public",
+        mc_channel_type=MeshCoreChannelType.PUBLIC,
     )
-    assert ch0.mc_channel_type == MeshCoreChannelType.PUBLIC
+    assert node.mc_channel_links.filter(mc_channel_idx=0, message_channel=ch0).exists()
 
 
 @pytest.mark.django_db
@@ -65,7 +66,8 @@ def test_reconcile_updates_name_on_resync(meshcore_feeder):
     ch = MessageChannel.objects.get(
         constellation=node.constellation,
         protocol=Protocol.MESHCORE,
-        mc_channel_idx=0,
+        name="Renamed",
+        mc_channel_type=MeshCoreChannelType.PUBLIC,
     )
     assert ch.name == "Renamed"
 
@@ -103,3 +105,4 @@ def test_resolve_mc_channel_prefers_m2m(meshcore_feeder):
     ch = resolve_mc_channel(node, 2)
     assert ch.name == "Synced"
     assert ch in node.mc_channels.all()
+    assert node.mc_channel_links.filter(mc_channel_idx=2, message_channel=ch).exists()

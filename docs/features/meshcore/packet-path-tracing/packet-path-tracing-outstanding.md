@@ -47,6 +47,70 @@ Until then, operators should assume heard-map paths are **list-order hash eviden
 
 ---
 
+## Message path data chain (confirmed — pre-prod Jun 2026)
+
+**Symptom:** Message “Heard” UI and `GET` message `heard[]` show observers but **no hop chain** for MeshCore channel/contact text on pre-prod, even though M1 edge rollups exist and the heard-map UI (#311) is wired to `path_hashes`.
+
+**Not the cause:** Single feeder (one observation per `packet_id` is expected). API heard assembly and UI #311 behave correctly when `MeshCorePacketObservation.path_hashes` is set on the **same** packet as `TextMessage.original_mc_packet` (see `text_messages/tests/test_heard_api.py`).
+
+### Pre-prod evidence (read-only DB, one feeder)
+
+| Metric | Value |
+| --- | --- |
+| Observations with non-empty `path_hashes` | 754 |
+| Event type for those rows | **100%** `rx_log_data` (stored as `advert` ingest) |
+| `channel_text` observations with `path_hashes` | **0** (746 `channel_text` rows without path) |
+| MeshCore `TextMessage` rows with path on linked packet observation | **0** |
+| Packets with >1 observation | **0** (one feeder) |
+
+M1 rollups on pre-prod are fed by **overheard ADVERT** frames (`rx_log_data` → `payload_typename == ADVERT`), not by channel-message ingest.
+
+### End-to-end chain (logic confirmed)
+
+```text
+channel_message (bot) → channel_text (API) → TextMessage.original_mc_packet
+  → heard[] reads obs.path_hashes on THAT packet  →  empty today
+
+rx_log_data ADVERT only (bot) → advert (API) → observation.path_hashes populated
+  → no TextMessage link  →  does not appear in message heard[]
+```
+
+1. **High-level decode (`channel_message`, `contact_message`)** — captures include `path_len` and often `path_hash_mode`, but **usually no `path` hex** (see meshflow-bot `docs/meshcore_packets/channel_messages/*.json`). Without `path`, ingest cannot populate `path_hashes` (bot today only forwards a pre-split list when `path` is present; API persists what the bot sends).
+
+2. **Low-level decode (`rx_log_data`)** — ADVERT (and PATH) frames **do** include `path` + `path_hash_size` in captures (see `docs/meshcore_packets/rx_log_data/*ADVERT*.json`). Bot uploads **ADVERT `rx_log_data` only**; TEXT_MSG / PATH / etc. are skipped (`MeshCoreSkipUpload`) per [packet-ingestion/meshcore.md](../../packet-ingestion/meshcore.md).
+
+3. **API** — no payload-type filter on `path_hashes`; M1 segment/edge tasks consume whatever observations exist.
+
+### Design constraint: thin bot, fat server
+
+Meshflow bots should stay **deploy-light**: forward captures with minimal transformation. **Maintainable path logic belongs on the API** (ingest normalization, dedup, rollups, heard assembly, resolution).
+
+Implications for closing this gap (direction only — not scheduled here):
+
+| Approach | Bot change | Server work |
+| --- | --- | --- |
+| **A. Ingest more `rx_log_data`** (TEXT_MSG / PATH with `path` on wire) | Thin: upload additional typename(s) as `raw` or mapped payload types; no hash splitting | Ingest serializer splits `path` → `path_hashes`; correlate to `TextMessage` via `pkt_hash` / time / dedup (needs design) |
+| **B. Store decode metadata + raw** on observation | Thin: pass through `path_len`, `path_hash_mode`, optional `raw_hex` from envelope | Server decodes or joins to PATH/`rx_log_data` rows if/when ingested |
+| **C. Wait for meshcore lib** to add `path` on `channel_message` | None if library starts emitting `path` | Existing ingest path may “just work” once `path` arrives in JSON |
+
+**Avoid** adding bot-side `_path_hashes()`-style rules, new upload filters, or message↔packet correlation — that duplicates server responsibility and is painful to roll out per feeder.
+
+### Sample references
+
+| Source | `path` present? |
+| --- | --- |
+| `channel_message` dump `20260507_094941_052599.json` | No (`path_len`, `path_hash_mode` only) |
+| `rx_log_data` ADVERT `20260506_211819_583174.json` | Yes |
+| `rx_log_data` PATH `20260506_211515_351329.json` | Yes (not uploaded today) |
+
+### Follow-up (tracking)
+
+- [ ] **Server-led ingest design** — extend API (and optionally bot upload surface) so channel-text messages get `path_hashes` on the observation tied to `original_mc_packet`, without bot-side path logic. Likely depends on [#266](https://github.com/pskillen/meshflow-api/issues/266) / `rx_log_data` TEXT_MSG ingest and/or dedup correlation spike.
+- [ ] **Confirm with M2 spike** — whether `path_hash_mode` changes segment identity when we do get text paths.
+- [ ] **Optional:** re-run pre-prod queries after deploy (`Meshflow/ai-env` + Django shell; local skill `MeshFlow/.cursor/skills/preprod-database/`) — breakdown by `payload_type` + `event_type`.
+
+---
+
 ## Cross-links
 
 - [ ] Update [#267](https://github.com/pskillen/meshflow-api/issues/267) epic and this file as milestones land.

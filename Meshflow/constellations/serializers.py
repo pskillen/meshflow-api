@@ -1,5 +1,7 @@
 from rest_framework import serializers
 
+from common.mc_channel_labels import mc_channel_display_label
+from common.protocol import Protocol
 from constellations.models import Constellation, MeshCoreChannelType, MessageChannel
 
 
@@ -8,15 +10,17 @@ def message_channel_payload(channel: MessageChannel) -> dict:
     mc_type = None
     if channel.mc_channel_type is not None:
         mc_type = MeshCoreChannelType(channel.mc_channel_type).label
-    return {
+    payload = {
         "id": channel.id,
         "name": channel.name,
         "protocol": channel.protocol,
-        "mc_channel_idx": channel.mc_channel_idx,
         "mc_channel_type": mc_type,
         "mc_hashtag": channel.mc_hashtag,
         "constellation": channel.constellation_id,
     }
+    if channel.protocol == Protocol.MESHCORE:
+        payload["display_label"] = mc_channel_display_label(channel)
+    return payload
 
 
 class ConstellationSerializer(serializers.ModelSerializer):

@@ -13,9 +13,9 @@ from meshcore_packets.models import MeshCoreRawPacket, MeshCoreTextPacket
 from meshcore_packets.permissions import MeshCoreFeederPermission
 from meshcore_packets.serializers import MeshCorePacketIngestSerializer, MeshCorePacketListSerializer
 from meshcore_packets.serializers_channel import (
+    FeederMcChannelMirrorSerializer,
     McChannelApplySerializer,
     McChannelSyncSerializer,
-    MessageChannelMcSerializer,
 )
 from meshcore_packets.services.channel_apply import apply_mc_channels_to_feeder
 from meshcore_packets.services.channel_sync import reconcile_mc_channels
@@ -168,7 +168,7 @@ class MeshCoreMcChannelSyncView(APIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            channels = reconcile_mc_channels(
+            reconcile_mc_channels(
                 managed_node,
                 serializer.validated_data["channels"],
                 synced_at=serializer.validated_data.get("synced_at"),
@@ -181,7 +181,10 @@ class MeshCoreMcChannelSyncView(APIView):
             {
                 "status": "success",
                 "synced_at": managed_node.mc_channels_synced_at,
-                "mc_channels": MessageChannelMcSerializer(channels, many=True).data,
+                "mc_channels": FeederMcChannelMirrorSerializer(
+                    managed_node.mc_channel_links.select_related("message_channel").order_by("mc_channel_idx"),
+                    many=True,
+                ).data,
             },
             status=status.HTTP_200_OK,
         )

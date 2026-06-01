@@ -86,7 +86,7 @@ Deploy api #325 before bot fleet upgrade.
 
 **meshflow-api — delivered**
 
-- `MessageChannel.mc_channel_type` / `mc_hashtag`; `ManagedNode.mc_channels` M2M + `mc_channels_synced_at`.
+- `MessageChannel.mc_channel_type` / `mc_hashtag`; `ManagedNodeMcChannelLink` + `ManagedNode.mc_channels` (through table) + `mc_channels_synced_at`.
 - `POST /api/meshcore/feeders/{prefix}/mc-channel-sync/`; `POST …/apply-mc-channel-config/` (WS dispatch).
 - `MeshCoreTextMessageService` + `text_messages` receiver; `TextMessage.protocol` + `original_mc_packet`.
 - History API `protocol` query; MC `heard` from `MeshCorePacketObservation`.
@@ -103,6 +103,25 @@ Deploy api #325 before bot fleet upgrade.
 - MeshCore channel panel on Node Settings (mirror + apply-to-radio).
 
 **Merged to `main` (2026-05-21):** api [#333](https://github.com/pskillen/meshflow-api/pull/333), bot [#105](https://github.com/pskillen/meshflow-bot/pull/105), ui [#273](https://github.com/pskillen/meshflow-ui/pull/273).
+
+---
+
+## Canonical MC channels ([#379](https://github.com/pskillen/meshflow-api/issues/379))
+
+**Status:** Open PRs — [api #380](https://github.com/pskillen/meshflow-api/pull/380), [ui #313](https://github.com/pskillen/meshflow-ui/pull/313).
+
+**meshflow-api — delivered**
+
+- `MessageChannel` unique by constellation + logical identity (name/hashtag); `mc_channel_idx` removed from channel row.
+- `ManagedNodeMcChannelLink` holds per-feeder device slot; `reconcile_mc_channels` / `resolve_mc_channel` use links.
+- `display_label` on constellation channels; feeder mirror nested on managed node API.
+
+**meshflow-ui — delivered**
+
+- `formatMessageChannelLabel` uses `display_label` / `#hashtag` (no device index in picker).
+- Node Settings: dual-list channel editor (Available → On this radio), reorder warning, apply confirmation modal.
+
+**meshflow-bot:** no wire changes.
 
 ---
 

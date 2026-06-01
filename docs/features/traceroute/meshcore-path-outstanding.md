@@ -18,9 +18,11 @@ Items **skipped**, **incomplete**, or **discovered during planning** for [#267](
 
 ## Bot ([meshflow-bot#119](https://github.com/pskillen/meshflow-bot/issues/119))
 
-- [ ] Unit tests for `_path_hashes()` (1/2/3-byte `path_hash_size`) — separate bot PR.
-- [ ] Optional: upload `rx_log_data` PATH-only frames.
-- [ ] Document limitation: `path_len > 0` but no `path` on decoded messages → `path_hashes` often null.
+Prefer **thin bot / fat server** for path handling — see [packet-path-tracing-outstanding.md § Message path data chain](../meshcore/packet-path-tracing/packet-path-tracing-outstanding.md#message-path-data-chain-confirmed--pre-prod-jun-2026).
+
+- [ ] Unit tests for `_path_hashes()` (1/2/3-byte `path_hash_size`) — separate bot PR (legacy; new work should move splitting to API where possible).
+- [ ] Optional: upload `rx_log_data` PATH-only frames (minimal forward; server ingests `path`).
+- [x] Document limitation: `path_len > 0` but no `path` on decoded messages → message `heard[]` has no path — detailed in packet-path-tracing outstanding (pre-prod confirmed).
 
 ---
 
