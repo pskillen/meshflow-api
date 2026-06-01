@@ -47,11 +47,6 @@ class MessageChannel(models.Model):
         db_index=True,
         help_text=_("Mesh protocol for this channel row."),
     )
-    mc_channel_idx = models.PositiveSmallIntegerField(
-        null=True,
-        blank=True,
-        help_text=_("MeshCore channel index when protocol is MeshCore; null for Meshtastic."),
-    )
     mc_channel_type = models.PositiveSmallIntegerField(
         choices=MeshCoreChannelType.choices,
         null=True,
@@ -70,9 +65,21 @@ class MessageChannel(models.Model):
         verbose_name_plural = _("Message channels")
         constraints = [
             models.UniqueConstraint(
-                fields=["constellation", "protocol", "mc_channel_idx"],
-                condition=models.Q(protocol=Protocol.MESHCORE, mc_channel_idx__isnull=False),
-                name="messagechannel_mc_idx_constellation_unique",
+                fields=["constellation", "protocol", "mc_hashtag"],
+                condition=models.Q(
+                    protocol=Protocol.MESHCORE,
+                    mc_channel_type=MeshCoreChannelType.HASHTAG,
+                    mc_hashtag__isnull=False,
+                ),
+                name="messagechannel_mc_hashtag_constellation_unique",
+            ),
+            models.UniqueConstraint(
+                fields=["constellation", "protocol", "name"],
+                condition=models.Q(
+                    protocol=Protocol.MESHCORE,
+                    mc_channel_type=MeshCoreChannelType.PUBLIC,
+                ),
+                name="messagechannel_mc_public_name_constellation_unique",
             ),
         ]
 
