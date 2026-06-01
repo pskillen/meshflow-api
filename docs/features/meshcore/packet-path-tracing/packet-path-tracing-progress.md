@@ -44,7 +44,7 @@ Tracked as sub-issues of [#267](https://github.com/pskillen/meshflow-api/issues/
 
 | Milestone | Issue | Status |
 | --- | --- | --- |
-| M1 MVP (capture + resolution table + hourly rollup + eviction + edges/segments API + diagnostic UI) | [#372](https://github.com/pskillen/meshflow-api/issues/372) | In progress |
+| M1 MVP (capture + resolution table + hourly rollup + eviction + edges/segments API + diagnostic UI) | [#372](https://github.com/pskillen/meshflow-api/issues/372) | Complete (pending deploy) |
 | M2 resolution spike (decision gate) | [#373](https://github.com/pskillen/meshflow-api/issues/373) | Not started |
 | M3 proactive resolver (conditional on M2) | [#374](https://github.com/pskillen/meshflow-api/issues/374) | Not started |
 | M4 Neo4j `PATH_OBSERVED` export | [#375](https://github.com/pskillen/meshflow-api/issues/375) | Not started |
@@ -56,7 +56,33 @@ Tracked as sub-issues of [#267](https://github.com/pskillen/meshflow-api/issues/
 
 ---
 
+## M1 — delivered (pending PR merge / deploy)
+
+**Branch:** `api-372/pskillen/meshcore-passive-path-m1`
+
+**API**
+
+- `meshcore_packet_path` app: segment resolution + edge bucket models, hourly rollup, 6-month eviction, backfill command.
+- `GET /api/meshcore/path-tracing/edges/`, `GET/PATCH .../segments/`.
+- `path_hash_size` / `path_hash_mode` on `MeshCorePacketObservation`.
+
+**Bot**
+
+- Forwards `path_hash_size` and `path_hash_mode` on ingest envelopes.
+
+**UI**
+
+- Diagnostic preview page (meshflow-ui; see ui PR).
+
+**Deploy / verify**
+
+- Run migrations and `run_deploy_tasks`; confirm Celery beat rows `collect_path_edge_buckets` and `evict_old_path_data`.
+- `python manage.py backfill_path_edge_buckets --days 7`
+- Hit edges/segments APIs; open Passive Path (preview) in UI.
+
+---
+
 ## Next
 
-- Execute M1 per the detailed Cursor plan `MC passive path M1`.
-- Branch from latest `origin/main` as `api-372/pskillen/meshcore-passive-path-m1` in meshflow-api, meshflow-bot, and meshflow-ui; atomic conventional commits; PRs via github-personal MCP.
+- Open PRs (api, bot, ui); merge and deploy.
+- Begin M2 resolution spike ([#373](https://github.com/pskillen/meshflow-api/issues/373)) using the diagnostic UI.

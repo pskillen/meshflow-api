@@ -20,6 +20,8 @@ tags:
     description: Meshtastic packet ingestion and feeder node upsert (Node API key)
   - name: MeshCore packets
     description: MeshCore packet ingestion (Node API key) and read-only packet list
+  - name: MeshCore path tracing
+    description: Passive MeshCore packet path evidence (hash-chain edge rollups and segment resolution)
   - name: Packets
     description: >
       Legacy tag name retained for compatibility. All Meshtastic packet ingestion and feeder
@@ -146,6 +148,14 @@ components:
           description: >
             Repeater path segments for this feeder observation (stored on MeshCorePacketObservation only;
             not on deduped MeshCoreRawPacket).
+        path_hash_size:
+          type: integer
+          nullable: true
+          description: Bytes per path segment (from wire or bot default 2)
+        path_hash_mode:
+          type: integer
+          nullable: true
+          description: path_hash_mode from channel/contact frames when present
         channel_idx:
           type: integer
           nullable: true
@@ -168,6 +178,133 @@ components:
         encrypted:
           type: boolean
           description: When true, ingest returns 304 without storage
+    MeshCorePathEdgeBucket:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        bucket_start:
+          type: string
+          format: date-time
+        bucket_size:
+          type: string
+          example: "1h"
+        from_kind:
+          type: string
+        to_kind:
+          type: string
+        from_hash:
+          type: string
+        to_hash:
+          type: string
+        from_node:
+          type: string
+          format: uuid
+          nullable: true
+        to_node:
+          type: string
+          format: uuid
+          nullable: true
+        observer:
+          type: string
+          format: uuid
+          nullable: true
+        observer_name:
+          type: string
+          nullable: true
+        constellation:
+          type: integer
+          nullable: true
+        constellation_name:
+          type: string
+          nullable: true
+        packet_count:
+          type: integer
+        observation_count:
+          type: integer
+        first_seen_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_seen_at:
+          type: string
+          format: date-time
+          nullable: true
+        avg_snr:
+          type: number
+          nullable: true
+        min_snr:
+          type: number
+          nullable: true
+        max_snr:
+          type: number
+          nullable: true
+        direction:
+          type: string
+          description: Always `list_order` (not proven forwarding direction)
+          example: list_order
+        resolved:
+          type: boolean
+          description: True when both from_node and to_node are set
+    MeshCorePathSegment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        segment_hash:
+          type: string
+        hash_size:
+          type: integer
+          nullable: true
+        hash_mode:
+          type: integer
+          nullable: true
+        status:
+          type: string
+          enum: [unknown, resolved, ambiguous, stale]
+        source:
+          type: string
+        resolver_version:
+          type: integer
+        confidence:
+          type: number
+          nullable: true
+        observed_node:
+          type: object
+          nullable: true
+          properties:
+            internal_id:
+              type: string
+              format: uuid
+            node_id_str:
+              type: string
+              nullable: true
+            long_name:
+              type: string
+              nullable: true
+        first_seen_at:
+          type: string
+          format: date-time
+        last_seen_at:
+          type: string
+          format: date-time
+    MeshCorePathSegmentAnnotateRequest:
+      type: object
+      description: Staff-only manual segment annotation (PATCH)
+      properties:
+        observed_node_id:
+          type: string
+          format: uuid
+          nullable: true
+        node_id_str:
+          type: string
+          nullable: true
+          description: mc: pubkey form
+        status:
+          type: string
+          enum: [unknown, resolved, ambiguous, stale]
     FeederReach:
       type: object
       description: >
@@ -4095,6 +4232,154 @@ paths:
       responses:
         '200':
           description: Paginated MeshCore raw packets
+
+  /meshcore/path-tracing/edges/:
+    get:
+      summary: List passive path edge buckets
+      tags: [MeshCore path tracing]
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PaginationPage'
+        - $ref: '#/components/parameters/PaginationPageSize'
+        - name: bucket_start_after
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: bucket_start_before
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: observer
+          in: query
+          schema:
+            type: string
+            format: uuid
+          description: ManagedNode internal_id
+        - name: constellation
+          in: query
+          schema:
+            type: integer
+        - name: from_hash
+          in: query
+          schema:
+            type: string
+        - name: to_hash
+          in: query
+          schema:
+            type: string
+        - name: resolved
+          in: query
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Paginated hash-chain edge rollups
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedResponse'
+                  - type: object
+                    properties:
+                      results:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/MeshCorePathEdgeBucket'
+
+  /meshcore/path-tracing/segments/:
+    get:
+      summary: List path segment resolutions
+      tags: [MeshCore path tracing]
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PaginationPage'
+        - $ref: '#/components/parameters/PaginationPageSize'
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: hash_mode
+          in: query
+          schema:
+            type: integer
+        - name: hash_size
+          in: query
+          schema:
+            type: integer
+        - name: segment_hash
+          in: query
+          schema:
+            type: string
+        - name: resolved
+          in: query
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Paginated path segments
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedResponse'
+                  - type: object
+                    properties:
+                      results:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/MeshCorePathSegment'
+
+  /meshcore/path-tracing/segments/{id}/:
+    get:
+      summary: Retrieve a path segment resolution
+      tags: [MeshCore path tracing]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Segment resolution row
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeshCorePathSegment'
+    patch:
+      summary: Staff manual segment annotation
+      tags: [MeshCore path tracing]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MeshCorePathSegmentAnnotateRequest'
+      responses:
+        '200':
+          description: Updated segment
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeshCorePathSegment'
+        '403':
+          description: Requires staff user
 
   /packets/{meshtastic_node_id}/bot-version/:
     put:

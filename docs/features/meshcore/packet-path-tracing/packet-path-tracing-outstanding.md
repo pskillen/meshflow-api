@@ -25,7 +25,7 @@ Items **skipped**, **incomplete**, or **discovered during planning** — not the
 
 ## Capture gaps to confirm during M1/M2
 
-- [ ] `path_hash_size` / `path_hash_mode` not yet persisted on `MeshCorePacketObservation` (being addressed in M1 capture, api + bot).
+- [x] `path_hash_size` / `path_hash_mode` persisted on `MeshCorePacketObservation` (M1 api + bot).
 - [ ] `path_update` carries `public_key` only (no path hash in captures) — capture for possible future binding, not as a current resolver source.
 - [ ] `trace_data` relationship to path hashes / active traces unconfirmed (M2 spike).
 
