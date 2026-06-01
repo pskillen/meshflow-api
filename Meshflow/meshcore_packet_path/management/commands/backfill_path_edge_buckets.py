@@ -5,7 +5,10 @@ from datetime import timedelta
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
-from meshcore_packet_path.services.rollup import collect_path_edge_buckets_for_range
+from meshcore_packet_path.services.rollup import (
+    collect_path_edge_buckets_for_range,
+    resolve_backfill_hours,
+)
 
 
 class Command(BaseCommand):
@@ -26,20 +29,22 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        hours = options.get("hours")
-        days = options.get("days")
-        if days is not None:
-            hours = days * 24
-        if hours is None:
-            hours = 24
+        try:
+            hours = resolve_backfill_hours(hours=options.get("hours"), days=options.get("days"))
+        except ValueError as exc:
+            self.stderr.write(self.style.ERROR(str(exc)))
+            return
 
         current_hour = timezone.now().replace(minute=0, second=0, microsecond=0)
         start_hour = current_hour - timedelta(hours=hours)
-        self.stdout.write(f"Backfilling path edge buckets from {start_hour} to {current_hour}...")
+        self.stdout.write(
+            f"Backfilling path edge buckets for {hours} hour(s) " f"from {start_hour} to {current_hour}..."
+        )
         result = collect_path_edge_buckets_for_range(
             start_hour,
             current_hour,
             skip_existing=True,
+            show_progress=True,
         )
         self.stdout.write(
             self.style.SUCCESS(

@@ -18,6 +18,22 @@ from meshcore_packet_path.models import (
 from meshcore_packets.models import MeshCorePacketObservation
 
 
+def resolve_backfill_hours(
+    *,
+    hours: int | None = None,
+    days: int | None = None,
+    default_hours: int = 24,
+) -> int:
+    """Convert CLI/Celery backfill args to a single hour count (--days wins over --hours)."""
+    if hours is not None and days is not None:
+        raise ValueError("Specify only one of hours or days")
+    if days is not None:
+        return days * 24
+    if hours is not None:
+        return hours
+    return default_hours
+
+
 def _normalize_hash(segment: str) -> str:
     return str(segment).strip().lower()
 
@@ -181,14 +197,23 @@ def collect_path_edge_buckets_for_range(
     end_hour: datetime,
     *,
     skip_existing: bool = False,
+    show_progress: bool = False,
 ) -> dict[str, int]:
     """Roll up each hour in [start_hour, end_hour)."""
+    from tqdm import tqdm
+
     totals = {"created": 0, "updated": 0, "skipped_hours": 0, "observations_processed": 0}
     hour = start_hour.replace(minute=0, second=0, microsecond=0)
     end = end_hour.replace(minute=0, second=0, microsecond=0)
-    while hour < end:
-        result = collect_path_edge_buckets_for_hour(hour, skip_existing=skip_existing)
+    total_hours = max(0, int((end - hour).total_seconds() // 3600))
+    hour_iter = range(total_hours)
+    if show_progress:
+        hour_iter = tqdm(hour_iter, unit="hour", desc="Backfilling path edges")
+
+    cursor = hour
+    for _ in hour_iter:
+        result = collect_path_edge_buckets_for_hour(cursor, skip_existing=skip_existing)
         for key in totals:
             totals[key] += result.get(key, 0)
-        hour += timedelta(hours=1)
+        cursor += timedelta(hours=1)
     return totals

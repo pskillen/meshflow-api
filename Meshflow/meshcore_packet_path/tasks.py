@@ -10,6 +10,7 @@ from celery import shared_task
 from meshcore_packet_path.services.rollup import (
     collect_path_edge_buckets_for_hour,
     collect_path_edge_buckets_for_range,
+    resolve_backfill_hours,
 )
 
 
@@ -22,10 +23,15 @@ def collect_path_edge_buckets():
 
 
 @shared_task
-def backfill_path_edge_buckets_task(hours: int = 24) -> dict:
-    """Backfill rollups for the last N hours (idempotent when skip_existing=True)."""
+def backfill_path_edge_buckets_task(hours: int | None = None, days: int | None = None) -> dict:
+    """
+    Backfill rollups for the last N hours or days (idempotent when skip_existing=True).
+
+    Prefer ``python manage.py backfill_path_edge_buckets`` for CLI use (--hours / --days).
+    """
+    backfill_hours = resolve_backfill_hours(hours=hours, days=days)
     current_hour = timezone.now().replace(minute=0, second=0, microsecond=0)
-    start_hour = current_hour - timedelta(hours=hours)
+    start_hour = current_hour - timedelta(hours=backfill_hours)
     return collect_path_edge_buckets_for_range(start_hour, current_hour, skip_existing=True)
 
 
