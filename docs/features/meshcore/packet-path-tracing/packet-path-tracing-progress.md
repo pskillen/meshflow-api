@@ -8,11 +8,13 @@
 
 ## Overall status
 
-**Status:** In progress
+**Status:** M1 PRs open (pending merge / deploy)
 
 **Branch:** `api-372/pskillen/meshcore-passive-path-m1` (meshflow-api, meshflow-bot, meshflow-ui)
 
-The display-only passive slice that precedes this subsystem has **shipped** (see Precursor below). M1 implementation in flight (capture, `meshcore_packet_path` app, rollup/eviction, edges/segments API, diagnostic UI).
+**PRs:** [meshflow-api#378](https://github.com/pskillen/meshflow-api/pull/378) · [meshflow-bot#122](https://github.com/pskillen/meshflow-bot/pull/122) · [meshflow-ui#310](https://github.com/pskillen/meshflow-ui/pull/310)
+
+The display-only passive slice that precedes this subsystem has **shipped** (see Precursor below). M1 implementation is complete in branch; awaiting merge and deploy.
 
 **Locked decisions (ADR-0001 open questions):**
 
@@ -58,6 +60,8 @@ Tracked as sub-issues of [#267](https://github.com/pskillen/meshflow-api/issues/
 
 ## M1 — delivered (pending PR merge / deploy)
 
+**PRs:** [api#378](https://github.com/pskillen/meshflow-api/pull/378) · [bot#122](https://github.com/pskillen/meshflow-bot/pull/122) · [ui#310](https://github.com/pskillen/meshflow-ui/pull/310)
+
 **Branch:** `api-372/pskillen/meshcore-passive-path-m1`
 
 **API**
@@ -84,5 +88,5 @@ Tracked as sub-issues of [#267](https://github.com/pskillen/meshflow-api/issues/
 
 ## Next
 
-- Open PRs (api, bot, ui); merge and deploy.
+- Merge PRs ([#378](https://github.com/pskillen/meshflow-api/pull/378), [#122](https://github.com/pskillen/meshflow-bot/pull/122), [#310](https://github.com/pskillen/meshflow-ui/pull/310)) and deploy.
 - Begin M2 resolution spike ([#373](https://github.com/pskillen/meshflow-api/issues/373)) using the diagnostic UI.
