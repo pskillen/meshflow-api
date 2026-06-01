@@ -11,6 +11,7 @@ Cross-repo MeshCore work is tracked on GitHub epics [#264](https://github.com/ps
 | **2** — parity, rename track, position/text | [phase-2-progress.md](./phase-2-progress.md) | [phase-2-outstanding.md](./phase-2-outstanding.md) |
 | **ManagedNode identity** ([#362](https://github.com/pskillen/meshflow-api/issues/362)) | [managed-node-identity-progress.md](./managed-node-identity-progress.md) | [managed-node-identity-outstanding.md](./managed-node-identity-outstanding.md) |
 | **Feeder enrollment** ([#293](https://github.com/pskillen/meshflow-ui/issues/293)) | [enrollment-progress.md](./enrollment-progress.md) | [enrollment-outstanding.md](./enrollment-outstanding.md) |
+| **Passive packet path** ([#267](https://github.com/pskillen/meshflow-api/issues/267)) | [packet-path-tracing/packet-path-tracing-progress.md](./packet-path-tracing/packet-path-tracing-progress.md) | [packet-path-tracing/packet-path-tracing-outstanding.md](./packet-path-tracing/packet-path-tracing-outstanding.md) |
 
 **Agent convention:** [progress-tracking skill](../../../.cursor/skills/progress-tracking/SKILL.md) — update progress/outstanding at plan breakpoints and before PRs.
 
@@ -18,6 +19,7 @@ Cross-repo MeshCore work is tracked on GitHub epics [#264](https://github.com/ps
 
 - [feeder-bootstrap.md](./feeder-bootstrap.md) — first MC feeder + API key + `mc_pubkey`
 - [text-message-channels.md](./text-message-channels.md) — Phase 2.2 text + channels (device → API sync, apply-to-radio, ops troubleshooting)
+- [packet-path-tracing/](./packet-path-tracing/) — proposed passive MC packet path subsystem (capture, resolution, Neo4j, realtime/history UI)
 - [../node-lifecycle/node-claims-meshcore.md](../node-lifecycle/node-claims-meshcore.md) — ownership claims via contact/DM proof
 
 **Recent follow-up (post–#295 / staging):** see [phase-2-progress.md](./phase-2-progress.md) § “Feeder identity & apply fixes” and [phase-2-outstanding.md](./phase-2-outstanding.md) § “Phase 2.2 — staging & ops”.
