@@ -52,24 +52,34 @@ Packets are correctly attributed per bot because the **observer** comes from the
 
 Each bot must use its own `node_id` in the URL. As long as the key is linked to both nodes via NodeAuth, packets are correctly associated per observer.
 
-## WebSocket Limitation with Shared Keys
+## WebSocket and Shared Keys
 
-The WebSocket endpoint (`ws/nodes/?api_key=<key>`) does **not** take a node ID. The consumer validates the API key and returns the **first** linked ManagedNode. The bot joins the channel group for that node.
+The WebSocket endpoint (`ws/nodes/?api_key=<key>`) must identify which feeder is connecting when multiple ManagedNodes share one key. Otherwise traceroute and other commands may be delivered to the wrong bot.
 
-If one key is linked to nodes A and B:
+| Protocol | Query parameter | Example |
+|----------|-----------------|---------|
+| Meshtastic | `feeder_node_id` (decimal nodenum) | `feeder_node_id=1127973616` |
+| Meshtastic | `feeder_node_id_str` (`!` + 8 hex) | `feeder_node_id_str=!433b82f0` |
+| MeshCore | `feeder_pubkey_prefix` (12-hex pubkey prefix) | `feeder_pubkey_prefix=1a37f5aea4a1` |
 
-- Both bots connect with the same key
-- Both receive the first linked node (e.g. A)
-- Both join `node_{A}`
-- Traceroute commands for node A go to both bots; only one is correct
+When only one feeder is linked to the key, no extra query parameter is required.
 
-**Recommendation:** Use one API key per ManagedNode when the bot needs WebSocket commands (e.g. traceroute). Shared keys work correctly for packet ingest only.
+When multiple feeders share a key and the bot omits the correct disambiguator, the connection is **rejected** (same as MeshCore multi-feeder behaviour).
+
+**Deploy note:** If you run multiple Meshtastic bots on one key, deploy an updated meshtastic-bot that sends `feeder_node_id` on the WebSocket URL before or together with the API change.
+
+Example URLs:
+
+```
+ws://{host}/ws/nodes/?api_key={key}&feeder_node_id=1127973616
+ws://{host}/ws/nodes/?api_key={key}&feeder_pubkey_prefix=1a37f5aea4a1
+```
 
 ## Authentication
 
 - **Header**: `X-API-KEY: <key>` or `Authorization: Token <key>`
 - **Packet ingest**: Requires `NodeAPIKeyAuthentication` and `NodeAuthorizationPermission`; the key must be linked to the node in the URL path
-- **WebSocket**: Validates the key and uses the first linked ManagedNode
+- **WebSocket**: Validates the key; uses the sole linked feeder, or resolves via `feeder_node_id` / `feeder_node_id_str` (Meshtastic) or `feeder_pubkey_prefix` (MeshCore)
 
 ## API Endpoints
 

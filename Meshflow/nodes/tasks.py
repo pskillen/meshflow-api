@@ -14,7 +14,7 @@ from nodes.models import ManagedNode, ManagedNodeStatus
 from packets.models import PacketObservation
 
 
-@shared_task
+@shared_task(ignore_result=True)
 def update_managed_node_statuses():
     """
     Bulk refresh ManagedNodeStatus from PacketObservation and MeshCorePacketObservation upload_time.

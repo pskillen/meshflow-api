@@ -6,7 +6,7 @@ from dx_monitoring.exploration import scan_active_dx_events_for_traceroutes
 from dx_monitoring.notification_service import run_notify_dx_event
 
 
-@shared_task
+@shared_task(ignore_result=True)
 def explore_active_dx_events(batch_size: int = 50):
     """Periodically queue or link traceroute exploration for active DX events."""
     return scan_active_dx_events_for_traceroutes(batch_size=batch_size)

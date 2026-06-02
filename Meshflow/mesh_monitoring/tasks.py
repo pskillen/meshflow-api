@@ -36,7 +36,7 @@ def _effective_last_heard_offline_after_seconds(obs: ObservedNode) -> int:
     return int(DEFAULT_OFFLINE_AFTER_SECONDS)
 
 
-@shared_task
+@shared_task(ignore_result=True)
 def send_monitoring_traceroute_command(_auto_traceroute_id: int) -> None:
     """
     Legacy hook: monitoring TR delivery is handled by :func:`traceroute.tasks.dispatch_pending_traceroutes`.
@@ -75,7 +75,7 @@ def _dispatch_monitoring_round(observed: ObservedNode) -> None:
         )
 
 
-@shared_task
+@shared_task(ignore_result=True)
 def process_node_watch_presence() -> dict:
     """
     Periodic task (~1 min). For each observed node with enabled watches, update presence:
