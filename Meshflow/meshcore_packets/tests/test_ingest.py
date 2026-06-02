@@ -8,7 +8,7 @@ import pytest
 from rest_framework.test import APIClient
 
 from common.protocol import Protocol
-from meshcore_packets.models import MeshCoreRawPacket
+from meshcore_packets.models import MeshCorePayloadType, MeshCoreRawPacket
 from meshcore_packets.services.channel_sync import reconcile_mc_channels
 from meshcore_packets.tests.conftest import FEEDER_MC_PUBKEY_PREFIX, feeder_url
 from nodes.models import MeshCoreLocationSource, NodeAuth, ObservedNode, Position
@@ -222,6 +222,37 @@ def test_meshcore_contact_text_ingest(ingest_client):
     response = ingest_client.post(url, payload, format="json")
     assert response.status_code == 201
     assert ObservedNode.objects.filter(protocol=Protocol.MESHCORE, mc_pubkey_prefix=PREFIX).exists()
+
+
+@pytest.mark.django_db
+def test_meshcore_channel_text_without_pkt_hash_dedup_same_feeder(ingest_client, meshcore_feeder):
+    reconcile_mc_channels(
+        meshcore_feeder["node"],
+        [{"mc_channel_idx": 0, "name": "Public", "mc_channel_type": "PUBLIC"}],
+    )
+    now = timezone.now()
+    payload = {
+        "event_type": "channel_message",
+        "payload_type": "channel_text",
+        "channel_idx": 0,
+        "rx_time": now.timestamp(),
+        "text": "dedup ping",
+        "raw": {
+            "protocol": "meshcore",
+            "event_type": "channel_message",
+            "payload": {"sender_timestamp": 1234567890, "text": "dedup ping"},
+        },
+    }
+    url = feeder_url("meshcore-feeder-packet-ingest", FEEDER_MC_PUBKEY_PREFIX)
+    r1 = ingest_client.post(url, payload, format="json")
+    r2 = ingest_client.post(url, payload, format="json")
+    assert r1.status_code == 201
+    assert r2.status_code == 201
+    assert r1.data["packet_id"] == r2.data["packet_id"]
+    assert MeshCoreRawPacket.objects.filter(payload_type=MeshCorePayloadType.CHANNEL_TEXT).count() == 1
+    packet = MeshCoreRawPacket.objects.get(id=r1.data["packet_id"])
+    assert packet.pkt_hash is not None
+    assert TextMessage.objects.filter(message_text="dedup ping").count() == 1
 
 
 @pytest.mark.django_db

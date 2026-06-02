@@ -6,11 +6,13 @@ import pytest
 
 from common.protocol import Protocol
 from constellations.models import MessageChannel
-from meshcore_packets.models import MeshCorePayloadType, MeshCoreTextPacket
+from meshcore_packets.models import MeshCorePacketObservation, MeshCorePayloadType, MeshCoreTextPacket
 from meshcore_packets.services.channel import resolve_mc_channel
 from meshcore_packets.services.channel_sync import reconcile_mc_channels
+from meshcore_packets.services.dedup_key import channel_text_dedup_key
 from meshcore_packets.services.text_message import MeshCoreTextMessageService
 from nodes.models import NodeAuth
+from text_messages.models import TextMessage
 
 
 @pytest.mark.django_db
@@ -71,44 +73,40 @@ def test_two_feeders_ingest_same_text_same_channel_id(meshcore_feeder, create_ma
 
     now = timezone.now()
     channel_a = resolve_mc_channel(meshcore_feeder["node"], 1)
-    packet_a = MeshCoreTextPacket.objects.create(
-        observer=meshcore_feeder["node"],
-        payload_type=MeshCorePayloadType.CHANNEL_TEXT,
-        event_type="channel_message",
-        rx_time=now,
-        raw_json={},
-        text="hello #test",
-        channel=channel_a,
-        pkt_hash=111,
-    )
-    from meshcore_packets.models import MeshCorePacketObservation
-
-    obs_a = MeshCorePacketObservation.objects.create(
-        packet=packet_a,
-        observer=meshcore_feeder["node"],
-        channel=channel_a,
-        rx_time=now,
-    )
-    msg_a = MeshCoreTextMessageService().process_packet(packet_a, meshcore_feeder["node"], obs_a)
-    assert msg_a is not None
-
     channel_b = resolve_mc_channel(feeder_b, 2)
-    packet_b = MeshCoreTextPacket.objects.create(
-        observer=feeder_b,
+    assert channel_a.id == channel_b.id
+
+    dedup_key = channel_text_dedup_key(
+        constellation_id=constellation.id,
+        message_channel_id=channel_a.id,
+        text="hello #test",
+        sender_timestamp=1780409317,
+    )
+    packet = MeshCoreTextPacket.objects.create(
+        observer=meshcore_feeder["node"],
         payload_type=MeshCorePayloadType.CHANNEL_TEXT,
         event_type="channel_message",
         rx_time=now,
         raw_json={},
         text="hello #test",
-        channel=channel_b,
-        pkt_hash=222,
+        channel=channel_a,
+        pkt_hash=dedup_key,
     )
+    obs_a = MeshCorePacketObservation.objects.create(
+        packet=packet,
+        observer=meshcore_feeder["node"],
+        channel=channel_a,
+        rx_time=now,
+    )
+    msg = MeshCoreTextMessageService().process_packet(packet, meshcore_feeder["node"], obs_a)
+    assert msg is not None
+
     obs_b = MeshCorePacketObservation.objects.create(
-        packet=packet_b,
+        packet=packet,
         observer=feeder_b,
         channel=channel_b,
         rx_time=now,
     )
-    msg_b = MeshCoreTextMessageService().process_packet(packet_b, feeder_b, obs_b)
-    assert msg_b is not None
-    assert msg_a.channel_id == msg_b.channel_id
+    assert MeshCoreTextMessageService().process_packet(packet, feeder_b, obs_b) is None
+    assert TextMessage.objects.filter(message_text="hello #test").count() == 1
+    assert msg.channel_id == channel_a.id
