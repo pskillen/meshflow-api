@@ -13,9 +13,6 @@ from common.ws_groups import managed_node_ws_group
 
 application = URLRouter(Meshflow.routing.websocket_urlpatterns)
 
-MT_NODE_A = 0x433B82F0
-MT_NODE_B = 0x12345678
-
 FEEDER_PUBKEY = "1a37f5aea4a1" + ("b" * 52)
 FEEDER_PREFIX = "1a37f5aea4a1"
 
@@ -31,13 +28,11 @@ async def test_mt_consumer_requires_node_id_when_multiple_feeders(
     def setup():
         constellation = create_constellation(protocol=Protocol.MESHTASTIC)
         node_a = create_managed_node(
-            meshtastic_node_id=MT_NODE_A,
             protocol=Protocol.MESHTASTIC,
             constellation=constellation,
             name="Feeder A",
         )
         node_b = create_managed_node(
-            meshtastic_node_id=MT_NODE_B,
             protocol=Protocol.MESHTASTIC,
             constellation=constellation,
             name="Feeder B",

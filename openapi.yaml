@@ -7820,6 +7820,12 @@ paths:
         ws://{host}/ws/nodes/?api_key={node_api_key}
         ```
 
+        When multiple ManagedNodes share one API key, pass a feeder identity query parameter
+        (same disambiguation as packet ingest):
+
+        - Meshtastic: `feeder_node_id` (decimal nodenum) and/or `feeder_node_id_str` (`!` + 8 hex)
+        - MeshCore: `feeder_pubkey_prefix` (12-hex device pubkey prefix)
+
         Authentication uses the same NodeAPIKey as packet ingest (X-API-Key header).
         For WebSocket, the key must be passed as the `api_key` query parameter.
 
@@ -7848,6 +7854,24 @@ paths:
           schema:
             type: string
             description: NodeAPIKey for authentication (same key used for packet ingest)
+        - name: feeder_node_id
+          in: query
+          required: false
+          schema:
+            type: integer
+            description: Meshtastic feeder nodenum (decimal). Required when multiple MT feeders share the key.
+        - name: feeder_node_id_str
+          in: query
+          required: false
+          schema:
+            type: string
+            description: Meshtastic feeder id as !xxxxxxxx hex. Alternative to feeder_node_id.
+        - name: feeder_pubkey_prefix
+          in: query
+          required: false
+          schema:
+            type: string
+            description: MeshCore feeder 12-hex pubkey prefix. Required when multiple MC feeders share the key.
       responses:
         '101':
           description: WebSocket connection established
