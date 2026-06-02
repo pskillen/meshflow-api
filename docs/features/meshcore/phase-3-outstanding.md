@@ -13,11 +13,11 @@ Gap analysis (Jun 2026): channel **Heard** is the user-facing “map view” for
 
 | Tier | User outcome | Tracking |
 | --- | --- | --- |
-| **Tier 1** (ship next) | Real `#channel` messages show **non-empty `path_hashes`** in Heard (unknown hop labels OK) | **[#385](https://github.com/pskillen/meshflow-api/issues/385)** |
-| **Tier 2** | Hop **polylines on Leaflet** when hashes map to node positions | M2/M3 matcher ([#373](https://github.com/pskillen/meshflow-api/issues/373), [#374](https://github.com/pskillen/meshflow-api/issues/374)); wire `heard[]` to M1 `MeshCorePathSegmentResolution`; UI draw MC waypoints with `position` |
+| **Tier 1** | Non-empty `path_hashes` per feeder in Heard (twin + bot RAW upload) | [#385](https://github.com/pskillen/meshflow-api/issues/385) — twin hardening on `main` (observation match, content key, 120s window) |
+| **Tier 2** | Hop **polylines on Leaflet** when segment rows resolve to positioned nodes | [tier-2-heard-resolution.md](./packet-path-tracing/tier-2-heard-resolution.md); auto-matcher ADR [#373](https://github.com/pskillen/meshflow-api/issues/373) still open |
 | **Tier 3** | Full path tracing product (Neo4j, realtime WS, M7 topology) | [#372](https://github.com/pskillen/meshflow-api/issues/372) milestones M4–M7, [meshflow-ui#309](https://github.com/pskillen/meshflow-ui/issues/309) |
 
-**Tier 1 blocker (pre-prod):** `channel_text` linked to `TextMessage` has empty `path_hashes`; PATH/TEXT_MSG `rx_log_data` with `path` is not uploaded. Precursor + UI ([#369](https://github.com/pskillen/meshflow-api/issues/369), [#304](https://github.com/pskillen/meshflow-ui/issues/304), [#311](https://github.com/pskillen/meshflow-ui/issues/311)) already work when data exists — **no new UI for Tier 1**.
+**Tier 1 ops:** Both feeders must run **meshflow-bot `main`** (PATH/TEXT_MSG upload) and post to API on **`main`**. If `path_hashes` stay empty, check per-feeder `RAW` row counts and twin window — not missing API merge on `main` alone.
 
 **Recommendations**
 
@@ -30,18 +30,20 @@ Gap analysis (Jun 2026): channel **Heard** is the user-facing “map view” for
 
 ## Passive path
 
-- [ ] **Cross-feeder channel message dedup** — [#387](https://github.com/pskillen/meshflow-api/issues/387): one `TextMessage` + N observations when multiple feeders hear the same `channel_text` (PR in flight). Pre-prod duplicate rows are not backfilled.
-- [ ] **Tier 1 — message path data chain** — [#385](https://github.com/pskillen/meshflow-api/issues/385): `path_hashes` on observation tied to `TextMessage.original_mc_packet` for channel traffic. Detail: [packet-path-tracing-outstanding.md § Message path data chain](./packet-path-tracing/packet-path-tracing-outstanding.md#message-path-data-chain-confirmed--pre-prod-jun-2026).
-- [ ] **Passive packet path subsystem (M1+)** — rollups, resolution table, Neo4j export, realtime/history UI ([ADR-0001](./packet-path-tracing/adr/0001-meshcore-packet-path-tracing-subsystem.md)); merge/deploy PRs [#378](https://github.com/pskillen/meshflow-api/pull/378), [bot#122](https://github.com/pskillen/meshflow-bot/pull/122), [ui#310](https://github.com/pskillen/meshflow-ui/pull/310).
-- [ ] **Tier 2 — `heard[]` → segment resolution table** — augment `bulk_format_path_hops` in `text_messages/views.py` with `MeshCorePathSegmentResolution` (manual + resolved rows).
-- [ ] **Proven hash → node matcher** — per [traceroute ADR §A](../traceroute/adr/0001-mc-path-hash-resolution.md); no unsafe heuristics in v1 ([#373](https://github.com/pskillen/meshflow-api/issues/373)).
+- [x] **Cross-feeder channel message dedup** — [#387](https://github.com/pskillen/meshflow-api/issues/387) on `main`.
+- [ ] **Tier 1 — path twin hardening** — observation-based twin after dedup; content-key match; default 120s window ([tier-1 doc](./packet-path-tracing/tier-1-message-path-twin.md)).
+- [ ] **Tier 1 — ops** — both feeders uploading `RAW` PATH/TEXT_MSG to pre-prod API.
+- [ ] **Passive packet path subsystem (M1+)** — rollups, resolution table, Neo4j export, realtime/history UI ([ADR-0001](./packet-path-tracing/adr/0001-meshcore-packet-path-tracing-subsystem.md)); deploy [#378](https://github.com/pskillen/meshflow-api/pull/378) on pre-prod if not already.
+- [x] **Tier 2 — `heard[]` → segment resolution table** — `bulk_format_path_hops` uses `MeshCorePathSegmentResolution` ([tier-2 doc](./packet-path-tracing/tier-2-heard-resolution.md)).
+- [ ] **Proven hash → node matcher** — per [traceroute ADR §A](../traceroute/adr/0001-mc-path-hash-resolution.md); v1 uses manual/rollup rows only ([#373](https://github.com/pskillen/meshflow-api/issues/373)).
+- [ ] **Tier 2 — UI MC polylines** — meshflow-ui `HeardPathGeoMap` when `resolved_path[].position` set.
 - [ ] **`GET /meshcore/packets/`** — optional `resolved_path` on list/detail (deferred).
 
 ### Bot ([meshflow-bot#119](https://github.com/pskillen/meshflow-bot/issues/119))
 
 Prefer **thin bot / fat server** — tracked under [#385](https://github.com/pskillen/meshflow-api/issues/385).
 
-- [ ] Upload `rx_log_data` TEXT_MSG / PATH (or raw pass-through) — **required for Tier 1**; no bot-side correlation.
+- [x] Upload `rx_log_data` TEXT_MSG / PATH — [bot#124](https://github.com/pskillen/meshflow-bot/pull/124) on `main`; verify per-feeder in ops.
 - [ ] Unit tests for `_path_hashes()` (1/2/3-byte `path_hash_size`) when wire includes `path`.
 
 ---
