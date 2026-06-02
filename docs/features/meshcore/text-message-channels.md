@@ -286,7 +286,7 @@ Per-feeder sighting of a packet, with optional `channel` FK (same `MessageChanne
 | `recipient_meshtastic_node_id` | MT broadcast sentinel; null for MC broadcast |
 | `sent_at` | MC uses packet `rx_time` where applicable |
 
-**Dedup:** one `TextMessage` per raw packet (`original_packet` or `original_mc_packet`).
+**Dedup:** one `TextMessage` per **on-air channel transmission** (deduped `MeshCoreTextPacket`; multiple feeders add observations only — [#387](https://github.com/pskillen/meshflow-api/issues/387)). MT: one per deduped `MtRawPacket` via `original_packet`.
 
 **History API (planned):** existing `GET /api/messages/` list stays **channel broadcast** only (like MT today): include MC rows with `protocol=MESHCORE`, `sender` null, channel set; **store** contact/DM rows but expose them via a future DM endpoint.
 
@@ -300,8 +300,8 @@ Per-feeder sighting of a packet, with optional `channel` FK (same `MessageChanne
 Flow for text packets:
 
 1. Validate envelope (`payload_type` `channel_text` or `contact_text`, `text` required).
-2. Dedup by `pkt_hash` + time window ([`dedup.py`](../../../Meshflow/meshcore_packets/services/dedup.py)).
-3. **`resolve_mc_channel(observer, channel_idx)`** — [`channel.py`](../../../Meshflow/meshcore_packets/services/channel.py).
+2. **`resolve_mc_channel(observer, channel_idx)`** — [`channel.py`](../../../Meshflow/meshcore_packets/services/channel.py) (before dedup key so canonical channel id is shared across feeders).
+3. Resolve dedup key ([`dedup_key.py`](../../../Meshflow/meshcore_packets/services/dedup_key.py)); lookup + persist on [`dedup.py`](../../../Meshflow/meshcore_packets/services/dedup.py) / `pkt_hash` column.
 
 ### `resolve_mc_channel`
 

@@ -30,6 +30,7 @@ Gap analysis (Jun 2026): channel **Heard** is the user-facing “map view” for
 
 ## Passive path
 
+- [ ] **Cross-feeder channel message dedup** — [#387](https://github.com/pskillen/meshflow-api/issues/387): one `TextMessage` + N observations when multiple feeders hear the same `channel_text` (PR in flight). Pre-prod duplicate rows are not backfilled.
 - [ ] **Tier 1 — message path data chain** — [#385](https://github.com/pskillen/meshflow-api/issues/385): `path_hashes` on observation tied to `TextMessage.original_mc_packet` for channel traffic. Detail: [packet-path-tracing-outstanding.md § Message path data chain](./packet-path-tracing/packet-path-tracing-outstanding.md#message-path-data-chain-confirmed--pre-prod-jun-2026).
 - [ ] **Passive packet path subsystem (M1+)** — rollups, resolution table, Neo4j export, realtime/history UI ([ADR-0001](./packet-path-tracing/adr/0001-meshcore-packet-path-tracing-subsystem.md)); merge/deploy PRs [#378](https://github.com/pskillen/meshflow-api/pull/378), [bot#122](https://github.com/pskillen/meshflow-bot/pull/122), [ui#310](https://github.com/pskillen/meshflow-ui/pull/310).
 - [ ] **Tier 2 — `heard[]` → segment resolution table** — augment `bulk_format_path_hops` in `text_messages/views.py` with `MeshCorePathSegmentResolution` (manual + resolved rows).
