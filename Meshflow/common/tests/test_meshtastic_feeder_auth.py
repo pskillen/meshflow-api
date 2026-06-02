@@ -2,12 +2,12 @@
 
 import pytest
 
+from common.mesh_node_helpers import meshtastic_id_to_hex
 from common.meshtastic_feeder_auth import (
     MeshtasticFeederResolutionError,
     resolve_meshtastic_feeder,
 )
 from common.protocol import Protocol
-from common.mesh_node_helpers import meshtastic_id_to_hex
 from nodes.models import NodeAuth
 
 
