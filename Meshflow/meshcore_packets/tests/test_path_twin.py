@@ -1,6 +1,7 @@
 """Tests for rx_log → channel_text path twin merge."""
 
 import json
+from datetime import timedelta
 from pathlib import Path
 
 from django.utils import timezone
@@ -151,3 +152,53 @@ def test_raw_path_without_channel_text_twin_leaves_no_text_path(meshcore_feeder,
     )
     assert response.status_code == 201
     assert MeshCoreTextPacket.objects.filter(payload_type=MeshCorePayloadType.CHANNEL_TEXT).count() == 0
+
+
+@pytest.mark.django_db
+def test_raw_path_before_channel_text_outside_30s_within_120s_window(meshcore_feeder, ingest_client):
+    """PATH up to 90s before channel_message still twins when default window is 120s."""
+    reconcile_mc_channels(
+        meshcore_feeder["node"],
+        [{"mc_channel_idx": 0, "name": "Public", "mc_channel_type": "PUBLIC"}],
+    )
+    text_time = timezone.now()
+    path_time = text_time - timedelta(seconds=90)
+    url = feeder_url("meshcore-feeder-packet-ingest", FEEDER_MC_PUBKEY_PREFIX)
+    path_dump = json.loads((DOCS / "rx_log_data_path.json").read_text())
+    channel_dump = _load(CHANNEL_MSG)
+    text = "delayed twin window test"
+    channel_dump = dict(channel_dump)
+    channel_dump["payload"] = dict(channel_dump["payload"])
+    channel_dump["payload"]["text"] = text
+    channel_dump["payload"]["sender_timestamp"] = 1780416123
+
+    ingest_client.post(
+        url,
+        {
+            "event_type": "rx_log_data",
+            "payload_type": "raw",
+            "pkt_hash": path_dump["payload"]["pkt_hash"],
+            "rx_time": path_time.timestamp(),
+            "path_hashes": ["aa", "bb"],
+            "path_hash_size": 2,
+            "raw": path_dump,
+        },
+        format="json",
+    )
+
+    ingest_client.post(
+        url,
+        {
+            "event_type": "channel_message",
+            "payload_type": "channel_text",
+            "channel_idx": 0,
+            "rx_time": text_time.timestamp(),
+            "text": text,
+            "raw": channel_dump,
+        },
+        format="json",
+    )
+
+    text_packet = MeshCoreTextPacket.objects.get(text=text)
+    text_obs = MeshCorePacketObservation.objects.get(packet=text_packet)
+    assert text_obs.path_hashes == ["aa", "bb"]

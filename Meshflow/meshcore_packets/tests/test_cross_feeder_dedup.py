@@ -1,5 +1,8 @@
 """Cross-feeder channel_text dedup (#387)."""
 
+import json
+from pathlib import Path
+
 from django.urls import reverse
 from django.utils import timezone
 
@@ -121,3 +124,68 @@ def test_cross_feeder_channel_text_one_packet_two_observations(
     assert response.status_code == 200
     row = next(item for item in response.data["results"] if item["id"] == str(tm.id))
     assert len(row["heard"]) == 2
+
+
+DOCS = Path(__file__).resolve().parents[3] / "docs" / "packets" / "meshcore"
+PATH_DUMP = json.loads((DOCS / "rx_log_data_path.json").read_text())
+
+
+@pytest.mark.django_db
+def test_cross_feeder_path_twin_on_second_feeder_observation(meshcore_feeder, second_mc_feeder):
+    """PATH on feeder B attaches to deduped packet via B's observation, not packet.observer only."""
+    _setup_hashtag_channels(meshcore_feeder, second_mc_feeder)
+    now = timezone.now()
+    text = "cross feeder path twin test"
+    ts = 1780416000
+
+    def channel_payload(channel_idx, feeder_prefix, feeder_info):
+        client = APIClient()
+        client.credentials(HTTP_X_API_KEY=feeder_info["api_key"].key)
+        return client.post(
+            feeder_url("meshcore-feeder-packet-ingest", feeder_prefix),
+            {
+                "event_type": "channel_message",
+                "payload_type": "channel_text",
+                "channel_idx": channel_idx,
+                "rx_time": now.timestamp(),
+                "text": text,
+                "raw": {
+                    "protocol": "meshcore",
+                    "event_type": "channel_message",
+                    "payload": {
+                        "channel_idx": channel_idx,
+                        "sender_timestamp": ts,
+                        "text": text,
+                    },
+                },
+            },
+            format="json",
+        )
+
+    r_a = channel_payload(1, FEEDER_MC_PUBKEY_PREFIX, meshcore_feeder)
+    r_b = channel_payload(2, FEEDER_B_MC_PUBKEY_PREFIX, second_mc_feeder)
+    assert r_a.status_code == 201
+    assert r_b.status_code == 201
+    packet_id = r_a.data["packet_id"]
+    assert packet_id == r_b.data["packet_id"]
+
+    client_b = APIClient()
+    client_b.credentials(HTTP_X_API_KEY=second_mc_feeder["api_key"].key)
+    r_path = client_b.post(
+        feeder_url("meshcore-feeder-packet-ingest", FEEDER_B_MC_PUBKEY_PREFIX),
+        {
+            "event_type": "rx_log_data",
+            "payload_type": "raw",
+            "pkt_hash": PATH_DUMP["payload"]["pkt_hash"],
+            "rx_time": now.timestamp(),
+            "path_hashes": ["6edc9b", "4cd741", "f3bcf1"],
+            "path_hash_size": 3,
+            "raw": PATH_DUMP,
+        },
+        format="json",
+    )
+    assert r_path.status_code == 201
+
+    packet = MeshCoreRawPacket.objects.get(id=packet_id)
+    obs_b = MeshCorePacketObservation.objects.get(packet=packet, observer=second_mc_feeder["node"])
+    assert obs_b.path_hashes == ["6edc9b", "4cd741", "f3bcf1"]
