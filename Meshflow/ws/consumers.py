@@ -32,14 +32,32 @@ class NodeConsumer(AsyncWebsocketConsumer):
             return
 
         feeder_pubkey_prefix = query_params.get("feeder_pubkey_prefix")
+        feeder_node_id_raw = query_params.get("feeder_node_id")
+        feeder_node_id_str = query_params.get("feeder_node_id_str")
+        feeder_node_id = None
+        if feeder_node_id_raw is not None:
+            try:
+                feeder_node_id = int(feeder_node_id_raw)
+            except ValueError:
+                logger.warning(
+                    "NodeConsumer: invalid feeder_node_id=%s",
+                    feeder_node_id_raw,
+                )
+                await self.close()
+                return
+
         managed_node = await self._validate_api_key(
             api_key,
             feeder_pubkey_prefix=feeder_pubkey_prefix,
+            feeder_node_id=feeder_node_id,
+            feeder_node_id_str=feeder_node_id_str,
         )
         if not managed_node:
             logger.warning(
-                "NodeConsumer: invalid api_key or feeder_pubkey_prefix=%s",
+                "NodeConsumer: invalid api_key feeder_pubkey_prefix=%s " "feeder_node_id=%s feeder_node_id_str=%s",
                 feeder_pubkey_prefix,
+                feeder_node_id,
+                feeder_node_id_str,
             )
             await self.close()
             return
@@ -74,11 +92,21 @@ class NodeConsumer(AsyncWebsocketConsumer):
         await self.send(text_data=json.dumps(command))
 
     @database_sync_to_async
-    def _validate_api_key(self, api_key, feeder_pubkey_prefix=None):
+    def _validate_api_key(
+        self,
+        api_key,
+        feeder_pubkey_prefix=None,
+        feeder_node_id=None,
+        feeder_node_id_str=None,
+    ):
         """Validate NodeAPIKey and return the linked ManagedNode, or None."""
         from common.meshcore_feeder_auth import (
             MeshCoreFeederResolutionError,
             resolve_meshcore_feeder,
+        )
+        from common.meshtastic_feeder_auth import (
+            MeshtasticFeederResolutionError,
+            resolve_meshtastic_feeder,
         )
         from common.protocol import Protocol
         from nodes.models import NodeAPIKey, NodeAuth
@@ -88,6 +116,14 @@ class NodeConsumer(AsyncWebsocketConsumer):
             key_obj.last_used = timezone.now()
             key_obj.save(update_fields=["last_used"])
 
+            has_mc_disambiguator = bool(feeder_pubkey_prefix)
+            has_mt_disambiguator = feeder_node_id is not None or bool(feeder_node_id_str)
+            if has_mc_disambiguator and has_mt_disambiguator:
+                logger.warning(
+                    "NodeConsumer: pass feeder_pubkey_prefix or feeder_node_id, not both",
+                )
+                return None
+
             if feeder_pubkey_prefix:
                 try:
                     return resolve_meshcore_feeder(
@@ -95,6 +131,16 @@ class NodeConsumer(AsyncWebsocketConsumer):
                         feeder_pubkey_prefix=feeder_pubkey_prefix,
                     )
                 except MeshCoreFeederResolutionError:
+                    return None
+
+            if has_mt_disambiguator:
+                try:
+                    return resolve_meshtastic_feeder(
+                        api_key=key_obj,
+                        feeder_node_id=feeder_node_id,
+                        feeder_node_id_str=feeder_node_id_str,
+                    )
+                except MeshtasticFeederResolutionError:
                     return None
 
             auths = list(
@@ -107,20 +153,31 @@ class NodeConsumer(AsyncWebsocketConsumer):
                 return None
 
             mc_auths = [a for a in auths if a.node.protocol == Protocol.MESHCORE]
+            mt_auths = [a for a in auths if a.node.protocol == Protocol.MESHTASTIC]
+
             if len(mc_auths) > 1:
                 logger.warning(
                     "NodeConsumer: API key linked to %s MC feeders; " "pass feeder_pubkey_prefix on ws/nodes/",
                     len(mc_auths),
                 )
                 return None
-            if len(mc_auths) == 1:
-                return mc_auths[0].node
+
+            if len(mt_auths) > 1:
+                logger.warning(
+                    "NodeConsumer: API key linked to %s MT feeders; "
+                    "pass feeder_node_id or feeder_node_id_str on ws/nodes/",
+                    len(mt_auths),
+                )
+                return None
 
             if len(auths) > 1:
                 logger.warning(
-                    "NodeConsumer: API key linked to %s nodes; use feeder_pubkey_prefix for MC",
+                    "NodeConsumer: API key linked to %s feeders; "
+                    "pass feeder_pubkey_prefix (MC) or feeder_node_id (MT)",
                     len(auths),
                 )
+                return None
+
             return auths[0].node
         except NodeAPIKey.DoesNotExist:
             pass
