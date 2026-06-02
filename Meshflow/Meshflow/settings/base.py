@@ -316,7 +316,7 @@ AUTH_USER_MODEL = "users.User"
 # Packet deduplication: time window (minutes) within which same sender+packet_id is treated as duplicate
 PACKET_DEDUP_WINDOW_MINUTES = int(os.environ.get("PACKET_DEDUP_WINDOW_MINUTES", "10"))
 MESHCORE_PACKET_DEDUP_WINDOW_MINUTES = int(os.environ.get("MESHCORE_PACKET_DEDUP_WINDOW_MINUTES", "10"))
-MESHCORE_DECODED_TWIN_WINDOW_SECONDS = int(os.environ.get("MESHCORE_DECODED_TWIN_WINDOW_SECONDS", "30"))
+MESHCORE_DECODED_TWIN_WINDOW_SECONDS = int(os.environ.get("MESHCORE_DECODED_TWIN_WINDOW_SECONDS", "120"))
 
 REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": [

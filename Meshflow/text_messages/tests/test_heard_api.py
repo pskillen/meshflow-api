@@ -8,8 +8,11 @@ from django.utils import timezone
 import pytest
 from rest_framework.test import APIClient
 
+from common.protocol import Protocol
+from meshcore_packet_path.models import MeshCorePathSegmentResolution, SegmentStatus
 from meshcore_packets.services.channel_sync import reconcile_mc_channels
 from meshcore_packets.tests.conftest import FEEDER_MC_PUBKEY_PREFIX, feeder_url
+from nodes.models import NodeLatestStatus, ObservedNode
 from text_messages.models import TextMessage
 
 
@@ -143,3 +146,53 @@ def test_mc_message_heard_path_via_rx_log_twin(meshcore_feeder, ingest_client):
     response = client.get(list_url, {"channel_id": tm.channel_id})
     row = next(item for item in response.data["results"] if item["id"] == str(tm.id))
     assert row["heard"][0]["path_hashes"] == ["ab", "cd"]
+
+
+@pytest.mark.django_db
+def test_mc_message_heard_resolved_path_from_segment_table(meshcore_feeder, ingest_client):
+    reconcile_mc_channels(
+        meshcore_feeder["node"],
+        [{"mc_channel_idx": 0, "name": "Public", "mc_channel_type": "PUBLIC"}],
+    )
+    node = ObservedNode.objects.create(
+        protocol=Protocol.MESHCORE,
+        mc_pubkey="b" * 64,
+        mc_pubkey_prefix="b" * 12,
+        long_name="Hop Node",
+    )
+    NodeLatestStatus.objects.create(
+        node=node,
+        latitude=55.95,
+        longitude=-4.25,
+    )
+    MeshCorePathSegmentResolution.objects.create(
+        segment_hash="ab",
+        hash_size=2,
+        status=SegmentStatus.RESOLVED,
+        observed_node=node,
+    )
+    now = timezone.now()
+    url = feeder_url("meshcore-feeder-packet-ingest", FEEDER_MC_PUBKEY_PREFIX)
+    ingest_client.post(
+        url,
+        {
+            "event_type": "channel_message",
+            "payload_type": "channel_text",
+            "channel_idx": 0,
+            "pkt_hash": 88011,
+            "rx_time": now.timestamp(),
+            "text": "resolved hop map test",
+            "path_hashes": ["ab"],
+            "raw": {},
+        },
+        format="json",
+    )
+    tm = TextMessage.objects.get(message_text="resolved hop map test")
+    client = APIClient()
+    response = client.get(reverse("textmessage-list"), {"channel_id": tm.channel_id})
+    row = next(item for item in response.data["results"] if item["id"] == str(tm.id))
+    hop = row["heard"][0]["resolved_path"][0]
+    assert hop["status"] == "resolved"
+    assert hop["node_id_str"] == node.node_id_str
+    assert hop["position"]["latitude"] == 55.95
+    assert row["heard"][0]["path_known"] is True
