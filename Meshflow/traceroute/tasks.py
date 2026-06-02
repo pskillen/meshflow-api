@@ -110,7 +110,7 @@ def schedule_traceroutes():
     return {"created": 0}
 
 
-@shared_task
+@shared_task(ignore_result=True)
 def dispatch_pending_traceroutes():
     """
     Run frequently (e.g. every 15s). Send due ``AutoTraceRoute`` rows to managed nodes over Channels,
@@ -142,7 +142,7 @@ def export_traceroutes_to_neo4j():
     return export_traceroutes_to_neo4j_impl()
 
 
-@shared_task
+@shared_task(ignore_result=True)
 def push_traceroute_to_neo4j(auto_traceroute_id: int):
     """
     Push a single completed AutoTraceRoute to Neo4j.
@@ -155,7 +155,7 @@ def push_traceroute_to_neo4j(auto_traceroute_id: int):
     return push_traceroute_to_neo4j_impl(auto_traceroute_id)
 
 
-@shared_task
+@shared_task(ignore_result=True)
 def mark_stale_traceroutes_failed():
     """
     Run every 60 seconds. Mark pending/sent auto-traceroutes as failed after
