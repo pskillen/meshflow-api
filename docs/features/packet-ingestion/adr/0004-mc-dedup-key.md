@@ -1,8 +1,8 @@
 # ADR-0004 — MeshCore deduplication key
 
-**Status:** Proposed
+**Status:** Accepted (partial — [#387](https://github.com/pskillen/meshflow-api/issues/387))
 **Date:** 2026-05-12
-**Tracking:** [meshflow-api#276](https://github.com/pskillen/meshflow-api/issues/276)
+**Tracking:** [meshflow-api#276](https://github.com/pskillen/meshflow-api/issues/276); cross-feeder channel dedup [#387](https://github.com/pskillen/meshflow-api/issues/387)
 
 ## Context
 
@@ -35,6 +35,15 @@ The previous backend-migration plan proposed `(from_pubkey_hash, packet_hash, rx
    - **Decoded-only dedup:** the dedup key for a decoded event with no `pkt_hash` falls back to `(event_type, sha256(canonical payload), rx_time window)` to prevent counting the same decoded twin twice if the companion emits it twice. Stored as `MeshCoreRawPacket.surrogate_hash` (nullable BigInt). Only one of `pkt_hash` or `surrogate_hash` is set on a given row; a partial unique index enforces this.
 5. **Non-text non-`rx_log_data` events** (`advertisement`, `path_update`, `discover_response`, `control_data`, `messages_waiting`, `trace_data`) follow the same surrogate-hash rule: their dedup key is `(event_type, sha256(canonical payload), rx_time window)`. These are infrequent enough that the collision risk of the surrogate hash is irrelevant in practice.
 6. **Per-observer idempotency** (same as MT): `MeshCorePacketObservation` has a unique constraint on `(packet, observer)` so retries from the bot never create duplicates.
+
+## Implementation ([#387](https://github.com/pskillen/meshflow-api/issues/387), partial)
+
+Shipped in `meshcore_packets/services/dedup_key.py` + ingest serializer:
+
+- **`MeshCoreRawPacket.pkt_hash`** stores the **resolved dedup key** on create (wire `pkt_hash` when present, otherwise computed).
+- **`channel_text`** without wire hash: content key `SHA-256(channel_text|constellation_id|message_channel_id|sender_timestamp|text)` (canonical `MessageChannel.id` after `resolve_mc_channel`; `sender_timestamp` from nested capture payload, `0` if missing).
+- **Cross-feeder:** same on-air channel post → one `MeshCoreTextPacket`, N `MeshCorePacketObservation`, one `TextMessage` (Meshtastic parity).
+- **Not yet:** separate `surrogate_hash` column, partial unique index, `raw_packet_fk` decoded-twin linkage ([#276](https://github.com/pskillen/meshflow-api/issues/276)); `contact_text` cross-feeder dedup (follow-up).
 
 ## Consequences
 

@@ -48,7 +48,7 @@ Code: `meshflow-bot/src/meshcore/serializers.py`, `src/api/StorageAPI.py` (`stor
 
 Also creates or updates **MeshCorePacketObservation** per `(packet, observer)` (deduped). Repeater **path_hashes** are stored on the observation row only (not on deduped `MeshCoreRawPacket`), so two feeders reporting the same `pkt_hash` can keep different paths. See [ADR-0001 (path hash resolution)](../traceroute/adr/0001-mc-path-hash-resolution.md).
 
-Dedup: `meshcore_packets/services/dedup.py` — `pkt_hash` + time window (see [adr/0004-mc-dedup-key.md](adr/0004-mc-dedup-key.md)).
+Dedup: `meshcore_packets/services/dedup_key.py` resolves the key; `dedup.py` looks up by stored `pkt_hash` + time window (see [adr/0004-mc-dedup-key.md](adr/0004-mc-dedup-key.md)). **Multi-feeder `channel_text`:** same on-air transmission (wire `pkt_hash` or content key) → one `MeshCoreTextPacket`, one `TextMessage`, N observations — Heard shows all feeders ([#387](https://github.com/pskillen/meshflow-api/issues/387)).
 
 ### API short-circuits
 

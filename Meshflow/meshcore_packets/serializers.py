@@ -13,6 +13,7 @@ from meshcore_packets.models import (
 )
 from meshcore_packets.services.channel import resolve_mc_channel
 from meshcore_packets.services.dedup import find_existing_packet
+from meshcore_packets.services.dedup_key import resolve_ingest_dedup_key
 from meshcore_packets.services.path_hashes import enrich_validated_data_paths
 from meshcore_packets.services.path_twin import sync_path_from_rx_log_twin, sync_path_to_channel_text_twin
 
@@ -90,13 +91,14 @@ class MeshCorePacketIngestSerializer(serializers.Serializer):
         elif from_prefix:
             from_prefix = normalize_mc_pubkey_prefix(from_prefix)
 
-        pkt_hash = validated_data.get("pkt_hash")
-        existing = find_existing_packet(
-            pkt_hash=pkt_hash,
-            rx_time=rx_time,
-            event_type=validated_data.get("event_type"),
-            raw_payload=str(validated_data.get("raw", "")),
+        channel_idx = validated_data.get("channel_idx")
+        channel = resolve_mc_channel(observer, channel_idx) if channel_idx is not None else None
+        dedup_key = resolve_ingest_dedup_key(
+            validated_data=validated_data,
+            observer=observer,
+            channel=channel,
         )
+        existing = find_existing_packet(dedup_key=dedup_key, rx_time=rx_time)
         if existing:
             self.instance = existing
             self._ensure_observation(existing, observer, validated_data, rx_time)
@@ -110,8 +112,6 @@ class MeshCorePacketIngestSerializer(serializers.Serializer):
             "raw": MeshCorePayloadType.RAW,
         }
         ptype = payload_type_map[validated_data["payload_type"]]
-        channel_idx = validated_data.get("channel_idx")
-        channel = resolve_mc_channel(observer, channel_idx) if channel_idx is not None else None
 
         base_fields = {
             "observer": observer,
@@ -119,7 +119,7 @@ class MeshCorePacketIngestSerializer(serializers.Serializer):
             "event_type": validated_data["event_type"],
             "from_pubkey": from_pubkey,
             "from_pubkey_prefix": from_prefix,
-            "pkt_hash": pkt_hash,
+            "pkt_hash": dedup_key,
             "rx_time": rx_time,
             "rx_rssi": validated_data.get("rx_rssi"),
             "rx_snr": validated_data.get("rx_snr"),
