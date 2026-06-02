@@ -2777,6 +2777,10 @@ components:
           nullable: true
         ambiguous:
           type: boolean
+        position:
+          $ref: '#/components/schemas/MapPosition'
+          nullable: true
+          description: Present when status is resolved and the linked ObservedNode has a latest position
 
     HeardObserver:
       type: object
@@ -2845,7 +2849,9 @@ components:
             $ref: '#/components/schemas/ResolvedHop'
         path_known:
           type: boolean
-          description: False in v1 (hop positions not linked to map coordinates)
+          description: >
+            True when every hop in resolved_path is resolved and has a position (from
+            MeshCorePathSegmentResolution / staff annotation).
 
     TextMessage:
       type: object

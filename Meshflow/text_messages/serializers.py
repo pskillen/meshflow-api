@@ -141,7 +141,7 @@ class TextMessageSerializer(serializers.ModelSerializer):
                         "rx_snr": obs.rx_snr,
                         "path_hashes": segments,
                         "resolved_path": _resolved_path_from_cache(segments, path_hop_cache),
-                        "path_known": path_known_for_segments(segments),
+                        "path_known": path_known_for_segments(segments, resolution_cache=path_hop_cache),
                     }
                 )
             return heard
