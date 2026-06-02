@@ -27,21 +27,29 @@ def surrogate_pkt_hash(*, event_type: str, raw_payload: str) -> int:
 
 def find_existing_packet(
     *,
-    pkt_hash: int | None,
-    rx_time,
+    dedup_key: int | None = None,
+    pkt_hash: int | None = None,
+    rx_time=None,
     event_type: str | None = None,
     raw_payload: str | None = None,
 ) -> MeshCoreRawPacket | None:
-    """Find duplicate within the dedup window."""
-    if pkt_hash is None:
+    """
+    Find duplicate within the dedup window.
+
+    Callers should pass ``dedup_key`` from ``resolve_ingest_dedup_key`` (stored on
+    ``MeshCoreRawPacket.pkt_hash``). Legacy ``pkt_hash`` / surrogate args remain for
+    tests that have not migrated yet.
+    """
+    key = dedup_key if dedup_key is not None else pkt_hash
+    if key is None:
         if not event_type or raw_payload is None:
             return None
-        pkt_hash = surrogate_pkt_hash(event_type=event_type, raw_payload=raw_payload)
+        key = surrogate_pkt_hash(event_type=event_type, raw_payload=raw_payload)
 
     window = dedup_window()
     return (
         MeshCoreRawPacket.objects.filter(
-            pkt_hash=pkt_hash,
+            pkt_hash=key,
             rx_time__gte=rx_time - window,
             rx_time__lte=rx_time + window,
         )
