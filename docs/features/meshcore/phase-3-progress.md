@@ -45,7 +45,7 @@ MC **path/trace** or passive hop accumulation as a Meshtastic traceroute analog:
 
 ## In flight
 
-- **Tier 1 MVP (message heard paths)** — [#385](https://github.com/pskillen/meshflow-api/issues/385): bot uploads TEXT_MSG/PATH as `raw`; API `path_twin` merges onto `channel_text` observations. Design: [tier-1-message-path-twin.md](./packet-path-tracing/tier-1-message-path-twin.md).
+- **Tier 1 MVP (message heard paths)** — [#385](https://github.com/pskillen/meshflow-api/issues/385): PRs [api#386](https://github.com/pskillen/meshflow-api/pull/386), [bot#124](https://github.com/pskillen/meshflow-bot/pull/124). Design: [tier-1-message-path-twin.md](./packet-path-tracing/tier-1-message-path-twin.md). Pre-prod verification pending.
 - **Packet path subsystem (M1)** — ADR + rollups + staff segments API: [packet-path-tracing/](./packet-path-tracing/); PRs [#378](https://github.com/pskillen/meshflow-api/pull/378), [bot#122](https://github.com/pskillen/meshflow-bot/pull/122), [ui#310](https://github.com/pskillen/meshflow-ui/pull/310).
 
 ---
