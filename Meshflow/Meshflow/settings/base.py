@@ -127,12 +127,31 @@ _redis_host = os.environ.get("REDIS_HOST", "localhost")
 _redis_port = os.environ.get("REDIS_PORT", "6379")
 _redis_url = f"redis://:{_redis_password}@{_redis_host}:{_redis_port}/0"
 
+
+def _channel_redis_host() -> dict:
+    """
+    Connection kwargs for channels_redis (Redis DB 0).
+
+    channels_redis blocks on BZPOPMIN with a 5s server-side timeout; client socket_timeout
+    must exceed that plus headroom when the shared Redis process is busy (e.g. Celery
+    result keys on DB 1), or WebSocket consumers raise TimeoutError and reconnect-loop.
+    """
+    host: dict = {"address": _redis_url}
+    raw_timeout = os.environ.get("CHANNEL_REDIS_SOCKET_TIMEOUT", "30").strip()
+    if raw_timeout.lower() not in ("", "none", "null"):
+        host["socket_timeout"] = float(raw_timeout)
+    connect_raw = os.environ.get("CHANNEL_REDIS_SOCKET_CONNECT_TIMEOUT", "5").strip()
+    if connect_raw:
+        host["socket_connect_timeout"] = float(connect_raw)
+    return host
+
+
 # Channel layers for Django Channels
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [_redis_url],
+            "hosts": [_channel_redis_host()],
         },
     },
 }
@@ -146,6 +165,8 @@ NEO4J_PASSWORD = os.environ.get("NEO4J_PASSWORD", "neo4j")
 _celery_broker_url = f"redis://:{_redis_password}@{_redis_host}:{_redis_port}/1"
 CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", _celery_broker_url)
 CELERY_RESULT_BACKEND = CELERY_BROKER_URL
+# Shorter than Celery default (~24h) to limit celery-task-meta-* growth on Redis DB 1.
+CELERY_RESULT_EXPIRES = int(os.environ.get("CELERY_RESULT_EXPIRES", "3600"))
 CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
 # Route heavy RF propagation renders to a dedicated queue consumed by celery-rf-worker;
 # keep the default "celery" queue so the existing worker picks up everything else.
