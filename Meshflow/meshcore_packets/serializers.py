@@ -13,6 +13,8 @@ from meshcore_packets.models import (
 )
 from meshcore_packets.services.channel import resolve_mc_channel
 from meshcore_packets.services.dedup import find_existing_packet
+from meshcore_packets.services.path_hashes import enrich_validated_data_paths
+from meshcore_packets.services.path_twin import sync_path_from_rx_log_twin, sync_path_to_channel_text_twin
 
 
 def _parse_rx_time(value) -> datetime:
@@ -63,8 +65,21 @@ class MeshCorePacketIngestSerializer(serializers.Serializer):
                 pass  # rx_log_data ADVERT may supply adv fields without from_pubkey in envelope
         return attrs
 
+    def _run_path_twin_sync(self, packet, observer):
+        if self.observation is None:
+            return
+        if packet.payload_type == MeshCorePayloadType.RAW:
+            sync_path_to_channel_text_twin(
+                packet=packet,
+                observer=observer,
+                observation=self.observation,
+            )
+        elif packet.payload_type == MeshCorePayloadType.CHANNEL_TEXT and isinstance(packet, MeshCoreTextPacket):
+            sync_path_from_rx_log_twin(packet=packet, observer=observer)
+
     def create(self, validated_data):
         observer = self.context["observer"]
+        enrich_validated_data_paths(validated_data)
         rx_time = _parse_rx_time(validated_data["rx_time"])
 
         from_pubkey = validated_data.get("from_pubkey") or None
@@ -85,6 +100,7 @@ class MeshCorePacketIngestSerializer(serializers.Serializer):
         if existing:
             self.instance = existing
             self._ensure_observation(existing, observer, validated_data, rx_time)
+            self._run_path_twin_sync(existing, observer)
             return existing
 
         payload_type_map = {
@@ -126,6 +142,7 @@ class MeshCorePacketIngestSerializer(serializers.Serializer):
 
         self.instance = packet
         self._ensure_observation(packet, observer, validated_data, rx_time)
+        self._run_path_twin_sync(packet, observer)
         return packet
 
     def _ensure_observation(self, packet, observer, validated_data, rx_time):

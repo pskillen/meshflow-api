@@ -43,7 +43,7 @@ Code: `meshflow-bot/src/meshcore/serializers.py`, `src/api/StorageAPI.py` (`stor
 | `advert`       | `ADVERT` (1)          | `MeshCoreRawPacket`  | `ObservedNode` upsert (pubkey / prefix); optional `Position` + `NodeLatestStatus` if `adv_lat`/`adv_lon` non-zero; `meshcore_adv_type` on node |
 | `channel_text` | `CHANNEL_TEXT` (2)    | `MeshCoreTextPacket` | `TextMessage` (`original_mc_packet`, `protocol=MESHCORE`); channel FK via feeder `channel_idx`                                                 |
 | `contact_text` | `CONTACT_TEXT` (3)    | `MeshCoreTextPacket` | `TextMessage` + sender `ObservedNode` from `from_pubkey_prefix`; node-claim path                                                               |
-| `raw`          | `RAW` (99)            | `MeshCoreRawPacket`  | **Serializer supports it; bot does not upload `raw` today**                                                                                    |
+| `raw`          | `RAW` (99)            | `MeshCoreRawPacket`  | `rx_log_data` **TEXT_MSG** / **PATH** (path + `pkt_hash`); twin-merge onto `channel_text` for Heard — see [tier-1-message-path-twin.md](../meshcore/packet-path-tracing/tier-1-message-path-twin.md) |
 
 
 Also creates or updates **MeshCorePacketObservation** per `(packet, observer)` (deduped). Repeater **path_hashes** are stored on the observation row only (not on deduped `MeshCoreRawPacket`), so two feeders reporting the same `pkt_hash` can keep different paths. See [ADR-0001 (path hash resolution)](../traceroute/adr/0001-mc-path-hash-resolution.md).

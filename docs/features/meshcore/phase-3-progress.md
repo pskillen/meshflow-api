@@ -37,10 +37,16 @@ MC **path/trace** or passive hop accumulation as a Meshtastic traceroute analog:
 
 ---
 
+### Passive path — heard UI per-feeder schematic
+
+- [meshflow-ui#311](https://github.com/pskillen/meshflow-ui/issues/311) — `MeshCoreHeardPathsPanel` / `PathHopChain` per feeder in heard dialog.
+
+---
+
 ## In flight
 
-- **Packet path subsystem** — ADR + rollups + resolution: [packet-path-tracing/](./packet-path-tracing/).
-- **UI #311** — logical path per feeder in heard dialog ([meshflow-ui#311](https://github.com/pskillen/meshflow-ui/issues/311)).
+- **Tier 1 MVP (message heard paths)** — [#385](https://github.com/pskillen/meshflow-api/issues/385): PRs [api#386](https://github.com/pskillen/meshflow-api/pull/386), [bot#124](https://github.com/pskillen/meshflow-bot/pull/124). Design: [tier-1-message-path-twin.md](./packet-path-tracing/tier-1-message-path-twin.md). Pre-prod verification pending.
+- **Packet path subsystem (M1)** — ADR + rollups + staff segments API: [packet-path-tracing/](./packet-path-tracing/); PRs [#378](https://github.com/pskillen/meshflow-api/pull/378), [bot#122](https://github.com/pskillen/meshflow-bot/pull/122), [ui#310](https://github.com/pskillen/meshflow-ui/pull/310).
 
 ---
 
@@ -48,15 +54,15 @@ MC **path/trace** or passive hop accumulation as a Meshtastic traceroute analog:
 
 | Repo | Issue |
 | --- | --- |
-| meshflow-api | [#360](https://github.com/pskillen/meshflow-api/issues/360), [#369](https://github.com/pskillen/meshflow-api/issues/369) |
-| meshflow-bot | [#119](https://github.com/pskillen/meshflow-bot/issues/119) |
+| meshflow-api | [#360](https://github.com/pskillen/meshflow-api/issues/360), [#369](https://github.com/pskillen/meshflow-api/issues/369), **[#385](https://github.com/pskillen/meshflow-api/issues/385)** (Tier 1), [#372](https://github.com/pskillen/meshflow-api/issues/372) (M1) |
+| meshflow-bot | [#119](https://github.com/pskillen/meshflow-bot/issues/119) (+ [#385](https://github.com/pskillen/meshflow-api/issues/385) upload surface) |
 | meshflow-ui | [#304](https://github.com/pskillen/meshflow-ui/issues/304), [#311](https://github.com/pskillen/meshflow-ui/issues/311) |
 
 ---
 
 ## References
 
-- [phase-3-outstanding.md](./phase-3-outstanding.md)
+- [phase-3-outstanding.md](./phase-3-outstanding.md) — MVP tiers (Tier 1 [#385](https://github.com/pskillen/meshflow-api/issues/385))
 - [traceroute/README.md](../traceroute/README.md) § MeshCore path parity
 - [ADR-0001 — MC path hash resolution](../traceroute/adr/0001-mc-path-hash-resolution.md)
 - [packet-ingestion/meshcore.md](../packet-ingestion/meshcore.md) — what the bot uploads today

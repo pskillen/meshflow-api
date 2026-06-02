@@ -105,7 +105,7 @@ Implications for closing this gap (direction only — not scheduled here):
 
 ### Follow-up (tracking)
 
-- [ ] **Server-led ingest design** — extend API (and optionally bot upload surface) so channel-text messages get `path_hashes` on the observation tied to `original_mc_packet`, without bot-side path logic. Likely depends on [#266](https://github.com/pskillen/meshflow-api/issues/266) / `rx_log_data` TEXT_MSG ingest and/or dedup correlation spike.
+- [ ] **Tier 1 — server-led ingest (ship)** — [#385](https://github.com/pskillen/meshflow-api/issues/385): `path_hashes` on observation tied to `original_mc_packet` for channel `TextMessage` traffic; thin bot upload of TEXT_MSG/PATH `rx_log_data`; API twin-merge. Design: [tier-1-message-path-twin.md](./tier-1-message-path-twin.md).
 - [ ] **Confirm with M2 spike** — whether `path_hash_mode` changes segment identity when we do get text paths.
 - [ ] **Optional:** re-run pre-prod queries after deploy (`Meshflow/ai-env` + Django shell; local skill `MeshFlow/.cursor/skills/preprod-database/`) — breakdown by `payload_type` + `event_type`.
 

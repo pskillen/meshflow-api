@@ -91,3 +91,55 @@ def test_message_list_query_count_bounded(meshcore_feeder, ingest_client):
     assert response.status_code == 200
     assert len(response.data["results"]) >= 3
     assert len(ctx) <= 25
+
+
+@pytest.mark.django_db
+def test_mc_message_heard_path_via_rx_log_twin(meshcore_feeder, ingest_client):
+    """Tier 1: channel_text without path + raw PATH twin → heard[] shows path_hashes."""
+    reconcile_mc_channels(
+        meshcore_feeder["node"],
+        [{"mc_channel_idx": 0, "name": "Public", "mc_channel_type": "PUBLIC"}],
+    )
+    now = timezone.now()
+    url = feeder_url("meshcore-feeder-packet-ingest", FEEDER_MC_PUBKEY_PREFIX)
+    rx_time = now.timestamp()
+    message_text = "tier1 heard twin path"
+
+    ingest_client.post(
+        url,
+        {
+            "event_type": "channel_message",
+            "payload_type": "channel_text",
+            "channel_idx": 0,
+            "rx_time": rx_time,
+            "text": message_text,
+            "path_hash_size": 2,
+            "path_hash_mode": 2,
+            "raw": {},
+        },
+        format="json",
+    )
+    ingest_client.post(
+        url,
+        {
+            "event_type": "rx_log_data",
+            "payload_type": "raw",
+            "pkt_hash": 3138934464,
+            "rx_time": rx_time,
+            "path_hashes": ["ab", "cd"],
+            "path_hash_size": 2,
+            "raw": {
+                "protocol": "meshcore",
+                "event_type": "rx_log_data",
+                "payload": {"payload_typename": "PATH", "path": "abcd"},
+            },
+        },
+        format="json",
+    )
+
+    tm = TextMessage.objects.get(message_text=message_text)
+    client = APIClient()
+    list_url = reverse("textmessage-list")
+    response = client.get(list_url, {"channel_id": tm.channel_id})
+    row = next(item for item in response.data["results"] if item["id"] == str(tm.id))
+    assert row["heard"][0]["path_hashes"] == ["ab", "cd"]
