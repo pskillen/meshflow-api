@@ -6,14 +6,13 @@ import hashlib
 from typing import Any
 
 from constellations.models import MessageChannel
-from meshcore_packets.services.dedup import surrogate_pkt_hash
+from meshcore_packets.services.dedup import digest_to_signed_bigint, normalize_stored_pkt_hash, surrogate_pkt_hash
 from nodes.models import ManagedNode
 
 
 def _hash_payload(payload: str) -> int:
     digest = hashlib.sha256(payload.encode()).hexdigest()
-    # Mask to signed 63-bit range (SQLite INTEGER limit in tests; PG BigInteger is fine).
-    return int(digest[:16], 16) & ((1 << 63) - 1)
+    return digest_to_signed_bigint(digest)
 
 
 def extract_sender_timestamp(validated_data: dict[str, Any]) -> int | None:
@@ -65,7 +64,7 @@ def resolve_ingest_dedup_key(
     """
     wire_hash = validated_data.get("pkt_hash")
     if wire_hash is not None:
-        return int(wire_hash)
+        return normalize_stored_pkt_hash(wire_hash)
 
     payload_type = validated_data.get("payload_type")
     if payload_type == "channel_text" and channel is not None:

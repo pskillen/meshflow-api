@@ -3,7 +3,7 @@
 import pytest
 
 from meshcore_packets.services.channel_sync import reconcile_mc_channels
-from meshcore_packets.services.dedup import surrogate_pkt_hash
+from meshcore_packets.services.dedup import SIGNED_BIGINT_MAX, surrogate_pkt_hash
 from meshcore_packets.services.dedup_key import (
     channel_text_dedup_key,
     extract_sender_timestamp,
@@ -20,6 +20,11 @@ def test_extract_sender_timestamp_from_nested_envelope():
         },
     }
     assert extract_sender_timestamp(data) == 1780409317
+
+
+def test_surrogate_pkt_hash_fits_postgresql_bigint():
+    key = surrogate_pkt_hash(event_type="channel_message", raw_payload="x" * 5000)
+    assert 0 <= key <= SIGNED_BIGINT_MAX
 
 
 def test_channel_text_dedup_key_stable_across_feeder_envelopes():

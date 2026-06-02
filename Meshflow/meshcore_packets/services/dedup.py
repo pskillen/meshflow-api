@@ -9,6 +9,23 @@ from django.conf import settings
 
 from meshcore_packets.models import MeshCoreRawPacket
 
+# PostgreSQL BIGINT is signed; Django BigIntegerField maps to the same range.
+SIGNED_BIGINT_MAX = (1 << 63) - 1
+SIGNED_BIGINT_MIN = -(1 << 63)
+
+
+def digest_to_signed_bigint(digest_hex: str) -> int:
+    """Map SHA-256 hex (first 16 nibbles) into storable signed BIGINT range."""
+    return int(digest_hex[:16], 16) & SIGNED_BIGINT_MAX
+
+
+def normalize_stored_pkt_hash(value: int) -> int:
+    """Ensure wire or computed keys fit PostgreSQL BIGINT."""
+    v = int(value)
+    if SIGNED_BIGINT_MIN <= v <= SIGNED_BIGINT_MAX:
+        return v
+    return v & SIGNED_BIGINT_MAX
+
 
 def dedup_window() -> timedelta:
     minutes = getattr(settings, "MESHCORE_PACKET_DEDUP_WINDOW_MINUTES", 10)
@@ -22,7 +39,7 @@ def decoded_twin_window() -> timedelta:
 
 def surrogate_pkt_hash(*, event_type: str, raw_payload: str) -> int:
     digest = hashlib.sha256(f"{event_type}|{raw_payload}".encode()).hexdigest()
-    return int(digest[:16], 16)
+    return digest_to_signed_bigint(digest)
 
 
 def find_existing_packet(
