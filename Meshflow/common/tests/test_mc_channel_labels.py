@@ -30,9 +30,21 @@ def test_mc_channel_admin_label_hashtag_prefix(create_constellation):
         constellation=constellation,
         protocol=Protocol.MESHCORE,
         mc_channel_type=MeshCoreChannelType.HASHTAG,
-        mc_hashtag="galloway",
     )
     assert mc_channel_admin_label(ch) == "#galloway"
+
+
+@pytest.mark.django_db
+def test_mc_channel_admin_label_hashtag_with_scope(create_constellation):
+    constellation = create_constellation()
+    ch = MessageChannel.objects.create(
+        name="galloway",
+        constellation=constellation,
+        protocol=Protocol.MESHCORE,
+        mc_channel_type=MeshCoreChannelType.HASHTAG,
+        region_scope="sample-west",
+    )
+    assert mc_channel_admin_label(ch) == "#galloway · sample-west"
 
 
 @pytest.mark.django_db
@@ -43,9 +55,9 @@ def test_message_channel_to_apply_entry_hashtag(create_constellation):
         constellation=constellation,
         protocol=Protocol.MESHCORE,
         mc_channel_type=MeshCoreChannelType.HASHTAG,
-        mc_hashtag="galloway",
+        region_scope="sample-west",
     )
     entry = message_channel_to_apply_entry(ch, mc_channel_idx=1)
     assert entry["mc_channel_type"] == "HASHTAG"
-    assert entry["mc_hashtag"] == "galloway"
     assert entry["name"] == "galloway"
+    assert entry["region_scope"] == "sample-west"

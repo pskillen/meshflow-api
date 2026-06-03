@@ -53,11 +53,14 @@ class MessageChannel(models.Model):
         blank=True,
         help_text=_("MeshCore channel type when protocol is MeshCore."),
     )
-    mc_hashtag = models.CharField(
-        max_length=64,
+    region_scope = models.CharField(
+        max_length=29,
         null=True,
         blank=True,
-        help_text=_("Hashtag string when mc_channel_type is HASHTAG (no leading #)."),
+        help_text=_(
+            "MeshCore region scope when protocol is MeshCore (lowercase alphanumeric + hyphen; "
+            "null = legacy / no scope)."
+        ),
     )
 
     class Meta:
@@ -65,21 +68,20 @@ class MessageChannel(models.Model):
         verbose_name_plural = _("Message channels")
         constraints = [
             models.UniqueConstraint(
-                fields=["constellation", "protocol", "mc_hashtag"],
+                fields=["constellation", "protocol", "name", "mc_channel_type"],
                 condition=models.Q(
                     protocol=Protocol.MESHCORE,
-                    mc_channel_type=MeshCoreChannelType.HASHTAG,
-                    mc_hashtag__isnull=False,
+                    region_scope__isnull=True,
                 ),
-                name="messagechannel_mc_hashtag_constellation_unique",
+                name="messagechannel_mc_null_scope_unique",
             ),
             models.UniqueConstraint(
-                fields=["constellation", "protocol", "name"],
+                fields=["constellation", "protocol", "name", "mc_channel_type", "region_scope"],
                 condition=models.Q(
                     protocol=Protocol.MESHCORE,
-                    mc_channel_type=MeshCoreChannelType.PUBLIC,
+                    region_scope__isnull=False,
                 ),
-                name="messagechannel_mc_public_name_constellation_unique",
+                name="messagechannel_mc_region_scope_unique",
             ),
         ]
 

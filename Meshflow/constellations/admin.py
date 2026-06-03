@@ -116,7 +116,7 @@ class MeshCoreMessageChannelAdmin(admin.ModelAdmin):
         ("mc_channel_type", admin.ChoicesFieldListFilter),
         "constellation",
     )
-    search_fields = ("name", "mc_hashtag", "constellation__name")
+    search_fields = ("name", "region_scope", "constellation__name")
     ordering = ("constellation__name", "name")
     list_select_related = ("constellation",)
     fieldsets = (
@@ -124,10 +124,10 @@ class MeshCoreMessageChannelAdmin(admin.ModelAdmin):
         (
             _("Channel"),
             {
-                "fields": ("name", "mc_channel_type", "mc_hashtag"),
+                "fields": ("name", "mc_channel_type", "region_scope"),
                 "description": _(
-                    "PUBLIC channels use a plain name. HASHTAG channels use mc_hashtag "
-                    "(no leading #); lists show #prefix for hashtags."
+                    "PUBLIC channels use a plain name. HASHTAG channels store the tag in name "
+                    "(no leading #); lists show #prefix. region_scope is optional (null = legacy scope)."
                 ),
             },
         ),

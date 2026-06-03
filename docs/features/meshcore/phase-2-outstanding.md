@@ -103,7 +103,7 @@ Follow-up after local UI + pre-prod bot + shared Postgres/Redis. Tracked on [#29
 - [ ] **Auto-set `mc_pubkey` on first connect** — still manual in admin ([#279](https://github.com/pskillen/meshflow-api/issues/279)).
 - [ ] **OpenAPI** — confirm all MC feeder paths and apply responses match deployed code after #335 merge (code was ahead of spec in places during staging).
 - [ ] **Admin push action** — pushes the feeder’s **linked** channel list (`ManagedNodeMcChannelLink` order/slots); editing constellation **MeshCore channels** admin does not auto-assign links or push (use Node Settings / bot sync).
-- [ ] **Dual API (`STORAGE_API_2_*`)** — bot POSTs `mc-channel-sync` (and packets) to **both** APIs when upload enabled; **WebSocket / apply** only on primary `STORAGE_API_ROOT`. Documented in [text-message-channels.md](./text-message-channels.md); UI apply against API 2 while bot WS on API 1 will always 503.
+- [ ] **Dual API (`STORAGE_API_2_*`)** — bot POSTs `mc-channel-sync` (and packets) to **both** APIs when upload enabled; **WebSocket / apply** only on primary `STORAGE_API_ROOT`. Documented in [mc-channel-sync/operations.md](./mc-channel-sync/operations.md); UI apply against API 2 while bot WS on API 1 will always 503.
 
 ### Intentional / by design (document only)
 

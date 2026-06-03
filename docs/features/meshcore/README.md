@@ -19,7 +19,8 @@ Cross-repo MeshCore work is tracked on GitHub epics [#264](https://github.com/ps
 **Feature guides** (how-to, not phase status):
 
 - [feeder-bootstrap.md](./feeder-bootstrap.md) — first MC feeder + API key + `mc_pubkey`
-- [text-message-channels.md](./text-message-channels.md) — Phase 2.2 text + channels (device → API sync, apply-to-radio, ops troubleshooting)
+- [mc-channel-sync/](./mc-channel-sync/) — feeder channel mirror (`mc-channel-sync`, apply-to-radio, data model, ops)
+- [text-message-channels.md](./text-message-channels.md) — MC text ingest, `TextMessage`, wire format (channel config → [mc-channel-sync/](./mc-channel-sync/))
 - [packet-path-tracing/](./packet-path-tracing/) — proposed passive MC packet path subsystem (capture, resolution, Neo4j, realtime/history UI)
 - [../node-lifecycle/node-claims-meshcore.md](../node-lifecycle/node-claims-meshcore.md) — ownership claims via contact/DM proof
 

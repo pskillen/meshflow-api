@@ -6,10 +6,47 @@ from django.db import transaction
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
+from common.mc_region_scope import normalize_region_scope
 from common.protocol import Protocol
 from constellations.models import MessageChannel
-from meshcore_packets.services.channel_identity import MC_CHANNEL_IDX_MAX, upsert_canonical_mc_channel
+from meshcore_packets.services.channel_identity import (
+    MC_CHANNEL_IDX_MAX,
+    snapshot_entry_matches_channel,
+    upsert_canonical_mc_channel,
+)
 from nodes.models import ManagedNode, ManagedNodeMcChannelLink
+
+
+def enrich_snapshot_region_scope(managed_node: ManagedNode, entry: dict) -> dict:
+    """
+    When the device snapshot omits region_scope, preserve scope from the feeder's
+    existing slot link when name and type still match (companion protocol gap).
+    """
+    entry = dict(entry)
+    if "region_scope" in entry:
+        try:
+            scope = normalize_region_scope(entry.get("region_scope"))
+        except ValueError:
+            scope = None
+        if scope is not None:
+            entry["region_scope"] = scope
+            return entry
+
+    idx = entry.get("mc_channel_idx")
+    if idx is None:
+        return entry
+
+    link = managed_node.mc_channel_links.filter(mc_channel_idx=int(idx)).select_related("message_channel").first()
+    if link is None:
+        return entry
+
+    channel = link.message_channel
+    if not channel.region_scope:
+        return entry
+    if not snapshot_entry_matches_channel(entry, channel):
+        return entry
+    entry["region_scope"] = channel.region_scope
+    return entry
 
 
 def reconcile_mc_channels(
@@ -20,7 +57,7 @@ def reconcile_mc_channels(
     """
     Upsert canonical MC MessageChannel rows and feeder slot links from a device snapshot.
 
-    Each channel dict: mc_channel_idx, name, mc_channel_type (PUBLIC|HASHTAG), mc_hashtag (optional).
+    Each channel dict: mc_channel_idx, name, mc_channel_type (PUBLIC|HASHTAG), region_scope (optional).
     """
     if managed_node.protocol != Protocol.MESHCORE:
         raise ValueError("mc-channel-sync is only valid for MeshCore managed nodes")
@@ -36,7 +73,8 @@ def reconcile_mc_channels(
     attached: list[MessageChannel] = []
 
     with transaction.atomic():
-        for entry in channels:
+        for raw_entry in channels:
+            entry = enrich_snapshot_region_scope(managed_node, raw_entry)
             idx = entry.get("mc_channel_idx")
             if idx is None:
                 continue

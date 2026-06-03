@@ -69,11 +69,11 @@ def second_mc_feeder(meshcore_feeder, create_managed_node, create_node_api_key):
 def _setup_hashtag_channels(meshcore_feeder, second_mc_feeder):
     reconcile_mc_channels(
         meshcore_feeder["node"],
-        [{"mc_channel_idx": 1, "name": "test", "mc_channel_type": "HASHTAG", "mc_hashtag": "test"}],
+        [{"mc_channel_idx": 1, "name": "test", "mc_channel_type": "HASHTAG"}],
     )
     reconcile_mc_channels(
         second_mc_feeder["node"],
-        [{"mc_channel_idx": 2, "name": "test", "mc_channel_type": "HASHTAG", "mc_hashtag": "test"}],
+        [{"mc_channel_idx": 2, "name": "test", "mc_channel_type": "HASHTAG"}],
     )
 
 

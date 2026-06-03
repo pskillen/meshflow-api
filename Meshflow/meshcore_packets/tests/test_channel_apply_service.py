@@ -15,11 +15,11 @@ def test_build_apply_channels_for_managed_node(meshcore_feeder):
     node = meshcore_feeder["node"]
     constellation = node.constellation
     ch = MessageChannel.objects.create(
-        name="tag",
+        name="meshflow",
         constellation=constellation,
         protocol=Protocol.MESHCORE,
         mc_channel_type=MeshCoreChannelType.HASHTAG,
-        mc_hashtag="meshflow",
+        region_scope="uk-wide",
     )
     ManagedNodeMcChannelLink.objects.create(
         managed_node=node,
@@ -31,7 +31,8 @@ def test_build_apply_channels_for_managed_node(meshcore_feeder):
     assert len(payload) == 1
     assert payload[0]["mc_channel_idx"] == 2
     assert payload[0]["mc_channel_type"] == "HASHTAG"
-    assert payload[0]["mc_hashtag"] == "meshflow"
+    assert payload[0]["name"] == "meshflow"
+    assert payload[0]["region_scope"] == "uk-wide"
 
 
 @pytest.mark.django_db

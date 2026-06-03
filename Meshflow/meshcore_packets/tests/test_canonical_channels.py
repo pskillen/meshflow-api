@@ -33,23 +33,56 @@ def test_two_feeders_same_hashtag_different_indices_one_canonical(
 
     reconcile_mc_channels(
         meshcore_feeder["node"],
-        [{"mc_channel_idx": 1, "name": "test", "mc_channel_type": "HASHTAG", "mc_hashtag": "test"}],
+        [{"mc_channel_idx": 1, "name": "test", "mc_channel_type": "HASHTAG"}],
     )
     reconcile_mc_channels(
         feeder_b,
-        [{"mc_channel_idx": 2, "name": "test", "mc_channel_type": "HASHTAG", "mc_hashtag": "test"}],
+        [{"mc_channel_idx": 2, "name": "test", "mc_channel_type": "HASHTAG"}],
     )
 
     canonical = MessageChannel.objects.filter(
         constellation=constellation,
         protocol=Protocol.MESHCORE,
-        mc_hashtag="test",
+        name="test",
+        mc_channel_type=2,
     )
     assert canonical.count() == 1
 
     ch_a = resolve_mc_channel(meshcore_feeder["node"], 1)
     ch_b = resolve_mc_channel(feeder_b, 2)
     assert ch_a.id == ch_b.id
+
+
+@pytest.mark.django_db
+def test_same_hashtag_different_region_scope_two_canonical(meshcore_feeder):
+    """Same tag in different region scopes → distinct MessageChannel rows."""
+    constellation = meshcore_feeder["node"].constellation
+    reconcile_mc_channels(
+        meshcore_feeder["node"],
+        [
+            {
+                "mc_channel_idx": 1,
+                "name": "galloway",
+                "mc_channel_type": "HASHTAG",
+                "region_scope": "sample-west",
+            },
+            {
+                "mc_channel_idx": 2,
+                "name": "galloway",
+                "mc_channel_type": "HASHTAG",
+                "region_scope": "uk-wide",
+            },
+        ],
+    )
+    rows = MessageChannel.objects.filter(
+        constellation=constellation,
+        protocol=Protocol.MESHCORE,
+        name="galloway",
+        mc_channel_type=2,
+    )
+    assert rows.count() == 2
+    scopes = {r.region_scope for r in rows}
+    assert scopes == {"sample-west", "uk-wide"}
 
 
 @pytest.mark.django_db
@@ -64,11 +97,11 @@ def test_two_feeders_ingest_same_text_same_channel_id(meshcore_feeder, create_ma
     )
     reconcile_mc_channels(
         meshcore_feeder["node"],
-        [{"mc_channel_idx": 1, "name": "test", "mc_channel_type": "HASHTAG", "mc_hashtag": "test"}],
+        [{"mc_channel_idx": 1, "name": "test", "mc_channel_type": "HASHTAG"}],
     )
     reconcile_mc_channels(
         feeder_b,
-        [{"mc_channel_idx": 2, "name": "test", "mc_channel_type": "HASHTAG", "mc_hashtag": "test"}],
+        [{"mc_channel_idx": 2, "name": "test", "mc_channel_type": "HASHTAG"}],
     )
 
     now = timezone.now()

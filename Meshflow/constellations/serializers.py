@@ -15,7 +15,7 @@ def message_channel_payload(channel: MessageChannel) -> dict:
         "name": channel.name,
         "protocol": channel.protocol,
         "mc_channel_type": mc_type,
-        "mc_hashtag": channel.mc_hashtag,
+        "region_scope": channel.region_scope,
         "constellation": channel.constellation_id,
     }
     if channel.protocol == Protocol.MESHCORE:

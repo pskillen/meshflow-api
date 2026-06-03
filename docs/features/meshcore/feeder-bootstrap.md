@@ -86,21 +86,7 @@ Restart the bot. Confirm logs show feeder-scoped paths, e.g. `POST /api/meshcore
 
 On connect, **meshflow-bot** reads the device channel table and calls **`POST /api/meshcore/feeders/{prefix}/mc-channel-sync/`** so the API mirror matches the radio.
 
-See [text-message-channels.md](./text-message-channels.md).
-
-### Django admin (operators)
-
-- **MeshCore channels** — constellation MC channel catalog only (proxy admin); hashtag rows show with **`#` prefix** in lists.
-- **Managed nodes** (MeshCore) — **read-only** “device mirror” table (slot, type, label); **`mc_channels_synced_at`** from last bot sync.
-- **Push MC channel config to feeder device** — admin action sends the current mirror to the radio over WebSocket (same mechanism as UI apply). Requires bot connected on **primary** API WS (see dual-API below).
-
-Editing channel definitions in admin does **not** auto-push; use the push action after the mirror reflects what you want on air.
-
-### Dual API upload (`STORAGE_API_2_*`)
-
-If the bot sets **`STORAGE_API_2_ROOT`** + token with `MESHCORE_UPLOAD_ENABLED`, it uploads packets, bot version, and **`mc-channel-sync`** to **both** APIs.
-
-**WebSocket** (apply-to-radio, traceroute) is only started from **`STORAGE_API_ROOT`** (or `MESHFLOW_WS_URL` pointing at the primary). API 2 receives passive mirror updates but will not receive `apply_mc_channel_config` unless WS is also pointed there.
+Full flow, data model, Django admin push action, and dual-API behaviour: **[mc-channel-sync/](mc-channel-sync/)** (see [operations.md](mc-channel-sync/operations.md) for `STORAGE_API_2_*` and apply troubleshooting).
 
 ## Operator trial (24h)
 

@@ -29,13 +29,11 @@ def test_reconcile_mc_channels_creates_and_links(meshcore_feeder):
                 "mc_channel_idx": 0,
                 "name": "Public",
                 "mc_channel_type": "PUBLIC",
-                "mc_hashtag": None,
             },
             {
                 "mc_channel_idx": 1,
-                "name": "Galloway",
+                "name": "galloway",
                 "mc_channel_type": "HASHTAG",
-                "mc_hashtag": "galloway",
             },
         ],
     )
@@ -93,6 +91,91 @@ def test_mc_channel_sync_endpoint(sync_client, meshcore_feeder):
     assert len(response.data["mc_channels"]) == 1
     meshcore_feeder["node"].refresh_from_db()
     assert meshcore_feeder["node"].mc_channels.count() == 1
+
+
+@pytest.mark.django_db
+def test_reconcile_preserves_region_scope_when_snapshot_omits_scope(meshcore_feeder):
+    """Device read without scope must not create a duplicate unscoped row."""
+    from constellations.models import MeshCoreChannelType
+
+    node = meshcore_feeder["node"]
+    reconcile_mc_channels(
+        node,
+        [
+            {
+                "mc_channel_idx": 0,
+                "name": "galloway",
+                "mc_channel_type": "HASHTAG",
+                "region_scope": "sample-west",
+            },
+        ],
+    )
+    scoped = MessageChannel.objects.get(
+        constellation=node.constellation,
+        name="galloway",
+        region_scope="sample-west",
+    )
+    reconcile_mc_channels(
+        node,
+        [
+            {
+                "mc_channel_idx": 0,
+                "name": "galloway",
+                "mc_channel_type": "HASHTAG",
+            },
+        ],
+    )
+    node.refresh_from_db()
+    link = node.mc_channel_links.get(mc_channel_idx=0)
+    assert link.message_channel_id == scoped.id
+    assert (
+        MessageChannel.objects.filter(
+            constellation=node.constellation,
+            protocol=Protocol.MESHCORE,
+            name="galloway",
+            mc_channel_type=MeshCoreChannelType.HASHTAG,
+        ).count()
+        == 1
+    )
+
+
+@pytest.mark.django_db
+def test_reconcile_rescope_updates_canonical_row(meshcore_feeder):
+    """Applying a new region_scope for the same tag creates/uses a distinct canonical row."""
+    from constellations.models import MeshCoreChannelType
+
+    node = meshcore_feeder["node"]
+    reconcile_mc_channels(
+        node,
+        [
+            {
+                "mc_channel_idx": 0,
+                "name": "galloway",
+                "mc_channel_type": "HASHTAG",
+                "region_scope": "sample-west",
+            },
+        ],
+    )
+    reconcile_mc_channels(
+        node,
+        [
+            {
+                "mc_channel_idx": 0,
+                "name": "galloway",
+                "mc_channel_type": "HASHTAG",
+                "region_scope": "uk-wide",
+            },
+        ],
+    )
+    rows = MessageChannel.objects.filter(
+        constellation=node.constellation,
+        protocol=Protocol.MESHCORE,
+        name="galloway",
+        mc_channel_type=MeshCoreChannelType.HASHTAG,
+    )
+    assert rows.count() == 2
+    link = node.mc_channel_links.get(mc_channel_idx=0)
+    assert link.message_channel.region_scope == "uk-wide"
 
 
 @pytest.mark.django_db
