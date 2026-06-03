@@ -67,7 +67,7 @@ See **tests/TESTING.md** for detailed instructions (unit tests, integration test
 
 ### Pre-production database (opt-in)
 
-Agents must **not** query pre-prod unless the user explicitly enables it. When enabled, follow **[.cursor/skills/preprod-database/SKILL.md](.cursor/skills/preprod-database/SKILL.md)** (`disable-model-invocation`; copy credentials to local `Meshflow/ai-env`, gitignored).
+Agents must **not** query pre-prod unless the user explicitly enables it. When enabled, follow the `preprod-database` skill (`MeshFlow/.cursor/skills/preprod-database/SKILL.md`, in the MeshFlow umbrella workspace) (`disable-model-invocation`; copy credentials to local `Meshflow/ai-env`, gitignored).
 
 ## Code Style
 

@@ -1,9 +1,0 @@
----
-description: Feature documentation under docs/features/ — follow mf-feature-docs skill
-globs: docs/features/**/*
-alwaysApply: false
----
-
-When creating or editing files under `docs/features/`, read and follow [.cursor/rules/mf-feature-docs/SKILL.md](mf-feature-docs/SKILL.md).
-
-For multi-step initiatives, also use [progress-tracking](.cursor/skills/progress-tracking/SKILL.md): maintain `*-progress.md` and `*-outstanding.md` in the feature folder; update before opening PRs.
