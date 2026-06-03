@@ -2972,10 +2972,13 @@ components:
           nullable: true
           enum: [PUBLIC, HASHTAG]
           description: MeshCore channel type when protocol is MeshCore
-        mc_hashtag:
+        region_scope:
           type: string
           nullable: true
-          description: Hashtag string when mc_channel_type is HASHTAG (no leading #)
+          maxLength: 29
+          description: >
+            MeshCore region scope (lowercase alphanumeric + hyphen; null = legacy / no scope).
+            HASHTAG rows use name for the tag without #.
         constellation:
           type: integer
           description: The ID of the constellation this channel belongs to
@@ -2998,9 +3001,10 @@ components:
           type: string
           nullable: true
           enum: [PUBLIC, HASHTAG]
-        mc_hashtag:
+        region_scope:
           type: string
           nullable: true
+          maxLength: 29
 
     McChannelSyncEntry:
       type: object
@@ -3015,9 +3019,10 @@ components:
         mc_channel_type:
           type: string
           enum: [PUBLIC, HASHTAG]
-        mc_hashtag:
+        region_scope:
           type: string
           nullable: true
+          maxLength: 29
 
     McChannelSyncRequest:
       type: object

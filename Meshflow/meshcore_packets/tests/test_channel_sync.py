@@ -29,13 +29,11 @@ def test_reconcile_mc_channels_creates_and_links(meshcore_feeder):
                 "mc_channel_idx": 0,
                 "name": "Public",
                 "mc_channel_type": "PUBLIC",
-                "mc_hashtag": None,
             },
             {
                 "mc_channel_idx": 1,
-                "name": "Galloway",
+                "name": "galloway",
                 "mc_channel_type": "HASHTAG",
-                "mc_hashtag": "galloway",
             },
         ],
     )

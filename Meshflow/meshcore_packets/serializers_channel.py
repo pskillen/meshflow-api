@@ -2,6 +2,7 @@
 
 from rest_framework import serializers
 
+from common.mc_region_scope import normalize_region_scope
 from constellations.models import MeshCoreChannelType, MessageChannel
 from nodes.models import ManagedNodeMcChannelLink
 
@@ -16,7 +17,7 @@ class McChannelSnapshotEntrySerializer(serializers.Serializer):
     mc_channel_idx = serializers.IntegerField(min_value=0, max_value=63)
     name = serializers.CharField(max_length=100)
     mc_channel_type = serializers.ChoiceField(choices=MC_CHANNEL_TYPE_API_CHOICES)
-    mc_hashtag = serializers.CharField(max_length=64, required=False, allow_null=True, allow_blank=True)
+    region_scope = serializers.CharField(max_length=29, required=False, allow_null=True, allow_blank=True)
 
 
 class McChannelSyncSerializer(serializers.Serializer):
@@ -35,7 +36,7 @@ class MessageChannelMcSerializer(serializers.ModelSerializer):
             "id",
             "name",
             "mc_channel_type",
-            "mc_hashtag",
+            "region_scope",
         ]
 
     def get_mc_channel_type(self, obj):
@@ -50,8 +51,8 @@ class FeederMcChannelMirrorSerializer(serializers.ModelSerializer):
     id = serializers.IntegerField(source="message_channel.id", read_only=True)
     name = serializers.CharField(source="message_channel.name", read_only=True)
     mc_channel_type = serializers.SerializerMethodField()
-    mc_hashtag = serializers.CharField(
-        source="message_channel.mc_hashtag",
+    region_scope = serializers.CharField(
+        source="message_channel.region_scope",
         read_only=True,
         allow_null=True,
     )
@@ -63,7 +64,7 @@ class FeederMcChannelMirrorSerializer(serializers.ModelSerializer):
             "name",
             "mc_channel_idx",
             "mc_channel_type",
-            "mc_hashtag",
+            "region_scope",
         ]
 
     def get_mc_channel_type(self, obj):
@@ -77,7 +78,7 @@ class McChannelApplyEntrySerializer(serializers.Serializer):
     mc_channel_idx = serializers.IntegerField(min_value=0, max_value=63, required=False)
     name = serializers.CharField(max_length=100)
     mc_channel_type = serializers.ChoiceField(choices=MC_CHANNEL_TYPE_API_CHOICES)
-    mc_hashtag = serializers.CharField(max_length=64, required=False, allow_null=True, allow_blank=True)
+    region_scope = serializers.CharField(max_length=29, required=False, allow_null=True, allow_blank=True)
 
 
 class McChannelApplySerializer(serializers.Serializer):
@@ -86,10 +87,14 @@ class McChannelApplySerializer(serializers.Serializer):
     def validate(self, attrs):
         channels = attrs.get("channels") or []
         for entry in channels:
+            if "region_scope" in entry:
+                try:
+                    entry["region_scope"] = normalize_region_scope(entry.get("region_scope"))
+                except ValueError as exc:
+                    raise serializers.ValidationError({"channels": str(exc)}) from exc
             if str(entry.get("mc_channel_type")).upper() == "HASHTAG":
-                tag = (entry.get("mc_hashtag") or entry.get("name") or "").strip().lstrip("#")
+                tag = (entry.get("name") or "").strip().lstrip("#")
                 if not tag:
-                    raise serializers.ValidationError({"channels": "Hashtag channels require a non-empty hashtag."})
-                entry["mc_hashtag"] = tag[:64]
+                    raise serializers.ValidationError({"channels": "Hashtag channels require a non-empty name."})
                 entry["name"] = tag[:100]
         return attrs

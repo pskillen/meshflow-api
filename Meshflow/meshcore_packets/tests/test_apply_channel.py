@@ -36,7 +36,7 @@ def test_apply_returns_503_when_feeder_not_connected(create_user, create_managed
                         "mc_channel_idx": 0,
                         "name": "galloway",
                         "mc_channel_type": "HASHTAG",
-                        "mc_hashtag": "galloway",
+                        "region_scope": "sample-west",
                     }
                 ]
             },
@@ -119,9 +119,8 @@ def test_apply_dispatches_when_feeder_connected(create_user, create_managed_node
                 "channels": [
                     {
                         "mc_channel_idx": 1,
-                        "name": "tag",
+                        "name": "galloway",
                         "mc_channel_type": "HASHTAG",
-                        "mc_hashtag": "#galloway",
                     }
                 ]
             },
@@ -131,7 +130,6 @@ def test_apply_dispatches_when_feeder_connected(create_user, create_managed_node
     assert response.status_code == 202
     dispatch_mock.assert_called_once()
     sent_channels = dispatch_mock.call_args[0][1]
-    assert sent_channels[0]["mc_hashtag"] == "galloway"
     assert sent_channels[0]["name"] == "galloway"
     assert sent_channels[0]["mc_channel_type"] == "HASHTAG"
     assert type(sent_channels[0]["mc_channel_type"]) is str

@@ -6,15 +6,22 @@ from constellations.models import MeshCoreChannelType, MessageChannel
 from nodes.models import ManagedNode, ManagedNodeMcChannelLink
 
 
+def _scope_suffix(channel: MessageChannel) -> str:
+    scope = (channel.region_scope or "").strip()
+    if scope:
+        return f" · {scope}"
+    return ""
+
+
 def mc_channel_admin_label(channel: MessageChannel) -> str:
     """Human label for admin lists: #hashtag for HASHTAG, plain name for PUBLIC."""
     if channel.mc_channel_type == MeshCoreChannelType.HASHTAG:
-        tag = (channel.mc_hashtag or channel.name or "").strip().lstrip("#")
+        tag = (channel.name or "").strip().lstrip("#")
         if tag:
-            return f"#{tag}"
+            return f"#{tag}{_scope_suffix(channel)}"
     name = (channel.name or "").strip()
     if name:
-        return name
+        return f"{name}{_scope_suffix(channel)}"
     return str(channel.pk)
 
 
@@ -53,10 +60,10 @@ def message_channel_to_apply_entry(
         "mc_channel_idx": mc_channel_idx,
         "name": channel.name,
         "mc_channel_type": ch_type,
+        "region_scope": channel.region_scope,
     }
     if channel.mc_channel_type == MeshCoreChannelType.HASHTAG:
-        tag = (channel.mc_hashtag or channel.name or "").strip().lstrip("#")
-        entry["mc_hashtag"] = tag[:64] if tag else None
+        tag = (channel.name or "").strip().lstrip("#")
         if tag:
             entry["name"] = tag[:100]
     return entry

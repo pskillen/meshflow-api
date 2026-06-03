@@ -20,7 +20,7 @@ def reconcile_mc_channels(
     """
     Upsert canonical MC MessageChannel rows and feeder slot links from a device snapshot.
 
-    Each channel dict: mc_channel_idx, name, mc_channel_type (PUBLIC|HASHTAG), mc_hashtag (optional).
+    Each channel dict: mc_channel_idx, name, mc_channel_type (PUBLIC|HASHTAG), region_scope (optional).
     """
     if managed_node.protocol != Protocol.MESHCORE:
         raise ValueError("mc-channel-sync is only valid for MeshCore managed nodes")
