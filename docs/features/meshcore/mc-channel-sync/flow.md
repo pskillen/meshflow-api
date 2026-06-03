@@ -21,8 +21,9 @@ The bot does **not** pull channel config from the API on startup.
 1. Wait `CHANNEL_READ_DELAY_S` (2 s) after connect so the channel table is stable.
 2. For each index `0 .. max_channels-1` (default 16), `meshcore.commands.get_channel(idx)`.
 3. Map `CHANNEL_INFO` to snapshot rows in [`channels.py`](https://github.com/pskillen/meshflow-bot/blob/main/src/meshcore/channels.py):
-   - Name starting with `#` → `mc_channel_type: HASHTAG`, `mc_hashtag` set (no `#` in value)
-   - Otherwise → `PUBLIC`, `mc_hashtag: null`
+   - Name starting with `#` → `mc_channel_type: HASHTAG`, `name` = tag without `#`
+   - Otherwise → `PUBLIC`
+   - `region_scope` when companion exposes it; otherwise `null` ([region-scope.md](region-scope.md))
 4. Build body: `{ "channels": [...], "synced_at": "<ISO8601 UTC>" }`.
 5. `POST` to each `StorageAPIWrapper` in `storage_apis` (primary + optional secondary).
 
@@ -52,15 +53,15 @@ See [feeder-bootstrap.md](../feeder-bootstrap.md) for 403 codes (`feeder_not_lin
 | `mc_channel_idx` | Yes | Device slot, 0–63 |
 | `name` | Yes | Channel name (hashtag channels: tag without leading `#` in stored canonical `name` where applicable) |
 | `mc_channel_type` | Yes | `PUBLIC` or `HASHTAG` (plain strings, not gettext) |
-| `mc_hashtag` | No | Normalized hashtag when `HASHTAG`; omitted or null for `PUBLIC` |
+| `region_scope` | No | MeshCore region name; `null` / `*` / empty = legacy scope |
 
 Example:
 
 ```json
 {
   "channels": [
-    { "mc_channel_idx": 0, "name": "Public", "mc_channel_type": "PUBLIC", "mc_hashtag": null },
-    { "mc_channel_idx": 1, "name": "galloway", "mc_channel_type": "HASHTAG", "mc_hashtag": "galloway" }
+    { "mc_channel_idx": 0, "name": "Public", "mc_channel_type": "PUBLIC", "region_scope": null },
+    { "mc_channel_idx": 1, "name": "galloway", "mc_channel_type": "HASHTAG", "region_scope": "sample-west" }
   ],
   "synced_at": "2026-05-20T12:00:00Z"
 }
@@ -122,7 +123,7 @@ Dispatched via Django Channels (`dispatch_node_command`) to group `node_mc_{mana
 ```json
 {
   "type": "apply_mc_channel_config",
-  "channels": [ { "mc_channel_idx": 0, "name": "...", "mc_channel_type": "PUBLIC", "mc_hashtag": null } ]
+  "channels": [ { "mc_channel_idx": 0, "name": "...", "mc_channel_type": "PUBLIC", "region_scope": null } ]
 }
 ```
 

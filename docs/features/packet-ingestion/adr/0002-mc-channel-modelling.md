@@ -1,6 +1,6 @@
 # ADR-0002 — MeshCore channel modelling
 
-**Status:** Accepted (amended 2026-06-01)
+**Status:** Accepted (amended 2026-06-03)
 **Date:** 2026-05-12
 **Tracking:** [meshflow-api#276](https://github.com/pskillen/meshflow-api/issues/276), [meshflow-api#379](https://github.com/pskillen/meshflow-api/issues/379)
 
@@ -25,9 +25,10 @@ We still need a way to:
 
 1. **Add `MessageChannel.protocol`** (same enum as `ObservedNode.protocol`). Channels are single-protocol; an MT channel and an MC channel are distinct rows even if their names happen to match.
 2. **Canonical `MessageChannel` rows (constellation-scoped logical identity):**
-   - `name`, `mc_channel_type` (`PUBLIC` / `HASHTAG`), `mc_hashtag` (when HASHTAG).
+   - `name`, `mc_channel_type` (`PUBLIC` / `HASHTAG`), optional `region_scope` (MeshCore region filter; null = legacy scope).
+   - For `HASHTAG`, `name` is the tag **without** `#`; display adds `#` in UI helpers.
    - **No `mc_channel_idx` on `MessageChannel`.** Device slot index is per-feeder, not global.
-   - Uniqueness: `(constellation, protocol, mc_hashtag)` for HASHTAG rows; `(constellation, protocol, name)` for PUBLIC rows (normalized in services).
+   - Uniqueness: `(constellation, protocol, name, mc_channel_type, region_scope)` with partial indexes for null vs non-null scope (normalized in services). See [region-scope.md](../../meshcore/mc-channel-sync/region-scope.md).
 3. **Defer `mc_channel_hash`.** Revisit if/when a firmware revision starts emitting one on the wire. No column added now.
 4. **Per-feeder slot mapping via `ManagedNodeMcChannelLink` (M2M through table):**
    - `managed_node`, `message_channel` (canonical), `mc_channel_idx` (`0..63`, unique per managed node).

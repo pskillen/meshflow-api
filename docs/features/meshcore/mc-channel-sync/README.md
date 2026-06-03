@@ -14,7 +14,7 @@ This feature is **configuration only** — it does not upload mesh traffic. Pack
 | Bot read on connect + after apply | Shipped | `meshcore.commands.get_channel`; optional dual API POST |
 | `POST …/apply-mc-channel-config/` (UI → device) | Shipped | WebSocket + Redis channel layer |
 | Canonical `MessageChannel` + `ManagedNodeMcChannelLink` | Shipped | Logical identity separate from device slot ([#379](https://github.com/pskillen/meshflow-api/issues/379)) |
-| `region_scope` on channels | Planned | [#391](https://github.com/pskillen/meshflow-api/issues/391) |
+| `region_scope` on channels | Shipped | [#391](https://github.com/pskillen/meshflow-api/issues/391) |
 | API-only mirror edits (no device round-trip) | Not supported | Next connect sync overwrites API from device |
 | Periodic background sync | Not supported | Connect + post-apply only |
 
@@ -27,6 +27,9 @@ This feature is **configuration only** — it does not upload mesh traffic. Pack
 | [flow.md](flow.md) | End-to-end sequences, HTTP/WebSocket contracts, reconcile behaviour |
 | [data-model.md](data-model.md) | `MessageChannel`, feeder links, placeholders at ingest |
 | [operations.md](operations.md) | Auth, dual API, scaling, troubleshooting |
+| [region-scope.md](region-scope.md) | Region scope semantics, API field, bot/UI behaviour |
+| [region-scope-progress.md](region-scope-progress.md) | Execution log ([#391](https://github.com/pskillen/meshflow-api/issues/391)) |
+| [region-scope-outstanding.md](region-scope-outstanding.md) | Protocol gaps and follow-ups |
 
 **Related (other features)**
 
@@ -46,7 +49,7 @@ This feature is **configuration only** — it does not upload mesh traffic. Pack
 | Term | Meaning |
 |------|---------|
 | **Device slot** | `mc_channel_idx` (0–63) on the companion channel table. On the wire, `channel_message` carries **index only**, not name or hashtag. |
-| **Canonical channel** | Constellation-scoped `MessageChannel` row (`protocol=MESHCORE`). Identity is **logical** (name / type / hashtag), not device index. |
+| **Canonical channel** | Constellation-scoped `MessageChannel` row (`protocol=MESHCORE`). Identity is **logical** (name / type / `region_scope`), not device index. |
 | **Feeder mirror** | `ManagedNode.mc_channels` M2M **through** `ManagedNodeMcChannelLink`: which canonical channel sits in which device slot **for this feeder**. |
 | **Snapshot** | Full list of configured slots from the device; reconcile **replaces** the feeder link rows to match (no partial merge). |
 | **Source of truth** | **Device** for names and types; API mirror is overwritten on each successful sync. UI/admin **apply** writes the device first, then syncs back. |

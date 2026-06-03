@@ -37,20 +37,13 @@ Django: [`Meshflow/constellations/models.py`](../../../Meshflow/constellations/m
 | `constellation` | FK |
 | `protocol` | `MESHCORE` (2) |
 | `mc_channel_type` | `PUBLIC` (1) or `HASHTAG` (2) |
-| `mc_hashtag` | Lowercase tag when `HASHTAG`; null for `PUBLIC` |
+| `region_scope` | Optional MeshCore region name (null = legacy / no scope); see [region-scope.md](region-scope.md) |
 
-**Uniqueness (MC rows):**
-
-| Type | Constraint |
-|------|------------|
-| `HASHTAG` | Unique `(constellation, protocol, mc_hashtag)` where hashtag set |
-| `PUBLIC` | Unique `(constellation, protocol, name)` for public rows |
+**Uniqueness (MC rows):** `(constellation, protocol, name, mc_channel_type, region_scope)` — partial indexes for null vs non-null `region_scope`.
 
 `MeshCoreMessageChannel` is a **proxy model** for admin listing MC rows only.
 
 **Not stored on canonical rows:** `mc_channel_idx`, PSK, channel secret (MeshCore companion stores secrets on device; not mirrored in API v1).
-
-**Planned ([#391](https://github.com/pskillen/meshflow-api/issues/391)):** `region_scope` on canonical rows; drop `mc_hashtag` in favour of `name` for hashtags.
 
 ---
 
@@ -76,8 +69,10 @@ Unique: `(managed_node, mc_channel_idx)`.
 
 | `mc_channel_type` | Match key | `defaults` |
 |-------------------|-----------|------------|
-| `HASHTAG` | `(constellation, protocol, mc_hashtag)` normalized from `mc_hashtag` or `name` | `name` display string |
-| `PUBLIC` | `(constellation, protocol, name)` normalized | `mc_hashtag=null` |
+| `HASHTAG` | `(constellation, protocol, name, mc_channel_type, region_scope)` — `name` = tag without `#` | — |
+| `PUBLIC` | same key shape — `name` = public channel name | — |
+
+`region_scope` normalized via `common/mc_region_scope.py` (`*`, empty → `NULL`).
 
 Invalid hashtag (empty after normalize) → `ValueError` → sync `400`.
 
@@ -100,7 +95,7 @@ Reconcile replaces the link’s `message_channel` when the device reports real m
 | Surface | Serializer | Contents |
 |---------|------------|----------|
 | Sync request | `McChannelSnapshotEntrySerializer` | Device snapshot entries |
-| Sync response / managed node | `FeederMcChannelMirrorSerializer` | Canonical `id`, `name`, `mc_channel_type`, `mc_hashtag`, plus `mc_channel_idx` from link |
+| Sync response / managed node | `FeederMcChannelMirrorSerializer` | Canonical `id`, `name`, `mc_channel_type`, `region_scope`, plus `mc_channel_idx` from link |
 | Constellation nested | `message_channel_payload` in `constellations/serializers.py` | Includes `display_label` from `mc_channel_display_label` |
 | Apply payload | `McChannelApplyEntrySerializer` | Same entry shape; validated hashtag rules |
 
