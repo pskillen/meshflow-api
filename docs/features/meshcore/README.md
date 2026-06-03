@@ -14,7 +14,7 @@ Cross-repo MeshCore work is tracked on GitHub epics [#264](https://github.com/ps
 | **Feeder enrollment** ([#293](https://github.com/pskillen/meshflow-ui/issues/293)) | [enrollment-progress.md](./enrollment-progress.md) | [enrollment-outstanding.md](./enrollment-outstanding.md) |
 | **Passive packet path** (Phase 3 slice) | [packet-path-tracing/packet-path-tracing-progress.md](./packet-path-tracing/packet-path-tracing-progress.md) | [packet-path-tracing/packet-path-tracing-outstanding.md](./packet-path-tracing/packet-path-tracing-outstanding.md) |
 
-**Agent convention:** [progress-tracking skill](../../../.cursor/skills/progress-tracking/SKILL.md) — update progress/outstanding at plan breakpoints and before PRs.
+**Agent convention:** `progress-tracking` skill (`MeshFlow/.cursor/skills/progress-tracking/SKILL.md`, in the MeshFlow umbrella workspace) — update progress/outstanding at plan breakpoints and before PRs.
 
 **Feature guides** (how-to, not phase status):
 
