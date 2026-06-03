@@ -39,9 +39,12 @@ Display helpers append scope when set, e.g. `#galloway · sample-west` (`Meshflo
 
 ## Bot / device
 
-On **read**, the bot includes `region_scope` in each snapshot entry when the companion protocol exposes it. Today `CMD_GET_CHANNEL` / `CHANNEL_INFO` returns **name + secret only** — v1 sync may send `region_scope: null` until firmware exposes per-channel scope ([region-scope-outstanding.md](region-scope-outstanding.md)).
+On **read**, the bot includes `region_scope` when `CHANNEL_INFO` exposes it. Today the response is **name + secret only**, so:
 
-On **apply**, after `set_channel`, the bot calls `meshcore.commands.set_flood_scope` when `region_scope` is set (best-effort; confirm per-channel vs global on hardware).
+- After **apply**, the bot re-reads the device and **merges `region_scope` from the apply payload** by `mc_channel_idx` before posting `mc-channel-sync` (avoids duplicate unscoped canonical rows).
+- On **connect** sync, the API may **preserve** scope from the feeder’s existing slot link when the snapshot omits scope but name/type still match.
+
+On **apply**, after each `set_channel`, the bot calls `meshcore.commands.set_flood_scope` for that row’s scope (companion **active** flood scope; only the last slot’s scope remains active on the radio until the operator changes channel in the MeshCore app).
 
 ---
 

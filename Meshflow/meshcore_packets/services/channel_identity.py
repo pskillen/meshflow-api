@@ -44,6 +44,18 @@ def _parse_region_scope(entry: dict) -> str | None:
         raise ValueError(str(exc)) from exc
 
 
+def snapshot_entry_matches_channel(entry: dict, channel: MessageChannel) -> bool:
+    """True when a device snapshot row describes the same logical channel row."""
+    ch_type = _parse_channel_type(entry.get("mc_channel_type"))
+    if channel.mc_channel_type != ch_type:
+        return False
+    if ch_type == MeshCoreChannelType.HASHTAG:
+        tag = normalize_mc_hashtag_name(entry.get("name") or entry.get("mc_hashtag"))
+        return bool(tag) and tag == (channel.name or "").strip().lower()
+    name = normalize_mc_public_name(entry.get("name"))
+    return name == (channel.name or "").strip()
+
+
 def upsert_canonical_mc_channel(constellation, entry: dict) -> MessageChannel:
     """
       Resolve or create a constellation-scoped canonical MessageChannel from a device snapshot entry.
