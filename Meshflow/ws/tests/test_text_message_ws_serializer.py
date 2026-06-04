@@ -49,3 +49,4 @@ def test_ws_serializer_includes_meshcore_protocol(create_constellation):
 
     assert data["protocol"] == "meshcore"
     assert data["channel"] == channel.id
+    assert data["original_mc_packet_id"] is None

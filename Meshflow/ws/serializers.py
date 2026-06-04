@@ -18,10 +18,14 @@ class TextMessageWSSerializer(serializers.ModelSerializer):
     channel = serializers.PrimaryKeyRelatedField(read_only=True)
     sent_at = serializers.DateTimeField(format="%Y-%m-%dT%H:%M:%S.%fZ", read_only=True)
     original_packet_id = serializers.SerializerMethodField()
+    original_mc_packet_id = serializers.SerializerMethodField()
     heard = serializers.SerializerMethodField()
 
     def get_protocol(self, obj):
         return Protocol(obj.protocol).label.lower()
+
+    def get_original_mc_packet_id(self, obj):
+        return str(obj.original_mc_packet_id) if obj.original_mc_packet_id else None
 
     class Meta:
         model = TextMessage
@@ -29,6 +33,7 @@ class TextMessageWSSerializer(serializers.ModelSerializer):
             "id",
             "protocol",
             "original_packet_id",
+            "original_mc_packet_id",
             "sender",
             "recipient_meshtastic_node_id",
             "channel",
