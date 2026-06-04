@@ -15,6 +15,7 @@ It is intentionally separate from the Meshtastic `traceroute` subsystem:
 
 - [Progress](./packet-path-tracing-progress.md) — what has shipped / is in flight
 - [Outstanding](./packet-path-tracing-outstanding.md) — open decisions and discovered debt
+- [Bug: no path info](./bug-no-path-info.md) — investigation when `heard[]` / path hashes are empty ([#385](https://github.com/pskillen/meshflow-api/issues/385))
 
 ## Related docs
 

@@ -11,7 +11,8 @@ from common.feeder_ws import COMMAND_DISPATCH_UNAVAILABLE, FEEDER_BOT_NOT_CONNEC
 from common.mc_channel_labels import (
     managed_node_mc_channel_links,
     managed_node_mc_channels_queryset,
-    mc_channel_admin_label,
+    mc_channel_mirror_label,
+    mc_channel_scope_display,
     mc_channel_type_name,
 )
 from common.mesh_node_helpers import (
@@ -572,20 +573,22 @@ class ManagedNodeAdmin(admin.ModelAdmin):
             )
         row_html = format_html_join(
             "",
-            "<tr><td>{}</td><td>{}</td><td><strong>{}</strong></td></tr>",
+            "<tr><td>{}</td><td>{}</td><td>{}</td><td><strong>{}</strong></td></tr>",
             (
                 (
                     link.mc_channel_idx,
                     mc_channel_type_name(link.message_channel),
-                    mc_channel_admin_label(link.message_channel),
+                    mc_channel_scope_display(link.message_channel),
+                    mc_channel_mirror_label(link.message_channel),
                 )
                 for link in links
             ),
         )
         return format_html(
-            "<table><thead><tr><th>{}</th><th>{}</th><th>{}</th></tr></thead><tbody>{}</tbody></table>",
+            "<table><thead><tr><th>{}</th><th>{}</th><th>{}</th><th>{}</th></tr></thead><tbody>{}</tbody></table>",
             _("Slot"),
             _("Type"),
+            _("Scope"),
             _("Label"),
             row_html,
         )

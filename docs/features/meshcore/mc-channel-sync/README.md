@@ -30,6 +30,7 @@ This feature is **configuration only** — it does not upload mesh traffic. Pack
 | [region-scope.md](region-scope.md) | Region scope semantics, API field, bot/UI behaviour |
 | [region-scope-progress.md](region-scope-progress.md) | Execution log ([#391](https://github.com/pskillen/meshflow-api/issues/391)) |
 | [region-scope-outstanding.md](region-scope-outstanding.md) | Protocol gaps and follow-ups |
+| [bug-channel-scope-read-write.md](bug-channel-scope-read-write.md) | Investigation: scoped channels not on radio after bot apply ([#129](https://github.com/pskillen/meshflow-bot/issues/129)) |
 
 **Related (other features)**
 

@@ -13,6 +13,22 @@ def _scope_suffix(channel: MessageChannel) -> str:
     return ""
 
 
+def mc_channel_mirror_label(channel: MessageChannel) -> str:
+    """Name/tag for feeder mirror tables where region_scope has its own column."""
+    if channel.mc_channel_type == MeshCoreChannelType.HASHTAG:
+        tag = (channel.name or "").strip().lstrip("#")
+        if tag:
+            return f"#{tag}"
+    name = (channel.name or "").strip()
+    if name:
+        return name
+    return str(channel.pk)
+
+
+def mc_channel_scope_display(channel: MessageChannel) -> str:
+    return channel.region_scope or "—"
+
+
 def mc_channel_admin_label(channel: MessageChannel) -> str:
     """Human label for admin lists: #hashtag for HASHTAG, plain name for PUBLIC."""
     if channel.mc_channel_type == MeshCoreChannelType.HASHTAG:
