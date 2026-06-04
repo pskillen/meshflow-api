@@ -88,6 +88,9 @@ the mesh. Because feeders are geographically distributed, Meshflow can show
 both sides of conversations even when no single radio could hear them all.
 Realtime updates are pushed over WebSocket.
 
+Reference: [text-messages/](text-messages/) (REST, WS fan-out, unread/badge
+contract with meshflow-ui); MeshCore ingest [meshcore/text-message-channels.md](meshcore/text-message-channels.md).
+
 ### Mesh infrastructure monitoring
 
 A dedicated page surfacing the health of every node with an infrastructure
