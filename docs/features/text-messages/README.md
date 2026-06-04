@@ -11,7 +11,7 @@ This folder documents cross-cutting text-message behaviour. MeshCore-specific in
 | REST list/detail `GET /api/messages/text/` | Shipped | `protocol`, `channel_id`, `constellation_id`, pagination |
 | `TextMessage.protocol` on DB row | Shipped | `Protocol.MESHTASTIC` / `Protocol.MESHCORE` |
 | WebSocket `/ws/messages/` | Shipped | JWT; Redis group `text_messages` |
-| WS payload parity with REST | **Gap** | `TextMessageWSSerializer` omits `protocol` (see [unread-count.md](unread-count.md)) |
+| WS payload `protocol` | Shipped | `TextMessageWSSerializer` (see [unread-count.md](unread-count.md)) |
 | Server-side unread / read receipts | Not implemented | Unread is entirely client-side in meshflow-ui |
 
 ## Documentation map
