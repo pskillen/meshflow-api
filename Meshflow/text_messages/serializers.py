@@ -3,7 +3,11 @@ from rest_framework import serializers
 from common.protocol import Protocol
 from constellations.models import MessageChannel
 from meshcore_packets.models import MeshCorePacketObservation
-from meshcore_packets.services.path_resolution import format_path_hops, path_known_for_segments
+from meshcore_packets.services.path_resolution import (
+    format_path_hops,
+    path_known_for_segments,
+    segment_identity_key,
+)
 from nodes.models import ManagedNode, ObservedNode
 from packets.serializers import PrefetchedPacketObservationSerializer
 
@@ -16,15 +20,15 @@ def _normalize_path_segment(segment) -> str:
     return str(segment).strip().lower().replace("0x", "")
 
 
-def _resolved_path_from_cache(segments, cache):
+def _resolved_path_from_cache(segments, cache, *, hash_mode=None, hash_size=None):
     if not segments:
         return []
     hops = []
     for segment in segments:
-        key = _normalize_path_segment(segment)
+        key = segment_identity_key(segment, hash_mode, hash_size)
         hop = cache.get(key) if cache else None
         if hop is None:
-            hop = format_path_hops([segment])[0]
+            hop = format_path_hops([segment], hash_mode=hash_mode, hash_size=hash_size)[0]
         hops.append(hop)
     return hops
 
@@ -139,9 +143,21 @@ class TextMessageSerializer(serializers.ModelSerializer):
                         "rx_time": obs.rx_time,
                         "rx_rssi": obs.rx_rssi,
                         "rx_snr": obs.rx_snr,
+                        "path_hash_mode": obs.path_hash_mode,
+                        "path_hash_size": obs.path_hash_size,
                         "path_hashes": segments,
-                        "resolved_path": _resolved_path_from_cache(segments, path_hop_cache),
-                        "path_known": path_known_for_segments(segments, resolution_cache=path_hop_cache),
+                        "resolved_path": _resolved_path_from_cache(
+                            segments,
+                            path_hop_cache,
+                            hash_mode=obs.path_hash_mode,
+                            hash_size=obs.path_hash_size,
+                        ),
+                        "path_known": path_known_for_segments(
+                            segments,
+                            hash_mode=obs.path_hash_mode,
+                            hash_size=obs.path_hash_size,
+                            resolution_cache=path_hop_cache,
+                        ),
                     }
                 )
             return heard

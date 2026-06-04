@@ -17,25 +17,30 @@ Items **skipped**, **incomplete**, or **discovered during planning** — not the
 
 ## Message heard map (UI — logical layout, not M7)
 
-- [ ] **[meshflow-ui#311](https://github.com/pskillen/meshflow-ui/issues/311)** — HeardPathMap logical path per feeder: dashed schematic hop chain (one node per hash segment), **not** placed at map coordinates; keep sender/feeder at geo positions when known. Feeder list below graph shows **each observer’s distinct path** beside its row. Uses existing `heard[]` `path_hashes` / `resolved_path` from #360; no new API.
+- [x] **[meshflow-ui#311](https://github.com/pskillen/meshflow-ui/issues/311)** — HeardPathMap logical path per feeder ([ui#322](https://github.com/pskillen/meshflow-ui/pull/322)): dashed schematic hop chain, per-feeder paths in heard dialog.
 
-## Geographic path on maps (future milestone — plan explicitly)
+## Geographic path on maps
 
-The logical heard-map slice above is **not** a substitute for placing hops at real coordinates. A later plan/milestone must cover:
-
-- [ ] **Geographic hop placement** — when M2/M3 (or manual segment annotation) yields `ObservedNode` positions for path segments, message heard map and/or M7 topology UI should render hops at **lat/lng** (and set `path_known` only when all hops are resolved per ADR).
-- [ ] **Wire message `heard[]` to segment resolution** — optional read path from `MeshCorePathSegmentResolution` (or resolver output) so the heard dialog benefits from staff annotations / proven matcher without duplicating rollup tables in the client.
+- [x] **Geographic hop placement (message heard, partial)** — [ui#322](https://github.com/pskillen/meshflow-ui/pull/322): `HeardPathGeoMap` draws polylines when hop `position` values exist; partial segments when only some hops resolve. `path_known` still requires all hops resolved **with** positions (ADR).
+- [x] **Wire message `heard[]` to segment resolution** — [api#395](https://github.com/pskillen/meshflow-api/pull/395): `bulk_format_path_hops` reads `MeshCorePathSegmentResolution` + guarded suffix auto-matcher; `path_hash_mode` / `path_hash_size` on `heard[]`.
 - [ ] **M7 realtime/history maps** ([meshflow-ui#309](https://github.com/pskillen/meshflow-ui/issues/309)) — edge-based geographic and logical topology; depends on API M5/M6.
+- [ ] **Sync [tier-2-heard-resolution.md](./tier-2-heard-resolution.md)** with shipped auto-matcher and `candidates[]` (doc still says “no heuristics in v1”).
 
-Until then, operators should assume heard-map paths are **list-order hash evidence**, not RF geography.
+Until all hops resolve with positions, operators should treat geo lines as **best-effort**; hash chains remain list-order evidence when resolution is incomplete.
 
 ---
 
 ## Carried from prior passive slice
 
-- [ ] **Proven hash → `ObservedNode` matcher** — still unproven; no production matcher until [traceroute ADR-0001 §A](../../traceroute/adr/0001-mc-path-hash-resolution.md) documents a safe rule. Gates M3. Tests must reject suffix/prefix/recency heuristics.
+- [ ] **Proven hash → `ObservedNode` matcher (M3 / rollups)** — spike still **unproven** for authoritative identity ([traceroute ADR-0001 §A](../../traceroute/adr/0001-mc-path-hash-resolution.md)). **Display-only** guarded suffix matcher for message `heard[]` shipped in [api#395](https://github.com/pskillen/meshflow-api/pull/395) (addendum in same ADR); ambiguity → `candidates[]`, no map placement for ambiguous hops.
 - [ ] **`resolved_path` on `GET /api/meshcore/packets/`** — deferred from #360 (message API only). Optional; revisit alongside the edges API.
-- [ ] **Upload `rx_log_data` PATH-only frames** — bot still skips non-ADVERT `rx_log_data`; needed for relays with `path_len > 0` and no business message (M1 capture / bot follow-up of [#119](https://github.com/pskillen/meshflow-bot/issues/119)).
+- [ ] **Upload `rx_log_data` PATH-only frames** — bot still skips non-ADVERT `rx_log_data` except TEXT_MSG/PATH typenames added for tier-1 twin; PATH-only relays without a correlatable text row may still be missing (M1 capture / bot follow-up of [#119](https://github.com/pskillen/meshflow-bot/issues/119)).
+
+---
+
+## Heard dialog UX (discovered 2026-06-04)
+
+- [x] **Sender “unknown” vs channel list** — [ui#322](https://github.com/pskillen/meshflow-ui/pull/322): `resolveHeardPathSender` sets `identified` from a single `mc_sender_candidate` without requiring position; `HopPositionIcon` and geo map use position only.
 
 ---
 
@@ -49,9 +54,11 @@ Until then, operators should assume heard-map paths are **list-order hash eviden
 
 ## Message path data chain (confirmed — pre-prod Jun 2026)
 
-**Symptom:** Message “Heard” UI and `GET` message `heard[]` show observers but **no hop chain** for MeshCore channel/contact text on pre-prod, even though M1 edge rollups exist and the heard-map UI (#311) is wired to `path_hashes`.
+**Symptom (baseline):** Message “Heard” UI and `GET` message `heard[]` show observers but **no hop chain** for most MeshCore channel/contact text on pre-prod, even though M1 edge rollups exist.
 
-**Not the cause:** Single feeder (one observation per `packet_id` is expected). API heard assembly and UI #311 behave correctly when `MeshCorePacketObservation.path_hashes` is set on the **same** packet as `TextMessage.original_mc_packet` (see `text_messages/tests/test_heard_api.py`).
+**Update (post tier-1 [#390](https://github.com/pskillen/meshflow-api/pull/390)):** Some rows now have `path_hashes` on the text observation when a PATH/TEXT_MSG twin merged in-window (e.g. `☘️GI7ULG☘️: Test` — 3 segments). Overall rate remains low (~4% on 2026-06-03 sample); see [bug-no-path-info.md](./bug-no-path-info.md).
+
+**Not the cause:** Single feeder (one observation per `packet_id` is expected). API heard assembly and UI behave correctly when `MeshCorePacketObservation.path_hashes` is set on the **same** packet as `TextMessage.original_mc_packet` (see `text_messages/tests/test_heard_api.py`).
 
 ### Pre-prod evidence (read-only DB, one feeder)
 
@@ -105,9 +112,10 @@ Implications for closing this gap (direction only — not scheduled here):
 
 ### Follow-up (tracking)
 
-- [ ] **Tier 1 — server-led ingest (ship)** — [#385](https://github.com/pskillen/meshflow-api/issues/385): `path_hashes` on observation tied to `original_mc_packet` for channel `TextMessage` traffic; thin bot upload of TEXT_MSG/PATH `rx_log_data`; API twin-merge. Design: [tier-1-message-path-twin.md](./tier-1-message-path-twin.md).
-- [ ] **Confirm with M2 spike** — whether `path_hash_mode` changes segment identity when we do get text paths.
-- [ ] **Optional:** re-run pre-prod queries after deploy (`Meshflow/ai-env` + Django shell; local skill `MeshFlow/.cursor/skills/preprod-database/`) — breakdown by `payload_type` + `event_type`.
+- [x] **Tier 1 — server-led ingest** — [#385](https://github.com/pskillen/meshflow-api/issues/385) / [api#390](https://github.com/pskillen/meshflow-api/pull/390) merged: twin-merge, bot TEXT_MSG/PATH upload. Design: [tier-1-message-path-twin.md](./tier-1-message-path-twin.md).
+- [x] **Tier 2 — heard resolution (display)** — [api#395](https://github.com/pskillen/meshflow-api/pull/395), [ui#322](https://github.com/pskillen/meshflow-ui/pull/322) open; design [tier-2-heard-resolution.md](./tier-2-heard-resolution.md).
+- [ ] **Confirm with M2 spike** — whether `path_hash_mode` changes segment identity when we do get text paths (composite key already used in #395 for heard).
+- [ ] **Re-run pre-prod metrics** after tier-1 on all feeders — `meshflow-api/Meshflow/ai-env` + Django shell or `MeshFlow/.cursor/skills/preprod-database/scripts/query-preprod.sh` (auto-detects api `ai-env`).
 
 ---
 

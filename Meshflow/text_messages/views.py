@@ -88,8 +88,8 @@ class TextMessageViewSet(viewsets.ModelViewSet):
                     labels.add(label)
         return labels
 
-    def _path_segments_for_messages(self, messages):
-        segments = []
+    def _path_segment_refs_for_messages(self, messages):
+        refs = []
         for msg in messages:
             if msg.protocol != Protocol.MESHCORE or not msg.original_mc_packet_id:
                 continue
@@ -97,15 +97,22 @@ class TextMessageViewSet(viewsets.ModelViewSet):
             observations = getattr(packet, "prefetched_mc_observations", None) or []
             for obs in observations:
                 if obs.path_hashes:
-                    segments.extend(_normalize_path_segment(segment) for segment in obs.path_hashes)
-        return segments
+                    for segment in obs.path_hashes:
+                        refs.append(
+                            {
+                                "segment": _normalize_path_segment(segment),
+                                "hash_mode": obs.path_hash_mode,
+                                "hash_size": obs.path_hash_size,
+                            }
+                        )
+        return refs
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         page = self.paginate_queryset(queryset)
         messages = page if page is not None else list(queryset)
         context = self.get_serializer_context()
-        context["path_hop_cache"] = bulk_format_path_hops(self._path_segments_for_messages(messages))
+        context["path_hop_cache"] = bulk_format_path_hops(self._path_segment_refs_for_messages(messages))
         context["mc_sender_candidates_by_label"] = bulk_mc_sender_candidates_by_label(
             self._mc_sender_labels_for_messages(messages)
         )

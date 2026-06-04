@@ -1,8 +1,8 @@
 # Bug: MeshCore channel text often has no path in heard / DB
 
-**Status:** Investigating (pre-prod verified 2026-06-03)  
+**Status:** Tier-1 mitigated on `main` ([#390](https://github.com/pskillen/meshflow-api/pull/390)); sparse capture still dominates empty paths. Heard resolution UI/API in open PRs ([#395](https://github.com/pskillen/meshflow-api/pull/395), [ui#322](https://github.com/pskillen/meshflow-ui/pull/322)).  
 **Tracking:** [meshflow-api#385](https://github.com/pskillen/meshflow-api/issues/385) (Tier 1 twin), epic [#267](https://github.com/pskillen/meshflow-api/issues/267)  
-**Related:** [packet-path-tracing-outstanding.md](./packet-path-tracing-outstanding.md), [tier-1-message-path-twin.md](./tier-1-message-path-twin.md)
+**Related:** [packet-path-tracing-outstanding.md](./packet-path-tracing-outstanding.md), [tier-1-message-path-twin.md](./tier-1-message-path-twin.md), [tier-2-heard-resolution.md](./tier-2-heard-resolution.md)
 
 ## Symptom
 
@@ -16,10 +16,11 @@ Operators expect path hashes to ride with (or immediately follow) the same on-ai
 | --- | --- |
 | [packet-path-tracing-outstanding.md](./packet-path-tracing-outstanding.md) § Message path data chain | `channel_message` decode has `path_len` / mode but usually **no `path` hex**; path on wire is often on **`rx_log_data` PATH/TEXT_MSG**; bot historically uploaded **ADVERT only**. |
 | [tier-1-message-path-twin.md](./tier-1-message-path-twin.md) | **Shipped approach:** thin bot uploads TEXT_MSG/PATH `rx_log_data`; API **twin-merge** copies `path_hashes` onto `channel_text` within **120s** (`MESHCORE_DECODED_TWIN_WINDOW_SECONDS`). |
-| PR [#390](https://github.com/pskillen/meshflow-api/pull/390) (`api-388`) | Implemented `path_twin.py`, `path_hashes` ingest, heard tests — merged to `main`. |
-| Agent [meta workspace consolidation](c074c495-8f39-4d1d-b755-e81567cd29ad) | Confirmed tier-1 docs on `main`; branch `api-388/pskillen/mc-path-twin-and-resolution`. |
+| PR [#390](https://github.com/pskillen/meshflow-api/pull/390) (`api-388`) | Implemented `path_twin.py`, `path_hashes` ingest, heard tests — **merged to `main`**. |
+| PR [#395](https://github.com/pskillen/meshflow-api/pull/395) | Heard `resolved_path`: composite segment lookup, `path_hash_mode` / `path_hash_size` on `heard[]`, guarded pubkey-suffix auto-matcher + `candidates[]`; ADR addendum in [traceroute ADR-0001 § addendum](../../traceroute/adr/0001-mc-path-hash-resolution.md). |
+| PR [ui#322](https://github.com/pskillen/meshflow-ui/pull/322) | `HeardPathGeoMap` path polylines, hop MapPin icons, ambiguity tooltips; shared layers with `HeardPathMap` ([#311](https://github.com/pskillen/meshflow-ui/issues/311)). Deploy after API #395. |
 
-**Conclusion from this session:** Tier-1 **code path works when a PATH/TEXT_MSG twin exists in-window**; pre-prod failure rate is dominated by **missing or mis-timed rx_log twins**, not broken heard assembly.
+**Conclusion:** Tier-1 **code path works when a PATH/TEXT_MSG twin exists in-window**; pre-prod failure rate is still dominated by **missing or mis-timed rx_log twins**, not broken heard assembly. Tier-2 improves **display** when `path_hashes` exist; it does not increase twin capture rate.
 
 ## Pre-prod sample messages (2026-06-03)
 
@@ -31,8 +32,22 @@ Compared four `TextMessage` rows (`protocol = MeshCore`) on the single feeder:
 | `Rogue Two: Beans 🤦‍♂️` | 07:59:59 | **Yes** (same path) | **PATH** @ 07:58:48 (−71s) |
 | `Rogue Two: 😂` | 07:50:48 | **No** | **None** |
 | `MCEK 4: @[Rogue Two]: Lol` | 07:50:58 | **No** | **None** |
+| `☘️GI7ULG☘️: Test` (2026-06-04 re-check) | (see DB) | **Yes** `['6edc9b','70929f','f3bcf1']` on PDYa obs | Twin merge succeeded for this row |
 
-**7-day aggregate (pre-prod):** 22 / 533 MeshCore `TextMessage` rows with `path_hashes` length ≥ 2 → **4.1%** success rate (hourly buckets 0–33%).
+**7-day aggregate (pre-prod, 2026-06-03):** 22 / 533 MeshCore `TextMessage` rows with `path_hashes` length ≥ 2 → **4.1%** success rate (hourly buckets 0–33%). Re-run after tier-1 deploy on feeders to refresh.
+
+### GI7ULG follow-up (2026-06-04) — path present, resolution / sender UX
+
+Message id `d2083011-6445-4a51-924b-a47b4685ac15` (`☘️GI7ULG☘️: Test`):
+
+| Check | Pre-prod result |
+| --- | --- |
+| `path_hashes` on text observation | **Yes** (3 segments) |
+| Segment resolution (suffix auto-matcher + M1 table) | All **unknown** — no `ObservedNode` suffix match for `6edc9b`, `70929f`, `f3bcf1` |
+| `mc_sender_candidates` | **1** (`mc:9cce73b9b3ee`, long name `☘️GI7ULG☘️`) |
+| `NodeLatestStatus` for sender | **None** — no position in DB |
+
+**Not the same bug as empty `path_hashes`:** channel list and heard dialog previously disagreed when one candidate had no position — **fixed in ui#322** (`resolveHeardPathSender`: `identified` without requiring `position`; geo map unchanged).
 
 ### Same 20-minute window (07:45–08:05 UTC)
 
@@ -93,5 +108,7 @@ Failures **are** because:
 
 | Date | Action | Result |
 | --- | --- | --- |
-| 2026-06-03 | Pre-prod DB via Django + `Meshflow/ai-env` | Sample table + 4.1% / 7d rate; fail cases = no in-window PATH twin |
+| 2026-06-03 | Pre-prod DB via Django + `meshflow-api/Meshflow/ai-env` | Sample table + 4.1% / 7d rate; fail cases = no in-window PATH twin |
 | 2026-06-03 | This doc created | Baseline for continued debugging |
+| 2026-06-04 | Tier-1 merged ([#390](https://github.com/pskillen/meshflow-api/pull/390)); tier-2 PRs opened | API #395 + UI #322; GI7ULG sample has path but unresolved hops + sender/position mismatch |
+| 2026-06-04 | Pre-prod Django shell (`GI7ULG` messages) | Confirmed twin path on `Test`; segments unknown; single sender candidate without `latest_status` |
