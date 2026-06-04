@@ -8,6 +8,35 @@ from common.protocol import Protocol
 
 from .models import Constellation, MeshCoreMessageChannel, MessageChannel
 
+_SCOPE_FILTER_NONE = "__none__"
+_SCOPE_FILTER_ANY = "__any__"
+
+
+class MeshCoreRegionScopeFilter(admin.SimpleListFilter):
+    """Filter MeshCore channels by region_scope (null, any, or a specific scope)."""
+
+    title = _("Region scope")
+    parameter_name = "region_scope"
+
+    def lookups(self, request, model_admin):
+        choices = [
+            (_SCOPE_FILTER_NONE, _("No scope")),
+            (_SCOPE_FILTER_ANY, _("Has scope")),
+        ]
+        qs = model_admin.get_queryset(request).filter(region_scope__isnull=False)
+        scopes = qs.values_list("region_scope", flat=True).distinct().order_by("region_scope")
+        choices.extend((scope, scope) for scope in scopes if scope)
+        return choices
+
+    def queryset(self, request, queryset):
+        if self.value() == _SCOPE_FILTER_NONE:
+            return queryset.filter(region_scope__isnull=True)
+        if self.value() == _SCOPE_FILTER_ANY:
+            return queryset.filter(region_scope__isnull=False)
+        if self.value():
+            return queryset.filter(region_scope=self.value())
+        return queryset
+
 
 class ConstellationAdminForm(forms.ModelForm):
     class Meta:
@@ -109,11 +138,13 @@ class MeshCoreMessageChannelAdmin(admin.ModelAdmin):
     list_display = (
         "admin_label",
         "mc_channel_type_display",
+        "region_scope_display",
         "constellation",
         "id",
     )
     list_filter = (
         ("mc_channel_type", admin.ChoicesFieldListFilter),
+        MeshCoreRegionScopeFilter,
         "constellation",
     )
     search_fields = ("name", "region_scope", "constellation__name")
@@ -147,3 +178,7 @@ class MeshCoreMessageChannelAdmin(admin.ModelAdmin):
     @admin.display(description=_("Type"), ordering="mc_channel_type")
     def mc_channel_type_display(self, obj):
         return mc_channel_type_name(obj)
+
+    @admin.display(description=_("Scope"), ordering="region_scope")
+    def region_scope_display(self, obj):
+        return obj.region_scope or "—"
