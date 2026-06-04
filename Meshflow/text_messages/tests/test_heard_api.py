@@ -196,3 +196,45 @@ def test_mc_message_heard_resolved_path_from_segment_table(meshcore_feeder, inge
     assert hop["node_id_str"] == node.node_id_str
     assert hop["position"]["latitude"] == 55.95
     assert row["heard"][0]["path_known"] is True
+
+
+@pytest.mark.django_db
+def test_mc_message_heard_ambiguous_hop_candidates(meshcore_feeder, ingest_client):
+    reconcile_mc_channels(
+        meshcore_feeder["node"],
+        [{"mc_channel_idx": 0, "name": "Public", "mc_channel_type": "PUBLIC"}],
+    )
+    for name, letter in (("Node A", "a"), ("Node B", "b")):
+        node = ObservedNode.objects.create(
+            protocol=Protocol.MESHCORE,
+            mc_pubkey=letter * 64,
+            mc_pubkey_prefix=f"{letter * 8}cafe",
+            long_name=name,
+        )
+        NodeLatestStatus.objects.create(node=node, latitude=55.0, longitude=-4.0)
+    now = timezone.now()
+    url = feeder_url("meshcore-feeder-packet-ingest", FEEDER_MC_PUBKEY_PREFIX)
+    ingest_client.post(
+        url,
+        {
+            "event_type": "channel_message",
+            "payload_type": "channel_text",
+            "channel_idx": 0,
+            "pkt_hash": 88012,
+            "rx_time": now.timestamp(),
+            "text": "ambiguous hop test",
+            "path_hashes": ["cafe"],
+            "path_hash_size": 2,
+            "raw": {},
+        },
+        format="json",
+    )
+    tm = TextMessage.objects.get(message_text="ambiguous hop test")
+    client = APIClient()
+    response = client.get(reverse("textmessage-list"), {"channel_id": tm.channel_id})
+    row = next(item for item in response.data["results"] if item["id"] == str(tm.id))
+    heard = row["heard"][0]
+    assert heard["path_hash_size"] == 2
+    hop = heard["resolved_path"][0]
+    assert hop["status"] == "ambiguous"
+    assert len(hop["candidates"]) == 2

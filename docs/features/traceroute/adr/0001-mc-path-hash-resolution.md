@@ -52,3 +52,15 @@ We can reliably **parse and display** path segments per feeder observation. We *
 - Message heard map shows sender, feeder position(s), and **dashed** paths; hop labels show raw hash hex.
 - UI must not link unknown hops to node detail pages.
 - When a proven matcher lands, add tests that fail if heuristic matching is reintroduced without ADR update.
+
+## Addendum (2026-06) — message heard auto-matcher
+
+`bulk_format_path_hops` still prefers **`MeshCorePathSegmentResolution`** rows keyed by `(hash_mode, hash_size, segment_hash)`.
+
+When no staff row applies, a **guarded suffix matcher** runs:
+
+- Segment hex must match the **suffix** of `mc_pubkey_prefix` or `mc_pubkey` on `ObservedNode` (case-insensitive).
+- **One** match → `status=resolved` with node fields and position when available.
+- **Multiple** matches → `status=ambiguous` with `candidates[]` (same shape as `McSenderCandidate`); UI must not place ambiguous hops on the map.
+
+This is display-only for message `heard[]`; it does not prove on-air identity. Tests in `meshcore_packets/tests/test_path_resolution.py` lock ambiguity behaviour.

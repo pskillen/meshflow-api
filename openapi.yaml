@@ -2775,12 +2775,20 @@ components:
         long_name:
           type: string
           nullable: true
+        short_name:
+          type: string
+          nullable: true
         ambiguous:
           type: boolean
         position:
           $ref: '#/components/schemas/MapPosition'
           nullable: true
           description: Present when status is resolved and the linked ObservedNode has a latest position
+        candidates:
+          type: array
+          items:
+            $ref: '#/components/schemas/McSenderCandidate'
+          description: Present when status is ambiguous; potential ObservedNode suffix matches for this segment
 
     HeardObserver:
       type: object
@@ -2838,6 +2846,14 @@ components:
           type: number
           format: float
           nullable: true
+        path_hash_mode:
+          type: integer
+          nullable: true
+          description: MeshCore path hash mode from the feeder observation
+        path_hash_size:
+          type: integer
+          nullable: true
+          description: MeshCore path hash size (bytes per segment) from the feeder observation
         path_hashes:
           type: array
           items:
