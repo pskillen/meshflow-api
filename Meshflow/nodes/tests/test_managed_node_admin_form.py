@@ -5,6 +5,12 @@ from nodes.admin import MANAGED_NODE_CHANNEL_FIELDS, ManagedNodeAdmin, ManagedNo
 from nodes.models import ManagedNode
 
 
+class _PostRequest:
+    def __init__(self, protocol):
+        self.method = "POST"
+        self.POST = {"protocol": str(protocol)}
+
+
 @pytest.mark.django_db
 def test_managed_node_admin_form_meshcore_clears_meshtastic_node_id(create_user, create_constellation):
     owner = create_user()
@@ -59,3 +65,28 @@ def test_managed_node_admin_fieldsets_include_meshtastic_channels(create_managed
     fieldsets = admin.get_fieldsets(request=None, obj=node)
     channel_section = next(fs for fs in fieldsets if fs[0] == "Meshtastic channels")
     assert channel_section[1]["fields"] == MANAGED_NODE_CHANNEL_FIELDS
+
+
+@pytest.mark.django_db
+def test_managed_node_admin_add_fieldsets_meshcore_show_pubkey():
+    admin = ManagedNodeAdmin(ManagedNode, None)
+    fieldsets = admin.get_fieldsets(request=_PostRequest(Protocol.MESHCORE), obj=None)
+    titles = [section[0] for section in fieldsets]
+    assert "MeshCore identity" in titles
+    assert "Meshtastic channels" not in titles
+    identity = next(section for section in fieldsets if section[0] == "MeshCore identity")
+    assert identity[1]["fields"] == ("mc_pubkey",)
+    feeder = next(section for section in fieldsets if section[0] == "Feeder")
+    assert "meshtastic_node_id" not in feeder[1]["fields"]
+    assert "mc_flood_advert_interval_hours" in feeder[1]["fields"]
+
+
+@pytest.mark.django_db
+def test_managed_node_admin_add_fieldsets_meshtastic_show_node_id_and_channels():
+    admin = ManagedNodeAdmin(ManagedNode, None)
+    fieldsets = admin.get_fieldsets(request=_PostRequest(Protocol.MESHTASTIC), obj=None)
+    titles = [section[0] for section in fieldsets]
+    assert "Meshtastic channels" in titles
+    assert "MeshCore identity" not in titles
+    feeder = next(section for section in fieldsets if section[0] == "Feeder")
+    assert "meshtastic_node_id" in feeder[1]["fields"]
