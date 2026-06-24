@@ -3,6 +3,7 @@ from django.contrib import admin, messages
 from django.contrib.admin.widgets import FilteredSelectMultiple
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
+from django.urls import reverse
 from django.utils.html import format_html, format_html_join
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
@@ -23,7 +24,7 @@ from common.mesh_node_helpers import (
 from common.protocol import Protocol
 from meshcore_packets.services.channel_apply import apply_mc_channels_to_feeder
 
-from .managed_node_bootstrap import ensure_observed_node_for_managed_node
+from .managed_node_bootstrap import ensure_observed_node_for_managed_node, find_matching_observed_node
 from .models import ManagedNode, ManagedNodeStatus, NodeAPIKey, NodeAuth, NodeLatestStatus, ObservedNode
 
 
@@ -521,6 +522,7 @@ class ManagedNodeAdmin(admin.ModelAdmin):
         "meshtastic_node_id",
         "display_id",
         "name",
+        "observed_node_link",
         "owner",
         "constellation",
         "mc_channel_count",
@@ -568,6 +570,17 @@ class ManagedNodeAdmin(admin.ModelAdmin):
     @admin.display(description=_("Display ID"))
     def display_id(self, obj):
         return obj.node_id_str
+
+    @admin.display(description=_("Observed node"))
+    def observed_node_link(self, obj):
+        try:
+            observed = find_matching_observed_node(obj)
+        except ValueError:
+            return "—"
+        if observed is None:
+            return "—"
+        url = reverse("admin:nodes_observednode_change", args=[observed.pk])
+        return format_html('<a href="{}">{}</a>', url, observed)
 
     @admin.display(description=_("MC channels"))
     def mc_channel_count(self, obj):

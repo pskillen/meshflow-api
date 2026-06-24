@@ -27,7 +27,7 @@ def _names_from_managed_node(managed_node: ManagedNode) -> tuple[str, str]:
     return long_name, short_name[:5]
 
 
-def _find_matching_observed_node(managed_node: ManagedNode) -> ObservedNode | None:
+def find_matching_observed_node(managed_node: ManagedNode) -> ObservedNode | None:
     if managed_node.protocol == Protocol.MESHTASTIC:
         if managed_node.meshtastic_node_id is None:
             raise ValueError("Meshtastic managed node requires meshtastic_node_id")
@@ -54,7 +54,7 @@ def ensure_observed_node_for_managed_node(managed_node: ManagedNode) -> tuple[Ob
     When the observed node is unclaimed, sets claimed_by to the managed node owner.
     """
     long_name, short_name = _names_from_managed_node(managed_node)
-    observed = _find_matching_observed_node(managed_node)
+    observed = find_matching_observed_node(managed_node)
     created = False
 
     if observed is None:

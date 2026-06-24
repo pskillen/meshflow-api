@@ -82,6 +82,23 @@ def test_managed_node_admin_add_fieldsets_meshcore_show_pubkey():
 
 
 @pytest.mark.django_db
+def test_managed_node_admin_observed_node_link(create_managed_node, create_observed_node):
+    managed = create_managed_node()
+    observed = create_observed_node(meshtastic_node_id=managed.meshtastic_node_id)
+    admin = ManagedNodeAdmin(ManagedNode, None)
+    html = admin.observed_node_link(managed)
+    assert str(observed) in html
+    assert f"admin/nodes/observednode/{observed.pk}/change/" in html
+
+
+@pytest.mark.django_db
+def test_managed_node_admin_observed_node_link_missing(create_managed_node):
+    managed = create_managed_node(meshtastic_node_id=0x99999999)
+    admin = ManagedNodeAdmin(ManagedNode, None)
+    assert admin.observed_node_link(managed) == "—"
+
+
+@pytest.mark.django_db
 def test_managed_node_admin_add_fieldsets_meshtastic_show_node_id_and_channels():
     admin = ManagedNodeAdmin(ManagedNode, None)
     fieldsets = admin.get_fieldsets(request=_PostRequest(Protocol.MESHTASTIC), obj=None)
