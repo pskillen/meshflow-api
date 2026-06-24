@@ -23,6 +23,7 @@ from common.mesh_node_helpers import (
 from common.protocol import Protocol
 from meshcore_packets.services.channel_apply import apply_mc_channels_to_feeder
 
+from .managed_node_bootstrap import ensure_observed_node_for_managed_node
 from .models import ManagedNode, ManagedNodeStatus, NodeAPIKey, NodeAuth, NodeLatestStatus, ObservedNode
 
 
@@ -653,6 +654,24 @@ class ManagedNodeAdmin(admin.ModelAdmin):
             },
         )
         return (common, channels)
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        if change:
+            return
+        observed, created = ensure_observed_node_for_managed_node(obj)
+        if created:
+            self.message_user(
+                request,
+                _("Created ObservedNode %(node)s for feeder owner.") % {"node": observed.node_id_str},
+                level=messages.SUCCESS,
+            )
+        elif observed.claimed_by_id == obj.owner_id:
+            self.message_user(
+                request,
+                _("Linked feeder to existing ObservedNode %(node)s.") % {"node": observed.node_id_str},
+                level=messages.INFO,
+            )
 
 
 @admin.register(ManagedNodeStatus)
