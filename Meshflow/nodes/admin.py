@@ -3,6 +3,7 @@ from django.contrib import admin, messages
 from django.contrib.admin.widgets import FilteredSelectMultiple
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
+from django.urls import reverse
 from django.utils.html import format_html, format_html_join
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
@@ -23,6 +24,7 @@ from common.mesh_node_helpers import (
 from common.protocol import Protocol
 from meshcore_packets.services.channel_apply import apply_mc_channels_to_feeder
 
+from .managed_node_bootstrap import ensure_observed_node_for_managed_node, find_matching_observed_node
 from .models import ManagedNode, ManagedNodeStatus, NodeAPIKey, NodeAuth, NodeLatestStatus, ObservedNode
 
 
@@ -44,7 +46,7 @@ class ManagedNodeActiveFilter(admin.SimpleListFilter):
         return queryset
 
 
-MANAGED_NODE_COMMON_FIELDS = (
+MANAGED_NODE_MESHTASTIC_FEEDER_FIELDS = (
     "protocol",
     "meshtastic_node_id",
     "name",
@@ -53,6 +55,16 @@ MANAGED_NODE_COMMON_FIELDS = (
     "allow_auto_traceroute",
     "latlong",
 )
+MANAGED_NODE_MESHCORE_FEEDER_FIELDS = (
+    "protocol",
+    "name",
+    "owner",
+    "constellation",
+    "allow_auto_traceroute",
+    "latlong",
+    "mc_flood_advert_interval_hours",
+)
+MANAGED_NODE_COMMON_FIELDS = MANAGED_NODE_MESHTASTIC_FEEDER_FIELDS
 MANAGED_NODE_CHANNEL_FIELDS = tuple(f"meshtastic_channel_{i}" for i in range(8))
 
 
@@ -344,7 +356,10 @@ class ManagedNodeAdminForm(forms.ModelForm):
     meshtastic_node_id = forms.CharField(
         label=_("Node ID"),
         widget=NodeIdDatalistWidget,
-        help_text=_("Select from observed Meshtastic nodes or enter a decimal id or !hex8."),
+        help_text=_(
+            "Select from observed Meshtastic nodes or enter a decimal id or !hex8. "
+            "A new node id may be entered when bootstrapping a constellation."
+        ),
     )
 
     latlong = LatLongFormField(
@@ -507,6 +522,7 @@ class ManagedNodeAdmin(admin.ModelAdmin):
         "meshtastic_node_id",
         "display_id",
         "name",
+        "observed_node_link",
         "owner",
         "constellation",
         "mc_channel_count",
@@ -555,6 +571,17 @@ class ManagedNodeAdmin(admin.ModelAdmin):
     def display_id(self, obj):
         return obj.node_id_str
 
+    @admin.display(description=_("Observed node"))
+    def observed_node_link(self, obj):
+        try:
+            observed = find_matching_observed_node(obj)
+        except ValueError:
+            return "—"
+        if observed is None:
+            return "—"
+        url = reverse("admin:nodes_observednode_change", args=[observed.pk])
+        return format_html('<a href="{}">{}</a>', url, observed)
+
     @admin.display(description=_("MC channels"))
     def mc_channel_count(self, obj):
         if obj.protocol != Protocol.MESHCORE:
@@ -598,8 +625,39 @@ class ManagedNodeAdmin(admin.ModelAdmin):
             return ("display_id", "mc_channels_mirror", "mc_channels_synced_at")
         return ("mc_channels_synced_at",)
 
+    def _protocol_for_admin(self, request, obj):
+        if obj is not None:
+            return obj.protocol
+        if request is not None and request.method == "POST":
+            try:
+                return int(request.POST.get("protocol", Protocol.MESHTASTIC))
+            except TypeError, ValueError:
+                pass
+        return Protocol.MESHTASTIC
+
     def get_fieldsets(self, request, obj=None):
-        common = (_("Feeder"), {"fields": MANAGED_NODE_COMMON_FIELDS})
+        protocol = self._protocol_for_admin(request, obj)
+        if protocol == Protocol.MESHCORE:
+            common = (_("Feeder"), {"fields": MANAGED_NODE_MESHCORE_FEEDER_FIELDS})
+            mc_identity_fields = ("mc_pubkey",) if obj is None else ("mc_pubkey", "display_id")
+            mc_identity = (_("MeshCore identity"), {"fields": mc_identity_fields})
+            if obj is not None and obj.protocol == Protocol.MESHCORE:
+                mc_channels = (
+                    _("MeshCore channels (device mirror)"),
+                    {
+                        "fields": ("mc_channels_mirror", "mc_channels_synced_at"),
+                        "description": _(
+                            "Read-only snapshot from the feeder device (bot channel sync). "
+                            "Edit constellation channel definitions under MeshCore channels, "
+                            "then use the admin action “Push MC channel config to feeder device” "
+                            "to apply this mirror to the radio."
+                        ),
+                    },
+                )
+                return (common, mc_identity, mc_channels)
+            return (common, mc_identity)
+
+        common = (_("Feeder"), {"fields": MANAGED_NODE_MESHTASTIC_FEEDER_FIELDS})
         channels = (
             _("Meshtastic channels"),
             {
@@ -608,22 +666,25 @@ class ManagedNodeAdmin(admin.ModelAdmin):
                 "description": _("Not used for MeshCore feeders."),
             },
         )
-        if obj and obj.protocol == Protocol.MESHCORE:
-            mc_identity = (_("MeshCore identity"), {"fields": ("mc_pubkey", "display_id")})
-            mc_channels = (
-                _("MeshCore channels (device mirror)"),
-                {
-                    "fields": ("mc_channels_mirror", "mc_channels_synced_at"),
-                    "description": _(
-                        "Read-only snapshot from the feeder device (bot channel sync). "
-                        "Edit constellation channel definitions under MeshCore channels, "
-                        "then use the admin action “Push MC channel config to feeder device” "
-                        "to apply this mirror to the radio."
-                    ),
-                },
-            )
-            return (common, mc_identity, mc_channels)
         return (common, channels)
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        if change:
+            return
+        observed, created = ensure_observed_node_for_managed_node(obj)
+        if created:
+            self.message_user(
+                request,
+                _("Created ObservedNode %(node)s for feeder owner.") % {"node": observed.node_id_str},
+                level=messages.SUCCESS,
+            )
+        elif observed.claimed_by_id == obj.owner_id:
+            self.message_user(
+                request,
+                _("Linked feeder to existing ObservedNode %(node)s.") % {"node": observed.node_id_str},
+                level=messages.INFO,
+            )
 
 
 @admin.register(ManagedNodeStatus)
