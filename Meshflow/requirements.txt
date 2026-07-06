@@ -25,6 +25,6 @@ networkx~=3.6
 
 # RF propagation pipeline (Meshtastic Site Planner engine client + GeoTIFF→PNG)
 httpx~=0.28
-Pillow~=12.2
+Pillow~=12.3
 tifffile~=2026.6
 
