@@ -8,6 +8,8 @@ info:
     multi-protocol support (MeshCore alongside Meshtastic); new responses may
     include a ``protocol`` discriminator on shared models. See
     ``docs/features/meshcore/README.md`` for the phased rollout.
+    The public M2M contract is ``openapi-m2m.yaml`` (not this file).
+    JWT key management for that API is under ``/m2m/``.
 
 servers:
   - url: /api
@@ -3464,6 +3466,42 @@ components:
 
 
 paths:
+  /m2m/terms/:
+    get:
+      summary: Current M2M terms
+      tags: [Authentication]
+      security: [{bearerAuth: []}]
+      responses:
+        "200":
+          description: Version, grace days, licence, and terms text
+  /m2m/keys/:
+    get:
+      summary: List the caller's M2M keys
+      tags: [Authentication]
+      security: [{bearerAuth: []}]
+      responses:
+        "200": {description: Keys without secrets}
+        "403": {description: Not in m2m_api and no existing keys}
+    post:
+      summary: Mint an M2M key
+      tags: [Authentication]
+      security: [{bearerAuth: []}]
+      responses:
+        "201": {description: Key shown once}
+        "403": {description: Not allowed to mint}
+  /m2m/admin/users/{user_id}/withdraw/:
+    post:
+      summary: Staff withdraw M2M access
+      tags: [Authentication]
+      security: [{bearerAuth: []}]
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        "200": {description: removed_from_group and keys_revoked}
+        "403": {description: Not staff}
   /status/:
     get:
       summary: Get API status

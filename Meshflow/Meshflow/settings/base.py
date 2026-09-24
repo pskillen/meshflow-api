@@ -83,6 +83,7 @@ INSTALLED_APPS = [
     "traceroute_analytics",
     "mesh_monitoring",
     "dx_monitoring",
+    "m2m_api",
     "ws",
     "django_celery_beat",
 ]

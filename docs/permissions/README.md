@@ -14,6 +14,10 @@ Guest-readable GET endpoints are throttled per view (not via `DEFAULT_THROTTLE_C
 - `429` responses include `Retry-After`.
 - Guests calling `stats/global` have the date range defaulted and clamped to 30 days. The response is cached for 60 seconds.
 
+## M2M API access
+
+Minting a key requires the Django group `m2m_api` or staff. Each M2M request checks only that the key exists, matches, is not revoked, and that the owner is active. Removing the group stops new mints. `withdraw_m2m_access` removes the group and revokes keys together. `ObservedNode.m2m_opt_out` may be set by the claimant, the owner of a matching managed node, or staff. Guests do not see the flag.
+
 ## Access levels
 
 | Level | Identity | Read (summary) | Write (summary) |

@@ -1,0 +1,8 @@
+FROM redocly/redoc
+
+COPY openapi-m2m.yaml /usr/share/nginx/html/openapi.yaml
+
+ENV SPEC_URL=openapi.yaml
+ENV PORT=8080
+
+EXPOSE 8080

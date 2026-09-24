@@ -8,33 +8,35 @@
 
 ## Overall status
 
-**Status:** In progress
-
----
-
-## Design docs
-
-**Status:** Complete
-**Delivered:** Cherry-picked design commits onto this branch (`docs/features/m2m-api/README.md`, UTC-day note in packet-stats).
+**Status:** Complete (pending merge)
 
 ---
 
 ## Guest throttling
 
-**Status:** In progress
+**Status:** Complete
+
+---
+
+## Keys, opt-out, Meshtastic and MeshCore data
+
+**Status:** Complete
 
 **Delivered**
 
-- `common/throttling.py` with CF-aware `client_ip`, guest burst, guest expensive, and user backstop.
-- Attached on guest-readable views only. Ingest has no throttle classes.
-- Guest `stats/global` range clamped to 30 days and cached 60s.
+- `m2m_api` app: hashed keys, terms grace, CRUD, withdraw, throttles, usage flush.
+- `ObservedNode.m2m_opt_out`.
+- `/api/m2m/v1/meshtastic/*` and `/api/m2m/v1/meshcore/*`. MeshCore `health` is null.
+- `openapi-m2m.yaml` and `Dockerfile-redocly-m2m`.
 
 **Verify**
 
+- [x] `Meshflow/m2m_api/tests/test_m2m_api.py`
 - [x] `Meshflow/common/tests/test_throttling.py`
 
 ---
 
 ## Next
 
-- M2M keys, terms, withdraw.
+- UI pull request on `ui-362/paddy/m2m-developer-access`.
+

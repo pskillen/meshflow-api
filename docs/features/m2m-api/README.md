@@ -1,6 +1,6 @@
 # Machine-to-machine (M2M) data API
 
-**Status:** design — decisions captured, not implemented. Remaining open questions are at the bottom.
+**Status:** shipped. Public contract is `/api/m2m/v1/`. Key management is JWT at `/api/m2m/keys/`. MeshCore infra `health` is `null` until telemetry exists. Role-mix history is [#424](https://github.com/pskillen/meshflow-api/issues/424).
 
 ## Motivation
 
