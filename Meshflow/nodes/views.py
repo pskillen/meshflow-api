@@ -41,6 +41,7 @@ from common.observed_node_lookup import (
     resolve_observed_node_lookup,
 )
 from common.protocol import Protocol
+from common.throttling import guest_read_throttles
 from meshcore_packets.models import MeshCorePacketObservation
 from nodes.constants import INFRASTRUCTURE_ROLES
 from nodes.models import (
@@ -62,6 +63,7 @@ from nodes.models import (
     WeatherUse,
 )
 from nodes.permission_helpers import (
+    user_can_edit_m2m_opt_out,
     user_can_edit_observed_node_environment_settings,
     user_can_edit_observed_node_rf_profile,
 )
@@ -264,6 +266,13 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
         if self.action in guest_read_actions:
             return [AllowGuestReadOnly()]
         return [IsAuthenticatedUser()]
+
+    def get_throttles(self):
+        if self.action in ("list", "retrieve", "recent_counts"):
+            return guest_read_throttles()
+        if self.action == "search":
+            return guest_read_throttles(expensive=True)
+        return []
 
     lookup_field = "internal_id"
     lookup_url_kwarg = "internal_id"
@@ -732,11 +741,17 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
     def environment_settings(self, request, internal_id=None):
         """Update environment_exposure and/or weather_use (staff or claim owner only)."""
         node = self.get_object()
-        if not user_can_edit_observed_node_environment_settings(request.user, node):
-            raise PermissionDenied()
         ser = ObservedNodeEnvironmentSettingsSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
         vd = ser.validated_data
+        wants_env = "environment_exposure" in vd or "weather_use" in vd
+        wants_opt = "m2m_opt_out" in vd
+        if wants_env and not user_can_edit_observed_node_environment_settings(request.user, node):
+            raise PermissionDenied()
+        if wants_opt and not user_can_edit_m2m_opt_out(request.user, node):
+            raise PermissionDenied()
+        if not wants_env and not wants_opt:
+            raise PermissionDenied()
         update_fields = []
         if "environment_exposure" in vd:
             node.environment_exposure = next(
@@ -746,6 +761,9 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
         if "weather_use" in vd:
             node.weather_use = next(c.value for c in WeatherUse if c.label == vd["weather_use"])
             update_fields.append("weather_use")
+        if "m2m_opt_out" in vd:
+            node.m2m_opt_out = vd["m2m_opt_out"]
+            update_fields.append("m2m_opt_out")
         node.save(update_fields=update_fields)
         out = ObservedNodeSerializer(node, context=self.get_serializer_context())
         return Response(out.data)

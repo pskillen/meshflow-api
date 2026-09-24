@@ -83,6 +83,7 @@ INSTALLED_APPS = [
     "traceroute_analytics",
     "mesh_monitoring",
     "dx_monitoring",
+    "m2m_api",
     "ws",
     "django_celery_beat",
 ]
@@ -239,6 +240,13 @@ RF_PROPAGATION_READY_RETENTION = int(os.environ.get("RF_PROPAGATION_READY_RETENT
 
 MESHCORE_PATH_RETENTION_DAYS = int(os.environ.get("MESHCORE_PATH_RETENTION_DAYS", "183"))
 
+# Trust CF-Connecting-IP only in production (Cloudflare Tunnel). Dev/test talk to Django directly.
+TRUST_CF_CONNECTING_IP = os.environ.get("TRUST_CF_CONNECTING_IP", "false").lower() in ("1", "true", "yes")
+
+M2M_TERMS_VERSION = os.environ.get("M2M_TERMS_VERSION", "1")
+M2M_TERMS_GRACE_DAYS = int(os.environ.get("M2M_TERMS_GRACE_DAYS", "90"))
+M2M_KEY_CAP = int(os.environ.get("M2M_KEY_CAP", "5"))
+
 # Django cache (Redis DB 2; channels use DB 0, Celery broker DB 1)
 _cache_url = f"redis://:{_redis_password}@{_redis_host}:{_redis_port}/2"
 CACHES = {
@@ -328,6 +336,16 @@ REST_FRAMEWORK = {
         # "nodes.authentication.NodeAPIKeyAuthentication",
     ],
     "DEFAULT_PAGINATION_CLASS": "Meshflow.paginator.PageSizePagination",
+    "EXCEPTION_HANDLER": "common.throttling.meshflow_exception_handler",
+    "DEFAULT_THROTTLE_RATES": {
+        "guest_burst": os.environ.get("THROTTLE_GUEST_BURST", "120/min"),
+        "guest_expensive": os.environ.get("THROTTLE_GUEST_EXPENSIVE", "10/min"),
+        "user": os.environ.get("THROTTLE_USER", "600/min"),
+        "m2m_key_min": os.environ.get("THROTTLE_M2M_KEY_MIN", "60/min"),
+        "m2m_key_day": os.environ.get("THROTTLE_M2M_KEY_DAY", "5000/day"),
+        "m2m_owner_min": os.environ.get("THROTTLE_M2M_OWNER_MIN", "60/min"),
+        "m2m_owner_day": os.environ.get("THROTTLE_M2M_OWNER_DAY", "5000/day"),
+    },
 }
 
 # JWT Settings

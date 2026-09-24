@@ -226,6 +226,7 @@ broker, cache, RF engine).
 | `push_notifications`   | Discord linking, audit, DM delivery.                                                                 |
 | `stats`                | Aggregated packet / node statistics.                                                                 |
 | `users`                | Auth, JWT, social auth, user preferences.                                                            |
+| `m2m_api`              | Hashed third-party keys and the read-only `/api/m2m/v1/` data contract.                              |
 | `common`               | Shared helpers (geo, mesh node ID conversion, etc.).                                                 |
 | `ws`                   | Channels consumers — bot command channel and UI live updates.                                        |
 

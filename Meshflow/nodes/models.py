@@ -419,6 +419,11 @@ class ObservedNode(models.Model):
     last_heard = models.DateTimeField(null=True, blank=True, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
 
+    m2m_opt_out = models.BooleanField(
+        default=False,
+        help_text=_("When set, this node is omitted from per-node M2M listings. Aggregates still count it."),
+    )
+
     claimed_by = models.ForeignKey(
         "users.User",
         on_delete=models.CASCADE,

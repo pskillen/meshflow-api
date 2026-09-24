@@ -236,6 +236,22 @@ Tunables for [automatic target selection reliability](../features/traceroute/alg
 - **TR_RELIABILITY_CONSECUTIVE_FAILS**: Streak of automatic failures (after the most recent attempt) required to exclude the target for that source. `0` disables exclusion.
 - **TR_RELIABILITY_SOFT_MAX** / **TR_RELIABILITY_MIN_ATTEMPTS_SOFT**: Soft deprioritisation of targets with a poor success ratio without excluding them.
 
+## 12. Guest throttling and M2M API
+
+| Variable | Default | Description |
+|---|---|---|
+| `TRUST_CF_CONNECTING_IP` | `false` | When `true`, rate limits use `CF-Connecting-IP`. Set `true` in production (Cloudflare Tunnel). Leave unset in dev and test. |
+| `THROTTLE_GUEST_BURST` | `120/min` | Anonymous burst limit per IP on guest-readable GETs. |
+| `THROTTLE_GUEST_EXPENSIVE` | `10/min` | Extra anonymous limit on `stats/global`, traceroute analytics, and observed-node search. |
+| `THROTTLE_USER` | `600/min` | Authenticated backstop on those same reads. |
+| `THROTTLE_M2M_KEY_MIN` | `60/min` | M2M key limit per minute. |
+| `THROTTLE_M2M_KEY_DAY` | `5000/day` | M2M key limit per UTC day. |
+| `THROTTLE_M2M_OWNER_MIN` | `60/min` | Same ceiling per key owner, per minute. |
+| `THROTTLE_M2M_OWNER_DAY` | `5000/day` | Same ceiling per key owner, per UTC day. |
+| `M2M_TERMS_VERSION` | `1` | Terms version a new key must accept. |
+| `M2M_TERMS_GRACE_DAYS` | `90` | Days a key may keep working after a terms bump before `403`. |
+| `FRONTEND_URL` | (see §1 / example) | Also used to build M2M `meshflow_url`. |
+
 ---
 
 # Example `.env` file
@@ -273,4 +289,15 @@ CORS_ALLOWED_ORIGINS=https://yourdomain.com,https://admin.yourdomain.com
 PACKET_DEDUP_WINDOW_MINUTES=10
 
 PROMETHEUS_PASSWORD=your-prometheus-password
+
+TRUST_CF_CONNECTING_IP=true
+THROTTLE_GUEST_BURST=120/min
+THROTTLE_GUEST_EXPENSIVE=10/min
+THROTTLE_USER=600/min
+THROTTLE_M2M_KEY_MIN=60/min
+THROTTLE_M2M_KEY_DAY=5000/day
+THROTTLE_M2M_OWNER_MIN=60/min
+THROTTLE_M2M_OWNER_DAY=5000/day
+M2M_TERMS_VERSION=1
+M2M_TERMS_GRACE_DAYS=90
 ``` 

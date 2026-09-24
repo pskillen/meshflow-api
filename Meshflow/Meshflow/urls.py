@@ -42,6 +42,7 @@ urlpatterns = [
                 path("monitoring/", include("mesh_monitoring.urls")),
                 path("dx/", include("dx_monitoring.urls")),
                 path("messages/", include("text_messages.urls")),
+                path("m2m/", include("m2m_api.urls")),
                 # JWT Token endpoints
                 path("token/", CustomTokenObtainPairView.as_view(), name="token_obtain_pair"),
                 path("token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),

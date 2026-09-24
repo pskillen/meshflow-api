@@ -1,0 +1,115 @@
+openapi: 3.1.0
+info:
+  title: Meshflow M2M API
+  version: "1"
+  description: >
+    Read-only machine-to-machine API. Authenticate with `X-API-KEY: mfk_…` or
+    `Authorization: Bearer mfk_…`. "Today" is the UTC calendar day. `packets.today`
+    sums completed hourly snapshots since 00:00 UTC and reports `day_start` and `as_of`.
+    Data is licensed CC BY-NC 4.0. Public displays must show "Data: Meshflow".
+    Meshtastic and MeshCore responses are never mixed. Positions are omitted.
+servers:
+  - url: /api/m2m
+tags:
+  - name: M2M
+paths:
+  /v1/meta:
+    get:
+      tags: [M2M]
+      summary: Terms, licence, attribution, and rate limits
+      security: [{M2MKey: []}]
+      responses:
+        "200": {description: Metadata}
+        "401": {description: Invalid or missing key}
+        "403": {description: Terms grace elapsed}
+        "429": {description: Rate limit, Retry-After set}
+  /v1/constellations:
+    get:
+      tags: [M2M]
+      summary: Constellation id and name
+      security: [{M2MKey: []}]
+      responses:
+        "200": {description: List}
+  /v1/meshtastic/summary:
+    get:
+      tags: [M2M]
+      summary: Meshtastic aggregates for the UTC day and rolling windows
+      security: [{M2MKey: []}]
+      parameters:
+        - $ref: "#/components/parameters/constellation"
+      responses:
+        "200": {description: Summary. CLIENT_BASE is in the role mix and not in infra_nodes_24h.}
+  /v1/meshtastic/timeseries:
+    get:
+      tags: [M2M]
+      summary: Hourly or UTC-daily series from StatsSnapshot
+      security: [{M2MKey: []}]
+      parameters:
+        - name: metric
+          in: query
+          schema: {type: string, enum: [online_nodes, packet_volume, new_nodes]}
+        - name: interval
+          in: query
+          schema: {type: string, enum: [hour, day]}
+        - name: from
+          in: query
+          schema: {type: string, format: date-time}
+        - name: to
+          in: query
+          schema: {type: string, format: date-time}
+        - $ref: "#/components/parameters/constellation"
+      responses:
+        "200": {description: Points. Hourly range cap 31 days. Daily range cap 400 days.}
+  /v1/meshtastic/infra-nodes:
+    get:
+      tags: [M2M]
+      summary: Infrastructure nodes heard recently, without positions
+      security: [{M2MKey: []}]
+      parameters:
+        - name: heard_within
+          in: query
+          schema: {type: string, enum: ["24h", "7d", "30d"], default: 7d}
+        - name: page
+          in: query
+          schema: {type: integer}
+        - name: page_size
+          in: query
+          schema: {type: integer}
+      responses:
+        "200": {description: Paginated infra nodes. Opted-out nodes are omitted.}
+  /v1/meshcore/summary:
+    get:
+      tags: [M2M]
+      summary: MeshCore aggregates
+      security: [{M2MKey: []}]
+      parameters:
+        - $ref: "#/components/parameters/constellation"
+      responses:
+        "200": {description: Summary using mc_* snapshots and adv_type mix.}
+  /v1/meshcore/timeseries:
+    get:
+      tags: [M2M]
+      summary: MeshCore series
+      security: [{M2MKey: []}]
+      responses:
+        "200": {description: Same shape as Meshtastic timeseries.}
+  /v1/meshcore/infra-nodes:
+    get:
+      tags: [M2M]
+      summary: MeshCore repeaters and rooms
+      security: [{M2MKey: []}]
+      responses:
+        "200": {description: Infra nodes. health is null.}
+components:
+  securitySchemes:
+    M2MKey:
+      type: apiKey
+      in: header
+      name: X-API-KEY
+  parameters:
+    constellation:
+      name: constellation
+      in: query
+      required: false
+      schema: {type: integer}
+      description: Optional constellation id. Packet snapshots and feeder counts are filtered. Node heard counts stay network-wide.

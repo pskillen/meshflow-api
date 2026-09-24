@@ -7,6 +7,7 @@ from rest_framework.response import Response
 from common.drf_permissions import AllowGuestReadOnly, IsAuthenticatedUser
 from common.mesh_node_helpers import MESHTASTIC_BROADCAST_ID
 from common.protocol import Protocol
+from common.throttling import guest_read_throttles
 from meshcore_packets.models import MeshCorePacketObservation
 from meshcore_packets.services.path_resolution import bulk_format_path_hops
 from nodes.models import ManagedNode, ObservedNode
@@ -25,6 +26,11 @@ class TextMessageViewSet(viewsets.ModelViewSet):
         if self.action in ("list", "retrieve"):
             return [AllowGuestReadOnly()]
         return [IsAuthenticatedUser()]
+
+    def get_throttles(self):
+        if self.action in ("list", "retrieve"):
+            return guest_read_throttles()
+        return []
 
     def get_queryset(self):
         queryset = (

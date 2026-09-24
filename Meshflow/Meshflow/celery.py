@@ -17,5 +17,6 @@ app.autodiscover_tasks(
         "nodes",
         "dx_monitoring",
         "meshcore_packet_path",
+        "m2m_api",
     ]
 )
