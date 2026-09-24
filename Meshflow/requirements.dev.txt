@@ -1,24 +1,24 @@
 # Testing
 pytest~=9.1
-pytest-django~=4.12
+pytest-django~=4.14
 pytest-cov~=7.1
 pytest-asyncio~=1.4
 pytest-mock~=3.15
 pytest-factoryboy~=2.8
 factory-boy~=3.3
-coverage~=7.14
+coverage~=7.16
 respx~=0.23
 
 # Development tools
 black~=26.5
 flake8~=7.3
 flake8-quotes~=3.4
-isort~=8.0
+isort~=9.0
 
 # live reload
 watchfiles~=1.2
-uvicorn~=0.49
-uvicorn[standard]~=0.49
+uvicorn~=0.52
+uvicorn[standard]~=0.52
 
 # Include production requirements
 -r requirements.txt
