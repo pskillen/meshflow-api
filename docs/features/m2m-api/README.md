@@ -1,6 +1,6 @@
-# Machine-to-machine (M2M) data API — design brainstorm
+# Machine-to-machine (M2M) data API
 
-**Status:** brainstorm / draft — not implemented. Nothing here is a commitment; open questions are at the bottom.
+**Status:** design — decisions captured, not implemented. Remaining open questions are at the bottom.
 
 ## Motivation
 
@@ -17,194 +17,247 @@ What they need:
 - **Stable node identifiers and a canonical Meshflow URL** so their UI can link back to our node pages.
 - **Separate Meshtastic and MeshCore data.** The two meshes have different roles and metrics and must not be mixed.
 
+## Decisions (summary)
+
+| Topic | Decision |
+|---|---|
+| Path | Single domain, **`/api/m2m/v1/`** (KISS; the prod host runs in an attic behind Cloudflare free). If we settle on a better feature name than "stats", it replaces `m2m` in the path. |
+| Licence | **CC BY-NC 4.0** |
+| Who can mint keys | Users in a Django group, **`m2m_api`**, granted by staff (same pattern as `feeder`). |
+| Request-time auth | **The API key alone.** No group or permission check per request. The key is bound to its owner, and an inactive owner kills the key. |
+| "Today" | **UTC calendar day**, following the existing all-UTC convention (see [Time and day boundaries](#time-and-day-boundaries)). Documented in feature docs and OpenAPI. |
+| Infra roles (Meshtastic) | `ROUTER`, `ROUTER_LATE`, plus deprecated `ROUTER_CLIENT` and `REPEATER` (still heard on air). **`CLIENT_BASE` excluded** in v1. |
+| Infra types (MeshCore) | `adv_type` `repeater` (2) and `room` (3) |
+| Feeders | **Aggregate counts only.** Feeders are internal to Meshflow. |
+| Positions | **Omitted** everywhere |
+| Node opt-out | Yes, for **feeders and claimed nodes**, shipped in v1 even where no per-node data is shared yet |
+| Guest throttling | **In scope** for this work: Django/DRF throttling, with Cloudflare free as an outer layer |
+
 ## Goals / non-goals
 
 **Goals**
 
 - A read-only, versioned HTTP API, separate from both the bot ingest API (`NodeAPIKey`) and the web UI API (JWT).
-- Self-service API keys: any logged-in user can create several named keys, after accepting the terms of use.
+- Self-service API keys for approved users (several named keys per user), minted after accepting the terms of use.
 - Enforceable limits: per-key rate limits, revocation, and usage visibility.
-- Aggregates first. Per-node data only for **infrastructure** nodes (routers/repeaters), and only with fields a guest
-  can already see.
+- Throttle the existing guest-readable UI endpoints, so the M2M terms can't be bypassed by scraping them.
 
 **Non-goals (v1)**
 
 - Write access of any kind.
-- Raw packets, text messages, traceroutes, precise positions of client nodes.
+- Raw packets, text messages, traceroutes, positions.
+- Per-feeder data.
 - OAuth client-credentials flows or third-party identity providers.
 - Paid tiers or SLAs.
 
-## What already exists (and why it's not enough)
+## Existing surface (checked)
 
-Much of what the requester wants is already **guest-readable with no key at all**:
+The permissions work in [#346](https://github.com/pskillen/meshflow-api/issues/346) (see
+[permissions/README.md](../../permissions/README.md)) **removed the JWT requirement for most reads.**
+`AllowGuestReadOnly` is used on:
 
-| Need | Existing endpoint | Notes |
+| Area | Guest-readable endpoints | Cost |
 |---|---|---|
-| Nodes seen in 2h/24h/7d/30d/90d | `GET /api/nodes/observed-nodes/recent_counts/?protocol=` | Protocol-split already |
-| Hourly online / packet volume / new nodes | `GET /api/stats/snapshots/` | `online_nodes`, `packet_volume`, `new_nodes`, `mc_*` variants |
-| Live global packet stats | `GET /api/stats/global/` | Meshtastic only |
-| Node list incl. role | `GET /api/nodes/observed-nodes/` | Guest-redacted; heavy payload for this use case |
+| Constellations / channels | `GET /api/constellations/…` | cheap |
+| Messages | `GET /api/messages/` | moderate (paginated) |
+| Observed nodes | list / retrieve / search / `recent_counts` (redacted) | moderate |
+| Stats | `GET /api/stats/snapshots/` | cheap (stored rows) |
+| Stats | `GET /api/stats/global/` | **expensive**: live `COUNT` + `Trunc` over `MtRawPacket`. With no `start_date` it scans **all history**. |
+| Traceroutes | `GET /api/traceroutes/`, `/{id}/` | moderate |
+| Traceroute analytics | heatmap edges (**Neo4j**), feeder reach, constellation coverage (H3), traceroute stats | **expensive** |
 
-Gaps:
+None of these are throttled. `REST_FRAMEWORK` has no `DEFAULT_THROTTLE_*`. Some already answer part of the
+requester's question, but they serve the UI and are not a stable contract. See
+[Guest endpoint throttling](#guest-endpoint-throttling).
 
-1. **No terms, attribution or accountability.** Anonymous callers never agree to anything and we cannot tell them apart.
-2. **No throttling.** `REST_FRAMEWORK` has no `DEFAULT_THROTTLE_*`. Guest endpoints can be scraped without limit
-   (this is a separate issue worth fixing regardless — see [Guest endpoints](#guest-endpoints-side-issue)).
-3. **These endpoints serve the UI, not a public contract.** Their shapes change whenever the UI needs something.
-   An external consumer needs a versioned, stable contract.
-4. **Missing aggregates:** counts by role, feeder counts, "packets today" as one number, and infra health metrics.
-
-## Proposal overview
+## Architecture
 
 ```mermaid
 flowchart LR
   subgraph clients [Callers]
     bot[Bots] -->|X-API-KEY NodeAPIKey| ingest
-    web[meshflow-ui] -->|JWT| main
+    web[meshflow-ui] -->|JWT or guest| main
     ext[3rd-party dashboards] -->|X-API-KEY mfk_…| m2m
   end
+  cf[Cloudflare free] --- clients
   subgraph api [meshflow-api]
     ingest["/api/packets, /api/meshcore (ingest)"]
     main["/api/* (UI API)"]
-    m2m["/api/open/v1/* (M2M, new app)"]
+    m2m["/api/m2m/v1/* (new app)"]
+    keys["/api/m2m/keys/ (JWT, m2m_api group)"]
   end
-  web -->|JWT: manage own M2M keys| keys["/api/open-keys/ (self-service CRUD)"]
-  m2m --> cache[(Redis cache)]
+  web -->|manage own keys| keys
+  m2m --> cache[(Redis: throttle + response cache)]
+  main --> cache
   m2m --> db[(Postgres: StatsSnapshot, ObservedNode, NodeLatestStatus)]
 ```
 
-- New Django app, e.g. `open_data/`, mounted at **`/api/open/v1/`** (name open to bikeshedding: `m2m`, `public`, `data`).
-- **Only** M2M-key authentication on those routes. JWT is not accepted and `NodeAPIKey` is not accepted, so the three
-  auth surfaces never overlap.
-- Key management (create/list/revoke) is a normal JWT-authenticated UI API in the same app, e.g. `/api/open-keys/`.
+- New Django app **`m2m_api`**.
+- **`/api/m2m/v1/*`** accepts **only** M2M-key authentication. JWT and `NodeAPIKey` are not accepted, so the auth
+  surfaces never overlap.
+- **`/api/m2m/keys/`** is key management over JWT (UI API). It sits outside `v1` because it is not part of the M2M
+  contract.
 
-## Authentication
+## Authentication and access
 
-### Options considered
+### Why our own model
 
-| Option | Verdict |
-|---|---|
-| Django core | Has no API-key mechanism. |
-| DRF `TokenAuthentication` (`authtoken`) | One token per user, stored in plaintext. Doesn't meet "multiple keys per user". ✗ |
-| [`djangorestframework-api-key`](https://florimondmanca.github.io/djangorestframework-api-key/) | Mature, hashed keys, prefix lookup, expiry, revocation, `AbstractAPIKey` for a custom model with a `user` FK. Its `HasAPIKey` is a *permission* rather than an authentication class, so `request.user` stays anonymous unless we add a small auth class. Viable. |
-| Own model (like `NodeAPIKey`) | Small amount of code, fits existing patterns. Must avoid `NodeAPIKey`'s plaintext storage. **Recommended**, or the library above if we'd rather not own the crypto details. |
+- **Django core** has no API-key mechanism.
+- **DRF `authtoken`** allows one plaintext token per user.
+- **`djangorestframework-api-key`** would work, but implements access as a *permission* rather than authentication,
+  so we'd write the auth class anyway.
+- **Own model:** a small, well-understood amount of code, in line with `NodeAPIKey`, but **hashed** (unlike
+  `NodeAPIKey`, which stores keys in plaintext).
 
-Either way, no external identity provider is needed. The user already logs in with Google/GitHub/Discord, and the key
-belongs to that Meshflow user.
-
-### Recommended key model (`OpenDataAPIKey`)
+### `M2MApiKey` model
 
 | Field | Notes |
 |---|---|
 | `id` | UUID |
-| `owner` | FK `users.User`. Several keys per user, with a cap (e.g. 5). |
+| `owner` | FK `users.User`, `on_delete=CASCADE`. Several keys per user, capped (e.g. 5). |
 | `name` | User label, e.g. "scotmesh dashboard" |
-| `prefix` | First ~8 chars, stored in plaintext and indexed, used for lookup and display (`mfk_ab12cd34…`) |
-| `hashed_key` | SHA-256 of the full key. Keys are high-entropy random values, so a fast hash is fine; no bcrypt needed. |
-| `created_at`, `last_used_at`, `revoked_at`, `expires_at` (nullable) | `last_used_at` is written at most once per N minutes to avoid a DB write per request. |
-| `terms_version` / `terms_accepted_at` | The terms version accepted when the key was created |
-| `intended_use` | Free text, required: what the caller is building and its URL. Supports good-faith review. |
-| `rate_tier` | Default `standard`; staff can raise it |
+| `prefix` | 8 random chars, unique and indexed, stored in plaintext for lookup and display |
+| `hashed_key` | SHA-256 of the full key. Keys are high-entropy random values, so a fast hash is enough. Compare with `hmac.compare_digest`. |
+| `intended_use` | Required free text: what the caller is building, plus its URL |
+| `terms_version`, `terms_accepted_at` | The terms accepted when the key was minted |
+| `created_at`, `last_used_at`, `revoked_at`, `revoked_reason` | `last_used_at` is written at most once per ~5 min |
+| `rate_tier` | `standard` by default; staff can raise it |
 
-- Key format: `mfk_<prefix>_<secret>`. The `mfk_` prefix makes leaked keys easy to spot and lets us register the
-  pattern with GitHub secret scanning later.
-- The full key is **shown once** on creation and never again.
-- Accepted as `X-API-KEY: …` or `Authorization: Bearer …` (the scheme is different from JWT's, so the two can't be
-  confused).
-- Authentication returns `(key.owner, key)`, the same pattern as `NodeAPIKeyAuthentication`.
+- Key format: `mfk_<prefix>_<secret>`. The `mfk_` prefix makes leaked keys easy to spot and can later be registered
+  with GitHub secret scanning.
+- The full key is **shown once** on creation.
+- Sent as `X-API-KEY: …` (preferred) or `Authorization: Bearer mfk_…`.
 
-### Who may create keys
+### Lifecycle and checks
 
-Any authenticated user (not only the feeder group), after accepting the current terms. Staff can revoke any key and
-suspend a user's ability to create keys. That could be a `can_use_open_api` flag or membership of an `open_api_banned`
-group.
+| Moment | Check |
+|---|---|
+| **Mint** (`POST /api/m2m/keys/`) | JWT user, `is_active`, member of group **`m2m_api`** (or staff), accepts the **current** terms version, under the key cap |
+| **List / revoke own** | JWT user who owns the key. Revoking is allowed even after losing the group, so users can clean up. |
+| **Each M2M request** | Key found by prefix, hash matches, `revoked_at IS NULL`, **`owner.is_active`**. **No group check.** |
 
-## Terms of use (self-service flow)
+- The request context is the key. `request.auth` is the `M2MApiKey`, and views never use `request.user` for data
+  decisions. `request.user` is set to the owner only so logging and metrics can name the person.
+- **Disabling a user** (`is_active=False`) immediately stops all their keys through the per-request check, and stops
+  minting because their JWT login stops working. A `pre_save` signal on `User` also stamps `revoked_at` on their keys
+  (reason `owner_disabled`), so the state is explicit in admin and survives re-activation. Re-activating the user does
+  **not** bring keys back; they mint new ones.
+- **Removing a user from `m2m_api`** stops new mints only. Existing keys keep working by design. Staff use the admin
+  action "Revoke all keys for user" if they want those gone as well.
+- Admin: list and filter keys, see usage, revoke, change tier. Staff can also revoke any single key.
 
-Key creation happens in the UI and shows the terms. The user must tick "I agree" and fill in `intended_use`. Terms are
-versioned (`OPEN_API_TERMS_VERSION`), and a bump requires re-acceptance before existing keys keep working (or within
-a grace period). Draft wording:
+## Terms of use
+
+Shown in the UI key-creation flow. The user ticks "I agree" and fills in `intended_use`. Terms are versioned
+(`M2M_TERMS_VERSION` setting). When the version is bumped, existing keys get a grace period to re-accept
+(see open questions).
 
 1. **Acceptable use.**
    - Stay within the published rate limits and don't try to get around them (e.g. by spreading traffic over several
      keys).
-   - Cache responses. Hourly data does not need polling more than once per hour, and "live" summaries no more than
-     once a minute.
-   - No bulk re-hosting of the whole dataset. Only use it for your stated purpose.
-   - Don't try to re-identify people or pinpoint home locations from the data.
-   - Keep your key secret. Never embed it in client-side JavaScript; proxy it through your own backend.
-2. **Good faith.** The data is free, but it takes a lot of volunteer effort and hardware to collect. Use it in the
-   spirit it's offered: to help the mesh community. We may revoke keys at our discretion, and the service comes with
-   no guarantee of availability or accuracy.
+   - Cache responses: poll hourly data no more than hourly, and summaries no more than once a minute.
+   - No bulk re-hosting of the dataset.
+   - Don't try to re-identify people or locate their homes.
+   - Keep your key server-side and never embed it in browser JavaScript.
+2. **Good faith.** The data is free, but it takes a lot of volunteer effort and hardware to collect. Use it to help
+   the mesh community. Keys may be revoked at our discretion, and the service comes with no guarantee of availability
+   or accuracy.
 3. **Non-commercial only.** No selling, reselling or paywalling the data or products built mainly on it, and no use in
-   commercial services. Ask us if you're unsure.
-4. **Attribution.** Any public display of the data must show "Data: Meshflow" linked to the Meshflow site, and should
-   link individual nodes to their Meshflow node pages (the API provides these URLs).
+   commercial services.
+4. **Attribution.** Data is licensed **[CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/)**. Any public
+   display must show "Data: Meshflow" linked to the Meshflow site, and should link nodes to their Meshflow pages via
+   the `meshflow_url` field.
 
-Suggested licence to cite: **CC BY-NC 4.0** (or BY-NC-SA if we want derivatives shared alike). This makes rules 3–4
-recognisable and legally meaningful rather than home-made.
+## Time and day boundaries
 
-## API surface (v1 sketch)
+Nothing in the code or docs previously defined "today". The effective convention is **UTC everywhere**:
 
-Everything is **split by protocol in the path**. Meshtastic and MeshCore never share a response.
+- `TIME_ZONE = "UTC"`, `USE_TZ = True` (`Meshflow/settings/base.py`).
+- `StatsSnapshot` rows are hourly on **UTC hour boundaries**, `recorded_at` = start of the completed hour, written at
+  :05 UTC ([packet-stats/meshtastic.md](../packet-stats/meshtastic.md)).
+- Live stats `Trunc` in UTC. `recent_counts` uses rolling windows (2h/24h/7d…), not calendar days.
+- `traceroute_analytics` daily snapshots use `date.today()` in a UTC container.
+
+**Decision:** for M2M, "today" = **00:00 UTC to now**. During British Summer Time that means UK "today" starts at
+23:00 UTC the previous evening. That is intentional, and every relevant response states it:
+
+- `packets.today` is the **sum of completed-hour `packet_volume` snapshots since 00:00 UTC**. It lags up to ~65 min
+  and excludes the in-progress hour. The response carries `as_of` (end of the last completed hour) and `day_start`
+  (00:00 UTC), so consumers are never guessing.
+- The same wording goes in the OpenAPI descriptions and in [packet-stats/README.md](../packet-stats/README.md).
+
+## API surface (v1)
+
+Everything is **split by protocol in the path**. Meshtastic and MeshCore never share a response. All timestamps are
+ISO 8601 UTC.
 
 ```
-GET /api/open/v1/meta                              # terms version, attribution string, rate limits, data freshness
-GET /api/open/v1/constellations                    # id, name, slug — for filtering
+GET /api/m2m/v1/meta                     # terms version, licence, attribution, rate limits, time conventions
+GET /api/m2m/v1/constellations           # id, name — for filtering
 
-GET /api/open/v1/meshtastic/summary                # "right now" snapshot
-GET /api/open/v1/meshtastic/timeseries             # from StatsSnapshot
-GET /api/open/v1/meshtastic/infra-nodes            # routers/repeaters + health
-GET /api/open/v1/meshtastic/feeders                # active feeders (aggregate or list — see open questions)
+GET /api/m2m/v1/meshtastic/summary
+GET /api/m2m/v1/meshtastic/timeseries
+GET /api/m2m/v1/meshtastic/infra-nodes
 
-GET /api/open/v1/meshcore/summary
-GET /api/open/v1/meshcore/timeseries
-GET /api/open/v1/meshcore/infra-nodes              # adv_type=repeater/room
-GET /api/open/v1/meshcore/feeders
+GET /api/m2m/v1/meshcore/summary
+GET /api/m2m/v1/meshcore/timeseries
+GET /api/m2m/v1/meshcore/infra-nodes
 ```
 
-Common query params: `constellation=<id>` (optional; the default is the whole network).
+Common query param: `constellation=<id>` (optional; default = whole network).
 
-### `…/summary` (example, Meshtastic)
+### `…/summary` (Meshtastic example)
 
 ```json
 {
   "protocol": "meshtastic",
-  "generated_at": "2026-09-24T12:00:00Z",
   "constellation": null,
-  "packets": { "today": 184223, "last_24h": 201554, "last_1h": 8120 },
+  "generated_at": "2026-09-24T12:03:10Z",
+  "packets": {
+    "today": 184223,
+    "day_start": "2026-09-24T00:00:00Z",
+    "as_of": "2026-09-24T12:00:00Z",
+    "last_24h": 201554
+  },
   "nodes_heard": { "2h": 412, "24h": 903, "7d": 1450, "30d": 2210 },
-  "nodes_by_role_24h": { "CLIENT": 610, "CLIENT_MUTE": 140, "ROUTER": 38, "ROUTER_LATE": 12, "CLIENT_BASE": 20, "TRACKER": 9, "SENSOR": 4, "unknown": 70 },
+  "nodes_by_role_24h": {
+    "CLIENT": 610, "CLIENT_MUTE": 140, "CLIENT_BASE": 20, "ROUTER": 38, "ROUTER_LATE": 12,
+    "ROUTER_CLIENT": 3, "REPEATER": 2, "TRACKER": 9, "SENSOR": 4, "unknown": 65
+  },
+  "infra_nodes_24h": 55,
   "feeders": { "active": 27, "total": 34 },
-  "attribution": { "text": "Data: Meshflow", "url": "https://…" }
+  "attribution": { "text": "Data: Meshflow", "url": "https://…", "licence": "CC BY-NC 4.0" }
 }
 ```
 
-- "today" is a UTC day. Should we add a `tz` param? Most consumers are UK-based, so Europe/London may be the better
-  default (see open questions).
-- MeshCore uses `nodes_by_type_24h` keyed on `adv_type`: `chat`, `repeater`, `room`, `sensor`, `unknown`.
-- `feeders.active` is `ManagedNodeStatus.is_sending_data=True` for that protocol.
+- `nodes_by_role_24h` reports **every** role, including `CLIENT_BASE`, because counts identify nobody.
+  `infra_nodes_24h` uses the infra definition, so it excludes `CLIENT_BASE`.
+- Role is the node's **current** role, since there's no role history.
+- `feeders` are aggregate only: `active` = `ManagedNodeStatus.is_sending_data`, `total` = non-deleted `ManagedNode`,
+  per protocol.
+- `packets.last_24h` is the sum of the last 24 completed-hour snapshots.
+- MeshCore uses `nodes_by_type_24h` keyed on `adv_type` (`chat`, `repeater`, `room`, `sensor`, `unknown`) and the
+  `mc_*` snapshot types.
+- Opted-out nodes **are still counted** in aggregates. Opt-out only affects per-node output.
 
 ### `…/timeseries`
 
-`?metric=online_nodes|packet_volume|new_nodes&interval=hour|day&from=&to=`. Served straight from `StatsSnapshot`
-(hourly already exists for both protocols; daily is a rollup or computed with SQL `date_trunc`). Maximum range per
-request is e.g. 90 days at hourly resolution and 2 years at daily. Response:
-`{ "metric": …, "interval": …, "points": [{"t": "…", "v": 123}] }`.
+`?metric=online_nodes|packet_volume|new_nodes&interval=hour|day&from=&to=`
 
-To add later: `nodes_by_role` as a snapshot type, so role mix can be charted over time. Today only the current role
-mix can be derived; history needs a new collector.
+- Served from `StatsSnapshot` (`mc_*` types for MeshCore).
+- `day` buckets are UTC days summed from hourly rows.
+- Range caps: hourly up to 31 days per request; daily up to 400 days.
+- Response: `{ "metric", "interval", "unit", "points": [{"t": "…", "v": 123}] }`.
+- For `packet_volume` hourly points, `v` is the count, with an optional `by_type` breakdown.
+
+To add later: a `nodes_by_role` snapshot type for charting role mix over time.
 
 ### `…/infra-nodes`
 
-"Infra" means:
-
-- **Meshtastic:** `meshtastic_role IN (ROUTER, ROUTER_LATE, REPEATER, ROUTER_CLIENT, CLIENT_BASE?)`
-- **MeshCore:** `meshcore_adv_type IN (repeater, room)`
-
-Should `CLIENT_BASE` count as infra? See open questions.
-
-Per node:
+- **Meshtastic:** `meshtastic_role IN (ROUTER, ROUTER_LATE, ROUTER_CLIENT, REPEATER)`. `CLIENT_BASE` is excluded.
+- **MeshCore:** `meshcore_adv_type IN (2 repeater, 3 room)`.
+- Excludes opted-out nodes. Default filter is heard in the last 7 days (`?heard_within=24h|7d|30d`).
+- Paginated with the standard `page_size` param.
 
 ```json
 {
@@ -212,6 +265,7 @@ Per node:
   "long_name": "Ben Lomond Router",
   "short_name": "BLR",
   "role": "ROUTER",
+  "role_deprecated": false,
   "hw_model": "RAK4631",
   "last_heard": "…",
   "meshflow_url": "https://<ui-host>/nodes/!433b82f0",
@@ -223,65 +277,108 @@ Per node:
 }
 ```
 
-- Source: `NodeLatestStatus` (latest values only). Could later add `…/infra-nodes/{id}/health?from=&to=` from
-  `DeviceMetrics` for history.
-- **No position** in v1, matching guest redaction. Router positions are arguably public (they're on hills), but that
-  is a per-owner privacy decision, so it's out of v1.
-- MeshCore health: we need to check which repeater telemetry we actually ingest. `channel_utilization` and
-  `air_util_tx` are Meshtastic-specific columns, so the MeshCore health block will have different fields.
-- Owners should be able to opt a node out of the open API, e.g. an `ObservedNode` flag `exclude_from_open_api`.
+- `health` comes from `NodeLatestStatus` (latest values only). History from `DeviceMetrics` is a later phase.
+- **No position, owner or claim fields.**
+- **MeshCore:** `channel_utilization` / `air_util_tx` are Meshtastic columns, so the MeshCore `health` block will have
+  its own fields, defined once we've checked what repeater telemetry we ingest.
+- `meshflow_url` is built from a `FRONTEND_URL`-style setting plus the node's `node_id_str` (or the MeshCore pubkey
+  route the UI uses).
 
-## Rate limiting, caching, observability
+## Node opt-out
 
-- **Throttling:** DRF throttles backed by the existing Redis cache (`django_redis`). A custom `OpenAPIKeyRateThrottle`
-  keyed on key id, e.g. `60/min` and `5000/day`, plus a per-user throttle so a user can't get around the limit with
-  several keys. Return `429` with `Retry-After`, and add `X-RateLimit-*` headers.
-- **Response caching:** summaries cached 60 s and timeseries 5–15 min in Redis, shared across all keys, so load does
-  not grow with the number of consumers. Send `Cache-Control` and `ETag` so good clients can do conditional requests.
-- **Usage metering:** Redis `INCR` per key per day (flushed to a `OpenDataAPIUsageDaily` table by Celery), shown to
-  the user on their key page and to staff in admin. Document the new Redis usage in `docs/REDIS.md`.
-- **Prometheus:** a labelled counter per endpoint (not per key; that label set would grow without bound).
+A single field on **`ObservedNode`**: `m2m_opt_out` (bool, default `false`).
+
+- **Who can set it:**
+  - The **claimant** (`claimed_by`) of a claimed node.
+  - The **owner of a `ManagedNode`** matched to the node (Meshtastic node id or MeshCore pubkey), which covers
+    feeders.
+  - Staff.
+- **Where:** a `PATCH` on the existing observed-node / managed-node settings surfaces in the UI API, plus a toggle in
+  meshflow-ui on the node settings page.
+- **Effect in v1:** excluded from `infra-nodes` and any future per-node M2M output. Still counted in aggregates.
+  Feeders are aggregate-only in v1, so for a feeder that isn't an infra node the flag has no visible effect yet. It's
+  stored now so per-node feeder data can come later without a consent gap.
+
+## Rate limiting and caching
+
+### M2M endpoints
+
+- `M2MKeyRateThrottle` (DRF `SimpleRateThrottle`, Redis cache), keyed on **key id**: e.g. `60/min`, `5000/day`,
+  depending on tier.
+- `M2MOwnerRateThrottle` keyed on **owner id**, so several keys can't be used to get around the limit.
+- `429` with `Retry-After`. Add `X-RateLimit-Limit` / `-Remaining` headers.
+- Response cache in Redis, shared across all keys: `summary` for 60 s, `timeseries` / `infra-nodes` for 5 min.
+  Also send `Cache-Control: max-age=…` and `ETag`.
+- Usage metering: a Redis `INCR` per key per UTC day, flushed hourly by Celery to an `M2MApiKeyUsageDaily` table and
+  shown on the key page. Document in [REDIS.md](../../REDIS.md).
+
+### Guest endpoint throttling
+
+In scope for this work. Two layers.
+
+**1. Django / DRF (source of truth, versioned in code)**
+
+- **Client IP behind Cloudflare.** DRF's default `get_ident` uses `X-Forwarded-For`/`REMOTE_ADDR`, which behind CF
+  (and any local reverse proxy) is the proxy's address, so every guest would share one bucket. Add a shared
+  `common.throttling.client_ip(request)` that trusts **`CF-Connecting-IP`** only when enabled by a setting
+  (`TRUST_CF_CONNECTING_IP=true`). Otherwise it falls back to `REMOTE_ADDR`. This is only safe if the origin can't
+  be reached except through Cloudflare (tunnel or firewall on CF ranges). See open questions.
+- Throttle classes, all based on that IP:
+  - `GuestBurstThrottle`: e.g. `120/min` per IP, applied to all `AllowGuestReadOnly` views when unauthenticated.
+    Generous, because one SPA page load makes several calls.
+  - `GuestExpensiveThrottle` (scoped): e.g. `10/min` per IP on `stats/global`, `traceroute_analytics/*`
+    (Neo4j/H3) and `observed-nodes/search`.
+  - Authenticated JWT users: `UserRateThrottle` at a high ceiling (e.g. `600/min`), just as a backstop.
+- **Never throttle ingest.** Bot ingest (`/api/packets/…`, `/api/meshcore/…`) and the WebSocket are excluded.
+  Throttles are attached per view (or via a mixin/decorator on guest views) rather than through
+  `DEFAULT_THROTTLE_CLASSES`, so ingest can't be caught by accident.
+- **Cap expensive params for guests.** `stats/global` without `start_date` scans the whole table. For guests,
+  require or clamp the range (e.g. default and maximum 30 days) and cache the result for 60 s.
+- Roll out with rates **set high** at first, log `429`s, then tighten.
+- Settings: rates as env vars (`THROTTLE_GUEST_BURST`, `THROTTLE_GUEST_EXPENSIVE`, `THROTTLE_USER`,
+  `THROTTLE_M2M_KEY`, …) in [ENV_VARS.md](../../ENV_VARS.md).
+
+**2. Cloudflare free (outer layer, configured in the dashboard/IaC)**
+
+- One **rate-limiting rule** (the free plan allows a small number with limited options; check what's currently
+  offered) on `/api/` paths, set well above the Django limits. It's a flood backstop that stops traffic before it
+  reaches the attic box.
+- **Bot Fight Mode:** be careful, because it can challenge legitimate M2M clients and bots. Leave it off for `/api/`,
+  or confirm it doesn't affect `/api/m2m/` and ingest paths.
+- Optionally, **edge caching** for `/api/m2m/v1/*` GETs is possible later, but the cache key would have to include
+  the API key header or it would leak cached responses past auth. Skip for v1; the Django Redis cache is enough.
 
 ## Self-service UI (meshflow-ui)
 
-- New "Developer / API access" page under the user menu.
-- List keys: name, prefix, created, last used, requests today/30d, revoke button.
-- "Create key" flow: terms (versioned, scroll-to-accept), `name`, `intended_use`, then the key is shown once with a
-  copy button and a warning.
-- Public docs page: rendered from a **separate OpenAPI file** (`openapi-open.yaml`) or a filtered tag. This keeps the
-  public contract separate from the internal one.
-
-## Guest endpoints (side issue)
-
-If M2M launches while the guest endpoints stay unthrottled, anyone can skip the terms by scraping the UI API. At
-minimum, add an anonymous `AnonRateThrottle` (per IP) to guest-readable endpoints, set generously enough for the UI.
-Consider stating in the terms that the UI API is not a supported integration surface.
+- "Developer / API access" page, visible to members of `m2m_api` (others see "request access" text explaining how).
+- List keys: name, prefix, created, last used, requests today/30d, revoke.
+- Create flow: terms (versioned) → `name`, `intended_use` → key shown once with copy button.
+- Node settings: "Exclude from public data API" toggle for claimed nodes and managed nodes.
+- Public docs: a separate **`openapi-m2m.yaml`**, rendered by the existing Redocly image, so the public contract
+  stays apart from the internal `openapi.yaml`.
 
 ## Phasing
 
-1. **Phase 0 — policy:** agree the terms text and licence, and decide the open questions below.
-2. **Phase 1 — keys:** `OpenDataAPIKey` model, auth class, throttle, self-service CRUD, admin, terms versioning, tests,
-   and an OpenAPI entry for the key endpoints.
-3. **Phase 2 — Meshtastic data:** `meta`, `summary`, `timeseries`, `infra-nodes`, `feeders`, response caching.
-   Enough for the scotmesh-style dashboard.
-4. **Phase 3 — MeshCore parity:** the same endpoints for MeshCore, depending on #329 snapshot coverage and a check of
-   MeshCore repeater telemetry.
-5. **Phase 4 — history:** role-mix snapshots, infra-node health history, daily rollups, usage dashboard.
-6. **UI** (meshflow-ui) alongside phases 1–2.
+1. **Phase 1 — guest throttling:** CF-aware client IP, guest/user throttles, range clamp and cache on
+   `stats/global`, env vars, tests. Independent of M2M and worth shipping first.
+2. **Phase 2 — keys:** `m2m_api` group (data migration), `M2MApiKey`, auth class, owner-disable signal, key CRUD,
+   admin, terms versioning, M2M throttles, `ObservedNode.m2m_opt_out` plus permission to set it, tests, OpenAPI.
+3. **Phase 3 — Meshtastic data:** `meta`, `constellations`, `summary`, `timeseries`, `infra-nodes`, response cache,
+   usage metering, `openapi-m2m.yaml`. This unblocks the scotmesh-style dashboard.
+4. **Phase 4 — MeshCore parity:** the same endpoints, after checking MeshCore snapshot coverage (#329) and repeater
+   telemetry.
+5. **Phase 5 — history:** role-mix snapshots, infra-node health history.
+6. **UI** (meshflow-ui): key page with phase 2, opt-out toggle with phase 2, docs link with phase 3.
 
 ## Open questions
 
-1. **Name/path:** `/api/open/v1/`, `/api/m2m/v1/`, or a separate subdomain (`data.meshflow…`)? A subdomain makes
-   separate throttling, caching and CDN rules easier later.
-2. **Licence:** CC BY-NC 4.0 vs BY-NC-SA vs custom terms only?
-3. **Terms bump:** block keys immediately, or allow a grace period?
-4. **Who gets keys:** any logged-in user automatically, or staff approval (a "pending" state)? Approval is more
-   friction but lets you vet the good-faith declaration.
-5. **"Today":** UTC day or Europe/London day?
-6. **Infra definition:** is `CLIENT_BASE` infra? Include `ROUTER_CLIENT` / `REPEATER` (deprecated roles still seen on
-   air)?
-7. **Feeders:** aggregate counts only, or a list of feeders with node links? A list reveals who runs feeders, though
-   that is already public in the UI.
-8. **Positions:** keep all positions out, or allow infra nodes to opt in?
-9. **Node opt-out:** do owners get an "exclude from open API" toggle in v1?
-10. **Guest throttling:** fix now, as a separate small PR, independent of this work?
+1. **Feature name.** Something more specific than `m2m` for path and branding? Candidates: "Open Data" (`/api/opendata/v1`),
+   "Mesh Pulse", "Insights". Default remains `/api/m2m/v1`.
+2. **Origin exposure.** Is the attic origin reachable **only** via Cloudflare (CF Tunnel, or firewall allowing only
+   CF IP ranges)? If not, `CF-Connecting-IP` can be spoofed and per-IP throttling has to fall back to `REMOTE_ADDR`
+   from the local proxy. The reverse proxy config isn't in this repo (IaC elsewhere).
+3. **Terms bump:** how long is the grace period for existing keys (e.g. 30 days, then 403 until re-accepted)?
+4. **Group removal:** confirm that removing a user from `m2m_api` should leave their existing keys working, which is
+   the current design.
+5. **Initial rates:** comfortable with the starting numbers above (guest 120/min, expensive 10/min, M2M 60/min +
+   5000/day)?
