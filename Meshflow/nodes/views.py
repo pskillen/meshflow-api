@@ -41,6 +41,7 @@ from common.observed_node_lookup import (
     resolve_observed_node_lookup,
 )
 from common.protocol import Protocol
+from common.throttling import guest_read_throttles
 from meshcore_packets.models import MeshCorePacketObservation
 from nodes.constants import INFRASTRUCTURE_ROLES
 from nodes.models import (
@@ -264,6 +265,13 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
         if self.action in guest_read_actions:
             return [AllowGuestReadOnly()]
         return [IsAuthenticatedUser()]
+
+    def get_throttles(self):
+        if self.action in ("list", "retrieve", "recent_counts"):
+            return guest_read_throttles()
+        if self.action == "search":
+            return guest_read_throttles(expensive=True)
+        return []
 
     lookup_field = "internal_id"
     lookup_url_kwarg = "internal_id"

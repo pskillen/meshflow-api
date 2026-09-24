@@ -4,6 +4,16 @@
 
 Meshflow is a **public mesh observatory** with a small set of global access levels. Constellation membership roles (`admin` / `editor` / `viewer`) are **removed**; `Constellation` remains organizational grouping only.
 
+## Guest throttling
+
+Guest-readable GET endpoints are throttled per view (not via `DEFAULT_THROTTLE_CLASSES`, so packet ingest and WebSockets are excluded).
+
+- Anonymous: `GuestBurstThrottle` (default 120/min per IP) on guest reads. `GuestExpensiveThrottle` (default 10/min per IP) also applies to `stats/global`, traceroute analytics, and observed-node search.
+- Authenticated JWT users on those same reads: `UserRateThrottle` (default 600/min). They are not counted in the guest buckets.
+- Client IP is `CF-Connecting-IP` when `TRUST_CF_CONNECTING_IP` is true (production behind Cloudflare Tunnel). Otherwise `REMOTE_ADDR`.
+- `429` responses include `Retry-After`.
+- Guests calling `stats/global` have the date range defaulted and clamped to 30 days. The response is cached for 60 seconds.
+
 ## Access levels
 
 | Level | Identity | Read (summary) | Write (summary) |

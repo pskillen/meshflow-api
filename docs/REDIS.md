@@ -30,6 +30,10 @@ Configuration lives in [`Meshflow/Meshflow/settings/base.py`](../Meshflow/Meshfl
     - **`tr:strategy:last:{feeder_pk}:{strategy}`** — traceroute target-strategy LRU rotation ([`Meshflow/traceroute/strategy_rotation.py`](../Meshflow/traceroute/strategy_rotation.py)); TTL **`STRATEGY_LRU_TTL_SECONDS`** (30 days).
     - **`tr:envelope:v1:{constellation_pk}`** — cached constellation envelope for strategy / perimeter logic ([`Meshflow/constellations/geometry.py`](../Meshflow/constellations/geometry.py)); TTL **`ENVELOPE_TTL_SECONDS`** (600 s).
     - **`discord_connect_oauth:{nonce}`** — one-time Discord OAuth link nonces ([`Meshflow/users/discord_connect_oauth.py`](../Meshflow/users/discord_connect_oauth.py)); TTL **900 s** (`STATE_MAX_AGE`).
+    - **`throttle_{scope}_{ident}`** — DRF rate-limit buckets (`guest_burst`, `guest_expensive`, `user`, `m2m_key_min`, `m2m_key_day`, `m2m_owner_min`, `m2m_owner_day`). TTL is the rate window.
+    - **`stats:global:guest:…`** — cached guest `stats/global` responses; TTL **60 s**.
+    - **`m2m:resp:…`** — shared M2M response cache (summary 60 s, timeseries and infra-nodes 5 min). Keyed by path and query, not by API key.
+    - **`m2m:usage:{key_id}:{YYYY-MM-DD}`** — per-key request counter for the UTC day; TTL **3 days**. Flushed hourly into `M2MApiKeyUsageDaily`.
   - Prefer **feature prefixes** (`tr:`, `discord_connect_oauth:`) so keys are identifiable in `KEYS`/monitoring.
 
 - **DB 3 — Meshtastic Site Planner engine**

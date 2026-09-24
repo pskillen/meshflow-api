@@ -5,6 +5,7 @@ from rest_framework.response import Response
 
 from common.drf_permissions import AllowGuestReadOnly, IsSystemAdmin
 from common.protocol import protocol_from_query_param
+from common.throttling import guest_read_throttles
 from Meshflow.permissions import NoPermission
 
 from .models import Constellation, MessageChannel
@@ -26,6 +27,11 @@ class ConstellationViewSet(viewsets.ModelViewSet):
         if self.action in ("create", "update", "partial_update", "destroy"):
             return [IsSystemAdmin()]
         return [NoPermission()]
+
+    def get_throttles(self):
+        if self.action in ("list", "retrieve"):
+            return guest_read_throttles()
+        return []
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
@@ -72,6 +78,11 @@ class ConstellationMessageChannelsViewSet(
         if self.action == "list":
             return [AllowGuestReadOnly()]
         return [IsSystemAdmin()]
+
+    def get_throttles(self):
+        if self.action == "list":
+            return guest_read_throttles()
+        return []
 
     def create(self, request, constellation_id=None):
         constellation = get_object_or_404(Constellation, pk=constellation_id)
