@@ -21,7 +21,7 @@ What they need:
 
 | Topic | Decision |
 |---|---|
-| Path | Single domain, **`/api/m2m/v1/`** (KISS; the prod host runs in an attic behind Cloudflare free). If we settle on a better feature name than "stats", it replaces `m2m` in the path. |
+| Path / name | Single domain, **`/api/m2m/v1/`**. The feature is called "M2M API". |
 | Licence | **CC BY-NC 4.0** |
 | Who can mint keys | Users in a Django group, **`m2m_api`**, granted by staff (same pattern as `feeder`). |
 | Request-time auth | **The API key alone.** No group or permission check per request. The key is bound to its owner, and an inactive owner kills the key. |
@@ -32,6 +32,9 @@ What they need:
 | Positions | **Omitted** everywhere |
 | Node opt-out | Yes, for **feeders and claimed nodes**, shipped in v1 even where no per-node data is shared yet |
 | Guest throttling | **In scope** for this work: Django/DRF throttling, with Cloudflare free as an outer layer |
+| Ingress | All public traffic arrives via **Cloudflare Tunnel** (dev and test excepted), so `CF-Connecting-IP` can be trusted in prod |
+| Terms bump | **90-day** grace period for existing keys to re-accept, then `403` until re-accepted |
+| Initial rates | Guest 120/min per IP; guest expensive endpoints 10/min per IP; JWT users 600/min; M2M 60/min + 5000/day per key, with the same ceiling per owner |
 
 ## Goals / non-goals
 
@@ -142,15 +145,20 @@ flowchart LR
   minting because their JWT login stops working. A `pre_save` signal on `User` also stamps `revoked_at` on their keys
   (reason `owner_disabled`), so the state is explicit in admin and survives re-activation. Re-activating the user does
   **not** bring keys back; they mint new ones.
-- **Removing a user from `m2m_api`** stops new mints only. Existing keys keep working by design. Staff use the admin
-  action "Revoke all keys for user" if they want those gone as well.
+- **Removing a user from `m2m_api`** stops new mints only. Existing keys keep working by design.
+- **"Remove from M2M & revoke keys"**: a single staff operation that removes the user from `m2m_api` **and** revokes
+  all their keys (reason `access_withdrawn`) in one transaction. It appears as:
+  - a Django admin action on the User list and a button on the User change page, and
+  - a staff-only endpoint `POST /api/m2m/admin/users/{id}/withdraw/`, so a system-admin UI can call it later.
 - Admin: list and filter keys, see usage, revoke, change tier. Staff can also revoke any single key.
 
 ## Terms of use
 
 Shown in the UI key-creation flow. The user ticks "I agree" and fills in `intended_use`. Terms are versioned
-(`M2M_TERMS_VERSION` setting). When the version is bumped, existing keys get a grace period to re-accept
-(see open questions).
+(`M2M_TERMS_VERSION` setting). When the version is bumped, existing keys keep working for a **90-day grace period**
+(`M2M_TERMS_GRACE_DAYS`). Responses carry an `X-M2M-Terms-Action-Required` header, and the owner sees a banner in
+the UI. After the grace period, the key returns `403` until the owner re-accepts. Re-accepting updates the key's
+`terms_version`, and the key itself is unchanged.
 
 1. **Acceptable use.**
    - Stay within the published rate limits and don't try to get around them (e.g. by spreading traffic over several
@@ -254,7 +262,8 @@ To add later: a `nodes_by_role` snapshot type for charting role mix over time.
 
 ### `…/infra-nodes`
 
-- **Meshtastic:** `meshtastic_role IN (ROUTER, ROUTER_LATE, ROUTER_CLIENT, REPEATER)`. `CLIENT_BASE` is excluded.
+- **Meshtastic:** reuse `nodes.constants.INFRASTRUCTURE_ROLES` (ROUTER, ROUTER_CLIENT, REPEATER, ROUTER_LATE). Mesh
+  monitoring and the UI's `INFRASTRUCTURE_ROLE_IDS` use the same set. `CLIENT_BASE` is excluded.
 - **MeshCore:** `meshcore_adv_type IN (2 repeater, 3 room)`.
 - Excludes opted-out nodes. Default filter is heard in the last 7 days (`?heard_within=24h|7d|30d`).
 - Paginated with the standard `page_size` param.
@@ -321,8 +330,9 @@ In scope for this work. Two layers.
 - **Client IP behind Cloudflare.** DRF's default `get_ident` uses `X-Forwarded-For`/`REMOTE_ADDR`, which behind CF
   (and any local reverse proxy) is the proxy's address, so every guest would share one bucket. Add a shared
   `common.throttling.client_ip(request)` that trusts **`CF-Connecting-IP`** only when enabled by a setting
-  (`TRUST_CF_CONNECTING_IP=true`). Otherwise it falls back to `REMOTE_ADDR`. This is only safe if the origin can't
-  be reached except through Cloudflare (tunnel or firewall on CF ranges). See open questions.
+  (`TRUST_CF_CONNECTING_IP=true`). Otherwise it falls back to `REMOTE_ADDR`. Prod is reached only via **Cloudflare
+  Tunnel**, so the header is trustworthy there: enable it in prod, and leave it off in dev/test, where clients connect
+  directly.
 - Throttle classes, all based on that IP:
   - `GuestBurstThrottle`: e.g. `120/min` per IP, applied to all `AllowGuestReadOnly` views when unauthenticated.
     Generous, because one SPA page load makes several calls.
@@ -372,13 +382,4 @@ In scope for this work. Two layers.
 
 ## Open questions
 
-1. **Feature name.** Something more specific than `m2m` for path and branding? Candidates: "Open Data" (`/api/opendata/v1`),
-   "Mesh Pulse", "Insights". Default remains `/api/m2m/v1`.
-2. **Origin exposure.** Is the attic origin reachable **only** via Cloudflare (CF Tunnel, or firewall allowing only
-   CF IP ranges)? If not, `CF-Connecting-IP` can be spoofed and per-IP throttling has to fall back to `REMOTE_ADDR`
-   from the local proxy. The reverse proxy config isn't in this repo (IaC elsewhere).
-3. **Terms bump:** how long is the grace period for existing keys (e.g. 30 days, then 403 until re-accepted)?
-4. **Group removal:** confirm that removing a user from `m2m_api` should leave their existing keys working, which is
-   the current design.
-5. **Initial rates:** comfortable with the starting numbers above (guest 120/min, expensive 10/min, M2M 60/min +
-   5000/day)?
+None outstanding. Tracking epic: see GitHub (linked from the phase issues).
