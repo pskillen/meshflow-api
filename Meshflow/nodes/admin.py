@@ -3,6 +3,7 @@ from django.contrib import admin, messages
 from django.contrib.admin.widgets import FilteredSelectMultiple
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
+from django.db.models import Q
 from django.urls import reverse
 from django.utils.html import format_html, format_html_join
 from django.utils.safestring import mark_safe
@@ -80,6 +81,27 @@ class ProtocolListFilter(admin.SimpleListFilter):
     def queryset(self, request, queryset):
         if self.value():
             return queryset.filter(protocol=int(self.value()))
+        return queryset
+
+
+def _predicted_id_str(predicted_id):
+    return meshtastic_id_to_hex(predicted_id) if predicted_id is not None else "—"
+
+
+class PredictedNodeIdFilter(admin.SimpleListFilter):
+    """Rows by whether a predicted Meshtastic 2.8 node id (crc32 of the public key) is known."""
+
+    title = _("Predicted 2.8 id")
+    parameter_name = "predicted_28_id"
+
+    def lookups(self, request, model_admin):
+        return (("yes", _("Has predicted id")), ("no", _("No predicted id")))
+
+    def queryset(self, request, queryset):
+        if self.value() == "yes":
+            return queryset.filter(meshtastic_key_node_id__isnull=False)
+        if self.value() == "no":
+            return queryset.filter(meshtastic_key_node_id__isnull=True)
         return queryset
 
 
@@ -521,6 +543,7 @@ class ManagedNodeAdmin(admin.ModelAdmin):
         "protocol",
         "meshtastic_node_id",
         "display_id",
+        "predicted_node_id_str",
         "name",
         "observed_node_link",
         "owner",
@@ -535,17 +558,24 @@ class ManagedNodeAdmin(admin.ModelAdmin):
         ProtocolListFilter,
         ("constellation__protocol", admin.ChoicesFieldListFilter),
         ManagedNodeActiveFilter,
+        PredictedNodeIdFilter,
         "owner",
         "constellation",
         "allow_auto_traceroute",
     )
     search_fields = (
         "meshtastic_node_id",
+        "meshtastic_key_node_id",
         "name",
         "mc_pubkey",
+        "meshtastic_public_key",
         "owner__username",
         "owner__email",
     )
+
+    @admin.display(description=_("Predicted 2.8 id"))
+    def predicted_node_id_str(self, obj):
+        return _predicted_id_str(obj.meshtastic_key_node_id)
 
     @admin.display(description=_("Feeding (API)"), boolean=True)
     def status_is_sending_data(self, obj):
@@ -623,7 +653,7 @@ class ManagedNodeAdmin(admin.ModelAdmin):
     def get_readonly_fields(self, request, obj=None):
         if obj and obj.protocol == Protocol.MESHCORE:
             return ("display_id", "mc_channels_mirror", "mc_channels_synced_at")
-        return ("mc_channels_synced_at",)
+        return ("mc_channels_synced_at", "meshtastic_public_key", "predicted_node_id_str")
 
     def _protocol_for_admin(self, request, obj):
         if obj is not None:
@@ -666,7 +696,17 @@ class ManagedNodeAdmin(admin.ModelAdmin):
                 "description": _("Not used for MeshCore feeders."),
             },
         )
-        return (common, channels)
+        identity = (
+            _("Meshtastic 2.8 identity (predicted)"),
+            {
+                "fields": ("meshtastic_public_key", "predicted_node_id_str"),
+                "description": _(
+                    "Set by the backfill_meshtastic_identity command. Predicted id = crc32 of the public key; "
+                    "not yet verified on hardware."
+                ),
+            },
+        )
+        return (common, identity, channels)
 
     def save_model(self, request, obj, form, change):
         super().save_model(request, obj, form, change)
@@ -810,6 +850,7 @@ class ObservedNodeAdmin(admin.ModelAdmin):
         "node_id_str",
         "mc_pubkey_prefix",
         "meshtastic_hw_model",
+        "predicted_node_id_str",
         "get_inferred_max_hops",
         "last_heard",
         "environment_exposure",
@@ -822,8 +863,14 @@ class ObservedNodeAdmin(admin.ModelAdmin):
         return obj.latest_status.meshtastic_inferred_max_hops if obj.latest_status else None
 
     get_inferred_max_hops.short_description = "Inferred max hops"
+
+    @admin.display(description=_("Predicted 2.8 id"))
+    def predicted_node_id_str(self, obj):
+        return _predicted_id_str(obj.meshtastic_key_node_id)
+
     list_filter = (
         ProtocolListFilter,
+        PredictedNodeIdFilter,
         MeshCoreObservedIdentityFilter,
         "meshtastic_hw_model",
         "environment_exposure",
@@ -841,6 +888,7 @@ class ObservedNodeAdmin(admin.ModelAdmin):
         "mac_addr",
         "meshtastic_hw_model",
         "meshtastic_public_key",
+        "meshtastic_public_key_hex",
         "claimed_by__username",
     )
     readonly_fields = (
@@ -850,6 +898,8 @@ class ObservedNodeAdmin(admin.ModelAdmin):
         "node_id_str",
         "mac_addr",
         "meshtastic_public_key",
+        "meshtastic_public_key_hex",
+        "predicted_node_id_str",
         "meshtastic_role",
         "last_heard",
     )
@@ -860,7 +910,15 @@ class ObservedNodeAdmin(admin.ModelAdmin):
     def get_search_results(self, request, queryset, search_term):
         if not search_term:
             return queryset, False
-        queryset = queryset.filter(observed_node_search_conditions(search_term)).distinct()
+        conditions = observed_node_search_conditions(search_term)
+        # Also match the predicted 2.8 id, so searching "!4396524c" finds the 2.7 node that will become it.
+        predicted = search_term.strip()
+        try:
+            conditions |= Q(meshtastic_key_node_id=meshtastic_hex_to_int(predicted))
+        except ValueError:
+            pass
+        conditions |= Q(meshtastic_public_key_hex__istartswith=predicted.lower())
+        queryset = queryset.filter(conditions).distinct()
         return queryset, True
 
     def get_fields(self, request, obj=None):
@@ -882,6 +940,8 @@ class ObservedNodeAdmin(admin.ModelAdmin):
             "mac_addr",
             "meshtastic_hw_model",
             "meshtastic_public_key",
+            "meshtastic_public_key_hex",
+            "predicted_node_id_str",
         ]
 
 

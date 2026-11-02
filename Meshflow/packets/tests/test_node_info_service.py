@@ -96,3 +96,36 @@ def test_process_node_info_packet_different_node(
     assert from_node.mac_addr == packet.mac_address
     assert from_node.meshtastic_is_licensed == packet.is_licensed
     assert from_node.meshtastic_is_unmessagable == packet.is_unmessagable
+
+
+@pytest.mark.django_db
+def test_process_node_info_packet_sets_predicted_node_id(
+    create_node_info_packet, create_managed_node, create_packet_observation, create_user
+):
+    """The packet key is normalised to hex and the predicted 2.8 id (crc32) is stored."""
+    packet = create_node_info_packet(public_key="oLOpz1p7W8/Ti8Z0iOU4TqZAYVAXe3Uwm8EF/m1zLFs=")
+    observer = create_managed_node()
+    observation = create_packet_observation(packet=packet, observer=observer)
+    from_node = ObservedNode.objects.get_or_create(meshtastic_node_id=packet.from_int)[0]
+
+    NodeInfoPacketService().process_packet(packet, observer, observation, create_user())
+
+    from_node.refresh_from_db()
+    assert from_node.meshtastic_public_key_hex == "a0b3a9cf5a7b5bcfd38bc67488e5384ea6406150177b75309bc105fe6d732c5b"
+    assert from_node.meshtastic_key_node_id == 0x4396524C
+
+
+@pytest.mark.django_db
+def test_process_node_info_packet_malformed_key_gives_null_prediction(
+    create_node_info_packet, create_managed_node, create_packet_observation, create_user
+):
+    packet = create_node_info_packet(public_key="not-a-32-byte-key")
+    observer = create_managed_node()
+    observation = create_packet_observation(packet=packet, observer=observer)
+    from_node = ObservedNode.objects.get_or_create(meshtastic_node_id=packet.from_int)[0]
+
+    NodeInfoPacketService().process_packet(packet, observer, observation, create_user())
+
+    from_node.refresh_from_db()
+    assert from_node.meshtastic_public_key_hex is None
+    assert from_node.meshtastic_key_node_id is None
