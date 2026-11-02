@@ -26,6 +26,7 @@ from .models import (
     ObservedNode,
     Position,
     PowerMetrics,
+    RoleSource,
     WeatherUse,
 )
 from .permission_helpers import (
@@ -1587,3 +1588,47 @@ class ObservedNodeSearchSerializer(ObservedNodeSerializer):
             "last_heard",
             "owner",
         ]
+
+
+class NearbyInfrastructureNodeSerializer(serializers.Serializer):
+    """Minimal public shape for the anonymous nearby-infrastructure endpoint.
+
+    Expects ``obj._distance_km`` (precomputed, rounded). Deliberately omits owner, claim,
+    metrics, MAC and key material.
+    """
+
+    internal_id = serializers.UUIDField()
+    node_id_str = serializers.SerializerMethodField()
+    long_name = serializers.CharField(allow_null=True)
+    short_name = serializers.CharField(allow_null=True)
+    meshtastic_role = serializers.IntegerField(allow_null=True)
+    meshtastic_role_label = serializers.SerializerMethodField()
+    meshtastic_hw_model = serializers.CharField(allow_null=True)
+    last_heard = serializers.DateTimeField()
+    latitude = serializers.SerializerMethodField()
+    longitude = serializers.SerializerMethodField()
+    altitude = serializers.SerializerMethodField()
+    distance_km = serializers.SerializerMethodField()
+
+    def get_node_id_str(self, obj):
+        return observed_node_id_str(obj)
+
+    def get_meshtastic_role_label(self, obj):
+        if obj.meshtastic_role is None:
+            return None
+        try:
+            return RoleSource(obj.meshtastic_role).label
+        except ValueError:
+            return None
+
+    def get_latitude(self, obj):
+        return obj.latest_status.latitude
+
+    def get_longitude(self, obj):
+        return obj.latest_status.longitude
+
+    def get_altitude(self, obj):
+        return obj.latest_status.altitude
+
+    def get_distance_km(self, obj):
+        return obj._distance_km
