@@ -7,7 +7,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
 
 from constellations.models import Constellation, MessageChannel
-from nodes.models import ManagedNode, NodeLatestStatus, ObservedNode
+from nodes.models import ManagedNode, NodeLatestStatus, ObservedNode, Position
 from packets.models import (
     DeviceMetricsPacket,
     LocalStatsPacket,
@@ -839,6 +839,106 @@ class NodeSerializerTest(BasePacketSerializerTestCase):
         self.from_node.refresh_from_db()
         self.assertIsNone(self.from_node.meshtastic_public_key_hex)
         self.assertIsNone(self.from_node.meshtastic_key_node_id)
+
+    # --- 2.8 NodeDB upserts must not clobber identity data (ID-8) ---
+
+    KEY = "oLOpz1p7W8/Ti8Z0iOU4TqZAYVAXe3Uwm8EF/m1zLFs="
+    KEY_HEX = "a0b3a9cf5a7b5bcfd38bc67488e5384ea6406150177b75309bc105fe6d732c5b"
+    FULL_NAME = "Highland Ridge Repeater North-East"
+
+    def _seed_identity(self):
+        self.from_node.mac_addr = "a0:b3:a9:cf:5a:7b"
+        self.from_node.long_name = self.FULL_NAME
+        self.from_node.meshtastic_public_key = self.KEY
+        self.from_node.meshtastic_public_key_hex = self.KEY_HEX
+        self.from_node.meshtastic_key_node_id = 0x4396524C
+        self.from_node.save()
+
+    def _upsert(self, **extra):
+        data = {"id": self.from_node.meshtastic_node_id, **extra}
+        serializer = NodeSerializer(instance=self.from_node, data=data, partial=True)
+        assert_serializer_valid(serializer)
+        serializer.save()
+        self.from_node.refresh_from_db()
+
+    def test_node_upsert_28_nodedb_payload_keeps_mac_name_and_key(self):
+        self._seed_identity()
+        self._upsert(
+            macaddr="00:00:00:00:00:00",
+            meshtastic_public_key="",
+            user={"long_name": self.FULL_NAME.encode()[:24].decode(), "short_name": "HRRN"},
+        )
+        self.assertEqual(self.from_node.mac_addr, "a0:b3:a9:cf:5a:7b")
+        self.assertEqual(self.from_node.long_name, self.FULL_NAME)
+        self.assertEqual(self.from_node.meshtastic_public_key, self.KEY)
+        self.assertEqual(self.from_node.meshtastic_public_key_hex, self.KEY_HEX)
+        self.assertEqual(self.from_node.meshtastic_key_node_id, 0x4396524C)
+        self.assertEqual(self.from_node.short_name, "HRRN")
+
+    def test_node_upsert_null_key_and_null_mac_keep_stored_values(self):
+        self._seed_identity()
+        self._upsert(macaddr=None, meshtastic_public_key=None)
+        self.assertEqual(self.from_node.mac_addr, "a0:b3:a9:cf:5a:7b")
+        self.assertEqual(self.from_node.meshtastic_public_key, self.KEY)
+        self.assertEqual(self.from_node.meshtastic_key_node_id, 0x4396524C)
+
+    def test_node_upsert_real_changes_still_apply(self):
+        self._seed_identity()
+        new_key = "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8="
+        self._upsert(
+            macaddr="11:22:33:44:55:66",
+            meshtastic_public_key=new_key,
+            user={"long_name": "Renamed Node", "short_name": "RENM"},
+        )
+        self.assertEqual(self.from_node.mac_addr, "11:22:33:44:55:66")
+        self.assertEqual(self.from_node.long_name, "Renamed Node")
+        self.assertEqual(self.from_node.meshtastic_public_key, new_key)
+        self.assertEqual(
+            self.from_node.meshtastic_public_key_hex,
+            "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+        )
+
+    def test_node_upsert_multibyte_truncated_name_keeps_stored_name(self):
+        stored = "Café Ünïcödé NødeÅlesund Relay"
+        self.from_node.long_name = stored
+        self.from_node.save()
+        self._upsert(user={"long_name": stored.encode()[:24].decode(errors="ignore"), "short_name": "CAFE"})
+        self.assertEqual(self.from_node.long_name, stored)
+
+    def test_node_upsert_zero_position_does_not_overwrite_stored_position(self):
+        from django.utils import timezone
+
+        def position(lat, lon):
+            return {
+                "reported_time": timezone.now().isoformat(),
+                "latitude": lat,
+                "longitude": lon,
+                "altitude": 5.0,
+                "meshtastic_location_source": "UNSET",
+            }
+
+        self._upsert(position=position(55.9, -3.2))
+        self._upsert(position=position(0.0, 0.0))
+
+        latest_status = NodeLatestStatus.objects.get(node=self.from_node)
+        self.assertEqual(latest_status.latitude, 55.9)
+        self.assertEqual(latest_status.longitude, -3.2)
+        self.assertEqual(Position.objects.filter(node=self.from_node).count(), 1)
+
+    def test_node_upsert_zero_position_on_new_node_stores_nothing(self):
+        from django.utils import timezone
+
+        self._upsert(
+            position={
+                "reported_time": timezone.now().isoformat(),
+                "latitude": 0.0,
+                "longitude": 0.0,
+                "altitude": 0.0,
+                "meshtastic_location_source": "UNSET",
+            }
+        )
+        self.assertFalse(NodeLatestStatus.objects.filter(node=self.from_node, latitude=0.0).exists())
+        self.assertFalse(Position.objects.filter(node=self.from_node).exists())
 
     def test_node_upsert_v3_rejects_legacy_only_position_field(self):
         from django.utils import timezone
