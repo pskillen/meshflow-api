@@ -75,6 +75,18 @@ class ManagedNode(models.Model):
             "Required when multiple feeders share a constellation API key."
         ),
     )
+    meshtastic_public_key = models.CharField(
+        max_length=64,
+        null=True,
+        blank=True,
+        help_text=_("Meshtastic feeder public key as 64-char lowercase hex; copied from the ObservedNode by backfill."),
+    )
+    meshtastic_key_node_id = models.BigIntegerField(
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text=_("Predicted Meshtastic 2.8 node number: crc32 of the public key. Unverified on hardware."),
+    )
     owner = models.ForeignKey(
         "users.User",
         on_delete=models.CASCADE,
@@ -388,6 +400,21 @@ class ObservedNode(models.Model):
         null=True,
         blank=True,
         help_text=_("Meshtastic device public key (PKI hex); null for MeshCore."),
+    )
+    meshtastic_public_key_hex = models.CharField(
+        max_length=64,
+        null=True,
+        blank=True,
+        help_text=_("meshtastic_public_key normalised to 64-char lowercase hex; null when absent or malformed."),
+    )
+    meshtastic_key_node_id = models.BigIntegerField(
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text=_(
+            "Predicted Meshtastic 2.8 node number: crc32 of the 32-byte public key. "
+            "Unverified on hardware; null when there is no usable key."
+        ),
     )
     meshtastic_role = models.IntegerField(
         choices=RoleSource.choices,

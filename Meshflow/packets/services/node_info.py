@@ -1,3 +1,4 @@
+from common.meshtastic_identity import identity_fields
 from packets.models import NodeInfoPacket
 from packets.services.base import BasePacketService
 
@@ -23,6 +24,8 @@ class NodeInfoPacketService(BasePacketService):
         sender.meshtastic_hw_model = self.packet.hw_model
         sender.meshtastic_role = self.packet.role
         sender.meshtastic_public_key = self.packet.public_key
+        for field, value in identity_fields(self.packet.public_key).items():
+            setattr(sender, field, value)
         sender.mac_addr = self.packet.mac_address
         sender.meshtastic_is_licensed = self.packet.is_licensed
         sender.meshtastic_is_unmessagable = self.packet.is_unmessagable
