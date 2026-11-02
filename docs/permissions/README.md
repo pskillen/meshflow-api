@@ -33,6 +33,8 @@ Feeder is granted via Django group `feeder` (migration: managed-node owners and 
 
 Stripped for guests: `latest_position`, `owner`, `claim`, `environment_settings_editable`, `rf_profile_editable`, `has_rf_profile`, `has_ready_rf_render`.
 
+`GET …/observed-nodes/infrastructure/nearby/` is a separate public endpoint that exposes positions of infrastructure-role Meshtastic nodes only (never client nodes); see [nearby infrastructure](../features/nearby-infrastructure/README.md).
+
 See [RF privacy](../features/rf_propagation/privacy.md) for propagation side channels.
 
 ## Access matrix (representative)
@@ -45,6 +47,7 @@ See [RF privacy](../features/rf_propagation/privacy.md) for propagation side cha
 | Channels | `GET …/channels/` | yes | yes | yes | yes |
 | Messages | `GET /api/messages/` | yes | yes | yes | yes |
 | Observed nodes | `GET /api/nodes/observed-nodes/` | redacted | full | full | full |
+| Nearby infrastructure | `GET …/observed-nodes/infrastructure/nearby/` | yes (public, CORS `*`) | yes | yes | yes |
 | Recent counts | `GET …/recent_counts/` | yes | yes | yes | yes |
 | Stats global | `GET /api/stats/global/` | yes | yes | yes | yes |
 | Traceroutes read | `GET /api/traceroutes/` | yes | yes | yes | yes |

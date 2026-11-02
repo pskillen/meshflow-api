@@ -34,6 +34,7 @@ Configuration lives in [`Meshflow/Meshflow/settings/base.py`](../Meshflow/Meshfl
     - **`stats:global:guest:…`** — cached guest `stats/global` responses; TTL **60 s**.
     - **`m2m:resp:…`** — shared M2M response cache (summary 60 s, timeseries and infra-nodes 5 min). Keyed by path and query, not by API key.
     - **`m2m:usage:{key_id}:{YYYY-MM-DD}`** — per-key request counter for the UTC day; TTL **3 days**. Flushed hourly into `M2MApiKeyUsageDaily`.
+    - **`nodes:infra_nearby:v1:{lat}:{lon}:{radius}:{days}:{cb}`** — cached body of the public nearby-infrastructure endpoint ([`Meshflow/nodes/services/nearby_infrastructure.py`](../Meshflow/nodes/services/nearby_infrastructure.py)); TTL **`NEARBY_INFRASTRUCTURE_CACHE_SECONDS`** (60 s; `0` disables).
   - Prefer **feature prefixes** (`tr:`, `discord_connect_oauth:`) so keys are identifiable in `KEYS`/monitoring.
 
 - **DB 3 — Meshtastic Site Planner engine**

@@ -98,6 +98,11 @@ role (`ROUTER`, `REPEATER`, etc.) — battery, voltage, channel utilisation,
 last heard. Used by operators to spot failing infra at a glance. Alert badges
 in the UI sidebar surface active mesh-monitoring alerts on infra nodes.
 
+Public nearby lookup: `GET /api/nodes/observed-nodes/infrastructure/nearby/`
+returns Meshtastic routers and repeaters near a point, nearest first, with no
+login and `Access-Control-Allow-Origin: *`, so third-party map clients can use it.
+Reference: [nearby-infrastructure/](nearby-infrastructure/)
+
 ### Traceroutes
 
 Managed nodes can be instructed to run Meshtastic `traceroute` commands. The
