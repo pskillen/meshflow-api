@@ -18,6 +18,11 @@ updates:
       python-app-and-dev:
         patterns:
           - "*"
+    # Held-back majors: https://github.com/pskillen/meshflow-ui/issues/387
+    # Remove the rule in the PR that takes the bump.
+    ignore:
+      - dependency-name: django
+        versions: [">=6.1"]
 
   - package-ecosystem: pip
     directory: /tests
