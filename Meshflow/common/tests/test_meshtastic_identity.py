@@ -5,7 +5,14 @@ import base64
 import pytest
 
 from common.mesh_node_helpers import meshtastic_id_to_hex
-from common.meshtastic_identity import identity_fields, key_node_id, normalise_pubkey
+from common.meshtastic_identity import (
+    identity_fields,
+    is_blank_mac,
+    is_truncated_long_name,
+    key_node_id,
+    normalise_pubkey,
+    protect_identity,
+)
 
 # Key from docs/packets/nodeinfo_packet.json (NodeInfo from !da545c78 "JPPX Home").
 WORKED_EXAMPLE_B64 = "oLOpz1p7W8/Ti8Z0iOU4TqZAYVAXe3Uwm8EF/m1zLFs="
@@ -55,3 +62,60 @@ def test_identity_fields_for_good_key():
         "meshtastic_public_key_hex": WORKED_EXAMPLE_HEX,
         "meshtastic_key_node_id": 0x4396524C,
     }
+
+
+# --- clobber protection (ID-8) ---
+
+LONG = "Highland Ridge Repeater North-East"  # 34 bytes
+LONG_PREFIX = LONG.encode()[:24].decode()  # "Highland Ridge Repeater N"
+
+
+@pytest.mark.parametrize("mac", [None, "", "  ", "00:00:00:00:00:00", "000000000000", "AAAAAAAA", "00-00-00-00-00-00"])
+def test_is_blank_mac_true(mac):
+    assert is_blank_mac(mac)
+
+
+@pytest.mark.parametrize("mac", ["a0:b3:a9:cf:5a:7b", "A0B3A9CF5A7B", "oLOpz1p7"])
+def test_is_blank_mac_false(mac):
+    assert not is_blank_mac(mac)
+
+
+def test_truncated_long_name_ascii():
+    assert is_truncated_long_name(LONG_PREFIX, LONG)
+
+
+def test_truncated_long_name_genuine_renames_not_matched():
+    assert not is_truncated_long_name("Short", "Short")
+    assert not is_truncated_long_name("Sho", "Short")  # stored fits in 24 bytes: a genuine rename
+    assert not is_truncated_long_name("Totally Different Name Here", LONG)
+    assert not is_truncated_long_name("Highland Ridge", LONG)  # not the 24-byte prefix: genuine rename
+
+
+def test_truncated_long_name_multibyte_split_mid_character():
+    stored = "Café Ünïcödé NødeÅlesund Relay"  # multibyte characters straddle the 24-byte boundary
+    raw = stored.encode()[:24]
+    with pytest.raises(UnicodeDecodeError):
+        raw.decode()  # the cut does land inside a character
+    assert is_truncated_long_name(raw.decode(errors="ignore"), stored)
+    assert is_truncated_long_name(raw.decode(errors="replace"), stored)
+
+
+def test_protect_identity_drops_clobbering_values():
+    class Stored:
+        long_name = LONG
+
+    data = {
+        "mac_addr": "00:00:00:00:00:00",
+        "meshtastic_public_key": "",
+        "long_name": LONG_PREFIX,
+        "short_name": "ABCD",
+    }
+    assert protect_identity(Stored(), data) == {"short_name": "ABCD"}
+
+
+def test_protect_identity_keeps_real_changes():
+    class Stored:
+        long_name = LONG
+
+    data = {"mac_addr": "a0:b3:a9:cf:5a:7b", "meshtastic_public_key": WORKED_EXAMPLE_B64, "long_name": "Renamed"}
+    assert protect_identity(Stored(), data) == data

@@ -1,4 +1,4 @@
-from common.meshtastic_identity import identity_fields
+from common.meshtastic_identity import identity_fields, protect_identity
 from packets.models import NodeInfoPacket
 from packets.services.base import BasePacketService
 
@@ -14,19 +14,27 @@ class NodeInfoPacketService(BasePacketService):
             raise ValueError("Packet must be a NodeInfoPacket")
         sender = self.from_node
 
-        # check if the node info packet is for the current node
-        if sender.meshtastic_node_id == self.packet.node_id:
-            return
+        # A NodeInfo packet's ``node_id`` is the sender's own id, so there is no "packet is about another node"
+        # check to make here (the old int-vs-str guard never matched and would have skipped every update).
+        # Blank/zero MACs, blank keys and 24-byte-truncated names must not clobber stored identity data.
+        updates = protect_identity(
+            sender,
+            {
+                "short_name": self.packet.short_name,
+                "long_name": self.packet.long_name,
+                "mac_addr": self.packet.mac_address,
+                "meshtastic_public_key": self.packet.public_key,
+            },
+        )
 
         # update the ObservedNode
-        sender.short_name = self.packet.short_name
-        sender.long_name = self.packet.long_name
+        for field, value in updates.items():
+            setattr(sender, field, value)
         sender.meshtastic_hw_model = self.packet.hw_model
         sender.meshtastic_role = self.packet.role
-        sender.meshtastic_public_key = self.packet.public_key
-        for field, value in identity_fields(self.packet.public_key).items():
-            setattr(sender, field, value)
-        sender.mac_addr = self.packet.mac_address
+        if "meshtastic_public_key" in updates:
+            for field, value in identity_fields(updates["meshtastic_public_key"]).items():
+                setattr(sender, field, value)
         sender.meshtastic_is_licensed = self.packet.is_licensed
         sender.meshtastic_is_unmessagable = self.packet.is_unmessagable
         sender.save()
