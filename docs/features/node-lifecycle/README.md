@@ -39,6 +39,8 @@ When the first packet is not a NodeInfo packet, the node is created with placeho
 
 NodeInfo packets and `NodeUpsertView` also store a normalised public key and the predicted Meshtastic 2.8 node number (`crc32` of the key) on the `ObservedNode`; `ManagedNode` gets the same via the `backfill_meshtastic_identity` command. See [packet ingestion](../packet-ingestion/meshtastic.md#identity-evidence-and-predicted-28-node-id).
 
+Neither path overwrites a stored MAC with a blank/all-zero one, a stored public key with a blank one, or a full long name with its own 24-byte truncation (2.8 feeder NodeDB data), and the upsert ignores a (0, 0) position. See [packet ingestion](../packet-ingestion/meshtastic.md#identity-data-is-not-clobbered-by-28-feeder-nodedb-entries).
+
 `NodeUpsertView` is a secondary API path used by authenticated nodes to update their own observed-node details. It is not the normal user-facing discovery flow.
 
 ## Permission Summary
