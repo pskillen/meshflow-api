@@ -29,6 +29,7 @@ from .models import (
     WeatherUse,
 )
 from .permission_helpers import (
+    user_can_edit_m2m_opt_out,
     user_can_edit_observed_node_environment_settings,
     user_can_edit_observed_node_rf_profile,
 )
@@ -46,10 +47,13 @@ class ObservedNodeEnvironmentSettingsSerializer(serializers.Serializer):
         choices=[c.label for c in WeatherUse],
         required=False,
     )
+    m2m_opt_out = serializers.BooleanField(required=False)
 
     def validate(self, attrs):
         if not attrs:
-            raise serializers.ValidationError("At least one of environment_exposure, weather_use must be provided.")
+            raise serializers.ValidationError(
+                "At least one of environment_exposure, weather_use, m2m_opt_out must be provided."
+            )
         return attrs
 
 
@@ -1203,6 +1207,7 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
     environment_exposure = serializers.SerializerMethodField()
     weather_use = serializers.SerializerMethodField()
     environment_settings_editable = serializers.SerializerMethodField()
+    m2m_opt_out_editable = serializers.SerializerMethodField()
     rf_profile_editable = serializers.SerializerMethodField()
     has_rf_profile = serializers.SerializerMethodField()
     has_ready_rf_render = serializers.SerializerMethodField()
@@ -1244,6 +1249,8 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
             "environment_exposure",
             "weather_use",
             "environment_settings_editable",
+            "m2m_opt_out",
+            "m2m_opt_out_editable",
             "rf_profile_editable",
             "has_rf_profile",
             "has_ready_rf_render",
@@ -1270,6 +1277,8 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
             "environment_exposure",
             "weather_use",
             "environment_settings_editable",
+            "m2m_opt_out",
+            "m2m_opt_out_editable",
             "rf_profile_editable",
             "has_rf_profile",
             "has_ready_rf_render",
@@ -1290,6 +1299,12 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
         if not request or not request.user.is_authenticated:
             return False
         return user_can_edit_observed_node_environment_settings(request.user, obj)
+
+    def get_m2m_opt_out_editable(self, obj):
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated:
+            return False
+        return user_can_edit_m2m_opt_out(request.user, obj)
 
     def get_rf_profile_editable(self, obj):
         request = self.context.get("request")
@@ -1328,6 +1343,8 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
         "owner",
         "claim",
         "environment_settings_editable",
+        "m2m_opt_out",
+        "m2m_opt_out_editable",
         "rf_profile_editable",
         "has_rf_profile",
         "has_ready_rf_render",
@@ -1339,6 +1356,9 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
         if request and get_access_level(request) == AccessLevel.GUEST:
             for field in self.GUEST_REDACTED_FIELDS:
                 data.pop(field, None)
+            return data
+        if not data.get("m2m_opt_out_editable"):
+            data.pop("m2m_opt_out", None)
         return data
 
     def get_claim(self, obj):

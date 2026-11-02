@@ -64,6 +64,15 @@ class CustomUserAdmin(UserAdmin):
             },
         ),
     )
+    actions = ["withdraw_m2m_access"]
+
+    @admin.action(description="Withdraw M2M access (remove from group + revoke keys)")
+    def withdraw_m2m_access(self, request, queryset):
+        from m2m_api.services import withdraw_m2m_access
+
+        for user in queryset:
+            withdraw_m2m_access(user, by=request.user)
+
     add_fieldsets = (
         (
             None,

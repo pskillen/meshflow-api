@@ -7,16 +7,18 @@ alternate identity once MeshCore packets contribute to aggregates.
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Optional, Tuple
 
+from django.core.cache import cache
 from django.db.models import BigIntegerField, Case, Count, Exists, F, OuterRef, Q, When
 from django.db.models.functions import Mod, Trunc
 
 from rest_framework import status
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.response import Response
 
 from common.drf_permissions import AllowGuestReadOnly, IsAuthenticatedUser
 from common.mesh_node_helpers import meshtastic_id_to_hex
 from common.protocol import Protocol
+from common.throttling import GUEST_EXPENSIVE_THROTTLE_CLASSES, GUEST_READ_THROTTLE_CLASSES
 from nodes.models import ManagedNode, ObservedNode
 from packets.models import MtRawPacket, PacketObservation
 
@@ -429,8 +431,23 @@ def node_neighbour_stats(request, node_id: int):
     return Response(serializer.validated_data)
 
 
+GUEST_STATS_MAX_RANGE = timedelta(days=30)
+
+
+def _clamp_guest_stats_range(request, start_date, end_date):
+    """Guests are limited to a 30-day window so an unbounded scan cannot run."""
+    if request.user and request.user.is_authenticated:
+        return start_date, end_date
+    end = end_date or datetime.now(timezone.utc)
+    start = start_date or (end - GUEST_STATS_MAX_RANGE)
+    if end - start > GUEST_STATS_MAX_RANGE:
+        start = end - GUEST_STATS_MAX_RANGE
+    return start, end
+
+
 @api_view(["GET"])
 @permission_classes([AllowGuestReadOnly])
+@throttle_classes(GUEST_EXPENSIVE_THROTTLE_CLASSES)
 def global_packet_stats(request):
     """
     Get global packet statistics across all nodes.
@@ -445,6 +462,15 @@ def global_packet_stats(request):
         start_date, end_date, interval, interval_type = parse_stats_params(request)
     except ValueError as e:
         return Response({"status": "error", "message": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    start_date, end_date = _clamp_guest_stats_range(request, start_date, end_date)
+    guest = not (request.user and request.user.is_authenticated)
+    cache_key = None
+    if guest:
+        cache_key = f"stats:global:guest:{start_date}:{end_date}:{interval}:{interval_type}"
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return Response(cached)
 
     # Build base query
     packets = MtRawPacket.objects.all()
@@ -500,6 +526,8 @@ def global_packet_stats(request):
             {"status": "error", "message": "Invalid response data"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
+    if cache_key:
+        cache.set(cache_key, serializer.validated_data, 60)
     return Response(serializer.validated_data)
 
 
@@ -522,6 +550,7 @@ def _parse_datetime_param(value):
 
 @api_view(["GET"])
 @permission_classes([AllowGuestReadOnly])
+@throttle_classes(GUEST_READ_THROTTLE_CLASSES)
 def stats_snapshots_list(request):
     """
     List stored stats snapshots with optional filters.

@@ -21,6 +21,18 @@ Django app: [`Meshflow/stats/`](../../../Meshflow/stats/). Related but separate:
 | Dashboard + protocol dashboards | Not started | [#329](https://github.com/pskillen/meshflow-api/issues/329) UI Task 3 (meshflow-ui) |
 | Live MC stats API | Not planned in #329 | Snapshots + list API only |
 
+## Time and day boundaries
+
+All stats are **UTC** (`TIME_ZONE = "UTC"`):
+
+- Hourly snapshots cover UTC hours, and `recorded_at` is the **start** of the completed hour.
+- Live endpoints `Trunc` in UTC.
+- `recent_counts` uses rolling windows (2h, 24h, …) rather than calendar days.
+
+Wherever an API reports a calendar day ("today", daily buckets), the day is the **UTC day**: 00:00–24:00 UTC. During
+British Summer Time, the UK day starts at 23:00 UTC the previous evening. Consumers should use the timestamps in the
+response rather than assuming local time. See also the [M2M API](../m2m-api/README.md#time-and-day-boundaries).
+
 ## Documentation map
 
 | Doc | Contents |

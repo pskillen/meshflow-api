@@ -11,13 +11,14 @@ from django.utils import timezone
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from rest_framework import status
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 
 from common.drf_permissions import AllowGuestReadOnly, IsAuthenticatedUser
 from common.mesh_node_helpers import MESHTASTIC_BROADCAST_ID
 from common.protocol import Protocol
+from common.throttling import GUEST_READ_THROTTLE_CLASSES
 from nodes.models import ManagedNode, NodeOwnerClaim, ObservedNode
 
 from .models import AutoTraceRoute
@@ -44,6 +45,7 @@ class TraceroutePagination(PageNumberPagination):
 
 @api_view(["GET"])
 @permission_classes([AllowGuestReadOnly])
+@throttle_classes(GUEST_READ_THROTTLE_CLASSES)
 def traceroute_list(request):
     """List AutoTraceRoute with filters. All authenticated users."""
     qs = AutoTraceRoute.objects.select_related(
@@ -164,6 +166,7 @@ def traceroute_list(request):
 
 @api_view(["GET"])
 @permission_classes([AllowGuestReadOnly])
+@throttle_classes(GUEST_READ_THROTTLE_CLASSES)
 def traceroute_detail(request, pk):
     """Single AutoTraceRoute. All authenticated users."""
     obj = get_object_or_404(

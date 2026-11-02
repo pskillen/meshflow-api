@@ -12,11 +12,12 @@ from django.db.models.functions import Coalesce, TruncDate
 from django.utils import timezone
 
 from rest_framework import status
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.response import Response
 
 from common.drf_permissions import AllowGuestReadOnly
 from common.mesh_node_helpers import MESHTASTIC_BROADCAST_ID
+from common.throttling import GUEST_EXPENSIVE_THROTTLE_CLASSES
 from nodes.models import ManagedNode, ObservedNode
 from traceroute.models import AutoTraceRoute
 
@@ -71,6 +72,7 @@ def _traceroute_stats_by_strategy(qs):
 
 @api_view(["GET"])
 @permission_classes([AllowGuestReadOnly])
+@throttle_classes(GUEST_EXPENSIVE_THROTTLE_CLASSES)
 def heatmap_edges(request):
     """Aggregated traceroute edges and nodes for heatmap visualization. Queries Neo4j."""
     from django.utils.dateparse import parse_datetime
@@ -174,6 +176,7 @@ def _include_targets_from_request(request) -> bool:
 
 @api_view(["GET"])
 @permission_classes([AllowGuestReadOnly])
+@throttle_classes(GUEST_EXPENSIVE_THROTTLE_CLASSES)
 def feeder_reach(request):
     """Per-target attempt and success counts for one feeder.
 
@@ -267,6 +270,7 @@ def feeder_reach(request):
 
 @api_view(["GET"])
 @permission_classes([AllowGuestReadOnly])
+@throttle_classes(GUEST_EXPENSIVE_THROTTLE_CLASSES)
 def constellation_coverage(request):
     """Server-side H3-binned reach for an entire constellation.
 
@@ -365,6 +369,7 @@ def constellation_coverage(request):
 
 @api_view(["GET"])
 @permission_classes([AllowGuestReadOnly])
+@throttle_classes(GUEST_EXPENSIVE_THROTTLE_CLASSES)
 def traceroute_stats(request):
     """Traceroute statistics: sources, success/failure, top routers, by source, success over time.
 

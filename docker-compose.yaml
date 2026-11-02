@@ -232,6 +232,17 @@ services:
     networks:
       - meshflow_net
 
+  docs-m2m:
+    build:
+      context: .
+      dockerfile: Dockerfile-redocly-m2m
+    container_name: meshflow-docs-m2m
+    restart: unless-stopped
+    ports:
+      - "8081:8080"
+    networks:
+      - meshflow_net
+
 volumes:
   pg_data:
   neo4j_data:

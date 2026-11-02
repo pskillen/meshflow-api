@@ -5,6 +5,7 @@ from enum import StrEnum
 from django.contrib.auth.models import Group
 
 FEEDER_GROUP_NAME = "feeder"
+M2M_API_GROUP_NAME = "m2m_api"
 
 
 class AccessLevel(StrEnum):
@@ -46,6 +47,15 @@ def get_access_level(request) -> AccessLevel:
 def ensure_feeder_group():
     """Create the feeder Django group if missing."""
     Group.objects.get_or_create(name=FEEDER_GROUP_NAME)
+
+
+def user_can_mint_m2m_keys(user) -> bool:
+    """Staff or members of ``m2m_api`` may create keys. Checked only at mint time."""
+    if not user or not user.is_authenticated or not user.is_active:
+        return False
+    if user.is_staff:
+        return True
+    return user.groups.filter(name=M2M_API_GROUP_NAME).exists()
 
 
 def grant_feeder_role(user):
