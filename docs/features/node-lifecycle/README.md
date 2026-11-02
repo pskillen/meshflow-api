@@ -37,6 +37,8 @@ The primary discovery path is packet ingestion. Any packet type can create an `O
 
 When the first packet is not a NodeInfo packet, the node is created with placeholder names. Later NodeInfo packets can update user name, hardware model, role, public key, MAC address, and related fields.
 
+NodeInfo packets and `NodeUpsertView` also store a normalised public key and the predicted Meshtastic 2.8 node number (`crc32` of the key) on the `ObservedNode`; `ManagedNode` gets the same via the `backfill_meshtastic_identity` command. See [packet ingestion](../packet-ingestion/meshtastic.md#identity-evidence-and-predicted-28-node-id).
+
 `NodeUpsertView` is a secondary API path used by authenticated nodes to update their own observed-node details. It is not the normal user-facing discovery flow.
 
 ## Permission Summary
