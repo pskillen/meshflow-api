@@ -31,7 +31,7 @@ Errors are `400 {"error": "<message>"}`.
   "results": [
     {
       "internal_id": "3f2b6c1e-8a4d-4c55-9a53-0d7a1e2b9c10",
-      "node_id_str": "!02d8b5b0",
+      "node_id_str": "!0000a001",
       "long_name": "Example Router",
       "short_name": "EXR",
       "meshtastic_role": 2,
@@ -70,7 +70,11 @@ public key. Guest redaction on the other endpoints is unchanged; see
 
 - No authentication. Any `Authorization` header (valid or not) is ignored.
 - GET only; other methods return 405.
-- Every response (200 and 400) carries `Access-Control-Allow-Origin: *`.
+- Guest-throttled like the other guest reads: `guest_burst` per client IP
+  (`THROTTLE_GUEST_BURST`, default 120/min; see
+  [permissions](../../permissions/README.md)). Over the limit returns 429 with
+  `Retry-After`.
+- Every response (200, 400, 405 and 429) carries `Access-Control-Allow-Origin: *`.
   When the request `Origin` is in `CORS_ALLOWED_ORIGINS` (the Meshflow SPA),
   django-cors-headers replaces it with the echoed origin and adds
   `Access-Control-Allow-Credentials: true`; browsers accept either.

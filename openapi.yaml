@@ -1220,7 +1220,7 @@ components:
           format: uuid
         node_id_str:
           type: string
-          example: '!02d8b5b0'
+          example: '!0000a001'
         long_name:
           type: string
           nullable: true
@@ -5232,7 +5232,7 @@ paths:
               example:
                 results:
                   - internal_id: 3f2b6c1e-8a4d-4c55-9a53-0d7a1e2b9c10
-                    node_id_str: '!02d8b5b0'
+                    node_id_str: '!0000a001'
                     long_name: Example Router
                     short_name: EXR
                     meshtastic_role: 2
@@ -5264,6 +5264,17 @@ paths:
                 properties:
                   error:
                     type: string
+        '429':
+          description: >
+            Guest rate limit (`THROTTLE_GUEST_BURST`, per client IP). Carries `Retry-After` and
+            `Access-Control-Allow-Origin: *`.
+          headers:
+            Retry-After:
+              schema:
+                type: integer
+            Access-Control-Allow-Origin:
+              schema:
+                type: string
 
   /nodes/observed-nodes/weather/:
     get:

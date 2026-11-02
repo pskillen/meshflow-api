@@ -8,7 +8,7 @@ Meshflow is a **public mesh observatory** with a small set of global access leve
 
 Guest-readable GET endpoints are throttled per view (not via `DEFAULT_THROTTLE_CLASSES`, so packet ingest and WebSockets are excluded).
 
-- Anonymous: `GuestBurstThrottle` (default 120/min per IP) on guest reads. `GuestExpensiveThrottle` (default 10/min per IP) also applies to `stats/global`, traceroute analytics, and observed-node search.
+- Anonymous: `GuestBurstThrottle` (default 120/min per IP) on guest reads. This includes the public nearby-infrastructure endpoint, which ignores auth, so every caller is counted as a guest. `GuestExpensiveThrottle` (default 10/min per IP) also applies to `stats/global`, traceroute analytics, and observed-node search.
 - Authenticated JWT users on those same reads: `UserRateThrottle` (default 600/min). They are not counted in the guest buckets.
 - Client IP is `CF-Connecting-IP` when `TRUST_CF_CONNECTING_IP` is true (production behind Cloudflare Tunnel). Otherwise `REMOTE_ADDR`.
 - `429` responses include `Retry-After`.

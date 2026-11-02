@@ -363,3 +363,22 @@ def test_parse_params_rounding_and_clamping():
     p = svc.parse_nearby_params(QueryDict("lat=10.12345&lon=-20.98765&radius_km=0.04&last_heard_within_days=400"))
     assert (p.lat, p.lon, p.radius_km, p.last_heard_within_days) == (10.123, -20.988, 1.0, 365)
     assert p.include_client_base is False
+
+
+@pytest.mark.django_db
+def test_guest_throttled_with_cors_on_429(client, url):
+    from common.throttling import GuestBurstThrottle, MeshflowUserRateThrottle
+
+    saved = [(cls, cls.THROTTLE_RATES) for cls in (GuestBurstThrottle, MeshflowUserRateThrottle)]
+    rates = {**GuestBurstThrottle.THROTTLE_RATES, "guest_burst": "2/min"}
+    for cls, _ in saved:
+        cls.THROTTLE_RATES = rates
+    try:
+        params = {"lat": CENTRE_LAT, "lon": CENTRE_LON}
+        responses = [client.get(url, params, HTTP_ORIGIN="https://example.org") for _ in range(3)]
+    finally:
+        for cls, old in saved:
+            cls.THROTTLE_RATES = old
+    assert [r.status_code for r in responses] == [200, 200, 429]
+    assert responses[2]["Access-Control-Allow-Origin"] == "*"
+    assert "Retry-After" in responses[2]
