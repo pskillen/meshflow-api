@@ -1,5 +1,7 @@
 # Packet Ingestion
 
+**Status:** In progress · **Tracking:** https://github.com/pskillen/meshflow-api/issues/437
+
 Packet ingestion is the spine of Meshflow: every other feature is downstream of
 the raw mesh traffic that lands in the API through this pipeline. The pipeline
 straddles two repositories:
@@ -28,7 +30,8 @@ stops at "signal emitted".
 | [MESHCORE_PACKET_FIELDS.md](MESHCORE_PACKET_FIELDS.md) | MC capture-verified dump shapes |
 | [DEDUPLICATION.md](DEDUPLICATION.md) | MT dedup window; MC see [adr/0004](adr/0004-mc-dedup-key.md) |
 | [signals.md](signals.md) | MT post-processing signals (MC uses `meshcore_packet_received` in-app) |
-| [adr/](adr/README.md) | MC identity, channels, broadcast, dedup |
+| **[meshtastic-2.8-upgrade-runbook.md](meshtastic-2.8-upgrade-runbook.md)** | **DRAFT**, planned: operator steps for upgrading a feeder to Meshtastic 2.8 |
+| [adr/](adr/README.md) | MC identity, channels, broadcast, dedup; MT feeder-scoped auth ([0005](adr/0005-feeder-scoped-auth.md), planned) and identity linking ([0006](adr/0006-meshtastic-identity-linking.md), planned) |
 
 Sample JSON: [docs/packets/](../../packets/) (MT by portnum), [docs/packets/meshcore/](../../packets/meshcore/README.md).
 

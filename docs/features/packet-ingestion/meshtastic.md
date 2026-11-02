@@ -2,6 +2,8 @@
 
 Reverse-engineered map of how Meshtastic (MT) traffic moves from a feeder radio through **meshflow-bot** into **meshflow-api** raw tables and downstream business models. Wire field detail lives in [PACKET_FIELDS.md](PACKET_FIELDS.md); dedup rules in [DEDUPLICATION.md](DEDUPLICATION.md).
 
+Upgrading feeders to Meshtastic 2.8 (planned, draft): [meshtastic-2.8-upgrade-runbook.md](meshtastic-2.8-upgrade-runbook.md).
+
 Parent epic for MeshCore parity: [meshflow-api#266](https://github.com/pskillen/meshflow-api/issues/266).
 
 ---
