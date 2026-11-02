@@ -110,7 +110,7 @@ All type-specific services extend **`BasePacketService`**: upsert `ObservedNode`
 | Service | Primary writes |
 | --- | --- |
 | `TextMessagePacketService` | `TextMessage` + `original_packet` |
-| `NodeInfoPacketService` | `ObservedNode` identity fields |
+| `NodeInfoPacketService` | `ObservedNode` identity fields, including the normalised key and predicted 2.8 node id (see [Identity evidence](#identity-evidence-and-predicted-28-node-id)) |
 | `PositionPacketService` | `Position`, `NodeLatestStatus` |
 | `DeviceMetricsPacketService` | `DeviceMetrics`, `NodeLatestStatus`, `device_metrics_recorded` |
 | `EnvironmentMetricsPacketService` | `EnvironmentMetrics`, `NodeLatestStatus` |
@@ -152,3 +152,20 @@ Dual-protocol `TextMessage.protocol` and CHECK constraints: `text_messages.model
 - [PACKET_FIELDS.md](PACKET_FIELDS.md)
 - [Packet stats (MT counts)](../packet-stats/meshtastic.md)
 - [Traceroute](../traceroute/)
+
+## Identity evidence and predicted 2.8 node id
+
+In Meshtastic 2.8 a node's number is `crc32` of its 32-byte public key, and an upgrade keeps the key, so each node's post-upgrade number can be predicted from a key we already hold ([ADR-0006](adr/0006-meshtastic-identity-linking.md)).
+
+| Model | Field | Meaning |
+| --- | --- | --- |
+| `ObservedNode` | `meshtastic_public_key` | Key as received (mixed base64 and hex); unchanged |
+| `ObservedNode` | `meshtastic_public_key_hex` | Same key as 64-char lowercase hex; null when absent, malformed or not 32 bytes |
+| `ObservedNode` | `meshtastic_key_node_id` | Predicted 2.8 number (`crc32` of the key bytes, indexed); null when there is no usable key |
+| `ManagedNode` | `meshtastic_public_key`, `meshtastic_key_node_id` | Same evidence for a feeder, copied from its `ObservedNode` by the backfill |
+
+- Helpers: `common/meshtastic_identity.py` (`normalise_pubkey`, `key_node_id`, `identity_fields`). Bad keys give null, never an error.
+- Written by `NodeInfoPacketService` and the node upsert serializer (`BaseNodeSerializer`) whenever a key arrives. Other writers (`ManagedNode` rows) are filled only by the backfill for now.
+- `python manage.py backfill_meshtastic_identity [--dry-run] [--batch-size N]` fills existing rows: it reads `ObservedNode.meshtastic_public_key`, falls back to the latest `NodeInfoPacket.public_key` for that `from_int`, copies the key onto the `ManagedNode` with the same number, and reports keys shared by several nodes. It is idempotent and never clears a stored value. **Run it in each environment straight after deploying.**
+- Django admin: the observed and managed node lists show the predicted id, can be filtered by whether one exists, and search matches `!<predicted id>` or the start of the hex key.
+- **Unverified:** that `zlib.crc32` equals the firmware's value is inferred from source. The worked example is the NodeInfo in `docs/packets/nodeinfo_packet.json`: `!da545c78` predicts `!4396524c`. Nothing acts on a prediction yet; hardware verification is tracked in api#439 and the runbook.

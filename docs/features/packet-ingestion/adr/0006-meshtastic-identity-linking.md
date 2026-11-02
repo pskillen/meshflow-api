@@ -30,6 +30,8 @@ Planned:
 5. **Do not clobber identity.** NodeInfo ingest must ignore a blank or zero MAC, never replace a name with its own 24-byte prefix, never clear a stored key, and prefer a sender's own NodeInfo over the feeder's NodeDB view (the NodeDB truncates names and zeroes MACs). Also fix the latent int-versus-str comparison in `packets/services/node_info.py`.
 6. **Carrying state across a link** (claims, watches, DX metadata, RF profile, inherited position, suppression of new-node baselines and DX logic) and linked history in the API and UI are later work built on the link signal, not part of this ADR's first steps.
 
+**Implementation note (step 1):** the stored evidence, `common/meshtastic_identity.py` and the `backfill_meshtastic_identity` command have landed (api#439); see [meshtastic.md](../meshtastic.md#identity-evidence-and-predicted-28-node-id). Steps 2 to 6 remain planned.
+
 ## Consequences
 
 - **Verification on hardware is pending.** Whether zlib `crc32(pubkey)` equals the firmware's `ErriezCRC32` result is inferred from source only. Nothing that acts on a prediction in production (auto re-key, auto links) is enabled until an upgrade of a spare node shows predicted and real numbers agree. Also unanswered: whether `my_info` is resent on a mid-session number change, whether Heltec 2.8.2 updates without an erase (keeping the key), and what a downgrade does to the number.
