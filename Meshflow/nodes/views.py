@@ -89,6 +89,11 @@ from nodes.serializers import (
 )
 from nodes.services.device_metrics import get_device_metrics_bulk
 from nodes.services.environment_metrics import get_environment_metrics_bulk
+from nodes.services.nearby_infrastructure import (
+    NearbyParamError,
+    get_nearby_infrastructure_cached,
+    parse_nearby_params,
+)
 from packets.models import PacketObservation
 
 from .utils import generate_claim_key
@@ -262,17 +267,35 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
     serializer_class = ObservedNodeSerializer
 
     def get_permissions(self):
+        # ``action`` is None for methods the route does not map (e.g. POST); match on the URL name
+        # so those get 405 rather than an auth error.
+        if self._is_infrastructure_nearby():
+            return [permissions.AllowAny()]
         guest_read_actions = ("list", "retrieve", "search", "recent_counts")
         if self.action in guest_read_actions:
             return [AllowGuestReadOnly()]
         return [IsAuthenticatedUser()]
 
     def get_throttles(self):
-        if self.action in ("list", "retrieve", "recent_counts"):
+        if self.action in ("list", "retrieve", "recent_counts", "infrastructure_nearby"):
             return guest_read_throttles()
         if self.action == "search":
             return guest_read_throttles(expensive=True)
         return []
+
+    def _is_infrastructure_nearby(self):
+        resolver_match = getattr(self.request, "resolver_match", None)
+        return self.action == "infrastructure_nearby" or (
+            resolver_match is not None and resolver_match.url_name == "observed-node-infrastructure-nearby"
+        )
+
+    def finalize_response(self, request, response, *args, **kwargs):
+        response = super().finalize_response(request, response, *args, **kwargs)
+        # Every response from the public nearby endpoint (200, 400, 405, 429) carries CORS ``*`` so
+        # browsers on any origin can read errors and Retry-After, not just successes.
+        if self._is_infrastructure_nearby():
+            response["Access-Control-Allow-Origin"] = "*"
+        return response
 
     lookup_field = "internal_id"
     lookup_url_kwarg = "internal_id"
@@ -677,6 +700,33 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
             return self.get_paginated_response(serializer.data)
         serializer = self.get_serializer(qs, many=True)
         return Response(serializer.data)
+
+    @action(
+        detail=False,
+        methods=["get"],
+        url_path="infrastructure/nearby",
+        url_name="infrastructure-nearby",
+        authentication_classes=[],
+        permission_classes=[permissions.AllowAny],
+    )
+    def infrastructure_nearby(self, request):
+        """
+        Public: Meshtastic infrastructure nodes near a point, nearest first (max 500).
+
+        Anonymous, GET only, ``Access-Control-Allow-Origin: *``, guest-throttled per client IP.
+        Send a simple GET with no custom headers (preflight is not supported). Query params: lat,
+        lon (required), radius_km (1-100, default 25), last_heard_within_days (1-365, default 30),
+        include_client_base (default false).
+        """
+        try:
+            params = parse_nearby_params(request.query_params)
+        except NearbyParamError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        body = get_nearby_infrastructure_cached(params)
+        resp = Response(body)
+        resp["Cache-Control"] = f"public, max-age={settings.NEARBY_INFRASTRUCTURE_CACHE_SECONDS}"
+        return resp
 
     @action(detail=False, methods=["get"], url_path="weather")
     def weather(self, request):

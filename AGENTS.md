@@ -33,6 +33,7 @@ All endpoints under `/api/`:
 
 - `api/nodes/observed-nodes/` – List, retrieve, search observed nodes
 - `api/nodes/observed-nodes/recent_counts/` – Node counts by time window (2h, 24h, 7d, 30d, 90d, all)
+- `api/nodes/observed-nodes/infrastructure/nearby/` – Public (anonymous, CORS `*`) infrastructure nodes near a point, nearest first
 - `api/nodes/observed-nodes/mine/` – User's claimed nodes
 - `api/nodes/managed-nodes/` – Managed nodes
 - `api/constellations/` – Constellations, memberships, channels

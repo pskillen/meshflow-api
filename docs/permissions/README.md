@@ -8,7 +8,7 @@ Meshflow is a **public mesh observatory** with a small set of global access leve
 
 Guest-readable GET endpoints are throttled per view (not via `DEFAULT_THROTTLE_CLASSES`, so packet ingest and WebSockets are excluded).
 
-- Anonymous: `GuestBurstThrottle` (default 120/min per IP) on guest reads. `GuestExpensiveThrottle` (default 10/min per IP) also applies to `stats/global`, traceroute analytics, and observed-node search.
+- Anonymous: `GuestBurstThrottle` (default 120/min per IP) on guest reads. This includes the public nearby-infrastructure endpoint, which ignores auth, so every caller is counted as a guest. `GuestExpensiveThrottle` (default 10/min per IP) also applies to `stats/global`, traceroute analytics, and observed-node search.
 - Authenticated JWT users on those same reads: `UserRateThrottle` (default 600/min). They are not counted in the guest buckets.
 - Client IP is `CF-Connecting-IP` when `TRUST_CF_CONNECTING_IP` is true (production behind Cloudflare Tunnel). Otherwise `REMOTE_ADDR`.
 - `429` responses include `Retry-After`.
@@ -33,6 +33,8 @@ Feeder is granted via Django group `feeder` (migration: managed-node owners and 
 
 Stripped for guests: `latest_position`, `owner`, `claim`, `environment_settings_editable`, `rf_profile_editable`, `has_rf_profile`, `has_ready_rf_render`.
 
+`GET …/observed-nodes/infrastructure/nearby/` is a separate public endpoint that exposes positions of infrastructure-role Meshtastic nodes only (never client nodes); see [nearby infrastructure](../features/nearby-infrastructure/README.md).
+
 See [RF privacy](../features/rf_propagation/privacy.md) for propagation side channels.
 
 ## Access matrix (representative)
@@ -45,6 +47,7 @@ See [RF privacy](../features/rf_propagation/privacy.md) for propagation side cha
 | Channels | `GET …/channels/` | yes | yes | yes | yes |
 | Messages | `GET /api/messages/` | yes | yes | yes | yes |
 | Observed nodes | `GET /api/nodes/observed-nodes/` | redacted | full | full | full |
+| Nearby infrastructure | `GET …/observed-nodes/infrastructure/nearby/` | yes (public, CORS `*`) | yes | yes | yes |
 | Recent counts | `GET …/recent_counts/` | yes | yes | yes | yes |
 | Stats global | `GET /api/stats/global/` | yes | yes | yes | yes |
 | Traceroutes read | `GET /api/traceroutes/` | yes | yes | yes | yes |

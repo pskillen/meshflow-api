@@ -259,6 +259,9 @@ CACHES = {
     },
 }
 
+# Public nearby-infrastructure endpoint cache TTL in seconds (0 disables caching).
+NEARBY_INFRASTRUCTURE_CACHE_SECONDS = int(os.environ.get("NEARBY_INFRASTRUCTURE_CACHE_SECONDS", "60"))
+
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 

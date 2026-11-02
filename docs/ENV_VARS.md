@@ -76,6 +76,7 @@ Discord **login** uses the OAuth pair above. **DM notifications** (test message 
 | Variable                | Default | Description                                      | Allowable Values         |
 |-------------------------|---------|--------------------------------------------------|-------------------------|
 | `CORS_ALLOWED_ORIGINS`  | (empty) | Comma-separated list of additional allowed CORS origins. | Comma-separated URLs    |
+| `NEARBY_INFRASTRUCTURE_CACHE_SECONDS` | `60` | Cache TTL for the public [nearby infrastructure](features/nearby-infrastructure/README.md) endpoint (Redis DB 2). That endpoint sends `Access-Control-Allow-Origin: *` itself, independent of the CORS settings. `0` disables caching. | Integer (string), `>= 0` |
 
 ---
 

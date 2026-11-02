@@ -1211,6 +1211,73 @@ components:
         - detail
         - choices
 
+    NearbyInfrastructureNode:
+      type: object
+      required: [internal_id, node_id_str, long_name, short_name, meshtastic_role, meshtastic_role_label, meshtastic_hw_model, last_heard, latitude, longitude, altitude, distance_km]
+      properties:
+        internal_id:
+          type: string
+          format: uuid
+        node_id_str:
+          type: string
+          example: '!0000a001'
+        long_name:
+          type: string
+          nullable: true
+        short_name:
+          type: string
+          nullable: true
+        meshtastic_role:
+          type: integer
+          nullable: true
+        meshtastic_role_label:
+          type: string
+          nullable: true
+          enum: [ROUTER, ROUTER_CLIENT, REPEATER, ROUTER_LATE, CLIENT_BASE]
+        meshtastic_hw_model:
+          type: string
+          nullable: true
+        last_heard:
+          type: string
+          format: date-time
+        latitude:
+          type: number
+        longitude:
+          type: number
+        altitude:
+          type: number
+          nullable: true
+          description: As stored (a float, e.g. 190.0, or null).
+        distance_km:
+          type: number
+          description: Great-circle distance from the query point, rounded to 2 decimal places.
+
+    NearbyInfrastructureResponse:
+      type: object
+      required: [results, meta]
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/NearbyInfrastructureNode'
+        meta:
+          type: object
+          required: [lat, lon, radius_km, last_heard_within_days, count, truncated]
+          properties:
+            lat:
+              type: number
+            lon:
+              type: number
+            radius_km:
+              type: number
+            last_heard_within_days:
+              type: integer
+            count:
+              type: integer
+              description: Number of results returned (at most 500).
+            truncated:
+              type: boolean
+
     ObservedNode:
       type: object
       description: >
@@ -5095,6 +5162,119 @@ paths:
                         type: array
                         items:
                           $ref: '#/components/schemas/ObservedNode'
+
+  /nodes/observed-nodes/infrastructure/nearby/:
+    get:
+      summary: List infrastructure nodes near a point
+      description: >
+        Public, read-only lookup of Meshtastic infrastructure nodes (ROUTER, ROUTER_CLIENT, REPEATER,
+        ROUTER_LATE; plus CLIENT_BASE when requested) near a point, nearest first. No authentication
+        (any Authorization header is ignored) and the response carries `Access-Control-Allow-Origin: *`
+        so any static web page can call it. Send a simple GET with no custom headers: preflight
+        (OPTIONS) requests are not supported for foreign origins. Meshtastic only. Positions come from
+        the node's latest status; nodes with no position or never heard are excluded. `lat` and `lon`
+        are rounded to 3 decimal places and `radius_km` to 1; `meta` echoes the values used. At most
+        500 results (`meta.truncated`). Responses are cached for about 60 seconds.
+      tags: [Nodes]
+      security: []
+      parameters:
+        - name: lat
+          in: query
+          required: true
+          schema:
+            type: number
+            minimum: -90
+            maximum: 90
+        - name: lon
+          in: query
+          required: true
+          schema:
+            type: number
+            minimum: -180
+            maximum: 180
+        - name: radius_km
+          in: query
+          required: false
+          schema:
+            type: number
+            default: 25
+            minimum: 1
+            maximum: 100
+            description: Values outside the range are clamped.
+        - name: last_heard_within_days
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 30
+            minimum: 1
+            maximum: 365
+            description: Values outside the range are clamped. Nodes never heard are excluded.
+        - name: include_client_base
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+            description: Also include CLIENT_BASE role nodes.
+      responses:
+        '200':
+          description: Nearby infrastructure nodes, nearest first
+          headers:
+            Access-Control-Allow-Origin:
+              description: Always `*` for foreign origins (an allowed Meshflow origin is echoed instead).
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NearbyInfrastructureResponse'
+              example:
+                results:
+                  - internal_id: 3f2b6c1e-8a4d-4c55-9a53-0d7a1e2b9c10
+                    node_id_str: '!0000a001'
+                    long_name: Example Router
+                    short_name: EXR
+                    meshtastic_role: 2
+                    meshtastic_role_label: ROUTER
+                    meshtastic_hw_model: RAK4631
+                    last_heard: '2026-11-02T11:03:17Z'
+                    latitude: 55.79
+                    longitude: -4.22
+                    altitude: 190.0
+                    distance_km: 3.4
+                meta:
+                  lat: 55.8
+                  lon: -4.2
+                  radius_km: 25.0
+                  last_heard_within_days: 30
+                  count: 1
+                  truncated: false
+        '400':
+          description: Missing or invalid `lat` / `lon` / `radius_km` / `last_heard_within_days`
+          headers:
+            Access-Control-Allow-Origin:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [error]
+                properties:
+                  error:
+                    type: string
+        '429':
+          description: >
+            Guest rate limit (`THROTTLE_GUEST_BURST`, per client IP). Carries `Retry-After` and
+            `Access-Control-Allow-Origin: *`.
+          headers:
+            Retry-After:
+              schema:
+                type: integer
+            Access-Control-Allow-Origin:
+              schema:
+                type: string
 
   /nodes/observed-nodes/weather/:
     get:
