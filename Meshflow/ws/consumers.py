@@ -17,7 +17,7 @@ class NodeConsumer(AsyncWebsocketConsumer):
     WebSocket consumer for ManagedNode bots.
 
     Bots connect with NodeAPIKey via query param: ws/nodes/?api_key=<key>
-    On connect, the bot joins group node_{node_id} and receives commands
+    On connect, the bot joins its ManagedNode group (see common.ws_groups) and receives commands
     (e.g. traceroute) pushed via the channel layer.
     """
 

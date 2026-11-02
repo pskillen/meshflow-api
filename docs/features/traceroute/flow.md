@@ -29,12 +29,12 @@ The API (or Celery task) sends a command via Django Channels:
 
 ```python
 channel_layer.group_send(
-    f"node_{source_node.node_id}",
+    managed_node_ws_group(source_node),  # node_mt_{internal_id}
     {"type": "node_command", "command": {"type": "traceroute", "target": target_node.node_id}},
 )
 ```
 
-The **NodeConsumer** WebSocket (`ws/nodes/?api_key=...`) is subscribed to `node_{node_id}`. When a bot (meshtastic-bot) connects with a NodeAPIKey for that ManagedNode, it receives the command and forwards it to the Meshtastic device.
+The **NodeConsumer** WebSocket (`ws/nodes/?api_key=...`) is subscribed to the ManagedNode group `node_mt_{internal_id}` (built by `common.ws_groups.managed_node_ws_group`; keyed on the ManagedNode primary key so it survives a node-number change). When a bot (meshtastic-bot) connects with a NodeAPIKey for that ManagedNode, it receives the command and forwards it to the Meshtastic device.
 
 ## 3. Device Execution
 
