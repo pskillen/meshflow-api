@@ -12,6 +12,12 @@ def node_auth_data(create_node_auth):
 
     def _get():
         node_auth = create_node_auth()
-        return {"api_key": node_auth.api_key.key, "node_id": node_auth.node.meshtastic_node_id}
+        from common.ws_groups import managed_node_ws_group
+
+        return {
+            "api_key": node_auth.api_key.key,
+            "node_id": node_auth.node.meshtastic_node_id,
+            "group": managed_node_ws_group(node_auth.node),
+        }
 
     return _get

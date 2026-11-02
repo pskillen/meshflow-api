@@ -67,10 +67,10 @@ Rows are ordered by `earliest_send_at`, then `id`.
 
 For each candidate, the dispatcher opens a short transaction, locks the row with `select_for_update()`, re-checks that it is still pending and due, and then checks whether that source is currently inside its dispatch cooldown. If the row is sendable, the dispatcher sends the WebSocket command and marks the row `sent`.
 
-The Channels target group is based on the managed source node's mesh node id:
+The Channels target group is based on the managed source node's internal id (not its mesh node number, which can change on a 2.8 re-key):
 
 ```python
-f"node_{tr.source_node.node_id}"
+managed_node_ws_group(tr.source_node)  # node_mt_{internal_id}
 ```
 
 The command target is the observed target node's mesh node id:

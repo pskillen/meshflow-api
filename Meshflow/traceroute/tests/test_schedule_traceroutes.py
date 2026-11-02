@@ -82,6 +82,6 @@ def test_schedule_traceroutes_creates_when_recent_observation(
     assert tr.dispatched_at is not None
     channel_layer.group_send.assert_called_once()
     call_kw = channel_layer.group_send.call_args[0]
-    assert call_kw[0] == f"node_{mn.meshtastic_node_id}"
+    assert call_kw[0] == f"node_mt_{mn.internal_id}"
     assert call_kw[1]["type"] == "node_command"
     assert call_kw[1]["command"] == {"type": "traceroute", "target": target.meshtastic_node_id}
