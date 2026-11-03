@@ -13,8 +13,10 @@ from __future__ import annotations
 
 import base64
 import binascii
+import logging
 import re
 import zlib
+from datetime import datetime
 
 PUBKEY_BYTES = 32
 _HEX64 = re.compile(r"^[0-9a-fA-F]{64}$")
@@ -116,4 +118,70 @@ def protect_identity(instance, data: dict) -> dict:
             del kept["long_name"]
         elif instance is not None and is_truncated_long_name(kept["long_name"], instance.long_name):
             del kept["long_name"]
+    return kept
+
+
+# --- Protection against a stale feeder NodeDB upload overwriting a newer on-air name ----------------------
+#
+# A feeder uploads its radio's whole NodeDB on connect. That NodeDB is often stale or holds a placeholder
+# (``Meshtastic 5abc`` / ``5abc``), while the API may already have a newer name from an on-air NODEINFO.
+# Only the NodeDB upload path uses this; an on-air NODEINFO is the source of truth and is not filtered here.
+
+NAME_FIELDS = ("long_name", "short_name")
+
+logger = logging.getLogger(__name__)
+
+
+def is_placeholder_name(name: str | None, node_id: int | None, field: str) -> bool:
+    """True if ``name`` is the firmware default for the node: ``Meshtastic xxxx`` (long) or ``xxxx`` (short).
+
+    ``xxxx`` is the last four hex digits of the node number. A blank name does not count (see ``is_blank``).
+    """
+    if not name or node_id is None:
+        return False
+    suffix = f"{node_id & 0xFFFFFFFF:08x}"[-4:]
+    value = name.strip().lower()
+    if field == "long_name":
+        return value == f"meshtastic {suffix}"
+    return value == suffix
+
+
+def _is_real_name(name: str | None, node_id: int | None, field: str) -> bool:
+    return bool(name and name.strip()) and not is_placeholder_name(name, node_id, field)
+
+
+def protect_stale_names(instance, data: dict, latest_nodeinfo_time: datetime | None = None) -> dict:
+    """Return ``data`` without NodeDB-upload names that would replace a newer or better stored name.
+
+    For each of ``long_name`` / ``short_name`` present in ``data`` and a stored real name (not blank, not the
+    placeholder) on ``instance``:
+
+    * an incoming blank or placeholder name is dropped, always;
+    * if the upload carries ``last_heard`` and the node's latest on-air NODEINFO (``latest_nodeinfo_time``) is
+      newer, the incoming name is dropped. An upload with no ``last_heard`` cannot be dated, so a different
+      real name is let through.
+
+    A node with no real stored name is always filled. ``instance`` None (create) changes nothing.
+    """
+    if instance is None:
+        return dict(data)
+    kept = dict(data)
+    node_id = getattr(instance, "meshtastic_node_id", None)
+    last_heard = kept.get("last_heard")
+    stale = bool(last_heard and latest_nodeinfo_time and latest_nodeinfo_time > last_heard)
+    for field in NAME_FIELDS:
+        if field not in kept:
+            continue
+        stored = getattr(instance, field, None)
+        incoming = kept[field]
+        if incoming == stored or not _is_real_name(stored, node_id, field):
+            continue
+        if not _is_real_name(incoming, node_id, field):
+            reason = "incoming name is blank or a placeholder"
+        elif stale:
+            reason = "on-air NODEINFO is newer than the NodeDB entry"
+        else:
+            continue
+        logger.debug("Kept %s %r for node %s over NodeDB upload %r: %s", field, stored, node_id, incoming, reason)
+        del kept[field]
     return kept

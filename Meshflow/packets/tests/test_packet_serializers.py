@@ -905,6 +905,75 @@ class NodeSerializerTest(BasePacketSerializerTestCase):
         self._upsert(user={"long_name": stored.encode()[:24].decode(errors="ignore"), "short_name": "CAFE"})
         self.assertEqual(self.from_node.long_name, stored)
 
+    # --- G28: a NodeDB upload must not replace a name learned more recently from the air ---------------
+
+    def _nodeinfo_at(self, when):
+        from packets.models import NodeInfoPacket
+
+        return NodeInfoPacket.objects.create(
+            packet_id=1,
+            from_int=self.from_node.meshtastic_node_id,
+            first_reported_time=when,
+            node_id=self.from_node.node_id_str,
+            long_name="TIGERBAWS",
+            short_name="TIGR",
+        )
+
+    def _seed_names(self, long_name="TIGERBAWS", short_name="TIGR"):
+        self.from_node.long_name = long_name
+        self.from_node.short_name = short_name
+        self.from_node.save()
+
+    def test_node_upsert_stale_last_heard_keeps_newer_onair_name(self):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        now = timezone.now()
+        self._seed_names()
+        self._nodeinfo_at(now)
+        self._upsert(
+            user={"long_name": "Old Name", "short_name": "OLD"},
+            last_heard=(now - timedelta(days=2)).isoformat(),
+        )
+        self.assertEqual(self.from_node.long_name, "TIGERBAWS")
+        self.assertEqual(self.from_node.short_name, "TIGR")
+
+    def test_node_upsert_newer_last_heard_updates_name(self):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        now = timezone.now()
+        self._seed_names()
+        self._nodeinfo_at(now - timedelta(days=2))
+        self._upsert(
+            user={"long_name": "Fresh Name", "short_name": "NEW"},
+            last_heard=now.isoformat(),
+        )
+        self.assertEqual(self.from_node.long_name, "Fresh Name")
+        self.assertEqual(self.from_node.short_name, "NEW")
+
+    def test_node_upsert_placeholder_never_replaces_real_name(self):
+        self._seed_names()
+        suffix = f"{self.from_node.meshtastic_node_id:08x}"[-4:]
+        self._upsert(user={"long_name": f"Meshtastic {suffix}", "short_name": suffix})
+        self.assertEqual(self.from_node.long_name, "TIGERBAWS")
+        self.assertEqual(self.from_node.short_name, "TIGR")
+
+    def test_node_upsert_fills_empty_name(self):
+        self._seed_names(long_name="", short_name="")
+        self._upsert(user={"long_name": "Filled Name", "short_name": "FILL"})
+        self.assertEqual(self.from_node.long_name, "Filled Name")
+        self.assertEqual(self.from_node.short_name, "FILL")
+
+    def test_node_upsert_fills_placeholder_name(self):
+        suffix = f"{self.from_node.meshtastic_node_id:08x}"[-4:]
+        self._seed_names(long_name=f"Meshtastic {suffix}", short_name=suffix)
+        self._upsert(user={"long_name": "Real Name", "short_name": "REAL"})
+        self.assertEqual(self.from_node.long_name, "Real Name")
+        self.assertEqual(self.from_node.short_name, "REAL")
+
     def test_node_upsert_zero_position_does_not_overwrite_stored_position(self):
         from django.utils import timezone
 

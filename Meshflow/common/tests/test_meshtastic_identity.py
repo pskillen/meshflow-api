@@ -8,10 +8,12 @@ from common.mesh_node_helpers import meshtastic_id_to_hex
 from common.meshtastic_identity import (
     identity_fields,
     is_blank_mac,
+    is_placeholder_name,
     is_truncated_long_name,
     key_node_id,
     normalise_pubkey,
     protect_identity,
+    protect_stale_names,
 )
 
 # Key from docs/packets/nodeinfo_packet.json (NodeInfo from !da545c78 "JPPX Home").
@@ -119,3 +121,32 @@ def test_protect_identity_keeps_real_changes():
 
     data = {"mac_addr": "a0:b3:a9:cf:5a:7b", "meshtastic_public_key": WORKED_EXAMPLE_B64, "long_name": "Renamed"}
     assert protect_identity(Stored(), data) == data
+
+
+def test_is_placeholder_name_matches_last_four_hex_digits():
+    assert is_placeholder_name("Meshtastic 5abc", 0x7D085ABC, "long_name")
+    assert is_placeholder_name("meshtastic 5ABC", 0x7D085ABC, "long_name")
+    assert is_placeholder_name("5abc", 0x7D085ABC, "short_name")
+    assert not is_placeholder_name("Meshtastic 1234", 0x7D085ABC, "long_name")
+    assert not is_placeholder_name("TIGERBAWS", 0x7D085ABC, "long_name")
+    assert not is_placeholder_name("", 0x7D085ABC, "long_name")
+
+
+def test_protect_stale_names_create_is_untouched():
+    data = {"long_name": "Meshtastic 5abc"}
+    assert protect_stale_names(None, data) == data
+
+
+class _Stored:
+    meshtastic_node_id = 0x7D085ABC
+    long_name = "TIGERBAWS"
+    short_name = "TIGR"
+
+
+def test_protect_stale_names_blank_never_replaces_real_name():
+    assert protect_stale_names(_Stored(), {"long_name": "", "short_name": None}) == {}
+
+
+def test_protect_stale_names_without_timestamp_lets_real_name_through():
+    data = {"long_name": "Renamed", "short_name": "RENM"}
+    assert protect_stale_names(_Stored(), data) == data

@@ -13,7 +13,7 @@ from common.mesh_node_helpers import (
     observed_node_id_str,
     parse_b64_mac_address,
 )
-from common.meshtastic_identity import identity_fields, protect_identity
+from common.meshtastic_identity import identity_fields, protect_identity, protect_stale_names
 from common.protocol import Protocol
 from constellations.models import MessageChannel
 from nodes.models import DeviceMetrics, ManagedNode, NodeLatestStatus, ObservedNode, Position
@@ -1536,6 +1536,14 @@ class BaseNodeSerializer(serializers.ModelSerializer):
         device_metrics_data = validated_data.pop("device_metrics", None)
         validated_data.pop("node_id_str", None)
         validated_data = protect_identity(instance, validated_data)
+        # A NodeDB upload can be stale: keep a name the API learned more recently from an on-air NODEINFO.
+        latest_nodeinfo = (
+            NodeInfoPacket.objects.filter(from_int=instance.meshtastic_node_id)
+            .order_by("-first_reported_time")
+            .values_list("first_reported_time", flat=True)
+            .first()
+        )
+        validated_data = protect_stale_names(instance, validated_data, latest_nodeinfo)
         if "meshtastic_public_key" in validated_data:
             validated_data.update(identity_fields(validated_data["meshtastic_public_key"]))
 
