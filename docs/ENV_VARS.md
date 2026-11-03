@@ -253,6 +253,16 @@ Tunables for [automatic target selection reliability](../features/traceroute/alg
 | `M2M_TERMS_GRACE_DAYS` | `90` | Days a key may keep working after a terms bump before `403`. |
 | `FRONTEND_URL` | (see §1 / example) | Also used to build M2M `meshflow_url`. |
 
+## 13. Migration guard
+
+See [DEPLOY.md](DEPLOY.md).
+
+| Variable | Default | Description |
+|---|---|---|
+| `MIGRATION_WAIT_TIMEOUT_SECONDS` | `120` | Entrypoint waits this long for migrations before exiting non-zero. `0` checks once. |
+| `MIGRATION_WAIT_INTERVAL_SECONDS` | `10` | Seconds between checks. |
+| `SKIP_MIGRATION_CHECK` | unset | `true` skips the check (dev/emergency). |
+
 ---
 
 # Example `.env` file
