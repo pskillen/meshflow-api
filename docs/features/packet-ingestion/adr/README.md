@@ -1,8 +1,8 @@
-# Architecture Decision Records — MeshCore packet ingestion
+# Architecture Decision Records — packet ingestion
 
-Lightweight ADRs for MeshCore (MC) ingestion and modelling, scoped under packet ingestion. They are **proposed** until merged; reviewer feedback may change individual decisions.
+Lightweight ADRs for packet ingestion: 0001–0004 cover MeshCore (MC) ingestion and modelling; 0005–0006 cover Meshtastic (MT) feeder authentication and identity for the 2.8 upgrade. They are **proposed** until merged; reviewer feedback may change individual decisions.
 
-**Tracking:** [meshflow-api#276](https://github.com/pskillen/meshflow-api/issues/276) (epic [meshflow-api#264](https://github.com/pskillen/meshflow-api/issues/264)).
+**Tracking:** MC: [meshflow-api#276](https://github.com/pskillen/meshflow-api/issues/276) (epic [meshflow-api#264](https://github.com/pskillen/meshflow-api/issues/264)). MT 2.8: epic [meshflow-api#437](https://github.com/pskillen/meshflow-api/issues/437).
 
 **Evidence:** cite JSON under [`docs/packets/meshcore/`](../../../packets/meshcore/README.md) and field tables in [`MESHCORE_PACKET_FIELDS.md`](../MESHCORE_PACKET_FIELDS.md).
 
@@ -16,6 +16,8 @@ Planned records (add the matching Markdown file in this directory when the ADR i
 | `0002-mc-channel-modelling.md` | MeshCore channel modelling (`MessageChannel`, indices, managed node mapping) |
 | `0003-mc-broadcast-semantics.md` | Broadcast vs directed semantics (MT vs MC on the wire) |
 | `0004-mc-dedup-key.md` | Deduplication key for MC (`pkt_hash`, windows, decoded twins) |
+| [`0005-feeder-scoped-auth.md`](0005-feeder-scoped-auth.md) | MT: one API key per feeder, v4 feeder URLs, legacy tracking (planned) |
+| [`0006-meshtastic-identity-linking.md`](0006-meshtastic-identity-linking.md) | MT 2.8: node number = crc32(public key), predicted ids, old/new identity linking (planned; hardware verification pending) |
 
 ## ADR format (use in each `NNNN-title.md`)
 
