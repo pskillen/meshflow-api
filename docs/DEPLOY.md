@@ -22,8 +22,10 @@ exits non-zero ("N unapplied migrations; run the migrations container") and the 
 | `MIGRATION_WAIT_INTERVAL_SECONDS` | `10` | Seconds between checks. (Also `--interval`.) |
 | `SKIP_MIGRATION_CHECK` | unset | `true` skips the check and logs a loud warning. For local dev or emergencies only. |
 
-The migrations container (same image, command `migrate && run_deploy_tasks`) overrides the entrypoint with
-`entrypoint: []` so it is not blocked by its own guard.
+The entrypoint itself skips the check (logging one INFO line) when the command it is about to run is a migrate: the
+arguments contain `manage.py` followed by exactly `migrate` (so `sh -c "python manage.py migrate && ..."` as used by
+the migrations container qualifies; `showmigrations` and `makemigrations` do not). No compose or Portainer
+configuration is needed for the migrations container to work.
 
 ## Deploy order
 
@@ -34,6 +36,4 @@ The migrations container (same image, command `migrate && run_deploy_tasks`) ove
 In Portainer an exited migrations container must be **recreated with a re-pulled image** (Recreate with "Re-pull
 image"), not just started: starting it again reruns the old image and applies nothing new.
 
-Downtime until migrations run is accepted; serving against the wrong schema is not. Any Portainer stack whose
-migrations service lacks `entrypoint: []` (see `deployment/portainer/docker-compose.portainer.yaml`) must be updated
-or the migrations container will wait on itself and fail.
+Downtime until migrations run is accepted; serving against the wrong schema is not.

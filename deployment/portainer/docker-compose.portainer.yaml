@@ -22,8 +22,6 @@ services:
 
   migrations:
     image: ghcr.io/pskillen/meshflow-api:${DJANGO_TAG}
-    # Bypass the migration guard (docker-entrypoint.sh): this is the one container that applies migrations
-    entrypoint: []
     command: ["sh", "-c", "python manage.py migrate && python manage.py run_deploy_tasks"]
     restart: no
     environment:
