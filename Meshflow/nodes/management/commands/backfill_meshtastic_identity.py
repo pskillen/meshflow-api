@@ -7,7 +7,6 @@ See docs/features/packet-ingestion/adr/0006-meshtastic-identity-linking.md.
 from collections import defaultdict
 
 from django.core.management.base import BaseCommand
-from django.db.models import Count
 
 from common.meshtastic_identity import identity_fields, key_node_id, normalise_pubkey
 from common.protocol import Protocol
@@ -32,8 +31,11 @@ class Command(BaseCommand):
         batch_size = options["batch_size"]
         prefix = "[dry-run] " if dry_run else ""
 
-        observed_stats = self._backfill_observed(dry_run, batch_size)
-        managed_stats = self._backfill_managed(dry_run, batch_size)
+        # The observed pass derives every key; the managed pass and shared-key report read that, not the database,
+        # so a dry-run (which writes nothing) reports exactly what a real run would.
+        index = _KeyIndex()
+        observed_stats = self._backfill_observed(dry_run, batch_size, index)
+        managed_stats = self._backfill_managed(dry_run, batch_size, index)
 
         self.stdout.write(
             f"{prefix}ObservedNode: scanned {observed_stats['scanned']}, updated {observed_stats['updated']}, "
@@ -43,7 +45,7 @@ class Command(BaseCommand):
             f"{prefix}ManagedNode: scanned {managed_stats['scanned']}, updated {managed_stats['updated']}, "
             f"no matching observed key {managed_stats['no_key']}"
         )
-        self._report_shared_keys()
+        self._report_shared_keys(index)
 
     def _latest_packet_keys(self, node_ids):
         """Latest non-empty NodeInfoPacket.public_key per from_int, for the given node numbers."""
@@ -59,7 +61,7 @@ class Command(BaseCommand):
             found.setdefault(from_int, key)
         return found
 
-    def _backfill_observed(self, dry_run, batch_size):
+    def _backfill_observed(self, dry_run, batch_size, index):
         stats = {"scanned": 0, "updated": 0, "fallback": 0, "no_key": 0}
         qs = ObservedNode.objects.filter(protocol=Protocol.MESHTASTIC).order_by("pk")
         last_pk = None
@@ -85,6 +87,7 @@ class Command(BaseCommand):
                         source = candidate
                         used_fallback = True
                 derived = identity_fields(source)
+                index.add(node, derived["meshtastic_public_key_hex"])
                 if derived["meshtastic_key_node_id"] is None:
                     stats["no_key"] += 1
                 if all(getattr(node, f) == derived[f] for f in OBSERVED_FIELDS):
@@ -99,7 +102,7 @@ class Command(BaseCommand):
                 ObservedNode.objects.bulk_update(to_update, list(OBSERVED_FIELDS))
         return stats
 
-    def _backfill_managed(self, dry_run, batch_size):
+    def _backfill_managed(self, dry_run, batch_size, index):
         stats = {"scanned": 0, "updated": 0, "no_key": 0}
         qs = ManagedNode.objects.filter(protocol=Protocol.MESHTASTIC, meshtastic_node_id__isnull=False).order_by("pk")
         last_pk = None
@@ -109,17 +112,10 @@ class Command(BaseCommand):
             if not batch:
                 break
             last_pk = batch[-1].pk
-            observed = dict(
-                ObservedNode.objects.filter(
-                    protocol=Protocol.MESHTASTIC,
-                    meshtastic_node_id__in=[n.meshtastic_node_id for n in batch],
-                    meshtastic_public_key_hex__isnull=False,
-                ).values_list("meshtastic_node_id", "meshtastic_public_key_hex")
-            )
             to_update = []
             for node in batch:
                 stats["scanned"] += 1
-                key_hex = observed.get(node.meshtastic_node_id)
+                key_hex = index.key_for_number(node.meshtastic_node_id)
                 if key_hex is None:
                     # Never clear a key we already hold just because the observed row has none.
                     stats["no_key"] += 1
@@ -135,25 +131,54 @@ class Command(BaseCommand):
                 ManagedNode.objects.bulk_update(to_update, ["meshtastic_public_key", "meshtastic_key_node_id"])
         return stats
 
-    def _report_shared_keys(self):
-        """Report keys held by more than one Meshtastic ObservedNode (cloned keys, or a node that changed number)."""
-        shared = (
-            ObservedNode.objects.filter(protocol=Protocol.MESHTASTIC, meshtastic_public_key_hex__isnull=False)
-            .values("meshtastic_public_key_hex")
-            .annotate(n=Count("pk"))
-            .filter(n__gt=1)
-            .order_by("-n")
-        )
-        shared = list(shared)
+    def _report_shared_keys(self, index):
+        """Report keys held by two or more *different* Meshtastic node numbers (cloned keys, or a renumbered node).
+
+        Duplicate ObservedNode rows for one node number (a pre-existing create race) are not a shared key; they are
+        counted on their own line so they stay visible.
+        """
+        duplicates = index.duplicate_row_count()
+        if duplicates:
+            self.stdout.write(f"Duplicate ObservedNode rows (same node number, several rows): {duplicates}")
+        shared = index.shared_keys()
         if not shared:
             self.stdout.write("Shared keys: none")
             return
         self.stdout.write(self.style.WARNING(f"Shared keys: {len(shared)} key(s) held by several nodes"))
-        for row in shared:
-            key_hex = row["meshtastic_public_key_hex"]
-            ids = defaultdict(list)
-            for node_id in ObservedNode.objects.filter(
-                protocol=Protocol.MESHTASTIC, meshtastic_public_key_hex=key_hex
-            ).values_list("meshtastic_node_id", flat=True):
-                ids["nodes"].append(f"!{node_id:08x}" if node_id is not None else "?")
-            self.stdout.write(f"  {key_hex[:16]}…: {row['n']} nodes ({', '.join(sorted(ids['nodes']))})")
+        for key_hex, numbers in shared:
+            labels = ", ".join(f"!{n:08x}" for n in numbers)
+            self.stdout.write(f"  {key_hex[:16]}…: {len(numbers)} nodes ({labels})")
+
+
+class _KeyIndex:
+    """Derived keys per Meshtastic node number, built from the observed pass (pk -> hex is all it keeps per row)."""
+
+    def __init__(self):
+        # number -> (rank, key_hex or None) of the chosen row; rank prefers a set key, then latest heard, then pk.
+        self._chosen = {}
+        self._rows = defaultdict(int)  # number -> row count
+        self._numbers_by_key = defaultdict(set)  # key_hex -> {number}
+
+    def add(self, node, key_hex):
+        number = node.meshtastic_node_id
+        if number is None:
+            return
+        self._rows[number] += 1
+        heard = node.last_heard.timestamp() if node.last_heard else float("-inf")
+        rank = (key_hex is not None, heard, node.pk)
+        current = self._chosen.get(number)
+        if current is None or rank > current[0]:
+            self._chosen[number] = (rank, key_hex)
+        if key_hex is not None:
+            self._numbers_by_key[key_hex].add(number)
+
+    def key_for_number(self, number):
+        chosen = self._chosen.get(number)
+        return chosen[1] if chosen else None
+
+    def duplicate_row_count(self):
+        return sum(1 for count in self._rows.values() if count > 1)
+
+    def shared_keys(self):
+        shared = [(k, sorted(nums)) for k, nums in self._numbers_by_key.items() if len(nums) > 1]
+        return sorted(shared, key=lambda item: (-len(item[1]), item[0]))

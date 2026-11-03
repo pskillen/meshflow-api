@@ -159,3 +159,77 @@ def test_backfill_reports_shared_keys(create_observed_node):
     assert "Shared keys: 1 key(s)" in out
     assert "!00001771, !00001772" in out
     assert "2 nodes" in out
+
+
+def _managed_and_shared_lines(out):
+    keep = ("ManagedNode:", "Shared keys", "  ", "Duplicate")
+    lines = [line.replace("[dry-run] ", "") for line in out.splitlines()]
+    return [line for line in lines if line.startswith(keep)]
+
+
+@pytest.mark.django_db
+def test_dry_run_managed_and_shared_output_matches_real_run(create_observed_node, create_managed_node):
+    create_observed_node(meshtastic_node_id=7001, meshtastic_public_key=KEY_B64)
+    create_observed_node(meshtastic_node_id=7002, meshtastic_public_key=KEY_B64)
+    create_observed_node(meshtastic_node_id=7003, meshtastic_public_key=None)
+    managed = create_managed_node(meshtastic_node_id=7001)
+    create_managed_node(meshtastic_node_id=7003)
+
+    dry = _run("--dry-run")
+    managed.refresh_from_db()
+    assert managed.meshtastic_public_key is None
+    assert ObservedNode.objects.filter(meshtastic_public_key_hex__isnull=False).count() == 0
+
+    real = _run()
+
+    assert "ManagedNode: scanned 2, updated 1, no matching observed key 1" in dry
+    assert "Shared keys: 1 key(s)" in dry
+    assert _managed_and_shared_lines(dry) == _managed_and_shared_lines(real)
+    managed.refresh_from_db()
+    assert managed.meshtastic_public_key == KEY_HEX
+
+
+@pytest.mark.django_db
+def test_duplicate_rows_for_one_number_are_not_a_shared_key(create_observed_node):
+    create_observed_node(meshtastic_node_id=8001, meshtastic_public_key=KEY_B64)
+    create_observed_node(meshtastic_node_id=8001, meshtastic_public_key=KEY_B64)
+
+    out = _run()
+
+    assert "Shared keys: none" in out
+    assert "Duplicate ObservedNode rows (same node number, several rows): 1" in out
+
+
+@pytest.mark.django_db
+def test_two_numbers_with_one_key_are_shared_and_listed_once(create_observed_node):
+    create_observed_node(meshtastic_node_id=8101, meshtastic_public_key=KEY_B64)
+    create_observed_node(meshtastic_node_id=8101, meshtastic_public_key=KEY_B64)
+    create_observed_node(meshtastic_node_id=8102, meshtastic_public_key=KEY_B64)
+
+    out = _run()
+
+    assert "Shared keys: 1 key(s)" in out
+    assert "2 nodes (!00001fa5, !00001fa6)" in out
+    assert out.count("!00001fa5") == 1
+
+
+@pytest.mark.django_db
+def test_managed_choice_among_duplicate_rows_prefers_key_then_latest_heard(create_observed_node, create_managed_node):
+    now = timezone.now()
+    keyed_old = create_observed_node(meshtastic_node_id=8201, meshtastic_public_key=KEY_B64)
+    keyless_new = create_observed_node(meshtastic_node_id=8201, meshtastic_public_key=None)
+    ObservedNode.objects.filter(pk=keyed_old.pk).update(last_heard=now - timedelta(days=5))
+    ObservedNode.objects.filter(pk=keyless_new.pk).update(last_heard=now)
+    other_old = create_observed_node(meshtastic_node_id=8202, meshtastic_public_key=OTHER_KEY_B64)
+    other_new = create_observed_node(meshtastic_node_id=8202, meshtastic_public_key=KEY_B64)
+    ObservedNode.objects.filter(pk=other_old.pk).update(last_heard=now - timedelta(days=5))
+    ObservedNode.objects.filter(pk=other_new.pk).update(last_heard=now)
+    m1 = create_managed_node(meshtastic_node_id=8201)
+    m2 = create_managed_node(meshtastic_node_id=8202)
+
+    _run()
+
+    m1.refresh_from_db()
+    m2.refresh_from_db()
+    assert m1.meshtastic_public_key == KEY_HEX
+    assert m2.meshtastic_public_key == KEY_HEX
