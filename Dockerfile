@@ -25,6 +25,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the Django project
 COPY ./Meshflow /app/
 
+# Migration guard entrypoint (see docs/DEPLOY.md)
+COPY docker-entrypoint.sh /app/docker-entrypoint.sh
+RUN chmod +x /app/docker-entrypoint.sh
+
 # Replace version in settings.py
 RUN sed -i "s/VERSION = os.environ.get('APP_VERSION', 'development')/VERSION = '${VERSION}'/" Meshflow/settings/base.py
 
@@ -38,6 +42,9 @@ EXPOSE 8000
 RUN adduser --disabled-password --gecos "" appuser
 RUN chown -R appuser:appuser /app
 USER appuser
+
+# Refuse to start while migrations are unapplied; also applies to celery commands overriding CMD
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
 
 # Run Daphne ASGI server
 CMD ["daphne", "-b", "0.0.0.0", "-p", "8000", "Meshflow.asgi:application"]

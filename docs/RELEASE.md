@@ -12,7 +12,7 @@ Each build produces two images (API and docs) in the same package with distinct 
 | `:latest-docs`, `:latest-dev-docs`, `:1.2.3-docs` | Redocly API documentation |
 
 Migrations run via the API image with a command override (`python manage.py migrate && python manage.py run_deploy_tasks`); 
-no separate migrations image.
+no separate migrations image. The API and workers refuse to start until migrations are applied; see [DEPLOY.md](DEPLOY.md).
 
 ## Release Triggers
 
@@ -46,7 +46,7 @@ no separate migrations image.
 
 **Workflow:** [release.yaml](../.github/workflows/release.yaml)
 
-**Trigger:** Publish a GitHub Release (not a pre-release) with a semver tag (e.g. `1.2.3`)
+**Trigger:** A GitHub Release is released (`released` event: publishing a full release, or promoting a pre-release; pre-releases alone do not fire it) with a semver tag (e.g. `1.2.3`)
 
 **Tags pushed:**
 
