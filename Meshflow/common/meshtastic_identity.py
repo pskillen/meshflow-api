@@ -16,7 +16,7 @@ import binascii
 import logging
 import re
 import zlib
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 PUBKEY_BYTES = 32
 _HEX64 = re.compile(r"^[0-9a-fA-F]{64}$")
@@ -184,4 +184,30 @@ def protect_stale_names(instance, data: dict, latest_nodeinfo_time: datetime | N
             continue
         logger.debug("Kept %s %r for node %s over NodeDB upload %r: %s", field, stored, node_id, incoming, reason)
         del kept[field]
+    return kept
+
+
+# --- last_heard from a NodeDB upload must never move backwards or into the future ---------------------------
+
+MAX_LAST_HEARD_FUTURE = timedelta(minutes=10)
+
+
+def clamp_last_heard(instance, data: dict, now: datetime | None = None) -> dict:
+    """Return ``data`` with ``last_heard`` made safe to store from a (often stale) feeder NodeDB upload.
+
+    An incoming value more than 10 minutes in the future (bad radio clock) is dropped; one not newer than the
+    stored value is dropped, so the stored value never moves backwards. ``instance`` None (create) only applies
+    the future rule. Use the incoming value for ``protect_stale_names`` *before* calling this.
+    """
+    if data.get("last_heard") is None:
+        return dict(data)
+    kept = dict(data)
+    incoming = kept["last_heard"]
+    now = now or datetime.now(timezone.utc)
+    stored = getattr(instance, "last_heard", None) if instance is not None else None
+    if incoming > now + MAX_LAST_HEARD_FUTURE:
+        logger.debug("Ignored NodeDB last_heard %s more than 10 minutes in the future", incoming)
+        del kept["last_heard"]
+    elif stored is not None and incoming <= stored:
+        del kept["last_heard"]
     return kept

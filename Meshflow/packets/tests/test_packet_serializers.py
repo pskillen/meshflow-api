@@ -974,6 +974,91 @@ class NodeSerializerTest(BasePacketSerializerTestCase):
         self.assertEqual(self.from_node.long_name, "Real Name")
         self.assertEqual(self.from_node.short_name, "REAL")
 
+    def _set_last_heard(self, value):
+        self.from_node.last_heard = value
+        self.from_node.save()
+
+    def test_node_upsert_older_last_heard_keeps_stored(self):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        now = timezone.now() - timedelta(minutes=5)
+        self._set_last_heard(now)
+        self._upsert(last_heard=(now - timedelta(days=1)).isoformat())
+        self.assertEqual(self.from_node.last_heard, now)
+
+    def test_node_upsert_newer_last_heard_updates_stored(self):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        now = timezone.now()
+        self._set_last_heard(now - timedelta(hours=1))
+        self._upsert(last_heard=now.isoformat())
+        self.assertEqual(self.from_node.last_heard, now)
+
+    def test_node_upsert_future_last_heard_is_ignored(self):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        stored = timezone.now() - timedelta(hours=1)
+        self._set_last_heard(stored)
+        self._upsert(last_heard=(timezone.now() + timedelta(hours=2)).isoformat())
+        self.assertEqual(self.from_node.last_heard, stored)
+
+    def test_node_upsert_none_stored_takes_incoming_last_heard(self):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        self._set_last_heard(None)
+        incoming = timezone.now() - timedelta(days=1)
+        self._upsert(last_heard=incoming.isoformat())
+        self.assertEqual(self.from_node.last_heard, incoming)
+
+    def test_node_upsert_stale_last_heard_keeps_name_and_last_heard(self):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        now = timezone.now()
+        self._seed_names()
+        self._set_last_heard(now)
+        self._nodeinfo_at(now)
+        self._upsert(
+            user={"long_name": "Old Name", "short_name": "OLD"},
+            last_heard=(now - timedelta(days=2)).isoformat(),
+        )
+        self.assertEqual(self.from_node.long_name, "TIGERBAWS")
+        self.assertEqual(self.from_node.last_heard, now)
+
+    def test_node_create_takes_incoming_last_heard_but_not_future(self):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        from packets.serializers import NodeSerializer
+
+        past = timezone.now() - timedelta(days=1)
+        for node_id, value, expected in [
+            (0x0A0B0C01, past, past),
+            (0x0A0B0C02, timezone.now() + timedelta(hours=2), None),
+        ]:
+            serializer = NodeSerializer(
+                data={
+                    "id": node_id,
+                    "macaddr": "a0:b3:a9:cf:5a:7b",
+                    "user": {"long_name": "New", "short_name": "NEW"},
+                    "last_heard": value.isoformat(),
+                }
+            )
+            assert_serializer_valid(serializer)
+            node = serializer.save()
+            node.refresh_from_db()
+            self.assertEqual(node.last_heard, expected)
+
     def test_node_upsert_zero_position_does_not_overwrite_stored_position(self):
         from django.utils import timezone
 

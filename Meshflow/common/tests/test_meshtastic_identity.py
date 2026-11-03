@@ -6,6 +6,7 @@ import pytest
 
 from common.mesh_node_helpers import meshtastic_id_to_hex
 from common.meshtastic_identity import (
+    clamp_last_heard,
     identity_fields,
     is_blank_mac,
     is_placeholder_name,
@@ -150,3 +151,20 @@ def test_protect_stale_names_blank_never_replaces_real_name():
 def test_protect_stale_names_without_timestamp_lets_real_name_through():
     data = {"long_name": "Renamed", "short_name": "RENM"}
     assert protect_stale_names(_Stored(), data) == data
+
+
+def test_clamp_last_heard_rules():
+    from datetime import datetime, timedelta, timezone
+
+    now = datetime(2026, 11, 3, 12, 0, tzinfo=timezone.utc)
+
+    class Node:
+        last_heard = now
+
+    assert clamp_last_heard(Node(), {"last_heard": now - timedelta(hours=1)}, now) == {}
+    newer = {"last_heard": now + timedelta(minutes=5)}
+    assert clamp_last_heard(Node(), newer, now) == newer
+    assert clamp_last_heard(Node(), {"last_heard": now + timedelta(minutes=11)}, now) == {}
+    assert clamp_last_heard(None, {"last_heard": now + timedelta(minutes=11)}, now) == {}
+    old = {"last_heard": now - timedelta(days=9)}
+    assert clamp_last_heard(None, old, now) == old
