@@ -13,6 +13,7 @@ from common.mesh_node_helpers import (
     observed_node_id_str,
     parse_b64_mac_address,
 )
+from common.meshtastic_identity import identity_fields
 from common.protocol import Protocol
 from constellations.models import MessageChannel
 from nodes.models import DeviceMetrics, ManagedNode, NodeLatestStatus, ObservedNode, Position
@@ -1516,6 +1517,8 @@ class BaseNodeSerializer(serializers.ModelSerializer):
         position_data = validated_data.pop("position", None)
         device_metrics_data = validated_data.pop("device_metrics", None)
         validated_data.pop("node_id_str", None)
+        if "meshtastic_public_key" in validated_data:
+            validated_data.update(identity_fields(validated_data["meshtastic_public_key"]))
 
         # Create the node
         node = ObservedNode.objects.create(**validated_data)
@@ -1531,6 +1534,8 @@ class BaseNodeSerializer(serializers.ModelSerializer):
         position_data = validated_data.pop("position", None)
         device_metrics_data = validated_data.pop("device_metrics", None)
         validated_data.pop("node_id_str", None)
+        if "meshtastic_public_key" in validated_data:
+            validated_data.update(identity_fields(validated_data["meshtastic_public_key"]))
 
         # Update the node
         for attr, value in validated_data.items():

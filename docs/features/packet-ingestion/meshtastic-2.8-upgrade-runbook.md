@@ -33,7 +33,7 @@ Do not upgrade a feeder until all of these hold. Bot version numbers are TBD.
 
 | Gate | Needed |
 | --- | --- |
-| API | Feeder-scoped v4 URLs ([ADR-0005](adr/0005-feeder-scoped-auth.md)), predicted node ids and key backfill, no-clobber identity fix, and feeder re-key deployed to the target environment; the backfill has been run |
+| API | Feeder-scoped v4 URLs ([ADR-0005](adr/0005-feeder-scoped-auth.md)), predicted node ids and key backfill, no-clobber identity fix, and feeder re-key deployed to the target environment; the backfill has been run (`python manage.py backfill_meshtastic_identity`, idempotent) |
 | Re-key switch | `MESHTASTIC_FEEDER_AUTO_REKEY` is on only if the crc32 match was confirmed on hardware; otherwise plan on a manual re-point |
 | Bot | Version TBD or later: reports identity (key, MAC, firmware, node number) and detects a number change; probes v4 URLs and falls back; uploads throttled self telemetry; library pinned below 2.8 |
 | Key | The feeder has **its own API key** (not shared with another feeder) |

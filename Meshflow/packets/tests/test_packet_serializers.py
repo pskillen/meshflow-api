@@ -814,6 +814,32 @@ class NodeSerializerTest(BasePacketSerializerTestCase):
         self.assertEqual(latest_status.meshtastic_channel_utilization, 0.15)
         self.assertEqual(latest_status.meshtastic_air_util_tx, 0.05)
 
+    def test_node_upsert_sets_predicted_node_id_from_public_key(self):
+        data = {
+            "id": self.from_node.meshtastic_node_id,
+            "meshtastic_public_key": "oLOpz1p7W8/Ti8Z0iOU4TqZAYVAXe3Uwm8EF/m1zLFs=",
+        }
+        serializer = NodeSerializer(instance=self.from_node, data=data, partial=True)
+        assert_serializer_valid(serializer)
+        serializer.save()
+
+        self.from_node.refresh_from_db()
+        self.assertEqual(
+            self.from_node.meshtastic_public_key_hex,
+            "a0b3a9cf5a7b5bcfd38bc67488e5384ea6406150177b75309bc105fe6d732c5b",
+        )
+        self.assertEqual(self.from_node.meshtastic_key_node_id, 0x4396524C)
+
+    def test_node_upsert_malformed_public_key_gives_null_prediction(self):
+        data = {"id": self.from_node.meshtastic_node_id, "meshtastic_public_key": "short"}
+        serializer = NodeSerializer(instance=self.from_node, data=data, partial=True)
+        assert_serializer_valid(serializer)
+        serializer.save()
+
+        self.from_node.refresh_from_db()
+        self.assertIsNone(self.from_node.meshtastic_public_key_hex)
+        self.assertIsNone(self.from_node.meshtastic_key_node_id)
+
     def test_node_upsert_v3_rejects_legacy_only_position_field(self):
         from django.utils import timezone
 
