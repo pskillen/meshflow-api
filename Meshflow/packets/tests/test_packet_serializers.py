@@ -939,7 +939,8 @@ class NodeSerializerTest(BasePacketSerializerTestCase):
         self.assertEqual(self.from_node.long_name, "TIGERBAWS")
         self.assertEqual(self.from_node.short_name, "TIGR")
 
-    def test_node_upsert_newer_last_heard_updates_name(self):
+    def test_node_upsert_newer_last_heard_still_keeps_onair_name(self):
+        """NodeDB last_heard is the last packet of any type, so a newer one does not beat an on-air name."""
         from datetime import timedelta
 
         from django.utils import timezone
@@ -948,11 +949,58 @@ class NodeSerializerTest(BasePacketSerializerTestCase):
         self._seed_names()
         self._nodeinfo_at(now - timedelta(days=2))
         self._upsert(
-            user={"long_name": "Fresh Name", "short_name": "NEW"},
+            user={"long_name": "Old Name", "short_name": "OLD"},
             last_heard=now.isoformat(),
+        )
+        self.assertEqual(self.from_node.long_name, "TIGERBAWS")
+        self.assertEqual(self.from_node.short_name, "TIGR")
+
+    def test_node_upsert_without_nodeinfo_applies_real_name(self):
+        from django.utils import timezone
+
+        self._seed_names()
+        self._upsert(
+            user={"long_name": "Fresh Name", "short_name": "NEW"},
+            last_heard=timezone.now().isoformat(),
         )
         self.assertEqual(self.from_node.long_name, "Fresh Name")
         self.assertEqual(self.from_node.short_name, "NEW")
+
+    def test_node_upsert_with_nodeinfo_still_fills_placeholder(self):
+        from django.utils import timezone
+
+        suffix = f"{self.from_node.meshtastic_node_id:08x}"[-4:]
+        self._seed_names(long_name=f"Meshtastic {suffix}", short_name=suffix)
+        self._nodeinfo_at(timezone.now())
+        self._upsert(user={"long_name": "Real Name", "short_name": "REAL"})
+        self.assertEqual(self.from_node.long_name, "Real Name")
+        self.assertEqual(self.from_node.short_name, "REAL")
+
+    def test_node_upsert_null_last_heard_keeps_stored(self):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        stored = timezone.now() - timedelta(hours=1)
+        self._set_last_heard(stored)
+        self._upsert(last_heard=None)
+        self.assertEqual(self.from_node.last_heard, stored)
+
+    def test_node_upsert_without_name_fields_skips_nodeinfo_query(self):
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        with CaptureQueriesContext(connection) as ctx:
+            self._upsert(macaddr="11:22:33:44:55:66")
+        self.assertFalse([q for q in ctx.captured_queries if "packets_nodeinfopacket" in q["sql"]])
+
+    def test_node_upsert_with_name_fields_queries_nodeinfo_once(self):
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        with CaptureQueriesContext(connection) as ctx:
+            self._upsert(user={"long_name": "Some Name", "short_name": "SOME"})
+        self.assertEqual(len([q for q in ctx.captured_queries if "packets_nodeinfopacket" in q["sql"]]), 1)
 
     def test_node_upsert_placeholder_never_replaces_real_name(self):
         self._seed_names()

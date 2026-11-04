@@ -148,9 +148,17 @@ def test_protect_stale_names_blank_never_replaces_real_name():
     assert protect_stale_names(_Stored(), {"long_name": "", "short_name": None}) == {}
 
 
-def test_protect_stale_names_without_timestamp_lets_real_name_through():
+def test_protect_stale_names_without_nodeinfo_lets_real_name_through():
     data = {"long_name": "Renamed", "short_name": "RENM"}
     assert protect_stale_names(_Stored(), data) == data
+
+
+def test_protect_stale_names_with_nodeinfo_keeps_real_name_and_logs_info(caplog):
+    import logging
+
+    with caplog.at_level(logging.INFO, logger="common.meshtastic_identity"):
+        assert protect_stale_names(_Stored(), {"long_name": "Renamed", "short_name": "RENM"}, True) == {}
+    assert len([r for r in caplog.records if r.levelno == logging.INFO]) == 1
 
 
 def test_clamp_last_heard_rules():
@@ -168,3 +176,5 @@ def test_clamp_last_heard_rules():
     assert clamp_last_heard(None, {"last_heard": now + timedelta(minutes=11)}, now) == {}
     old = {"last_heard": now - timedelta(days=9)}
     assert clamp_last_heard(None, old, now) == old
+    assert clamp_last_heard(Node(), {"last_heard": None, "x": 1}, now) == {"x": 1}
+    assert clamp_last_heard(None, {"last_heard": None}, now) == {"last_heard": None}

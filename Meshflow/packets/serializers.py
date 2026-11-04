@@ -13,7 +13,13 @@ from common.mesh_node_helpers import (
     observed_node_id_str,
     parse_b64_mac_address,
 )
-from common.meshtastic_identity import clamp_last_heard, identity_fields, protect_identity, protect_stale_names
+from common.meshtastic_identity import (
+    clamp_last_heard,
+    has_name_fields,
+    identity_fields,
+    protect_identity,
+    protect_stale_names,
+)
 from common.protocol import Protocol
 from constellations.models import MessageChannel
 from nodes.models import DeviceMetrics, ManagedNode, NodeLatestStatus, ObservedNode, Position
@@ -1537,15 +1543,14 @@ class BaseNodeSerializer(serializers.ModelSerializer):
         device_metrics_data = validated_data.pop("device_metrics", None)
         validated_data.pop("node_id_str", None)
         validated_data = protect_identity(instance, validated_data)
-        # A NodeDB upload can be stale: keep a name the API learned more recently from an on-air NODEINFO.
-        latest_nodeinfo = (
-            NodeInfoPacket.objects.filter(from_int=instance.meshtastic_node_id)
-            .order_by("-first_reported_time")
-            .values_list("first_reported_time", flat=True)
-            .first()
+        # On-air NODEINFO is the authority for names: if we hold any, a NodeDB upload never replaces a real name.
+        # (The upload's last_heard is the radio's last packet of any type, so it cannot date a rename.)
+        has_nodeinfo = (
+            has_name_fields(validated_data)
+            and NodeInfoPacket.objects.filter(from_int=instance.meshtastic_node_id).exists()
         )
-        validated_data = protect_stale_names(instance, validated_data, latest_nodeinfo)
-        # ...but only after that: last_heard itself must never move backwards or into the future.
+        validated_data = protect_stale_names(instance, validated_data, has_nodeinfo)
+        # last_heard itself must never move backwards, into the future, or be cleared.
         validated_data = clamp_last_heard(instance, validated_data)
         if "meshtastic_public_key" in validated_data:
             validated_data.update(identity_fields(validated_data["meshtastic_public_key"]))
