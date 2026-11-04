@@ -20,7 +20,12 @@ def _stub_python(tmp_path, body):
 @pytest.fixture
 def run_entrypoint(tmp_path):
     log = tmp_path / "python.log"
-    _stub_python(tmp_path, f'echo "$@" >> {log}')
+    _stub_python(
+        tmp_path,
+        f'echo "$@" >> {log}\n'
+        '[ "$1" = "manage.py" ] && [ "$2" = "wait_for_migrations" ] && echo "MIGRATION_CHECK_MARKER" >&2\n'
+        "exit 0",
+    )
 
     def run(*cmd, **env):
         full_env = {"PATH": f"{tmp_path}:/usr/bin:/bin", **env}
@@ -93,3 +98,18 @@ def test_version_logged_before_migrate_skip(run_entrypoint):
     lines = result.stderr.splitlines()
     assert lines[0].startswith("Meshflow API 2.2.2 starting:")
     assert "skipping the migration check" in lines[1]
+
+
+def test_version_logged_before_migration_check(run_entrypoint):
+    result, checked = run_entrypoint("echo", "started", APP_VERSION="2.2.2")
+    assert checked
+    lines = result.stderr.splitlines()
+    assert lines[0].startswith("Meshflow API 2.2.2 starting:")
+    assert "MIGRATION_CHECK_MARKER" in lines
+    assert lines.index("MIGRATION_CHECK_MARKER") > 0
+
+
+def test_backslash_in_argument_is_logged_verbatim(run_entrypoint):
+    result, _ = run_entrypoint("echo", r"a\nb\tc", APP_VERSION="2.2.2")
+    assert result.returncode == 0
+    assert result.stderr.splitlines()[0] == r"Meshflow API 2.2.2 starting: echo a\nb\tc"

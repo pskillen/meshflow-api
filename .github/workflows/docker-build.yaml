@@ -120,6 +120,11 @@ jobs:
       - build-and-push
       - tagging
     if: always() && !cancelled() && needs.build-and-push.result == 'success'
+    # Two overlapping runs would list and delete the same untagged versions; the second gets a 404 and the action
+    # reports "fail delete N". Serialise cleanups (queue, never cancel one mid-delete) so that cannot happen.
+    concurrency:
+      group: ghcr-cleanup-meshflow-api
+      cancel-in-progress: false
     steps:
       - name: Delete untagged images
         uses: Chizkiyahu/delete-untagged-ghcr-action@v6.1.1
