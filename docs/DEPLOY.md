@@ -10,6 +10,10 @@ The image has an `ENTRYPOINT` (`docker-entrypoint.sh`) that runs `python manage.
 `exec`s the container command. Because it is an `ENTRYPOINT`, it covers every container that reuses the image with a
 command override (celery worker, rf-worker, beat).
 
+Before anything else, the entrypoint logs one line to stderr, `Meshflow API <version> starting: <command>`, so the
+container logs say which build is running. `<version>` is `APP_VERSION` (the image's `VERSION` build arg, the same
+string `/health` reports), or `unknown` when unset.
+
 `wait_for_migrations` builds the same plan as `migrate --check`. It exits 0 when nothing is unapplied. Otherwise it
 logs the unapplied migrations (`app.name`), waits, and checks again. If they are still unapplied at the timeout it
 exits non-zero ("N unapplied migrations; run the migrations container") and the container stops (and is restarted by
