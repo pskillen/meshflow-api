@@ -10,6 +10,7 @@ from django.core.management.base import BaseCommand
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 
+from common.ws_groups import managed_node_ws_group
 from nodes.models import ManagedNode, NodeAuth
 
 
@@ -50,7 +51,8 @@ class Command(BaseCommand):
             self.stderr.write(self.style.ERROR("Provide --managed-node-id or --by-api-key to identify the bot"))
             return
 
-        if not ManagedNode.objects.filter(meshtastic_node_id=managed_node_id, deleted_at__isnull=True).exists():
+        managed_node = ManagedNode.objects.filter(meshtastic_node_id=managed_node_id, deleted_at__isnull=True).first()
+        if managed_node is None:
             self.stderr.write(
                 self.style.ERROR(
                     f"ManagedNode with meshtastic_node_id={managed_node_id} not found. "
@@ -59,15 +61,14 @@ class Command(BaseCommand):
             )
             return
 
+        group = managed_node_ws_group(managed_node)
         channel_layer = get_channel_layer()
         async_to_sync(channel_layer.group_send)(
-            f"node_{managed_node_id}",
+            group,
             {"type": "node_command", "command": {"type": "traceroute", "target": target_node_id}},
         )
 
-        self.stdout.write(
-            self.style.SUCCESS(f"Sent traceroute command to group node_{managed_node_id}: " f"target={target_node_id}")
-        )
+        self.stdout.write(self.style.SUCCESS(f"Sent traceroute command to group {group}: " f"target={target_node_id}"))
         self.stdout.write(
             "Tip: If the bot did not receive it, ensure managed_node_id matches the "
             "ManagedNode.meshtastic_node_id linked to the bot's API key. Check API logs when the "

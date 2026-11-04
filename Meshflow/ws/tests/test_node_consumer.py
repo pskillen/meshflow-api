@@ -57,7 +57,7 @@ async def test_node_consumer_receives_traceroute_command(node_auth_data):
     # Send traceroute command via channel layer (simulating trigger API)
     channel_layer = get_channel_layer()
     await channel_layer.group_send(
-        f"node_{data['node_id']}",
+        data["group"],
         {"type": "node_command", "command": {"type": "traceroute", "target": 1623194643}},
     )
 
@@ -65,4 +65,37 @@ async def test_node_consumer_receives_traceroute_command(node_auth_data):
     response = await communicator.receive_json_from()
     assert response == {"type": "traceroute", "target": 1623194643}
 
+    await communicator.disconnect()
+
+
+@pytest.mark.django_db
+@pytest.mark.asyncio
+async def test_node_group_survives_meshtastic_node_id_change(node_auth_data):
+    """A re-keyed feeder (new meshtastic_node_id) keeps the same group; the bot still gets commands."""
+    from channels.layers import get_channel_layer
+
+    from common.ws_groups import managed_node_ws_group
+    from nodes.models import ManagedNode
+
+    data = await database_sync_to_async(node_auth_data)()
+    old_group = data["group"]
+    assert old_group.startswith("node_mt_")
+
+    @database_sync_to_async
+    def rekey():
+        node = ManagedNode.objects.get(meshtastic_node_id=data["node_id"])
+        node.meshtastic_node_id = data["node_id"] + 1
+        node.save(update_fields=["meshtastic_node_id"])
+        return managed_node_ws_group(node)
+
+    communicator = WebsocketCommunicator(application, f"/ws/nodes/?api_key={data['api_key']}")
+    connected, _ = await communicator.connect()
+    assert connected is True
+
+    # Re-key while connected: a sender resolving the group afterwards still reaches the bot.
+    assert await rekey() == old_group
+    await get_channel_layer().group_send(
+        old_group, {"type": "node_command", "command": {"type": "traceroute", "target": 5}}
+    )
+    assert await communicator.receive_json_from() == {"type": "traceroute", "target": 5}
     await communicator.disconnect()

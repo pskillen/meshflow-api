@@ -169,3 +169,17 @@ In Meshtastic 2.8 a node's number is `crc32` of its 32-byte public key, and an u
 - `python manage.py backfill_meshtastic_identity [--dry-run] [--batch-size N]` fills existing rows: it reads `ObservedNode.meshtastic_public_key`, falls back to the latest `NodeInfoPacket.public_key` for that `from_int`, copies the key onto the `ManagedNode` with the same number, and reports keys shared by several nodes. It is idempotent and never clears a stored value. **Run it in each environment straight after deploying.**
 - Django admin: the observed and managed node lists show the predicted id, can be filtered by whether one exists, and search matches `!<predicted id>` or the start of the hex key.
 - **Unverified:** that `zlib.crc32` equals the firmware's value is inferred from source. The worked example is the NodeInfo in `docs/packets/nodeinfo_packet.json`: `!da545c78` predicts `!4396524c`. Nothing acts on a prediction yet; hardware verification is tracked in api#439 and the runbook.
+
+### Identity data is not clobbered by 2.8 feeder NodeDB entries
+
+2.8 feeders hand the bot NodeDB entries with a zero-filled `macaddr` and a long name cut to 24 bytes (firmware `TypeConversions.cpp`). The node upsert (`BaseNodeSerializer.create/update`) and `NodeInfoPacketService` both pass incoming values through `common.meshtastic_identity.protect_identity`, which drops:
+
+- a blank or all-zero MAC (`00:00:00:00:00:00`, `000000000000`, base64 of six zero bytes): the stored MAC is kept, because MAC evidence is what identity linking uses;
+- a blank or null public key: the stored key is kept, and so are the derived `meshtastic_public_key_hex` and `meshtastic_key_node_id` (they are only rewritten when a non-blank key is applied);
+- a long name that is exactly the stored name cut to 24 UTF-8 bytes (byte-wise, so a multibyte character split by the cut counts; surrounding whitespace is ignored). A genuine rename still applies.
+
+The node upsert also ignores a position of exactly latitude 0, longitude 0 (NodeDB "no fix"): no `Position` row is written and `NodeLatestStatus` is left alone. The request is still accepted (no 400).
+
+A feeder uploads its radio's whole NodeDB on connect, and that NodeDB is often stale or holds the firmware placeholder (`Meshtastic 5abc` / `5abc`, the last four hex digits of the node number). Only the node upsert also passes names through `protect_stale_names` (same module), so an upload cannot replace a name the API learned from the air: a blank or placeholder name never replaces a real stored one, and if the upload carries `last_heard` and the node's latest stored `NodeInfoPacket` (`first_reported_time`) is newer, the stored names are kept. Bots that do not send `last_heard` get only the placeholder rule. An upload still fills a name that is empty or a placeholder, and a different real name without a timestamp still applies. Each kept name is logged at DEBUG. The upload's `last_heard` (the bot sends the NodeDB entry's `lastHeard`) is compared for staleness first, then clamped by `clamp_last_heard`: the stored `ObservedNode.last_heard` never moves backwards (a node with none takes the incoming value), and a value more than 10 minutes in the future (bad radio clock) is ignored, on create too. On-air NODEINFO is not filtered this way.
+
+`NodeInfoPacketService` no longer has a "NodeInfo is for the current node" early return: it compared an int to a str so never fired, and a NodeInfo's `node_id` is always the sender's own id, so a working version would have skipped every update.

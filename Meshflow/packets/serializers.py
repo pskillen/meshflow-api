@@ -13,7 +13,7 @@ from common.mesh_node_helpers import (
     observed_node_id_str,
     parse_b64_mac_address,
 )
-from common.meshtastic_identity import identity_fields
+from common.meshtastic_identity import clamp_last_heard, identity_fields, protect_identity, protect_stale_names
 from common.protocol import Protocol
 from constellations.models import MessageChannel
 from nodes.models import DeviceMetrics, ManagedNode, NodeLatestStatus, ObservedNode, Position
@@ -1463,8 +1463,8 @@ class BaseNodeSerializer(serializers.ModelSerializer):
 
     def _create_related_objects(self, node, position_data, device_metrics_data):
         """Create position and device metrics records for a node."""
-        # Create position if provided
-        if position_data:
+        # Create position if provided; a NodeDB (0, 0) means "no fix" and must not overwrite a stored position
+        if position_data and not (position_data.get("latitude") == 0 and position_data.get("longitude") == 0):
             reported_time = position_data.get("reported_time")
             Position.objects.create(
                 node=node,
@@ -1517,6 +1517,8 @@ class BaseNodeSerializer(serializers.ModelSerializer):
         position_data = validated_data.pop("position", None)
         device_metrics_data = validated_data.pop("device_metrics", None)
         validated_data.pop("node_id_str", None)
+        validated_data = protect_identity(None, validated_data)
+        validated_data = clamp_last_heard(None, validated_data)
         if "meshtastic_public_key" in validated_data:
             validated_data.update(identity_fields(validated_data["meshtastic_public_key"]))
 
@@ -1534,6 +1536,17 @@ class BaseNodeSerializer(serializers.ModelSerializer):
         position_data = validated_data.pop("position", None)
         device_metrics_data = validated_data.pop("device_metrics", None)
         validated_data.pop("node_id_str", None)
+        validated_data = protect_identity(instance, validated_data)
+        # A NodeDB upload can be stale: keep a name the API learned more recently from an on-air NODEINFO.
+        latest_nodeinfo = (
+            NodeInfoPacket.objects.filter(from_int=instance.meshtastic_node_id)
+            .order_by("-first_reported_time")
+            .values_list("first_reported_time", flat=True)
+            .first()
+        )
+        validated_data = protect_stale_names(instance, validated_data, latest_nodeinfo)
+        # ...but only after that: last_heard itself must never move backwards or into the future.
+        validated_data = clamp_last_heard(instance, validated_data)
         if "meshtastic_public_key" in validated_data:
             validated_data.update(identity_fields(validated_data["meshtastic_public_key"]))
 
