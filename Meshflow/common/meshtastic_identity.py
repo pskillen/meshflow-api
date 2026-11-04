@@ -121,10 +121,12 @@ def protect_identity(instance, data: dict) -> dict:
     return kept
 
 
-# --- Protection against a stale feeder NodeDB upload overwriting a newer on-air name ----------------------
+# --- Protection against a feeder NodeDB upload overwriting a name learned from the air --------------------
 #
 # A feeder uploads its radio's whole NodeDB on connect. That NodeDB is often stale or holds a placeholder
-# (``Meshtastic 5abc`` / ``5abc``), while the API may already have a newer name from an on-air NODEINFO.
+# (``Meshtastic 5abc`` / ``5abc``). Its ``last_heard`` is the time of the radio's last packet of *any* type, not
+# of the last NODEINFO, so it cannot say whether the name is newer than ours. On-air NODEINFO is therefore the
+# authority: once we hold any NodeInfoPacket for a node, an upload never replaces a real name.
 # Only the NodeDB upload path uses this; an on-air NODEINFO is the source of truth and is not filtered here.
 
 NAME_FIELDS = ("long_name", "short_name")
@@ -150,25 +152,29 @@ def _is_real_name(name: str | None, node_id: int | None, field: str) -> bool:
     return bool(name and name.strip()) and not is_placeholder_name(name, node_id, field)
 
 
-def protect_stale_names(instance, data: dict, latest_nodeinfo_time: datetime | None = None) -> dict:
-    """Return ``data`` without NodeDB-upload names that would replace a newer or better stored name.
+def has_name_fields(data: dict) -> bool:
+    """True if ``data`` carries a name field, i.e. ``protect_stale_names`` needs its ``has_nodeinfo`` answer."""
+    return any(field in data for field in NAME_FIELDS)
+
+
+def protect_stale_names(instance, data: dict, has_nodeinfo: bool = False) -> dict:
+    """Return ``data`` without NodeDB-upload names that would replace a better stored name.
 
     For each of ``long_name`` / ``short_name`` present in ``data`` and a stored real name (not blank, not the
     placeholder) on ``instance``:
 
     * an incoming blank or placeholder name is dropped, always;
-    * if the upload carries ``last_heard`` and the node's latest on-air NODEINFO (``latest_nodeinfo_time``) is
-      newer, the incoming name is dropped. An upload with no ``last_heard`` cannot be dated, so a different
-      real name is let through.
+    * if the node has any stored on-air NODEINFO (``has_nodeinfo``), a different incoming name is dropped
+      whatever the upload's ``last_heard``. Without one, a different real name applies.
 
-    A node with no real stored name is always filled. ``instance`` None (create) changes nothing.
+    A node with no real stored name is always filled. ``instance`` None (create) changes nothing. One INFO line
+    summarises what was kept.
     """
     if instance is None:
         return dict(data)
     kept = dict(data)
     node_id = getattr(instance, "meshtastic_node_id", None)
-    last_heard = kept.get("last_heard")
-    stale = bool(last_heard and latest_nodeinfo_time and latest_nodeinfo_time > last_heard)
+    dropped = []
     for field in NAME_FIELDS:
         if field not in kept:
             continue
@@ -176,14 +182,16 @@ def protect_stale_names(instance, data: dict, latest_nodeinfo_time: datetime | N
         incoming = kept[field]
         if incoming == stored or not _is_real_name(stored, node_id, field):
             continue
-        if not _is_real_name(incoming, node_id, field):
-            reason = "incoming name is blank or a placeholder"
-        elif stale:
-            reason = "on-air NODEINFO is newer than the NodeDB entry"
-        else:
+        if _is_real_name(incoming, node_id, field) and not has_nodeinfo:
             continue
-        logger.debug("Kept %s %r for node %s over NodeDB upload %r: %s", field, stored, node_id, incoming, reason)
+        dropped.append(field)
         del kept[field]
+    if dropped:
+        logger.info(
+            "Kept stored %s for node %s over NodeDB upload (blank/placeholder, or on-air NODEINFO is authoritative)",
+            "+".join(dropped),
+            node_id,
+        )
     return kept
 
 
@@ -197,11 +205,15 @@ def clamp_last_heard(instance, data: dict, now: datetime | None = None) -> dict:
 
     An incoming value more than 10 minutes in the future (bad radio clock) is dropped; one not newer than the
     stored value is dropped, so the stored value never moves backwards. ``instance`` None (create) only applies
-    the future rule. Use the incoming value for ``protect_stale_names`` *before* calling this.
+    the future rule. An explicit ``last_heard: None`` is dropped on update so it cannot clear a stored value
+    (logged at INFO). On create it is kept: there is nothing to clear.
     """
-    if data.get("last_heard") is None:
-        return dict(data)
     kept = dict(data)
+    if kept.get("last_heard") is None:
+        if instance is not None and "last_heard" in kept:
+            del kept["last_heard"]
+            logger.info("Ignored null NodeDB last_heard for node %s", getattr(instance, "meshtastic_node_id", None))
+        return kept
     incoming = kept["last_heard"]
     now = now or datetime.now(timezone.utc)
     stored = getattr(instance, "last_heard", None) if instance is not None else None
