@@ -214,3 +214,20 @@ def test_clamp_last_heard_rules():
     assert clamp_last_heard(None, old, now) == old
     assert clamp_last_heard(Node(), {"last_heard": None, "x": 1}, now) == {"x": 1}
     assert clamp_last_heard(None, {"last_heard": None}, now) == {"last_heard": None}
+
+
+def test_is_placeholder_name_unknown_node_keeps_leading_zeros():
+    """Node 0x6F855 renders as !0006f855: the synthesised name has all eight hex digits, zeros included."""
+    assert is_placeholder_name("Unknown Node !0006f855", 0x6F855, "long_name")
+    assert is_placeholder_name("Meshtastic f855", 0x6F855, "long_name")
+    assert not is_placeholder_name("Unknown Node !6f855", 0x6F855, "long_name")
+
+
+def test_protect_stale_names_combined_reason_logged(caplog):
+    import logging
+
+    # long_name: a different real name (onair); short_name: the placeholder (placeholder).
+    with caplog.at_level(logging.INFO, logger="common.meshtastic_identity"):
+        assert protect_stale_names(_Stored(), {"long_name": "Renamed", "short_name": "5abc"}, True) == {}
+    infos = [r.getMessage() for r in caplog.records if r.levelno == logging.INFO]
+    assert infos == ["Kept stored long_name+short_name for node !7d085abc (onair+placeholder)"]
