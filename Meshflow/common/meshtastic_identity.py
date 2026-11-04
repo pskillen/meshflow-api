@@ -135,16 +135,19 @@ logger = logging.getLogger(__name__)
 
 
 def is_placeholder_name(name: str | None, node_id: int | None, field: str) -> bool:
-    """True if ``name`` is the firmware default for the node: ``Meshtastic xxxx`` (long) or ``xxxx`` (short).
+    """True if ``name`` is a default for the node: ``Meshtastic xxxx`` (long) or ``xxxx`` (short).
 
-    ``xxxx`` is the last four hex digits of the node number. A blank name does not count (see ``is_blank``).
+    ``xxxx`` is the last four hex digits of the node number. A long name ``Unknown Node !xxxxxxxx`` (the full
+    node number, which the API itself synthesises for a node it has only heard) also counts. A blank name does
+    not count (see ``is_blank``).
     """
     if not name or node_id is None:
         return False
-    suffix = f"{node_id & 0xFFFFFFFF:08x}"[-4:]
+    full = f"{node_id & 0xFFFFFFFF:08x}"
+    suffix = full[-4:]
     value = name.strip().lower()
     if field == "long_name":
-        return value == f"meshtastic {suffix}"
+        return value in (f"meshtastic {suffix}", f"unknown node !{full}")
     return value == suffix
 
 
@@ -163,9 +166,9 @@ def protect_stale_names(instance, data: dict, has_nodeinfo: bool = False) -> dic
     For each of ``long_name`` / ``short_name`` present in ``data`` and a stored real name (not blank, not the
     placeholder) on ``instance``:
 
-    * an incoming blank or placeholder name is dropped, always;
+    * an incoming blank or placeholder name is dropped, always (log reason ``placeholder``);
     * if the node has any stored on-air NODEINFO (``has_nodeinfo``), a different incoming name is dropped
-      whatever the upload's ``last_heard``. Without one, a different real name applies.
+      whatever the upload's ``last_heard`` (reason ``onair``). Without one, a different real name applies.
 
     A node with no real stored name is always filled. ``instance`` None (create) changes nothing. One INFO line
     summarises what was kept.
@@ -175,6 +178,7 @@ def protect_stale_names(instance, data: dict, has_nodeinfo: bool = False) -> dic
     kept = dict(data)
     node_id = getattr(instance, "meshtastic_node_id", None)
     dropped = []
+    reasons = []
     for field in NAME_FIELDS:
         if field not in kept:
             continue
@@ -182,15 +186,20 @@ def protect_stale_names(instance, data: dict, has_nodeinfo: bool = False) -> dic
         incoming = kept[field]
         if incoming == stored or not _is_real_name(stored, node_id, field):
             continue
-        if _is_real_name(incoming, node_id, field) and not has_nodeinfo:
+        real_incoming = _is_real_name(incoming, node_id, field)
+        if real_incoming and not has_nodeinfo:
             continue
+        reason = "onair" if real_incoming else "placeholder"
+        if reason not in reasons:
+            reasons.append(reason)
         dropped.append(field)
         del kept[field]
     if dropped:
         logger.info(
-            "Kept stored %s for node %s over NodeDB upload (blank/placeholder, or on-air NODEINFO is authoritative)",
+            "Kept stored %s for node !%08x (%s)",
             "+".join(dropped),
-            node_id,
+            (node_id or 0) & 0xFFFFFFFF,
+            "+".join(reasons),
         )
     return kept
 

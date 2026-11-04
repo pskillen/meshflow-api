@@ -158,7 +158,43 @@ def test_protect_stale_names_with_nodeinfo_keeps_real_name_and_logs_info(caplog)
 
     with caplog.at_level(logging.INFO, logger="common.meshtastic_identity"):
         assert protect_stale_names(_Stored(), {"long_name": "Renamed", "short_name": "RENM"}, True) == {}
-    assert len([r for r in caplog.records if r.levelno == logging.INFO]) == 1
+    infos = [r.getMessage() for r in caplog.records if r.levelno == logging.INFO]
+    assert infos == ["Kept stored long_name+short_name for node !7d085abc (onair)"]
+
+
+def test_protect_stale_names_placeholder_reason_logged(caplog):
+    import logging
+
+    with caplog.at_level(logging.INFO, logger="common.meshtastic_identity"):
+        assert protect_stale_names(_Stored(), {"long_name": "Meshtastic 5abc", "short_name": "5abc"}, True) == {}
+    infos = [r.getMessage() for r in caplog.records if r.levelno == logging.INFO]
+    assert infos == ["Kept stored long_name+short_name for node !7d085abc (placeholder)"]
+
+
+def test_is_placeholder_name_unknown_node_full_hex_any_case():
+    assert is_placeholder_name("Unknown Node !7d085abc", 0x7D085ABC, "long_name")
+    assert is_placeholder_name("UNKNOWN NODE !7D085ABC", 0x7D085ABC, "long_name")
+    assert not is_placeholder_name("Unknown Node !11111111", 0x7D085ABC, "long_name")
+    assert not is_placeholder_name("Unknown Node !7d085abc", 0x7D085ABC, "short_name")
+
+
+def test_protect_stale_names_incoming_unknown_node_never_replaces_real_name(caplog):
+    import logging
+
+    with caplog.at_level(logging.INFO, logger="common.meshtastic_identity"):
+        assert protect_stale_names(_Stored(), {"long_name": "Unknown Node !7D085ABC"}) == {}
+    assert [r.getMessage() for r in caplog.records if r.levelno == logging.INFO] == [
+        "Kept stored long_name for node !7d085abc (placeholder)"
+    ]
+
+
+def test_protect_stale_names_real_name_replaces_stored_unknown_node_despite_nodeinfo():
+    class Stored(_Stored):
+        long_name = "Unknown Node !7d085abc"
+        short_name = "5abc"
+
+    data = {"long_name": "TIGERBAWS", "short_name": "TIGR"}
+    assert protect_stale_names(Stored(), data, True) == data
 
 
 def test_clamp_last_heard_rules():
