@@ -74,3 +74,22 @@ def test_failed_check_blocks_command(tmp_path):
     )
     assert result.returncode != 0
     assert "started" not in result.stdout
+
+
+def test_logs_version_first(run_entrypoint):
+    result, _ = run_entrypoint("echo", "started", APP_VERSION="main-abc1234")
+    assert result.returncode == 0
+    assert result.stderr.splitlines()[0] == "Meshflow API main-abc1234 starting: echo started"
+
+
+def test_logs_unknown_version_without_failing(run_entrypoint):
+    result, _ = run_entrypoint("echo", "started")
+    assert result.returncode == 0
+    assert result.stderr.splitlines()[0] == "Meshflow API unknown starting: echo started"
+
+
+def test_version_logged_before_migrate_skip(run_entrypoint):
+    result, _ = run_entrypoint("python", "manage.py", "migrate", APP_VERSION="2.2.2")
+    lines = result.stderr.splitlines()
+    assert lines[0].startswith("Meshflow API 2.2.2 starting:")
+    assert "skipping the migration check" in lines[1]
