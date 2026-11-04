@@ -107,3 +107,9 @@ def test_version_logged_before_migration_check(run_entrypoint):
     assert lines[0].startswith("Meshflow API 2.2.2 starting:")
     assert "MIGRATION_CHECK_MARKER" in lines
     assert lines.index("MIGRATION_CHECK_MARKER") > 0
+
+
+def test_backslash_in_argument_is_logged_verbatim(run_entrypoint):
+    result, _ = run_entrypoint("echo", r"a\nb\tc", APP_VERSION="2.2.2")
+    assert result.returncode == 0
+    assert result.stderr.splitlines()[0] == r"Meshflow API 2.2.2 starting: echo a\nb\tc"
