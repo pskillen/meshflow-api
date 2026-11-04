@@ -29,9 +29,6 @@ COPY ./Meshflow /app/
 COPY docker-entrypoint.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh
 
-# Replace version in settings.py
-RUN sed -i "s/VERSION = os.environ.get('APP_VERSION', 'development')/VERSION = '${VERSION}'/" Meshflow/settings/base.py
-
 # Collect static files
 RUN python manage.py collectstatic --noinput
 
