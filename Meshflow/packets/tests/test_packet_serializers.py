@@ -1350,3 +1350,26 @@ class PacketDeduplicationTest(BasePacketSerializerTestCase):
 
         self.assertEqual(packet1.id, packet2.id)
         self.assertEqual(packet1.observations.count(), 1)
+
+
+class NodeSerializerHwModelTest(BasePacketSerializerTestCase):
+    """Hardware model normalisation on node upsert."""
+
+    def test_update_normalises_numeric_hw_model(self):
+        serializer = NodeSerializer(
+            instance=self.from_node,
+            data={"id": self.from_node.meshtastic_node_id, "meshtastic_hw_model": "152"},
+            partial=True,
+        )
+        assert_serializer_valid(serializer)
+        serializer.save()
+        self.from_node.refresh_from_db()
+        self.assertEqual(self.from_node.meshtastic_hw_model, "HELTEC_MESH_POCKET_V2")
+
+    def test_create_normalises_legacy_alias_and_renamed_name(self):
+        serializer = NodeSerializer(
+            data={"id": 777001, "long_name": "New", "short_name": "NEW", "macaddr": None, "hw_model": "SENSELORA_S3"}
+        )
+        assert_serializer_valid(serializer)
+        node = serializer.save()
+        self.assertEqual(node.meshtastic_hw_model, "MAKERFABS_RESERVED")

@@ -14,7 +14,7 @@ from common.mesh_node_helpers import (
     observed_node_id_str,
     parse_b64_mac_address,
 )
-from common.meshtastic_enums import normalise_portnum
+from common.meshtastic_enums import normalise_hw_model, normalise_portnum
 from common.meshtastic_identity import (
     clamp_last_heard,
     has_name_fields,
@@ -376,6 +376,10 @@ class NodeInfoPacketSerializer(BasePacketSerializer):
             role = serializers.CharField(required=False, allow_null=True)
             isLicensed = serializers.BooleanField(source="is_licensed", required=False, allow_null=True)
             isUnmessagable = serializers.BooleanField(source="is_unmessagable", required=False, allow_null=True)
+
+            def validate_hwModel(self, value):
+                # Lib 2.7.11 sends 2.8 hardware models as numbers; store the name (or ``HW_<n>``).
+                return normalise_hw_model(value)
 
         user = UserSerializer()
 
@@ -1485,6 +1489,10 @@ class BaseNodeSerializer(serializers.ModelSerializer):
 
     def get_id_str(self, obj):
         return observed_node_id_str(obj)
+
+    def validate_meshtastic_hw_model(self, value):
+        # Runs for both ``create`` and ``update``; numbers and renamed 2.7 names become 2.8 names.
+        return normalise_hw_model(value)
 
     def to_internal_value(self, data):
         """Convert the incoming data to the appropriate format."""

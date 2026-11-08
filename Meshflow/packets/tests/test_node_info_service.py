@@ -163,3 +163,33 @@ def test_process_node_info_packet_malformed_key_gives_null_prediction(
     from_node.refresh_from_db()
     assert from_node.meshtastic_public_key_hex is None
     assert from_node.meshtastic_key_node_id is None
+
+
+@pytest.mark.django_db
+def test_node_info_with_numeric_hw_model_stores_name_on_packet_and_node(create_managed_node, create_user):
+    """A 2.8 hardware model sent as a number by lib 2.7.11 is stored as its name on the packet and the node."""
+    from packets.models import PacketObservation
+    from packets.serializers import NodeInfoPacketSerializer
+
+    observer = create_managed_node()
+    data = {
+        "id": 424242,
+        "from": 987654,
+        "fromId": "!000f1206",
+        "to": 4294967295,
+        "toId": "^all",
+        "decoded": {
+            "portnum": "NODEINFO_APP",
+            "user": {"id": "!000f1206", "shortName": "NDR", "longName": "Nodara", "hwModel": 151},
+        },
+        "rxTime": 1672531200,
+    }
+    serializer = NodeInfoPacketSerializer(data=data, context={"observer": observer})
+    assert serializer.is_valid(), serializer.errors
+    packet = serializer.save()
+    assert packet.hw_model == "NODARA"
+
+    observation = PacketObservation.objects.get(packet=packet)
+    NodeInfoPacketService().process_packet(packet, observer, observation, create_user())
+    node = ObservedNode.objects.get(meshtastic_node_id=987654)
+    assert node.meshtastic_hw_model == "NODARA"

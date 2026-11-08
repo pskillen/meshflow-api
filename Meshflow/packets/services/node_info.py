@@ -1,3 +1,4 @@
+from common.meshtastic_enums import normalise_hw_model
 from common.meshtastic_identity import identity_fields, protect_identity
 from packets.models import NodeInfoPacket
 from packets.services.base import BasePacketService
@@ -30,7 +31,7 @@ class NodeInfoPacketService(BasePacketService):
         # update the ObservedNode
         for field, value in updates.items():
             setattr(sender, field, value)
-        sender.meshtastic_hw_model = self.packet.hw_model
+        sender.meshtastic_hw_model = normalise_hw_model(self.packet.hw_model)
         sender.meshtastic_role = self.packet.role
         if "meshtastic_public_key" in updates:
             for field, value in identity_fields(updates["meshtastic_public_key"]).items():
