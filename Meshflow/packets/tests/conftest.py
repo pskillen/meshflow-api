@@ -251,3 +251,19 @@ def create_packet_observation(create_raw_packet, create_managed_node):  # noqa: 
         )
 
     return make_observation
+
+
+@pytest.fixture
+def feeder(create_managed_node, create_node_api_key):  # noqa: F811
+    """One registered feeder and its single-feeder key, as the Meshtastic goldens set up."""
+    from packets.tests import goldens
+
+    return goldens.setup_feeder(create_managed_node, create_node_api_key)
+
+
+@pytest.fixture
+def side_effects(settings):
+    from packets.tests import goldens
+
+    with goldens.guarded_side_effects(settings) as patched:
+        yield patched

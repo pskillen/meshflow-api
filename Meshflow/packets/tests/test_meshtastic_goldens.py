@@ -15,25 +15,8 @@ from packets.tests import goldens
 pytestmark = pytest.mark.django_db
 
 
-@pytest.fixture
-def feeder(create_managed_node, create_node_api_key):
-    return goldens.setup_feeder(create_managed_node, create_node_api_key)
-
-
-@pytest.fixture
-def side_effects(settings):
-    with goldens.guarded_side_effects(settings) as patched:
-        yield patched
-
-
 def _run(name, feeder, side_effects, url="v4"):
-    node, api_key = feeder
-    entry = goldens.entry_for(name)
-    body = goldens.load_wire(name)
-    snapshot = goldens.Snapshot(body["from"])
-    response = goldens.post_wire(body, node, api_key, url=url, feeder_num=entry["feeder_num"])
-    request = {"url": url, "feeder_num_header": entry["feeder_num"] if url == "v4" else None}
-    return goldens.outcome(response, request, snapshot, side_effects)
+    return goldens.run_case(name, *feeder, side_effects, url=url)
 
 
 @pytest.mark.parametrize("name", goldens.case_ids())

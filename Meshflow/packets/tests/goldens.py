@@ -258,14 +258,28 @@ def outcome(response, request: dict, snapshot: Snapshot, side_effects: dict) -> 
     return result
 
 
+def run_case(name: str, node, api_key, side_effects: dict, *, url="v4", body: dict | None = None) -> dict:
+    """POST one case (the stored wire body unless ``body`` is given) and return its outcome."""
+    entry = entry_for(name)
+    body = load_wire(name) if body is None else body
+    snapshot = Snapshot(body["from"])
+    response = post_wire(body, node, api_key, url=url, feeder_num=entry["feeder_num"])
+    request = {"url": url, "feeder_num_header": entry["feeder_num"] if url == "v4" else None}
+    return outcome(response, request, snapshot, side_effects)
+
+
+def assert_golden(name: str, actual: dict) -> None:
+    """Assert ``actual`` equals ``golden/<name>.json``."""
+    expected = json.loads(golden_path(name).read_text(encoding="utf-8"))
+    # Round trip so tuples and non-JSON types compare like the file does.
+    assert json.loads(json.dumps({"key": name, **actual}, sort_keys=True)) == expected
+
+
 def check_golden(name: str, actual: dict) -> None:
     """Compare ``actual`` with ``golden/<name>.json``; write it instead when regenerating."""
-    actual = {"key": name, **actual}
-    path = golden_path(name)
     if REGEN:
+        path = golden_path(name)
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(actual, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        path.write_text(json.dumps({"key": name, **actual}, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         return
-    expected = json.loads(path.read_text(encoding="utf-8"))
-    # Round trip so tuples and non-JSON types compare like the file does.
-    assert json.loads(json.dumps(actual, sort_keys=True)) == expected
+    assert_golden(name, actual)
