@@ -4,9 +4,9 @@ This document describes how Node API keys work in the Meshflow system: the model
 
 ## Model Overview
 
-**NodeAPIKey** is owned by a user and scoped to a constellation. **NodeAuth** links an API key to one or more ManagedNodes:
+**NodeAPIKey** is owned by a user and scoped to a constellation. **NodeAuth** links an API key to a ManagedNode:
 
-- One API key can be linked to **multiple** ManagedNodes via NodeAuth
+- A new API key is linked to **one** feeder (ManagedNode) via NodeAuth; see [One Key per Feeder](#one-key-per-feeder). Older keys may still be linked to several (legacy shared keys)
 - Each NodeAuth record associates `(api_key, node)` with a unique constraint
 - Keys are used for packet ingest and WebSocket commands (e.g. traceroute)
 
@@ -64,14 +64,16 @@ Packets are correctly attributed per bot because the **observer** comes from the
 
    Each packet observation records which ManagedNode reported the packet. The same packet can be observed by multiple ManagedNodes; each gets its own PacketObservation.
 
-**When multiple bots share one API key:**
+**Legacy shared keys (several bots on one existing key):**
 
 - Bot A (device 12345) → `/api/packets/12345/ingest/` → observer = ManagedNode 12345
 - Bot B (device 67890) → `/api/packets/67890/ingest/` → observer = ManagedNode 67890
 
 Each bot must use its own `node_id` in the URL. As long as the key is linked to both nodes via NodeAuth, packets are correctly associated per observer.
 
-## WebSocket and Shared Keys
+## WebSocket and Shared Keys (legacy)
+
+New shared links are refused, so this section only applies to existing shared keys.
 
 The WebSocket endpoint (`ws/nodes/?api_key=<key>`) must identify which feeder is connecting when multiple ManagedNodes share one key. Otherwise traceroute and other commands may be delivered to the wrong bot.
 
