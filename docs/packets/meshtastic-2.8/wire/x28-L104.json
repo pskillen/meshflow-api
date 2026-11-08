@@ -1,0 +1,34 @@
+{
+  "channel": 0,
+  "decoded": {
+    "payload": "DSl98GoyMAiZCBWQwvVAHQTDCz8gHCg3MA44FUBYSAhQFVgCYMj9CGi0uAN4kP//////////AQ==",
+    "portnum": "TELEMETRY_APP",
+    "telemetry": {
+      "localStats": {
+        "airUtilTx": 0.54594445,
+        "channelUtilization": 7.6800003,
+        "heapFreeBytes": 56372,
+        "heapTotalBytes": 147144,
+        "noiseFloor": -112,
+        "numOnlineNodes": 21,
+        "numPacketsRx": 55,
+        "numPacketsRxBad": 14,
+        "numPacketsTx": 28,
+        "numRxDupe": 8,
+        "numTotalNodes": 88,
+        "numTxRelay": 21,
+        "numTxRelayCanceled": 2,
+        "uptimeSeconds": 1049
+      },
+      "time": 1794145577
+    }
+  },
+  "from": 3769067321,
+  "fromId": "!e0a76739",
+  "hopLimit": 3,
+  "id": 3590689059,
+  "priority": "BACKGROUND",
+  "rxTime": 1794145577,
+  "to": 4294967295,
+  "toId": "^all"
+}

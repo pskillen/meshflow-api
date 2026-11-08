@@ -1,0 +1,28 @@
+{
+  "channel": 0,
+  "decoded": {
+    "bitfield": 0,
+    "payload": "CgkhN2QwODVhYmMSCVRJR0VSQkFXUxoEVGJhdyIGUHh9CFq8KGdCIK5raVidNovXJLbLI80vIvdr7YgRJwpelXC8RImb0KQSSAA=",
+    "portnum": "NODEINFO_APP",
+    "user": {
+      "hwModel": "T_LORA_PAGER",
+      "id": "!7d085abc",
+      "isUnmessagable": false,
+      "longName": "TIGERBAWS",
+      "macaddr": "UHh9CFq8",
+      "publicKey": "rmtpWJ02i9cktssjzS8i92vtiBEnCl6VcLxEiZvQpBI=",
+      "shortName": "Tbaw"
+    }
+  },
+  "from": 2097699516,
+  "fromId": "!7d085abc",
+  "hopStart": 3,
+  "id": 3906867666,
+  "relayNode": 180,
+  "rxRssi": -80,
+  "rxSnr": 7.25,
+  "rxTime": 1794144712,
+  "to": 4294967295,
+  "toId": "^all",
+  "transportMechanism": "TRANSPORT_LORA"
+}

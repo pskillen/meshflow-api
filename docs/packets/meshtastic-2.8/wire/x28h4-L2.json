@@ -1,0 +1,30 @@
+{
+  "channel": 0,
+  "decoded": {
+    "bitfield": 0,
+    "payload": "DUyA8GkaFw1uczlBFSW2iUIdVz1zRCXjO+tDOI4B",
+    "portnum": "TELEMETRY_APP",
+    "telemetry": {
+      "environmentMetrics": {
+        "barometricPressure": 972.95844,
+        "gasResistance": 470.46786,
+        "iaq": 142,
+        "relativeHumidity": 68.85575,
+        "temperature": 11.590681
+      },
+      "time": 1777369164
+    }
+  },
+  "from": 580542218,
+  "fromId": "!229a5f0a",
+  "hopLimit": 2,
+  "hopStart": 7,
+  "id": 1458788268,
+  "relayNode": 240,
+  "rxRssi": -79,
+  "rxSnr": 6.25,
+  "rxTime": 1794146649,
+  "to": 4294967295,
+  "toId": "^all",
+  "transportMechanism": "TRANSPORT_LORA"
+}

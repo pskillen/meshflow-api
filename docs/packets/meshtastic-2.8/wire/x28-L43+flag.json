@@ -1,0 +1,29 @@
+{
+  "channel": 0,
+  "decoded": {
+    "payload": "DbV58GoSFgheFSGwgkAdeHe7QSX6yuQ/KPjF9wI=",
+    "portnum": "TELEMETRY_APP",
+    "telemetry": {
+      "deviceMetrics": {
+        "airUtilTx": 1.7874444,
+        "batteryLevel": 94,
+        "channelUtilization": 23.433334,
+        "uptimeSeconds": 6152952,
+        "voltage": 4.084
+      },
+      "time": 1794144693
+    }
+  },
+  "from": 529363329,
+  "fromId": "!1f8d7181",
+  "hopLimit": 1,
+  "hopStart": 3,
+  "id": 2577301768,
+  "priority": "BACKGROUND",
+  "replayed": true,
+  "rxSnr": 5.5,
+  "rxTime": 1794144693,
+  "to": 4294967295,
+  "toId": "^all",
+  "transportMechanism": "TRANSPORT_LORA"
+}

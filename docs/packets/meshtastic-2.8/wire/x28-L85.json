@@ -1,0 +1,29 @@
+{
+  "channel": 0,
+  "decoded": {
+    "bitfield": 0,
+    "payload": "CgkhMjNjM2M0OWYSF3VubG9iaXRvIPCfj6AgKHJvdXRpbmcpGgRsb2JSIgbw9b1QM5woKzgMQiCs1mMoXonrvmdpSRyBT9Gb5MeFNDb0n3bZw0Qw+KoWREgB",
+    "portnum": "NODEINFO_APP",
+    "user": {
+      "hwModel": "HELTEC_V3",
+      "id": "!23c3c49f",
+      "isUnmessagable": true,
+      "longName": "unlobito \ud83c\udfe0 (routing)",
+      "macaddr": "8PW9UDOc",
+      "publicKey": "rNZjKF6J675naUkcgU/Rm+THhTQ29J922cNEMPiqFkQ=",
+      "role": "CLIENT_BASE",
+      "shortName": "lobR"
+    }
+  },
+  "from": 600032415,
+  "fromId": null,
+  "hopStart": 2,
+  "id": 2373735515,
+  "relayNode": 180,
+  "rxRssi": -80,
+  "rxSnr": 5.75,
+  "rxTime": 1794144892,
+  "to": 4294967295,
+  "toId": "^all",
+  "transportMechanism": "TRANSPORT_LORA"
+}

@@ -1,0 +1,32 @@
+{
+  "channel": 0,
+  "decoded": {
+    "bitfield": 0,
+    "payload": "DYBnQiEVgCF//RgKJZID8mooAXgAgAEAuAEg",
+    "portnum": "POSITION_APP",
+    "position": {
+      "altitude": 10,
+      "groundSpeed": 0,
+      "groundTrack": 0,
+      "latitude": 55.8,
+      "latitudeI": 558000000,
+      "locationSource": "LOC_MANUAL",
+      "longitude": -4.2,
+      "longitudeI": -42000000,
+      "precisionBits": 32,
+      "time": 1794245522
+    }
+  },
+  "from": 4162343426,
+  "fromId": "!f8185202",
+  "hopLimit": 5,
+  "hopStart": 6,
+  "id": 2714148026,
+  "relayNode": 240,
+  "rxRssi": -80,
+  "rxSnr": 6.0,
+  "rxTime": 1794144895,
+  "to": 4294967295,
+  "toId": "^all",
+  "transportMechanism": "TRANSPORT_LORA"
+}

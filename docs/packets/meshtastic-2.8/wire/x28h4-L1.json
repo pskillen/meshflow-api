@@ -1,0 +1,21 @@
+{
+  "channel": 0,
+  "decoded": {
+    "payload": "GAAiCKTZSKHZZy0L",
+    "portnum": "ROUTING_APP",
+    "requestId": 2416544809,
+    "routing": {
+      "ackProof": "pNlIodlnLQs=",
+      "errorReason": "NONE"
+    }
+  },
+  "from": 3769067321,
+  "fromId": "!e0a76739",
+  "hopLimit": 4,
+  "id": 729066805,
+  "pkiEncrypted": true,
+  "priority": "ACK",
+  "rxTime": 1794146643,
+  "to": 3769067321,
+  "toId": "!e0a76739"
+}
