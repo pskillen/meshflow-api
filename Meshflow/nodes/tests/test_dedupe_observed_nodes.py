@@ -104,6 +104,36 @@ def test_merge_keeps_keeper_identity_fields_and_names_when_only_placeholders_els
 
 
 @pytest.mark.django_db
+def test_merge_fills_a_blank_inferred_firmware_from_another_row():
+    keeper = _make(age_days=10, heard_days=5)
+    _make(
+        age_days=5,
+        heard_days=1,
+        inferred_firmware="2.8",
+        inferred_firmware_basis="key_identity",
+        inferred_firmware_at=timezone.now(),
+    )
+
+    merge_duplicate_meshtastic_nodes()
+
+    row = _rows().get()
+    assert row.pk == keeper.pk
+    assert (row.inferred_firmware, row.inferred_firmware_basis) == ("2.8", "key_identity")
+    assert row.inferred_firmware_at is not None
+
+
+@pytest.mark.django_db
+def test_merge_keeps_the_keepers_inferred_firmware():
+    _make(age_days=10, heard_days=5, inferred_firmware="2.7", inferred_firmware_basis="key_identity")
+    _make(age_days=5, heard_days=1, inferred_firmware="2.8", inferred_firmware_basis="predicted_id")
+
+    merge_duplicate_meshtastic_nodes()
+
+    row = _rows().get()
+    assert (row.inferred_firmware, row.inferred_firmware_basis) == ("2.7", "key_identity")
+
+
+@pytest.mark.django_db
 def test_merge_moves_fk_and_one_to_one_rows_to_keeper_without_integrity_errors(create_user):
     user = create_user()
     keeper = _make(age_days=10, heard_days=5)
