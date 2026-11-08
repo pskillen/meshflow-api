@@ -8,6 +8,7 @@ from rest_framework import generics, permissions, serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from common.feeder_metrics import API_MC_PREFIX, FeederApiUsageMixin
 from common.feeder_ws import COMMAND_DISPATCH_UNAVAILABLE, FEEDER_BOT_NOT_CONNECTED
 from meshcore_packets.models import MeshCoreRawPacket, MeshCoreTextPacket
 from meshcore_packets.permissions import MeshCoreFeederPermission
@@ -32,11 +33,13 @@ class MeshCoreFeederBotVersionSerializer(serializers.Serializer):
     bot_version = serializers.CharField(max_length=128, trim_whitespace=True)
 
 
-class MeshCoreFeederBotConfigView(APIView):
+class MeshCoreFeederBotConfigView(FeederApiUsageMixin, APIView):
     """Return operator config for the meshflow-bot linked to this MeshCore feeder."""
 
     authentication_classes = [NodeAPIKeyAuthentication]
     permission_classes = [MeshCoreFeederPermission]
+    feeder_api = API_MC_PREFIX
+    feeder_endpoint = "bot-config"
 
     def get(self, request, feeder_pubkey_prefix, format=None):
         managed_node = request.auth.node
@@ -48,11 +51,13 @@ class MeshCoreFeederBotConfigView(APIView):
         )
 
 
-class MeshCoreFeederBotVersionView(APIView):
+class MeshCoreFeederBotVersionView(FeederApiUsageMixin, APIView):
     """Update bot_version for the MeshCore feeder identified in the URL prefix."""
 
     authentication_classes = [NodeAPIKeyAuthentication]
     permission_classes = [MeshCoreFeederPermission]
+    feeder_api = API_MC_PREFIX
+    feeder_endpoint = "bot-version"
 
     def put(self, request, feeder_pubkey_prefix, format=None):
         return self._update(request)
@@ -91,11 +96,13 @@ class MeshCoreFeederBotVersionView(APIView):
         )
 
 
-class MeshCorePacketIngestView(APIView):
+class MeshCorePacketIngestView(FeederApiUsageMixin, APIView):
     """POST ingest for MeshCore feeder bots (API key + feeder pubkey prefix in URL)."""
 
     authentication_classes = [NodeAPIKeyAuthentication]
     permission_classes = [MeshCoreFeederPermission]
+    feeder_api = API_MC_PREFIX
+    feeder_endpoint = "ingest"
 
     def post(self, request, feeder_pubkey_prefix, format=None):
         if request.data.get("encrypted"):
@@ -155,11 +162,13 @@ class MeshCorePacketListView(generics.ListAPIView):
         return qs
 
 
-class MeshCoreMcChannelSyncView(APIView):
+class MeshCoreMcChannelSyncView(FeederApiUsageMixin, APIView):
     """POST device channel snapshot from feeder bot; reconciles API mirror."""
 
     authentication_classes = [NodeAPIKeyAuthentication]
     permission_classes = [MeshCoreFeederPermission]
+    feeder_api = API_MC_PREFIX
+    feeder_endpoint = "mc-channel-sync"
 
     def post(self, request, feeder_pubkey_prefix, format=None):
         managed_node = request.auth.node

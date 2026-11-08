@@ -11,6 +11,7 @@ from constellations.models import Constellation, MessageChannel
 from meshcore_packets.serializers_channel import FeederMcChannelMirrorSerializer
 from users.models import User
 
+from .api_key_linking import ApiKeyAlreadyLinked
 from .models import (
     AntennaPattern,
     DeviceMetrics,
@@ -335,6 +336,13 @@ class APIKeyCreateSerializer(serializers.ModelSerializer):
         if not user_can_manage_api_keys(user):
             raise serializers.ValidationError("Feeder or admin access required to create API keys.")
         return value
+
+    def validate(self, attrs):
+        # A key may be linked to only one feeder; refuse before any key row is created.
+        linked = set(attrs.get("nodes", [])) | set(attrs.get("managed_node_internal_ids", []))
+        if len(linked) > 1:
+            raise ApiKeyAlreadyLinked()
+        return attrs
 
     def create(self, validated_data):
         """Create a new API key with a randomly generated key and link it to nodes."""

@@ -210,6 +210,45 @@ class ManagedNode(models.Model):
         help_text=_("When set, this managed node was soft-deleted and no longer participates in ingest or listings."),
     )
 
+    class FeederApiGeneration(models.TextChoices):
+        """Which feeder URL family a bot last called (ADR-0005)."""
+
+        V2 = "v2", _("v2 (/api/packets/{node_id}/)")
+        V3 = "v3", _("v3 (/api/v3/packets/{node_id}/)")
+        MC_PREFIX = "mc_prefix", _("MeshCore prefix (/api/meshcore/feeders/{prefix}/)")
+        V4 = "v4", _("v4 (/api/v4/feeder/)")
+
+    feeder_api_generation = models.CharField(
+        max_length=16,
+        choices=FeederApiGeneration.choices,
+        null=True,
+        blank=True,
+        help_text=_("Feeder URL family this node's bot last used. Written at most every 10 minutes."),
+    )
+    feeder_api_last_used_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text=_("When this node's bot last called a feeder URL (any generation; 10-minute resolution)."),
+    )
+    legacy_api_last_used_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text=_("When this node's bot last called a legacy (pre-v4) feeder URL (10-minute resolution)."),
+    )
+    reported_meshtastic_node_id = models.BigIntegerField(
+        null=True,
+        blank=True,
+        help_text=_(
+            "Node number the bot last reported (X-Meshtastic-Feeder-Node-Num). Informational only: "
+            "never used for authorisation, and never copied into meshtastic_node_id."
+        ),
+    )
+    identity_reported_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text=_("When reported_meshtastic_node_id was last written."),
+    )
+
     class Meta:
         """Model metadata."""
 
