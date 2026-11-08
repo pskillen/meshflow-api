@@ -19,6 +19,45 @@ With coverage:
 python -m pytest -v --cov
 ```
 
+## Bot contract test
+
+`Meshflow/packets/tests/contract/test_bot_contract.py` (marker `contract`) checks that what the meshflow-bot sends is
+what this API's goldens (`docs/packets/meshtastic-2.8/`) expect. For every key in the golden manifest it:
+
+1. runs the bot's own serialiser (`MeshtasticPacketSerializer().serialise_raw_packet`) over the bot's capture subset and
+   compares the body with `wire/<key>.json` (and the bot's `replayed: true` flag body with `wire/<key>+flag.json`);
+2. checks the bot's replay classifier (`is_replayed`) agrees with the golden's `observation.replayed`;
+3. posts the bot-produced body through the real ingest and compares with `golden/<key>.json`;
+4. uploads five x28 NodeDB entries through the bot's node serialiser and checks a zeroed MAC and a 24-byte-cut long
+   name do not overwrite stored values.
+
+It needs a bot checkout (the bot's code used is standard library only, so none of its dependencies are installed):
+
+```bash
+cd Meshflow
+MESHFLOW_BOT_PATH=/path/to/meshflow-bot pytest --no-cov -q --create-db -m contract packets/tests/contract
+```
+
+Without `MESHFLOW_BOT_PATH` the module is skipped, so the ordinary suite is unaffected.
+
+CI runs it as `.github/workflows/contract.yaml`: on every PR and push to `main` against the bot ref pinned in
+`.github/contract/bot-ref` (a release tag, or a full commit SHA until a bot release contains the fixtures), nightly with
+API `main` against bot `main` (a drift signal), by hand with `workflow_dispatch` (`bot_ref` input), and from every
+meshflow-bot PR (bot head against API `main`).
+
+**Bumping the pin.** When a bot release ships or the bot's fixture data changes, open a PR that changes
+`.github/contract/bot-ref` (one line, no comments) and carries any golden updates the new bot needs. A change needing
+both sides lands API first (accepting old and new), then the bot, then the pin bump.
+
+| Failure | Meaning |
+| --- | --- |
+| `bot output changed: update the api goldens and bump .github/contract/bot-ref` | The bot's serialiser produces a different body from `wire/<key>.json`. The diff is printed. Either the bot change is a regression, or regenerate the wire file and golden and bump the pin. |
+| `api manifest keys missing from the bot's subset.json` | A golden exists for a capture the bot no longer ships. |
+| `new bot fixture: add a golden for ...` | The bot added a capture with no API golden; add it so it cannot go untested. |
+| `bot is_replayed=... but the api golden has replayed=...` | The bot's and the API's replay rules disagree. |
+| An ingest mismatch | The API's behaviour for the same body changed; update the golden only if that is intended. |
+| `the API now has a top-level 'src' / 'tools' package` | Name clash with the bot's import path; change how the test imports the bot. |
+
 ## Integration tests
 
 Integration tests live in `tests/integration/` and call the API over HTTP. They require:

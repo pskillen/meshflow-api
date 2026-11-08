@@ -63,6 +63,14 @@ git diff docs/packets/meshtastic-2.8   # read every change; nothing should move 
 
 Regenerating on unchanged code changes nothing.
 
+## Contract job
+
+The `contract` CI job (`.github/workflows/contract.yaml`, test in `Meshflow/packets/tests/contract/`) replays the bot's
+capture subset through the bot's serialiser and this API's ingest and compares with these `wire/` and `golden/` files,
+so a break fails CI in whichever repo caused it. The API pins the bot ref it is tested against in
+`.github/contract/bot-ref`; the bot's PRs run against API `main`. Changing a wire body or golden here means bumping the
+pin in the same PR. See `tests/TESTING.md` ("Bot contract test").
+
 ## Label meanings
 
 Labels come from the bot's subset (`labels` in `manifest.json`):
