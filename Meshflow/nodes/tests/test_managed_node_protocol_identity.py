@@ -101,26 +101,20 @@ def test_api_key_add_node_by_internal_id(create_user, create_managed_node, creat
         protocol=Protocol.MESHCORE,
         mc_pubkey="e" * 64,
     )
-    node_b = create_managed_node(
-        constellation=constellation,
-        protocol=Protocol.MESHCORE,
-        mc_pubkey="f" * 64,
-    )
     api_key = create_node_api_key(constellation=constellation, owner=user)
     client = APIClient()
     client.force_authenticate(user=user)
 
-    for managed in (node_a, node_b):
-        resp = client.post(
-            reverse("api-keys-add-node", kwargs={"pk": api_key.id}),
-            {"managed_node_internal_id": str(managed.internal_id)},
-            format="json",
-        )
-        assert resp.status_code == status.HTTP_201_CREATED, resp.data
+    resp = client.post(
+        reverse("api-keys-add-node", kwargs={"pk": api_key.id}),
+        {"managed_node_internal_id": str(node_a.internal_id)},
+        format="json",
+    )
+    assert resp.status_code == status.HTTP_201_CREATED, resp.data
 
     detail = client.get(reverse("api-keys-detail", kwargs={"pk": api_key.id}))
     linked = {row["internal_id"] for row in detail.data["linked_managed_nodes"]}
-    assert linked == {str(node_a.internal_id), str(node_b.internal_id)}
+    assert linked == {str(node_a.internal_id)}
     assert detail.data["nodes"] == []
 
 

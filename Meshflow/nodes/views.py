@@ -43,6 +43,11 @@ from common.observed_node_lookup import (
 from common.protocol import Protocol
 from common.throttling import guest_read_throttles
 from meshcore_packets.models import MeshCorePacketObservation
+from nodes.api_key_linking import (
+    API_KEY_ALREADY_LINKED_CODE,
+    API_KEY_ALREADY_LINKED_MESSAGE,
+    api_key_can_link,
+)
 from nodes.constants import INFRASTRUCTURE_ROLES
 from nodes.models import (
     DeviceMetrics,
@@ -211,6 +216,13 @@ class APIKeyViewSet(viewsets.ModelViewSet):
         if NodeAuth.objects.filter(api_key=api_key, node=node).exists():
             return Response(
                 {"error": "Node is already linked to this API key"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # A key may be linked to only one active feeder (existing shared links keep working)
+        if not api_key_can_link(api_key, node):
+            return Response(
+                {"error": API_KEY_ALREADY_LINKED_MESSAGE, "code": API_KEY_ALREADY_LINKED_CODE},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
