@@ -24,8 +24,18 @@ WORKED_EXAMPLE_PREDICTED = "!4396524c"
 
 
 def test_worked_example_predicts_expected_id():
-    """!da545c78 is predicted to become !4396524c (zlib equivalence still unverified on hardware)."""
+    """!da545c78 is predicted to become !4396524c (zlib equals the firmware's crc32, confirmed on hardware 2026-11-08)."""
     assert meshtastic_id_to_hex(key_node_id(WORKED_EXAMPLE_B64)) == WORKED_EXAMPLE_PREDICTED
+
+
+def test_hardware_confirmed_xiao_key_predicts_its_2_8_number():
+    """The Xiao (NIAV-1), updated 2.7.26 -> 2.8.2 on 2026-11-08, reported !e0a76739 for this key."""
+    assert key_node_id("PYjx6JkBQKnt7197Yx55ZcD4ZshAG8fOHQy5Q3DwGww=") == 0xE0A76739
+
+
+def test_hardware_confirmed_rekeyed_xiao_key_predicts_its_number():
+    """After a re-key on 2.8.2 the radio reported !faec6f41; predicted from the new key before the write."""
+    assert key_node_id("tHG7yKuK6bw2JfyKLtd5e7+uWGbPfsr0B1F4Av0zOWY=") == 0xFAEC6F41
 
 
 def test_base64_and_hex_agree():

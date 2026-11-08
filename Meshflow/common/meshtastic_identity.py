@@ -4,8 +4,10 @@ Meshtastic 2.8 firmware derives a node's number from the CRC-32 of its 32-byte C
 (``NodeDB.cpp`` ``createNewIdentity()``). Upgrades reuse the existing private key, so the number a node
 will have after upgrading can be predicted from a public key we already store.
 
-NOTE: the firmware uses its own ``ErriezCRC32``. That ``zlib.crc32`` gives the same value is inferred from
-source and the worked example (``!da545c78`` -> ``!4396524c``), and is **not yet confirmed on hardware**.
+NOTE: the firmware uses its own ``ErriezCRC32``. That ``zlib.crc32`` gives the same value is **confirmed on hardware
+(2026-11-08)**: a 2.7.26 node updated to 2.8.2 took the number predicted from its stored key, a re-key predicted from
+the new public key before the write gave the number the radio then reported, and a wild 2.8 sender's number equals the
+crc32 of its broadcast key. The worked example is ``!da545c78`` -> ``!4396524c``.
 See docs/features/packet-ingestion/adr/0006-meshtastic-identity-linking.md.
 """
 
