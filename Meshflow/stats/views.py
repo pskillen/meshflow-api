@@ -20,6 +20,7 @@ from common.mesh_node_helpers import meshtastic_id_to_hex
 from common.protocol import Protocol
 from common.throttling import GUEST_EXPENSIVE_THROTTLE_CLASSES, GUEST_READ_THROTTLE_CLASSES
 from nodes.models import ManagedNode, ObservedNode
+from nodes.services.observed_nodes import get_meshtastic_observed_node
 from packets.models import MtRawPacket, PacketObservation
 
 from .models import StatsSnapshot
@@ -141,10 +142,8 @@ def node_packet_stats(request, node_id: int):
     Returns:
         Response containing packet statistics grouped by time intervals
     """
-    try:
-        # Validate node exists
-        ObservedNode.objects.get(meshtastic_node_id=node_id, protocol=Protocol.MESHTASTIC)
-    except ObservedNode.DoesNotExist:
+    # Validate node exists
+    if get_meshtastic_observed_node(node_id) is None:
         return Response({"status": "error", "message": "Node not found"}, status=status.HTTP_404_NOT_FOUND)
 
     try:

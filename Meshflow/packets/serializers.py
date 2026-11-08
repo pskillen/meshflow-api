@@ -51,6 +51,25 @@ def convert_timestamp(timestamp):
         raise serializers.ValidationError({"timestamp": f"Invalid timestamp: {str(e)}"})
 
 
+def resolve_reading_time(validated_data):
+    """Set ``reading_time`` on a telemetry packet's validated data, in place.
+
+    Protobuf3 drops zero values, so a node with no clock sends no ``time`` (or
+    ``0``/``null``). In that case the reading time is the packet's ``rx_time``
+    (already a datetime). When ``rx_time`` is missing too, ``reading_time`` is
+    left unset and the model rejects the packet as before.
+    """
+    raw = validated_data.get("reading_time")
+    if raw:
+        validated_data["reading_time"] = convert_timestamp(raw)
+        return
+    rx_time = validated_data.get("rx_time")
+    if rx_time is not None:
+        validated_data["reading_time"] = rx_time
+    else:
+        validated_data.pop("reading_time", None)
+
+
 def convert_location_source(source):
     """Convert a location source string to its integer value."""
     if not source:
@@ -453,7 +472,7 @@ class DeviceMetricsPacketSerializer(BasePacketSerializer):
                 uptimeSeconds = serializers.IntegerField(source="uptime_seconds", required=False, allow_null=True)
 
             deviceMetrics = DeviceMetricsSerializer()
-            time = serializers.IntegerField(source="reading_time")
+            time = serializers.IntegerField(source="reading_time", required=False, allow_null=True)
 
         telemetry = TelemetrySerializer()
 
@@ -475,9 +494,7 @@ class DeviceMetricsPacketSerializer(BasePacketSerializer):
             # add the rest of the telemetry data
             validated_data.update(telemetry_data)
 
-        # Convert reading_time to a datetime object
-        if "reading_time" in validated_data:
-            validated_data["reading_time"] = convert_timestamp(validated_data["reading_time"])
+        resolve_reading_time(validated_data)
 
         return validated_data
 
@@ -545,7 +562,7 @@ class LocalStatsPacketSerializer(BasePacketSerializer):
                 noiseFloor = serializers.IntegerField(source="noise_floor", required=False, allow_null=True)
 
             localStats = LocalStatsSerializer()
-            time = serializers.IntegerField(source="reading_time")
+            time = serializers.IntegerField(source="reading_time", required=False, allow_null=True)
 
         telemetry = TelemetrySerializer()
 
@@ -567,9 +584,7 @@ class LocalStatsPacketSerializer(BasePacketSerializer):
             # add the rest of the telemetry data
             validated_data.update(telemetry_data)
 
-        # Convert reading_time to a datetime object if it exists
-        if "reading_time" in validated_data and validated_data["reading_time"] is not None:
-            validated_data["reading_time"] = convert_timestamp(validated_data["reading_time"])
+        resolve_reading_time(validated_data)
 
         return validated_data
 
@@ -650,7 +665,7 @@ class EnvironmentMetricsPacketSerializer(BasePacketSerializer):
                 soilTemperature = serializers.FloatField(source="soil_temperature", required=False, allow_null=True)
 
             environmentMetrics = EnvironmentMetricsSerializer()
-            time = serializers.IntegerField(source="reading_time")
+            time = serializers.IntegerField(source="reading_time", required=False, allow_null=True)
 
         telemetry = TelemetrySerializer()
 
@@ -666,8 +681,7 @@ class EnvironmentMetricsPacketSerializer(BasePacketSerializer):
             if "time" in telemetry_data:
                 validated_data["reading_time"] = telemetry_data["time"]
             validated_data.update(telemetry_data)
-        if "reading_time" in validated_data and validated_data["reading_time"] is not None:
-            validated_data["reading_time"] = convert_timestamp(validated_data["reading_time"])
+        resolve_reading_time(validated_data)
         return validated_data
 
     def create(self, validated_data):
@@ -753,7 +767,7 @@ class AirQualityMetricsPacketSerializer(BasePacketSerializer):
                 particlesTps = serializers.FloatField(source="particles_tps", required=False, allow_null=True)
 
             airQualityMetrics = AirQualityMetricsSerializer()
-            time = serializers.IntegerField(source="reading_time")
+            time = serializers.IntegerField(source="reading_time", required=False, allow_null=True)
 
         telemetry = TelemetrySerializer()
 
@@ -769,8 +783,7 @@ class AirQualityMetricsPacketSerializer(BasePacketSerializer):
             if "time" in telemetry_data:
                 validated_data["reading_time"] = telemetry_data["time"]
             validated_data.update(telemetry_data)
-        if "reading_time" in validated_data and validated_data["reading_time"] is not None:
-            validated_data["reading_time"] = convert_timestamp(validated_data["reading_time"])
+        resolve_reading_time(validated_data)
         return validated_data
 
     def create(self, validated_data):
@@ -844,7 +857,7 @@ class PowerMetricsPacketSerializer(BasePacketSerializer):
                 ch8Current = serializers.FloatField(source="ch8_current", required=False, allow_null=True)
 
             powerMetrics = PowerMetricsSerializer()
-            time = serializers.IntegerField(source="reading_time")
+            time = serializers.IntegerField(source="reading_time", required=False, allow_null=True)
 
         telemetry = TelemetrySerializer()
 
@@ -860,8 +873,7 @@ class PowerMetricsPacketSerializer(BasePacketSerializer):
             if "time" in telemetry_data:
                 validated_data["reading_time"] = telemetry_data["time"]
             validated_data.update(telemetry_data)
-        if "reading_time" in validated_data and validated_data["reading_time"] is not None:
-            validated_data["reading_time"] = convert_timestamp(validated_data["reading_time"])
+        resolve_reading_time(validated_data)
         return validated_data
 
     def create(self, validated_data):
@@ -913,7 +925,7 @@ class HealthMetricsPacketSerializer(BasePacketSerializer):
                 temperature = serializers.FloatField(required=False, allow_null=True)
 
             healthMetrics = HealthMetricsSerializer()
-            time = serializers.IntegerField(source="reading_time")
+            time = serializers.IntegerField(source="reading_time", required=False, allow_null=True)
 
         telemetry = TelemetrySerializer()
 
@@ -929,8 +941,7 @@ class HealthMetricsPacketSerializer(BasePacketSerializer):
             if "time" in telemetry_data:
                 validated_data["reading_time"] = telemetry_data["time"]
             validated_data.update(telemetry_data)
-        if "reading_time" in validated_data and validated_data["reading_time"] is not None:
-            validated_data["reading_time"] = convert_timestamp(validated_data["reading_time"])
+        resolve_reading_time(validated_data)
         return validated_data
 
     def create(self, validated_data):
@@ -975,7 +986,7 @@ class HostMetricsPacketSerializer(BasePacketSerializer):
                 userString = serializers.CharField(source="user_string", required=False, allow_null=True)
 
             hostMetrics = HostMetricsSerializer()
-            time = serializers.IntegerField(source="reading_time")
+            time = serializers.IntegerField(source="reading_time", required=False, allow_null=True)
 
         telemetry = TelemetrySerializer()
 
@@ -991,8 +1002,7 @@ class HostMetricsPacketSerializer(BasePacketSerializer):
             if "time" in telemetry_data:
                 validated_data["reading_time"] = telemetry_data["time"]
             validated_data.update(telemetry_data)
-        if "reading_time" in validated_data and validated_data["reading_time"] is not None:
-            validated_data["reading_time"] = convert_timestamp(validated_data["reading_time"])
+        resolve_reading_time(validated_data)
         return validated_data
 
     def create(self, validated_data):
@@ -1051,7 +1061,7 @@ class TrafficManagementStatsPacketSerializer(BasePacketSerializer):
                 )
 
             trafficManagementStats = TrafficManagementStatsSerializer()
-            time = serializers.IntegerField(source="reading_time")
+            time = serializers.IntegerField(source="reading_time", required=False, allow_null=True)
 
         telemetry = TelemetrySerializer()
 
@@ -1067,8 +1077,7 @@ class TrafficManagementStatsPacketSerializer(BasePacketSerializer):
             if "time" in telemetry_data:
                 validated_data["reading_time"] = telemetry_data["time"]
             validated_data.update(telemetry_data)
-        if "reading_time" in validated_data and validated_data["reading_time"] is not None:
-            validated_data["reading_time"] = convert_timestamp(validated_data["reading_time"])
+        resolve_reading_time(validated_data)
         return validated_data
 
     def create(self, validated_data):

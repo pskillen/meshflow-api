@@ -20,6 +20,7 @@ from common.mesh_node_helpers import MESHTASTIC_BROADCAST_ID
 from common.protocol import Protocol
 from common.throttling import GUEST_READ_THROTTLE_CLASSES
 from nodes.models import ManagedNode, NodeOwnerClaim, ObservedNode
+from nodes.services.observed_nodes import get_meshtastic_observed_node
 
 from .models import AutoTraceRoute
 from .permission_helpers import get_triggerable_nodes_queryset, user_can_trigger_from_node
@@ -74,9 +75,10 @@ def traceroute_list(request):
     target_node = request.query_params.get("target_node")
     if target_node:
         try:
-            on = ObservedNode.objects.get(meshtastic_node_id=int(target_node))
-            qs = qs.filter(target_node=on)
-        except ValueError, ObservedNode.DoesNotExist:
+            on = get_meshtastic_observed_node(int(target_node))
+            if on is not None:
+                qs = qs.filter(target_node=on)
+        except ValueError:
             pass
 
     status_filter = request.query_params.get("status")
@@ -244,9 +246,8 @@ def traceroute_trigger(request):
         )
 
     if target_node_id is not None:
-        try:
-            target_node = ObservedNode.objects.get(meshtastic_node_id=target_node_id)
-        except ObservedNode.DoesNotExist:
+        target_node = get_meshtastic_observed_node(target_node_id)
+        if target_node is None:
             return Response(
                 {"target_node_id": ["ObservedNode with this node_id not found."]},
                 status=status.HTTP_404_NOT_FOUND,
