@@ -51,7 +51,7 @@ bot's `MeshtasticPacketSerializer.serialise_raw_packet` with `time.time` patched
 - `nls` holds the sender's `NodeLatestStatus` fields that changed. `observed_node` is the sender's row (non-time
   fields), null when none was created. A 304 golden has `packet: null`.
 - The DX-detection and new-node-baseline entry points are patched where they are looked up; the sender is a new node,
-  so the baseline is queued for every live packet.
+  so the baseline is queued for every live packet. Self goldens (`kind:self`) use a bare `ManagedNode` setup, so the feeder's own packet creates its `ObservedNode` and the new-node, DX and baseline effects fire; in production that node already exists.
 
 ## Regenerating
 
@@ -80,8 +80,8 @@ Labels come from the bot's subset (`labels` in `manifest.json`):
 | `kind:live` / `kind:replay` / `kind:self` | Heard on air / 2.8 connect-time replay / the feeder's own packet |
 | `port:<APP>`, `variant:<x>` | Portnum, and the telemetry variant |
 | `sender-id:mac` / `crc32` / `unknown` | How the sender's number was derived: from its MAC (2.7), from the crc32 of its key (2.8), or unknown (no user record, or only a zeroed MAC) |
-| `from-id-null` | `fromId` is present and null (the API then stores `from_str` null) |
-| `hops-exhausted` | `hopLimit` absent: proto3 drops zero, so the real value is 0 and the API records `hop_limit` null (hop count unknown) |
+| `from-id-null` | `fromId` is present and null (known gap: the API stores `from_str` null instead of deriving it from `from`) |
+| `hops-exhausted` | live packets only: `hopLimit` absent, proto3 drops zero, so the real value is 0, yet the API records `hop_limit` null (known gap: hop count unknown). On replays the absent `hopLimit` is firmware-fabricated, not an exhausted packet |
 | `fake-direct` | A replay whose hop fields look direct (`hopStart == hopLimit`); the API reports no hop count and not direct |
 | `stable-replay-id` | A replay keeps the same packet id across reconnects |
 | `no-rx-time` | The capture has no `rxTime`; the bot fills it from its clock, so the API sees one |

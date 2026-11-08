@@ -1,11 +1,10 @@
 # Meshtastic 2.8 feeder upgrade runbook
 
-> **DRAFT. Do not follow this to upgrade a production feeder yet.** It describes **planned** behaviour: most of the API and bot support it relies on is not built or deployed. Nothing here has been run on hardware.
+> **DRAFT. Do not follow this to upgrade a production feeder yet.** It describes **planned** behaviour: most of the API and bot support it relies on is not built or deployed. Only the identity checks (crc32 node number, re-key, downgrade and re-upgrade) have been run on hardware; the rest has not.
 >
 > **Pending before this is final:**
 >
-> - Results of the hardware session (identity snapshots, whether `crc32(public key)` equals the node number, mid-session key mint, 403 behaviour, signing and Traffic Management captures).
-> - Rollback findings (what a 2.8 to 2.7 downgrade does to the node number and config). Step 7 is a placeholder until then.
+> - Remaining results of the hardware session (mid-session key mint, 403 behaviour, signing and Traffic Management captures). Done: `crc32(public key)` equals the node number, and the rollback findings (step 7).
 > - Whether the Heltec 2.8.2 update keeps the key without an erase.
 > - Bot version numbers: every "bot version TBD" below is a placeholder.
 > - Whether the bot can tell a feeder's local telemetry from its broadcast telemetry (open question; see step 5).
@@ -18,7 +17,7 @@ Part of [packet ingestion](README.md). Design background: [ADR-0005 feeder-scope
 
 In Meshtastic 2.8 a node's number is `crc32(public key)`, so an upgraded feeder's number changes. A feeder that still posts under its old number on a legacy URL gets a 403 and stops ingesting without any visible error. 2.8 also changes what the feeder radio passes to the bot (Traffic Management drops some packets before the bot, broadcast telemetry and public positions are switched off on upgrade, signing fields appear). The steps below keep ingest running and the node's history attached.
 
-The firmware facts come from the 2.8.2 source and release notes; they have not been exercised on our hardware yet. 2.8.1 and 2.8.2 are both Alpha releases; the latest stable-track release is still 2.7.x. Decide separately whether a feeder should run an alpha.
+The firmware facts come from the 2.8.2 source and release notes; apart from the identity checks noted at the top, they have not been exercised on our hardware yet. 2.8.1 and 2.8.2 are both Alpha releases; the latest stable-track release is still 2.7.x. Decide separately whether a feeder should run an alpha.
 
 ## Hardware plan for the first runs
 
@@ -95,7 +94,7 @@ If ingest is not 200, check in this order: bot is on a v4 URL; key is the feeder
 
 Findings from the hardware session (2026-11-08, one Xiao, 2.8.2 to 2.7.26 and back):
 
-- A 2.8.2 to 2.7.26 downgrade in update mode (no erase) **keeps the crc32 number** (`!faec6f41`), the key, the owner, the region and the channels. It does not revert to the MAC-based number, so the API sees no reversion: the identity link logic needs no special case.
+- A 2.8.2 to 2.7.26 downgrade in update mode (no erase) **keeps the crc32 number** on a re-keyed node (`!faec6f41`; a plain update-then-downgrade was not run), the key, the owner, the region and the channels. It does not revert to the MAC-based number, so the API saw no reversion; the identity link logic is expected to need no special case.
 - A later 2.7 to 2.8 re-upgrade keeps the identity but **empties the NodeDB** (device state version 24 and 25 differ). Expect the feeder to hear its mesh again from scratch, and the 2.8 connect-time replay to be small until the NodeDB refills.
 - 2.8.2 ignores the 1200-baud DFU touch. Run `meshtastic --enter-dfu` first, then flash.
 
