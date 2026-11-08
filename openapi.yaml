@@ -2851,10 +2851,10 @@ components:
           nullable: true
         direct_from_sender:
           type: boolean
-          description: Whether the packet was heard directly from the sender
+          description: Whether the packet was heard directly from the sender. False when the hop count is unknown (hop_start 0 with no bitfield)
         hop_count:
           type: integer
-          description: The number of hops the packet took to reach the observer
+          description: The number of hops the packet took to reach the observer. Null when unknown (hop_start 0 with no bitfield)
           nullable: true
         observer_position:
           $ref: '#/components/schemas/MapPosition'

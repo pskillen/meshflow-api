@@ -20,6 +20,24 @@ All packet types share these common fields:
 | toId       | string    | Recipient's node ID      | String format, "^all" for broadcast |
 | raw        | string    | Raw packet data          | Text format of the complete packet  |
 
+### Hops, `decoded.bitfield` and unknown hop counts
+
+`decoded.bitfield` (2.8+ firmware, any port) is stored on `PacketObservation.bitfield`. Absent stays null, which is
+different from `0`.
+
+2.8 HopScaling lowers `hopStart` on broadcast POSITION, TELEMETRY, NODEINFO and NEIGHBORINFO packets depending on
+mesh density, and a 2.8 relay can send `hopStart == 0` on a packet that travelled. So **`hopStart == 0` with no
+bitfield means the hop count is unknown**, not direct:
+
+- `hop_count` in the observation API is null and `direct_from_sender` is false;
+- DX detection does not treat the observation as direct;
+- `hopStart == 0` with a bitfield (even `0`) is a real zero: `hopLimit == 0` then means direct.
+
+`NodeLatestStatus.meshtastic_inferred_max_hops` (with `_at` and `_source`, the port name) ignores unknown-hop,
+inconsistent (`hopStart < hopLimit`) and MQTT observations. TEXT_MESSAGE, TRACEROUTE, ROUTING, ADMIN and generic
+ports are authoritative and can lower it. POSITION, TELEMETRY, NODEINFO and NEIGHBORINFO may only raise it, and only
+when no authoritative value is younger than 7 days.
+
 ## Packet Type Specific Fields
 
 ### NODEINFO_APP

@@ -91,6 +91,7 @@ cluster.
 - Usable observer and destination positions when distance-based rules need them.
 - Packet hop metadata, especially whether the packet was observed with zero
   remaining intermediate hops between sender and managed observer.
+  An observation with `hop_start == 0` and no bitfield has an unknown hop count and is never treated as direct.
 
 The detector ignores packets that do not have a usable `from_int`, do not have a
 `PacketObservation`, do not have a `first_reported_time`, or are observations of
