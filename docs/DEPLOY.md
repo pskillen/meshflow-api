@@ -41,3 +41,13 @@ In Portainer an exited migrations container must be **recreated with a re-pulled
 image"), not just started: starting it again reruns the old image and applies nothing new.
 
 Downtime until migrations run is accepted; serving against the wrong schema is not.
+
+## Post-deploy data commands
+
+Run these once per environment after the deploy that introduces them. Back up the database first, run with
+`--dry-run` and read the report, then run for real. **Pre-prod first.** All are idempotent.
+
+| Command | Since | What it does |
+| --- | --- | --- |
+| `python manage.py backfill_meshtastic_identity [--dry-run]` | 2.2.0 | Fills the normalised key and predicted 2.8 node id on observed and managed nodes ([details](features/packet-ingestion/meshtastic.md#identity-evidence-and-predicted-28-node-id)). |
+| `python manage.py dedupe_observed_nodes [--dry-run] [--batch-size N]` | 2.2.3 | Merges duplicate Meshtastic `ObservedNode` rows (same node number) into the oldest row and re-points their related rows. Sets whose rows have different `claimed_by` owners are skipped and listed: resolve those by hand, then re-run. Must be clean before the unique-constraint migration ships. |
