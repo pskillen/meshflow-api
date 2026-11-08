@@ -25,7 +25,7 @@ entries, by `key`). One physical radio (NIAV-1) was captured across an upgrade a
 `wire/` is generated, not hand-written. `Meshflow/packets/tests/gen_meshtastic_wire.py --bot <meshflow-bot checkout>`
 loads the bot's `subset.json` through the bot's `tools/meshtastic_fixtures/load.py` and runs each packet through the
 bot's `MeshtasticPacketSerializer.serialise_raw_packet` with `time.time` patched to the entry's `t_host`, so the
-`rxTime` fallback is reproducible. Run it by hand, not in CI; the bot commit is recorded in `manifest.json`.
+`rxTime` fallback is reproducible. Run it by hand, not in CI; the bot commit is recorded in `manifest.json`. To use the pinned bot, check it out at `.github/contract/bot-ref` (recipe in `tests/TESTING.md`, "Bot contract test").
 
 ## The golden format
 
@@ -68,7 +68,7 @@ Regenerating on unchanged code changes nothing.
 The `contract` CI job (`.github/workflows/contract.yaml`, test in `Meshflow/packets/tests/contract/`) replays the bot's
 capture subset through the bot's serialiser and this API's ingest and compares with these `wire/` and `golden/` files,
 so a break fails CI in whichever repo caused it. The API pins the bot ref it is tested against in
-`.github/contract/bot-ref`; the bot's PRs run against API `main`. Changing a wire body or golden here means bumping the
+`.github/contract/bot-ref`; once the bot's PR job lands (not merged yet) the bot's PRs will run against API `main`. Changing a wire body or golden here means bumping the
 pin in the same PR. See `tests/TESTING.md` ("Bot contract test").
 
 ## Label meanings

@@ -38,11 +38,18 @@ cd Meshflow
 MESHFLOW_BOT_PATH=/path/to/meshflow-bot pytest --no-cov -q --create-db -m contract packets/tests/contract
 ```
 
+To test against the ref CI uses, clone the bot and check out the pin (from the API repo root):
+
+```bash
+git clone https://github.com/pskillen/meshflow-bot.git /path/to/meshflow-bot
+git -C /path/to/meshflow-bot checkout "$(cat .github/contract/bot-ref)"
+```
+
 Without `MESHFLOW_BOT_PATH` the module is skipped, so the ordinary suite is unaffected.
 
 CI runs it as `.github/workflows/contract.yaml`: on every PR and push to `main` against the bot ref pinned in
 `.github/contract/bot-ref` (a release tag, or a full commit SHA until a bot release contains the fixtures), nightly with
-API `main` against bot `main` (a drift signal), by hand with `workflow_dispatch` (`bot_ref` input), and from every
+API `main` against bot `main` (a drift signal), by hand with `workflow_dispatch` (`bot_ref` input), and, once the bot's PR job lands (not merged yet), from every
 meshflow-bot PR (bot head against API `main`).
 
 **Bumping the pin.** When a bot release ships or the bot's fixture data changes, open a PR that changes
@@ -51,11 +58,12 @@ both sides lands API first (accepting old and new), then the bot, then the pin b
 
 | Failure | Meaning |
 | --- | --- |
-| `bot output changed: update the api goldens and bump .github/contract/bot-ref` | The bot's serialiser produces a different body from `wire/<key>.json`. The diff is printed. Either the bot change is a regression, or regenerate the wire file and golden and bump the pin. |
+| `bot output changed: update the api goldens and bump .github/contract/bot-ref` | The bot's serialiser produces a different body from `wire/<key>.json`. The diff is printed. Either the bot change is a regression, or regenerate and bump the pin: `python packets/tests/gen_meshtastic_wire.py --bot <bot>` for `wire/` and `manifest.json`, then `MESHFLOW_REGEN_GOLDENS=1 pytest packets/tests/test_meshtastic_goldens.py` for `golden/` (see `docs/packets/meshtastic-2.8/README.md`). |
 | `api manifest keys missing from the bot's subset.json` | A golden exists for a capture the bot no longer ships. |
 | `new bot fixture: add a golden for ...` | The bot added a capture with no API golden; add it so it cannot go untested. |
 | `bot is_replayed=... but the api golden has replayed=...` | The bot's and the API's replay rules disagree. |
 | An ingest mismatch | The API's behaviour for the same body changed; update the golden only if that is intended. |
+| `has no docs/meshtastic_packets/2.8/subset.json`, `bot captures.json has no capture`, `has no nodedb.json`, `bot API changed: ...` | `MESHFLOW_BOT_PATH` is wrong, or the bot moved a fixture or module the test uses; update the lookup or imports in `test_bot_contract.py`. |
 | `the API now has a top-level 'src' / 'tools' package` | Name clash with the bot's import path; change how the test imports the bot. |
 
 ## Integration tests
