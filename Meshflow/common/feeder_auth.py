@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Optional
 from rest_framework import permissions
 from rest_framework.exceptions import PermissionDenied
 
+from common.feeder_metrics import API_V4, record_feeder_auth_rejection
 from common.protocol import Protocol
 from nodes.models import NodeAuth
 
@@ -94,6 +95,7 @@ class FeederScopedPermission(permissions.BasePermission):
         try:
             node = resolve_single_feeder(request.auth, protocol=getattr(view, "feeder_protocol", None))
         except FeederResolutionError as exc:
+            record_feeder_auth_rejection(api=API_V4, code=exc.code)
             raise PermissionDenied(detail={"detail": exc.detail, "code": exc.code}) from exc
 
         request.auth.node = node
