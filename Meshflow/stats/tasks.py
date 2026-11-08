@@ -1,17 +1,26 @@
 """Celery tasks for stats snapshot collection."""
 
+import datetime as dt
 import logging
 import os
+import time
 import uuid
 from datetime import datetime, timedelta
 from typing import Optional
 
 from django.db.models import Count, Exists, OuterRef, Q
+from django.db.models.functions import TruncDate
 from django.utils import timezone
 
 from celery import shared_task
 from tqdm import tqdm
 
+from common.meshtastic_firmware import (
+    ADOPTION_WINDOW_HOURS,
+    BASIS_FEEDER_REPORT,
+    BASIS_KEY_IDENTITY,
+    BASIS_PREDICTED_ID,
+)
 from common.protocol import Protocol
 from constellations.models import Constellation
 from meshcore_packets.models import MeshCorePacketObservation, MeshCorePayloadType, MeshCoreRawPacket
@@ -492,6 +501,151 @@ def _collect_mc_new_nodes(
     return (created, skipped)
 
 
+NODE_FIRMWARE_STAT = "node_firmware"
+NODE_FIRMWARE_HOUR_UTC = 0
+
+UNKNOWN_FIRMWARE = "unknown"
+NO_BASIS = "none"
+
+
+def _node_firmware_value(rows) -> dict:
+    """
+    Build the node_firmware snapshot value from (firmware, basis, count) rows.
+
+    by_type keys are open (a new generation appears without an API change); null firmware is "unknown".
+    by_basis seeds the known bases at 0; feeder_report is written as "reported" and null as "none".
+    """
+    by_type: dict[str, int] = {}
+    by_basis: dict[str, int] = {
+        BASIS_KEY_IDENTITY: 0,
+        BASIS_PREDICTED_ID: 0,
+        "reported": 0,
+        NO_BASIS: 0,
+    }
+    total = 0
+    for firmware, basis, count in rows:
+        type_key = firmware or UNKNOWN_FIRMWARE
+        if basis is None:
+            basis_key = NO_BASIS
+        elif basis == BASIS_FEEDER_REPORT:
+            basis_key = "reported"
+        else:
+            basis_key = basis
+        by_type[type_key] = by_type.get(type_key, 0) + count
+        by_basis[basis_key] = by_basis.get(basis_key, 0) + count
+        total += count
+    return {
+        "count": total,
+        "window_hours": ADOPTION_WINDOW_HOURS,
+        "by_type": by_type,
+        "by_basis": by_basis,
+    }
+
+
+def _collect_node_firmware(
+    recorded_at: datetime,
+    *,
+    run_id: Optional[uuid.UUID] = None,
+    skip_existing: bool = False,
+) -> tuple[int, int]:
+    """
+    Collect the daily global node_firmware snapshot. Returns (created, skipped).
+
+    recorded_at is midnight UTC of the day it runs. The window has no upper bound on last_heard:
+    last_heard only moves forward, so a bound would drop nodes heard just after midnight.
+    """
+    if skip_existing and _snapshot_exists(recorded_at, NODE_FIRMWARE_STAT, None):
+        return (0, 1)
+    rows = (
+        ObservedNode.objects.filter(
+            protocol=Protocol.MESHTASTIC,
+            last_heard__gte=recorded_at - timedelta(hours=ADOPTION_WINDOW_HOURS),
+        )
+        .values("inferred_firmware", "inferred_firmware_basis")
+        .annotate(n=Count("internal_id"))
+        .values_list("inferred_firmware", "inferred_firmware_basis", "n")
+    )
+    StatsSnapshot.objects.create(
+        recorded_at=recorded_at,
+        stat_type=NODE_FIRMWARE_STAT,
+        constellation=None,
+        value=_node_firmware_value(rows),
+        run_id=run_id,
+    )
+    return (1, 0)
+
+
+def backfill_node_firmware_snapshots(days: int = 90, dry_run: bool = False) -> dict:
+    """
+    Backfill daily node_firmware snapshots for the last ``days`` midnights (UTC), idempotently.
+
+    One query against MtRawPacket gives the (day, from_int) pairs; active sets are unioned in Python.
+    History uses today's classification of each node.
+    """
+    utc = dt.timezone.utc
+    end = timezone.now().astimezone(utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    targets = [end - timedelta(days=i) for i in range(days - 1, -1, -1)]
+    window_days = ADOPTION_WINDOW_HOURS // 24
+    scan_start = targets[0] - timedelta(days=window_days)
+
+    started = time.monotonic()
+    nodes_by_day: dict = {}
+    scanned = 0
+    pairs = (
+        MtRawPacket.objects.filter(first_reported_time__gte=scan_start, first_reported_time__lt=end)
+        .annotate(day=TruncDate("first_reported_time", tzinfo=utc))
+        .values_list("day", "from_int")
+        .distinct()
+        .iterator(chunk_size=5000)
+    )
+    for day, from_int in pairs:
+        nodes_by_day.setdefault(day, set()).add(from_int)
+        scanned += 1
+    scan_seconds = time.monotonic() - started
+
+    classification: dict = {}
+    for node_id, firmware, basis in ObservedNode.objects.filter(protocol=Protocol.MESHTASTIC).values_list(
+        "meshtastic_node_id", "inferred_firmware", "inferred_firmware_basis"
+    ):
+        if node_id is None:
+            continue
+        if node_id not in classification or (classification[node_id][0] is None and firmware is not None):
+            classification[node_id] = (firmware, basis)
+
+    run_id = uuid.uuid4()
+    created = 0
+    skipped = 0
+    for target in targets:
+        if _snapshot_exists(target, NODE_FIRMWARE_STAT, None):
+            skipped += 1
+            continue
+        created += 1
+        if dry_run:
+            continue
+        active: set = set()
+        for offset in range(1, window_days + 1):
+            active |= nodes_by_day.get((target - timedelta(days=offset)).date(), set())
+        counts: dict = {}
+        for node_id in active:
+            key = classification.get(node_id, (None, None))
+            counts[key] = counts.get(key, 0) + 1
+        StatsSnapshot.objects.create(
+            recorded_at=target,
+            stat_type=NODE_FIRMWARE_STAT,
+            constellation=None,
+            value=_node_firmware_value((fw, basis, n) for (fw, basis), n in counts.items()),
+            run_id=run_id,
+        )
+
+    return {
+        "created": created,
+        "skipped": skipped,
+        "scanned": scanned,
+        "scan_seconds": scan_seconds,
+        "dry_run": dry_run,
+    }
+
+
 @shared_task
 def collect_stats_snapshots():
     """
@@ -520,6 +674,9 @@ def collect_stats_snapshots():
     created += c
     c, _ = _collect_mc_new_nodes(hour_start, run_id=run_id, last_run_started_at=last_run_mc)
     created += c
+    if current_hour.hour == NODE_FIRMWARE_HOUR_UTC:
+        c, _ = _collect_node_firmware(current_hour, run_id=run_id, skip_existing=True)
+        created += c
 
     logger.info(
         "collect_stats_snapshots: completed run_id=%s, created=%d",
