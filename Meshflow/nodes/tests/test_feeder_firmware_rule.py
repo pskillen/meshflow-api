@@ -12,6 +12,7 @@ from common.feeder_metrics import record_feeder_usage
 from common.meshtastic_firmware import Evidence, classify, feeder_report_rule
 from common.protocol import Protocol
 from nodes.services.node_firmware import feeder_firmware_for, refresh_inferred_firmware
+from nodes.services.observed_nodes import get_or_create_meshtastic_observed_node
 
 pytestmark = pytest.mark.django_db
 
@@ -151,3 +152,15 @@ def test_backfill_matches_ingest(create_managed_node, create_observed_node):
     downgraded.inferred_firmware_basis = None
     refresh_inferred_firmware(downgraded)
     assert (downgraded.inferred_firmware, downgraded.inferred_firmware_basis) == ("2.7", "feeder_report")
+
+
+def test_new_keyless_row_for_a_reporting_feeder_starts_as_feeder_report(create_managed_node):
+    feeder = create_managed_node(protocol=Protocol.MESHTASTIC, meshtastic_node_id=NUM)
+    _report(feeder, "2.7.26")  # no ObservedNode exists for NUM yet
+
+    row, created = get_or_create_meshtastic_observed_node(NUM)
+    assert created
+    assert _fields(row) == ("2.7", "feeder_report")
+
+    other, _ = get_or_create_meshtastic_observed_node(NUM + 1)
+    assert _fields(other) == (None, None)

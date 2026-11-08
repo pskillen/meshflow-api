@@ -330,3 +330,16 @@ def test_serializer_returns_firmware_fields(feeder):
 
     assert data["reported_firmware_version"] == FIRMWARE
     assert data["firmware_reported_at"] is not None
+
+
+@pytest.mark.django_db
+def test_refresh_feeder_row_failure_keeps_the_request_at_200(feeder):
+    node, api_key = feeder
+
+    with mock.patch("common.feeder_metrics.refresh_feeder_row", side_effect=RuntimeError("boom")) as refresh:
+        response = _identity(api_key, HTTP_X_MESHTASTIC_FEEDER_FIRMWARE=FIRMWARE)
+
+    assert refresh.called
+    assert response.status_code == 200
+    node.refresh_from_db()
+    assert node.reported_firmware_version == FIRMWARE
