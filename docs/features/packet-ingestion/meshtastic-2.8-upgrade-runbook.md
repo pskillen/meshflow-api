@@ -34,7 +34,7 @@ Do not upgrade a feeder until all of these hold. Bot version numbers are TBD.
 | Gate | Needed |
 | --- | --- |
 | API | Feeder-scoped v4 URLs ([ADR-0005](adr/0005-feeder-scoped-auth.md): `GET /api/v4/feeder/identity/`, `/api/v4/feeder/bot-version/`, `POST /api/v4/feeder/meshtastic/ingest/`, `POST /api/v4/feeder/meshtastic/nodes/`, and `ws/nodes/?feeder_scoped=1`; see [API.md](../../API.md#feeder-api-v4)), predicted node ids and key backfill, no-clobber identity fix, and feeder re-key deployed to the target environment; the backfill has been run (`python manage.py backfill_meshtastic_identity`, idempotent) |
-| Re-key switch | `MESHTASTIC_FEEDER_AUTO_REKEY` is on only if the crc32 match was confirmed on hardware; otherwise plan on a manual re-point |
+| Re-key switch | `MESHTASTIC_FEEDER_AUTO_REKEY` is on only when you accept the crc32 match, which is confirmed on hardware (2026-11-08); otherwise plan on a manual re-point |
 | Bot | Version TBD or later: reports identity (key, MAC, firmware, node number) and detects a number change; probes v4 URLs and falls back; uploads throttled self telemetry; library pinned below 2.8 |
 | Key | The feeder has **its own API key** (not shared with another feeder) |
 | Identity | The feeder's public key is already visible on its `ManagedNode` |
@@ -93,7 +93,13 @@ If ingest is not 200, check in this order: bot is on a v4 URL; key is the feeder
 
 ## 7. Rollback
 
-**TBD: pending the hardware rollback test.** Findings needed: after a 2.8 to 2.7 downgrade without an erase, does the node number revert to the MAC-based id, stay as the crc32 id, or does the config reset? What the API does on a reversion (the link logic must tolerate it) follows from that. Until it is recorded: restore the private key backup if the config was lost, and do not downgrade a production feeder.
+Findings from the hardware session (2026-11-08, one Xiao, 2.8.2 to 2.7.26 and back):
+
+- A 2.8.2 to 2.7.26 downgrade in update mode (no erase) **keeps the crc32 number** (`!faec6f41`), the key, the owner, the region and the channels. It does not revert to the MAC-based number, so the API sees no reversion: the identity link logic needs no special case.
+- A later 2.7 to 2.8 re-upgrade keeps the identity but **empties the NodeDB** (device state version 24 and 25 differ). Expect the feeder to hear its mesh again from scratch, and the 2.8 connect-time replay to be small until the NodeDB refills.
+- 2.8.2 ignores the 1200-baud DFU touch. Run `meshtastic --enter-dfu` first, then flash.
+
+Until the remaining DRAFT items are closed, do not downgrade a production feeder; if the config was lost, restore the private key backup.
 
 ## 8. Fleet order
 

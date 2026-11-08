@@ -200,6 +200,15 @@ the API has never seen creates no node (the bot's NodeDB upload still does). `ob
 `observation_is_direct` false for it, so the observation API shows no hop count and not direct. Stats exclude it
 ([packet stats](../packet-stats/meshtastic.md)); feeder liveness still counts the upload.
 
+## Fixtures and goldens
+
+`docs/packets/meshtastic-2.8/` holds the API's side of the 2.7/2.8 capture subset the bot labels (36 packets from three
+feeders, one radio across an upgrade and a re-key): `wire/` has the exact ingest body the bot sends for each packet
+(plus a flag-mode body for the seven replays), `golden/` has what the API stores and does with it (packet row,
+observation, `ObservedNode`, `NodeLatestStatus` changes, side effects), and `packets/tests/test_meshtastic_goldens.py`
+holds the API to them. A change in stored behaviour shows up as a golden diff; see the README there for how to
+regenerate and for the label meanings.
+
 ## Related docs
 
 - [Packet ingestion hub](README.md)
