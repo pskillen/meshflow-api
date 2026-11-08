@@ -71,8 +71,8 @@ Labels come from the bot's subset (`labels` in `manifest.json`):
 | --- | --- |
 | `kind:live` / `kind:replay` / `kind:self` | Heard on air / 2.8 connect-time replay / the feeder's own packet |
 | `port:<APP>`, `variant:<x>` | Portnum, and the telemetry variant |
-| `sender-id:mac` / `crc32` / `unknown` | How the sender's number relates to its key or MAC (a 2.7 MAC-derived number, a 2.8 crc32 number, or neither known) |
-| `from-id-null` | The capture has no `fromId` (the API then stores `from_str` null) |
+| `sender-id:mac` / `crc32` / `unknown` | How the sender's number was derived: from its MAC (2.7), from the crc32 of its key (2.8), or unknown (no user record, or only a zeroed MAC) |
+| `from-id-null` | `fromId` is present and null (the API then stores `from_str` null) |
 | `hops-exhausted` | `hopLimit` absent: proto3 drops zero, so the real value is 0 and the API records `hop_limit` null (hop count unknown) |
 | `fake-direct` | A replay whose hop fields look direct (`hopStart == hopLimit`); the API reports no hop count and not direct |
 | `stable-replay-id` | A replay keeps the same packet id across reconnects |
