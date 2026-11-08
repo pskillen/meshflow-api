@@ -882,6 +882,8 @@ components:
                           nullable: true
                     time:
                       type: integer
+                      nullable: true
+                      description: "Unix seconds. Optional; a node with no clock omits it (protobuf drops zero), and the API then uses the packet's rxTime as the reading time."
                     raw:
                       type: string
                       nullable: true
@@ -937,6 +939,8 @@ components:
                           nullable: true
                     time:
                       type: integer
+                      nullable: true
+                      description: "Unix seconds. Optional; a node with no clock omits it (protobuf drops zero), and the API then uses the packet's rxTime as the reading time."
                     raw:
                       type: string
                       nullable: true
@@ -959,6 +963,10 @@ components:
                     environmentMetrics:
                       type: object
                       description: See meshtastic/telemetry.proto EnvironmentMetrics
+                    time:
+                      type: integer
+                      nullable: true
+                      description: "Unix seconds. Optional; a node with no clock omits it (protobuf drops zero), and the API then uses the packet's rxTime as the reading time."
 
     AirQualityTelemetryPacket:
       allOf:
@@ -978,6 +986,10 @@ components:
                     airQualityMetrics:
                       type: object
                       description: See meshtastic/telemetry.proto AirQualityMetrics
+                    time:
+                      type: integer
+                      nullable: true
+                      description: "Unix seconds. Optional; a node with no clock omits it (protobuf drops zero), and the API then uses the packet's rxTime as the reading time."
 
     PowerTelemetryPacket:
       allOf:
@@ -997,6 +1009,10 @@ components:
                     powerMetrics:
                       type: object
                       description: See meshtastic/telemetry.proto PowerMetrics
+                    time:
+                      type: integer
+                      nullable: true
+                      description: "Unix seconds. Optional; a node with no clock omits it (protobuf drops zero), and the API then uses the packet's rxTime as the reading time."
 
     HealthTelemetryPacket:
       allOf:
@@ -1016,6 +1032,10 @@ components:
                     healthMetrics:
                       type: object
                       description: See meshtastic/telemetry.proto HealthMetrics
+                    time:
+                      type: integer
+                      nullable: true
+                      description: "Unix seconds. Optional; a node with no clock omits it (protobuf drops zero), and the API then uses the packet's rxTime as the reading time."
 
     HostTelemetryPacket:
       allOf:
@@ -1035,6 +1055,10 @@ components:
                     hostMetrics:
                       type: object
                       description: See meshtastic/telemetry.proto HostMetrics
+                    time:
+                      type: integer
+                      nullable: true
+                      description: "Unix seconds. Optional; a node with no clock omits it (protobuf drops zero), and the API then uses the packet's rxTime as the reading time."
 
     TrafficManagementStatsTelemetryPacket:
       allOf:
@@ -1054,6 +1078,10 @@ components:
                     trafficManagementStats:
                       type: object
                       description: See meshtastic/telemetry.proto TrafficManagementStats
+                    time:
+                      type: integer
+                      nullable: true
+                      description: "Unix seconds. Optional; a node with no clock omits it (protobuf drops zero), and the API then uses the packet's rxTime as the reading time."
 
     TraceroutePacket:
       allOf:
@@ -1928,6 +1956,16 @@ components:
           minimum: 1
           maximum: 7
           description: Default for TR_HOPS_LIMIT and TEXT_MESSAGE_MAX_HOPS env vars
+
+    ApiKeyAlreadyLinkedError:
+      type: object
+      properties:
+        error:
+          type: string
+          example: This API key is already linked to a feeder. Create a separate key for each feeder.
+        code:
+          type: string
+          enum: [api_key_already_linked]
 
     NodeAPIKey:
       type: object
@@ -6594,6 +6632,8 @@ paths:
                   type: integer
                 nodes:
                   type: array
+                  maxItems: 1
+                  description: At most one feeder in total across nodes and managed_node_internal_ids
                   items:
                     type: integer
       responses:
@@ -6603,6 +6643,15 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/NodeAPIKey'
+        '400':
+          description: >-
+            Refused. When a key would be linked to more than one feeder the body is
+            `{"error": "This API key is already linked to a feeder. Create a separate key for each feeder.",
+            "code": "api_key_already_linked"}`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiKeyAlreadyLinkedError'
 
   /nodes/api-keys/{id}/:
     get:
@@ -6702,6 +6751,15 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/NodeAPIKey'
+        '400':
+          description: >-
+            Refused. When a key would be linked to more than one feeder the body is
+            `{"error": "This API key is already linked to a feeder. Create a separate key for each feeder.",
+            "code": "api_key_already_linked"}`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiKeyAlreadyLinkedError'
 
   /nodes/api-keys/{id}/remove_node/:
     post:

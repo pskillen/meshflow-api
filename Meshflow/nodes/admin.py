@@ -28,6 +28,7 @@ from common.mesh_node_helpers import (
 from common.protocol import Protocol
 from meshcore_packets.services.channel_apply import apply_mc_channels_to_feeder
 
+from .api_key_linking import API_KEY_ALREADY_LINKED_CODE, API_KEY_ALREADY_LINKED_MESSAGE
 from .managed_node_bootstrap import ensure_observed_node_for_managed_node, find_matching_observed_node
 from .models import ManagedNode, ManagedNodeStatus, NodeAPIKey, NodeAuth, NodeLatestStatus, ObservedNode
 
@@ -298,6 +299,16 @@ class NodeAPIKeyForm(forms.ModelForm):
             for node in selected_nodes:
                 if node not in valid_nodes:
                     raise forms.ValidationError(f"Node {node} does not belong to constellation {constellation}")
+
+        # A key may be linked to only one active feeder. Existing shared keys may be trimmed or
+        # edited, but a save that adds a node must not leave more than one active link.
+        if self.instance.pk and "nodes" in cleaned_data:
+            selected = set(cleaned_data["nodes"])
+            current = set(self.instance.node_links.values_list("node", flat=True))
+            added = {n for n in selected if n.pk not in current}
+            active_result = [n for n in selected if n.deleted_at is None]
+            if added and len(active_result) > 1:
+                raise forms.ValidationError(API_KEY_ALREADY_LINKED_MESSAGE, code=API_KEY_ALREADY_LINKED_CODE)
 
         return cleaned_data
 

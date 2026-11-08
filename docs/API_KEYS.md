@@ -4,9 +4,9 @@ This document describes how Node API keys work in the Meshflow system: the model
 
 ## Model Overview
 
-**NodeAPIKey** is owned by a user and scoped to a constellation. **NodeAuth** links an API key to one or more ManagedNodes:
+**NodeAPIKey** is owned by a user and scoped to a constellation. **NodeAuth** links an API key to a ManagedNode:
 
-- One API key can be linked to **multiple** ManagedNodes via NodeAuth
+- A new API key is linked to **one** feeder (ManagedNode) via NodeAuth; see [One Key per Feeder](#one-key-per-feeder). Older keys may still be linked to several (legacy shared keys)
 - Each NodeAuth record associates `(api_key, node)` with a unique constraint
 - Keys are used for packet ingest and WebSocket commands (e.g. traceroute)
 
@@ -17,6 +17,34 @@ Users in the Django **`feeder`** group (or staff) may create keys for **any** co
 Managed-node owners are granted the feeder group via migration when the membership model was removed.
 
 ## One Key per Feeder
+
+A key may be linked to **only one active feeder**. Mint one key per feeder.
+
+- A second `add_node` on a key that already has an active link to a different feeder is refused with `400` and
+  `{"error": "This API key is already linked to a feeder. Create a separate key for each feeder.", "code": "api_key_already_linked"}`.
+- Creating a key with more than one node (across `nodes` and `managed_node_internal_ids`) is refused with the same
+  `400` body, and no key is created.
+- The Django admin key form refuses a save that adds a node while leaving more than one active link.
+- A feeder may still hold two keys during a rotation; the limit is per key, not per feeder.
+- Soft-deleted feeders do not count.
+
+**Existing shared keys keep working** on the legacy per-node URLs (`/api/packets/{node_id}/ingest/` and so on). They
+can still be renamed, deactivated, deleted or trimmed (remove a node). To replace one, mint one new key per feeder,
+roll each feeder over to its own key, then delete the shared key.
+
+`seed_integration_tests` creates its shared key through the ORM directly, so it is not affected by the rule. It demonstrates legacy shared-key support.
+
+### Finding shared keys
+
+```bash
+python manage.py report_shared_api_keys
+```
+
+Read-only. For each key with more than one active link it prints the key name and id, owner, constellation,
+`last_used`, and the linked feeders with their protocols. It ends with two totals: keys shared by more than one
+feeder, and keys linked across both protocols.
+
+### v4 feeder URLs
 
 **Use one API key per feeder.** The v4 feeder URLs (`/api/v4/feeder/…`, see [API.md](API.md#feeder-api-v4))
 identify the feeder from the key alone, so they require the key to be linked to exactly one active
@@ -30,8 +58,6 @@ API keys page and configure each bot with its own key. Soft-deleted feeders do n
 Shared keys (one key linked to several ManagedNodes) **still work on the legacy URLs**, which are unchanged:
 `/api/packets/{node_id}/…`, `/api/v3/packets/{node_id}/…` and `/api/meshcore/feeders/{prefix}/…`. Legacy use is
 tracked (Prometheus and `ManagedNode.legacy_api_last_used_at`) so the legacy URLs can be retired once unused.
-
-The integration test seed (`seed_integration_tests`) creates one API key linked to two ManagedNodes, demonstrating legacy shared-key support.
 
 ## Packet Ingest: How Packets Are Associated
 
@@ -53,14 +79,16 @@ Packets are correctly attributed per bot because the **observer** comes from the
 
    Each packet observation records which ManagedNode reported the packet. The same packet can be observed by multiple ManagedNodes; each gets its own PacketObservation.
 
-**When multiple bots share one API key:**
+**Legacy shared keys (several bots on one existing key):**
 
 - Bot A (device 12345) → `/api/packets/12345/ingest/` → observer = ManagedNode 12345
 - Bot B (device 67890) → `/api/packets/67890/ingest/` → observer = ManagedNode 67890
 
 Each bot must use its own `node_id` in the URL. As long as the key is linked to both nodes via NodeAuth, packets are correctly associated per observer.
 
-## WebSocket and Shared Keys
+## WebSocket and Shared Keys (legacy)
+
+New shared links are refused, so this section only applies to existing shared keys.
 
 The WebSocket endpoint (`ws/nodes/?api_key=<key>`) must identify which feeder is connecting when multiple ManagedNodes share one key. Otherwise traceroute and other commands may be delivered to the wrong bot.
 
