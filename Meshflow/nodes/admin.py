@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from django import forms
 from django.contrib import admin, messages
 from django.contrib.admin.widgets import FilteredSelectMultiple
@@ -5,6 +7,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 from django.db.models import Q
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.html import format_html, format_html_join
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
@@ -25,6 +28,7 @@ from common.mesh_node_helpers import (
 from common.protocol import Protocol
 from meshcore_packets.services.channel_apply import apply_mc_channels_to_feeder
 
+from .api_key_linking import API_KEY_ALREADY_LINKED_CODE, API_KEY_ALREADY_LINKED_MESSAGE
 from .managed_node_bootstrap import ensure_observed_node_for_managed_node, find_matching_observed_node
 from .models import ManagedNode, ManagedNodeStatus, NodeAPIKey, NodeAuth, NodeLatestStatus, ObservedNode
 
@@ -67,6 +71,9 @@ MANAGED_NODE_MESHCORE_FEEDER_FIELDS = (
 )
 MANAGED_NODE_COMMON_FIELDS = MANAGED_NODE_MESHTASTIC_FEEDER_FIELDS
 MANAGED_NODE_CHANNEL_FIELDS = tuple(f"meshtastic_channel_{i}" for i in range(8))
+MANAGED_NODE_FEEDER_API_FIELDS = ("feeder_api_generation", "feeder_api_last_used_at", "legacy_api_last_used_at")
+MANAGED_NODE_REPORTED_IDENTITY_FIELDS = ("reported_meshtastic_node_id", "identity_reported_at")
+LEGACY_FEEDER_URL_WINDOW = timedelta(days=7)
 
 
 class ProtocolListFilter(admin.SimpleListFilter):
@@ -81,6 +88,24 @@ class ProtocolListFilter(admin.SimpleListFilter):
     def queryset(self, request, queryset):
         if self.value():
             return queryset.filter(protocol=int(self.value()))
+        return queryset
+
+
+class LegacyFeederUrlFilter(admin.SimpleListFilter):
+    """Feeders whose bot called a legacy (pre-v4) feeder URL in the last 7 days (ADR-0005)."""
+
+    title = _("On legacy URLs (last 7 days)")
+    parameter_name = "legacy_urls_7d"
+
+    def lookups(self, request, model_admin):
+        return (("yes", _("Yes")), ("no", _("No")))
+
+    def queryset(self, request, queryset):
+        since = timezone.now() - LEGACY_FEEDER_URL_WINDOW
+        if self.value() == "yes":
+            return queryset.filter(legacy_api_last_used_at__gte=since)
+        if self.value() == "no":
+            return queryset.exclude(legacy_api_last_used_at__gte=since)
         return queryset
 
 
@@ -274,6 +299,16 @@ class NodeAPIKeyForm(forms.ModelForm):
             for node in selected_nodes:
                 if node not in valid_nodes:
                     raise forms.ValidationError(f"Node {node} does not belong to constellation {constellation}")
+
+        # A key may be linked to only one active feeder. Existing shared keys may be trimmed or
+        # edited, but a save that adds a node must not leave more than one active link.
+        if self.instance.pk and "nodes" in cleaned_data:
+            selected = set(cleaned_data["nodes"])
+            current = set(self.instance.node_links.values_list("node", flat=True))
+            added = {n for n in selected if n.pk not in current}
+            active_result = [n for n in selected if n.deleted_at is None]
+            if added and len(active_result) > 1:
+                raise forms.ValidationError(API_KEY_ALREADY_LINKED_MESSAGE, code=API_KEY_ALREADY_LINKED_CODE)
 
         return cleaned_data
 
@@ -559,6 +594,8 @@ class ManagedNodeAdmin(admin.ModelAdmin):
         ("constellation__protocol", admin.ChoicesFieldListFilter),
         ManagedNodeActiveFilter,
         PredictedNodeIdFilter,
+        LegacyFeederUrlFilter,
+        "feeder_api_generation",
         "owner",
         "constellation",
         "allow_auto_traceroute",
@@ -652,8 +689,12 @@ class ManagedNodeAdmin(admin.ModelAdmin):
 
     def get_readonly_fields(self, request, obj=None):
         if obj and obj.protocol == Protocol.MESHCORE:
-            return ("display_id", "mc_channels_mirror", "mc_channels_synced_at")
-        return ("mc_channels_synced_at", "meshtastic_public_key", "predicted_node_id_str")
+            return ("display_id", "mc_channels_mirror", "mc_channels_synced_at") + MANAGED_NODE_FEEDER_API_FIELDS
+        return (
+            ("mc_channels_synced_at", "meshtastic_public_key", "predicted_node_id_str")
+            + MANAGED_NODE_FEEDER_API_FIELDS
+            + MANAGED_NODE_REPORTED_IDENTITY_FIELDS
+        )
 
     def _protocol_for_admin(self, request, obj):
         if obj is not None:
@@ -684,7 +725,7 @@ class ManagedNodeAdmin(admin.ModelAdmin):
                         ),
                     },
                 )
-                return (common, mc_identity, mc_channels)
+                return (common, mc_identity, mc_channels, self._feeder_api_fieldset(MANAGED_NODE_FEEDER_API_FIELDS))
             return (common, mc_identity)
 
         common = (_("Feeder"), {"fields": MANAGED_NODE_MESHTASTIC_FEEDER_FIELDS})
@@ -706,7 +747,25 @@ class ManagedNodeAdmin(admin.ModelAdmin):
                 ),
             },
         )
-        return (common, identity, channels)
+        if obj is None:
+            return (common, identity, channels)
+        usage = self._feeder_api_fieldset(MANAGED_NODE_FEEDER_API_FIELDS + MANAGED_NODE_REPORTED_IDENTITY_FIELDS)
+        return (common, identity, channels, usage)
+
+    @staticmethod
+    def _feeder_api_fieldset(fields):
+        return (
+            _("Feeder API usage"),
+            {
+                "fields": fields,
+                "classes": ("collapse",),
+                "description": _(
+                    "Written by the feeder API at most every 10 minutes. Legacy = the pre-v4 URLs "
+                    "(/api/packets/, /api/v3/packets/, /api/meshcore/feeders/{prefix}/). The reported "
+                    "node number is informational and never changes the stored one."
+                ),
+            },
+        )
 
     def save_model(self, request, obj, form, change):
         super().save_model(request, obj, form, change)

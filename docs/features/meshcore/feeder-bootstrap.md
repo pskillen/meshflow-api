@@ -24,7 +24,7 @@ MeshCore uses the same pattern as Meshtastic: **device identity in the URL**, pl
 | **`ManagedNode.meshtastic_node_id`** | Must match the radio | **`NULL`** (not used on the wire) |
 | **Payload `from_pubkey`** | Packet sender on the mesh | Remote node in the heard packet; not the feeder |
 
-**Shared constellation API keys:** multiple MeshCore feeders may use the same `NodeAPIKey` if each `ManagedNode` has a distinct **`mc_pubkey`** (full 64-hex from bot logs). The bot disambiguates via the URL prefix, like Meshtastic `{node_id}`.
+**API keys are one per feeder:** new shared links are refused (`api_key_already_linked`). Existing shared keys keep working on the legacy URLs, where each `ManagedNode` has a distinct **`mc_pubkey`** (full 64-hex from bot logs) and the bot disambiguates via the URL prefix, until each feeder is moved to its own key.
 
 **403 codes** (JSON `detail` + `code`): `feeder_not_linked`, `feeder_identity_ambiguous`, `feeder_pubkey_mismatch`, `feeder_pubkey_not_configured`.
 
@@ -61,7 +61,7 @@ See [meshflow-ui#293](https://github.com/pskillen/meshflow-ui/issues/293).
 
 1. **Node API keys** → create or reuse a constellation key.
 2. **Node authentications** → link the key to this MC ManagedNode, or `POST …/api-keys/{id}/add_node/` with `managed_node_internal_id` (UUID from the managed node row).
-3. Multiple feeders may share one key if each has a unique `mc_pubkey`.
+3. Use one key per feeder: linking a key that already has another feeder is refused. Existing shared keys keep working until replaced.
 4. Put the key in the bot env as `STORAGE_API_TOKEN`.
 
 ## 3. Configure meshflow-bot

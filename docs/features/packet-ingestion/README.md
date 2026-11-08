@@ -39,7 +39,7 @@ Sample JSON: [docs/packets/](../../packets/) (MT by portnum), [docs/packets/mesh
 
 | Protocol | Ingest app | Endpoint | Phase |
 | --- | --- | --- | --- |
-| Meshtastic | `packets` | `POST /api/packets/{node_id}/ingest/` | Production |
+| Meshtastic | `packets` | `POST /api/packets/{node_id}/ingest/` (also `/api/v3/packets/…`, and key-scoped `POST /api/v4/feeder/meshtastic/ingest/`) | Production |
 | MeshCore | `meshcore_packets` | `POST /api/meshcore/feeders/{prefix}/packets/ingest/` | Phase 1 MVP (advert + text); [#266](https://github.com/pskillen/meshflow-api/issues/266) for full types |
 
 MeshCore uses a **parallel** schema (pubkeys, `pkt_hash`, no Meshtastic `packet_id`) — see [meshcore.md](meshcore.md) and ADRs under [adr/](adr/README.md).
@@ -142,14 +142,35 @@ packet does not stop ingestion.
 
 ### Endpoint and authentication
 
-URL: `POST /api/packets/{node_id}/ingest/`
-View: `packets.views.PacketIngestView`
+URLs (all with the same body and response):
 
-`NodeAPIKeyAuthentication` looks up the API key, finds the observer
-`ManagedNode`, and attaches it to `request.auth.node`. The observer is **not**
-the packet sender — it is the feeder that heard the transmission. The
-`{node_id}` path component identifies the observer too, and the bot fills it
-in with its own node number.
+| URL | Generation | Authorisation |
+| --- | --- | --- |
+| `POST /api/packets/{node_id}/ingest/` | v2 (legacy) | `NodeAuthorizationPermission`: key linked to the node number in the path |
+| `POST /api/v3/packets/{node_id}/ingest/` | v3 (legacy) | as v2 |
+| `POST /api/v4/feeder/meshtastic/ingest/` | v4 | `FeederScopedPermission`: the key alone, linked to exactly one active feeder |
+
+Views: `packets.views.PacketIngestView` (legacy) and its v4 subclass in
+`packets/views_feeder_v4.py`. The other v4 feeder URLs are `identity/`, `bot-version/` and
+`meshtastic/nodes/` under `/api/v4/feeder/` (see [API.md](../../API.md#feeder-api-v4) and `openapi.yaml`).
+
+`NodeAPIKeyAuthentication` looks up the API key; the permission class finds the observer
+`ManagedNode` and attaches it to `request.auth.node`. The observer is **not**
+the packet sender — it is the feeder that heard the transmission. On the legacy URLs the
+`{node_id}` path component identifies the observer, and the bot fills it in with its own node
+number, so a shared key works there. On v4 the key must be one key per feeder: a shared key gets
+403 `shared_api_key`, no linked feeder gets `feeder_not_linked`, and a MeshCore feeder on a
+`meshtastic/` path gets `feeder_protocol_mismatch` (body `{"detail", "code"}`). Because v4 does not
+authorise on the node number, a Meshtastic 2.8 feeder whose number changes keeps ingesting
+([ADR-0005](adr/0005-feeder-scoped-auth.md)).
+
+Every feeder view records, at most every 10 minutes per feeder, which URL generation it used
+(`ManagedNode.feeder_api_generation`, `feeder_api_last_used_at`, `legacy_api_last_used_at`) and the
+node number the bot reports in `X-Meshtastic-Feeder-Node-Num` (`reported_meshtastic_node_id`;
+informational, a mismatch is logged and never rejected). Prometheus counts
+`meshflow_feeder_api_requests_total{api,protocol,endpoint,status_class}` and
+`meshflow_feeder_auth_rejections_total{api,code}`. The legacy URLs are unchanged and tracked for
+retirement; staff can list feeders still on them with the admin filter "On legacy URLs (last 7 days)".
 
 A separate (legacy) authentication class
 `packets.authentication.PacketIngestNodeAPIKeyAuthentication` additionally
