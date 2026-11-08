@@ -116,7 +116,7 @@ Daily count of active Meshtastic nodes per firmware generation (see [inferred fi
 - **`by_type`:** open keys, one per stored `inferred_firmware` value; nodes with none are `unknown`. A new generation appears with no API change.
 - **`by_basis`:** `key_identity`, `predicted_id`, `reported` (stored `feeder_report`) and `none` (null) are always present, at 0 if empty; any other stored basis passes through.
 - A node that upgrades (new row) counts twice for up to 7 days.
-- **Backfill:** `python manage.py backfill_node_firmware_snapshots [--days N] [--dry-run]` (default 90 days, idempotent). It does one `MtRawPacket` scan for `(day, from_int)` pairs and unions the 7 preceding days per target midnight, using today's classification. It prints the scan size and time. Run it after `backfill_inferred_firmware`.
+- **Backfill:** `python manage.py backfill_node_firmware_snapshots [--days N] [--dry-run]` (default 90 days, idempotent). It does one `MtRawPacket` scan for `(day, from_int)` pairs and unions the 7 preceding days per target midnight, using today's classification. Backfilled days, including the current day's midnight, are derived from packets, not from `last_heard`, so a midnight written by the backfill before that day's `00:05` run can differ slightly from what the live run would have written; the live run then skips it. It prints the scan size and time. Run it after `backfill_inferred_firmware`.
 
 ---
 

@@ -582,6 +582,8 @@ def backfill_node_firmware_snapshots(days: int = 90, dry_run: bool = False) -> d
     One query against MtRawPacket gives the (day, from_int) pairs; active sets are unioned in Python.
     History uses today's classification of each node.
     """
+    if days < 1:
+        return {"created": 0, "skipped": 0, "scanned": 0, "scan_seconds": 0.0, "dry_run": dry_run}
     utc = dt.timezone.utc
     end = timezone.now().astimezone(utc).replace(hour=0, minute=0, second=0, microsecond=0)
     targets = [end - timedelta(days=i) for i in range(days - 1, -1, -1)]

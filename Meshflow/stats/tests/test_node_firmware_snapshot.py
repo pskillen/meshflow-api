@@ -206,3 +206,37 @@ def test_backfill_command_output(backfill_data, capsys):
     assert out.startswith("[dry-run] Scanned 3 day/node rows in ")
     assert "[dry-run] Snapshots: created 3, already present 0" in out
     assert _fw_snapshots().count() == 0
+
+
+@pytest.mark.django_db
+def test_backfill_rejects_non_positive_days(backfill_data):
+    from django.core.management import call_command
+    from django.core.management.base import CommandError
+
+    assert _backfill(backfill_data, days=0)["created"] == 0
+    with pytest.raises(CommandError):
+        call_command("backfill_node_firmware_snapshots", "--days", "0")
+    assert _fw_snapshots().count() == 0
+
+
+@pytest.mark.django_db
+def test_live_run_skips_midnight_written_by_backfill(backfill_data):
+    _backfill(backfill_data, days=1)
+    before = list(_fw_snapshots().values_list("id", flat=True))
+    assert len(before) == 1
+
+    _run_at(RUN_AT)
+    assert list(_fw_snapshots().values_list("id", flat=True)) == before
+
+
+@pytest.mark.django_db
+def test_backfill_seven_day_edge(create_observed_node, create_raw_packet):
+    _node(create_observed_node, 6001, None, "2.8", "key_identity")
+    _node(create_observed_node, 6002, None, "2.7", "feeder_report")
+    # Window for the 06-10 midnight is 06-03..06-09 (UTC days).
+    _packet(create_raw_packet, 11, 6001, dt.datetime(2025, 6, 3, 0, 0, tzinfo=UTC))
+    _packet(create_raw_packet, 12, 6002, dt.datetime(2025, 6, 2, 23, 59, tzinfo=UTC))
+
+    _backfill(dt.datetime(2025, 6, 10, 12, 0, tzinfo=UTC), days=1)
+    snap = _fw_snapshots().get(recorded_at=MIDNIGHT)
+    assert snap.value["by_type"] == {"2.8": 1}
