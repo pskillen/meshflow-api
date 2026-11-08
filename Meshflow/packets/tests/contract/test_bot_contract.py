@@ -37,17 +37,26 @@ sys.path.insert(0, str(_BOT_ROOT))
 from django.urls import reverse  # noqa: E402
 
 from rest_framework.test import APIClient  # noqa: E402
-from src.meshtastic.replay import is_replayed  # noqa: E402
-from src.meshtastic.serializers import MeshtasticPacketSerializer  # noqa: E402
-from src.meshtastic.translation import node_dict_to_mesh_node  # noqa: E402
-from tools.meshtastic_fixtures.load import lib_packet, load_subset  # noqa: E402
+
+try:
+    from src.meshtastic.replay import is_replayed  # noqa: E402
+    from src.meshtastic.serializers import MeshtasticPacketSerializer  # noqa: E402
+    from src.meshtastic.translation import node_dict_to_mesh_node  # noqa: E402
+    from tools.meshtastic_fixtures.load import lib_packet, load_subset  # noqa: E402
+except ImportError as exc:
+    pytest.fail(
+        f"bot API changed: {exc}. The bot moved or renamed something this test imports; "
+        "update the imports in test_bot_contract.py (and the pin notes in tests/TESTING.md)",
+        pytrace=False,
+    )
 
 from nodes.models import ObservedNode  # noqa: E402
 from packets.tests import goldens  # noqa: E402
 
 pytestmark = [pytest.mark.contract, pytest.mark.django_db]
 
-SUBSET = {entry["key"]: entry for entry in load_subset(_BOT_ROOT / "docs" / "meshtastic_packets" / "2.8")}
+BOT_PACKETS = _BOT_ROOT / "docs" / "meshtastic_packets" / "2.8"
+SUBSET = {entry["key"]: entry for entry in load_subset(BOT_PACKETS)}
 API_KEYS = [entry["key"] for entry in goldens.load_manifest()]
 
 BUMP = "update the api goldens and bump .github/contract/bot-ref"
@@ -111,31 +120,56 @@ def test_bot_body_ingests_to_the_golden(name, feeder, side_effects):
 
 # --- NodeDB upload ---------------------------------------------------------------------------------------------
 
-NODEDB = _BOT_ROOT / "docs" / "meshtastic_packets" / "2.8" / "captures" / "2026-11-08-xiao-2.8.2" / "nodedb.json"
 ZERO_MAC = "AAAAAAAA"  # base64 of six zero bytes
 FULL_MAC = "02:11:22:33:44:55"
+NODEDB_CAPTURE = "x28"  # the bot's short id (captures.json) for the 2.8 feeder capture whose NodeDB we replay
+NODEDB_CASES = [f"nodedb-{i}" for i in range(5)]
 
 
 def _user(item: tuple[str, dict]) -> dict:
     return item[1].get("user", {})
 
 
+def _nodedb_path() -> Path:
+    """The x28 capture's nodedb.json, found through the bot's captures.json rather than a directory name."""
+    index = BOT_PACKETS / "captures.json"
+    if not index.is_file():
+        pytest.fail(f"bot layout changed: {index} is missing; update NODEDB_CAPTURE lookup in test_bot_contract.py")
+    entries = [e for e in json.loads(index.read_text(encoding="utf-8")) if e.get("short") == NODEDB_CAPTURE]
+    if not entries:
+        pytest.fail(f"bot captures.json has no capture with short={NODEDB_CAPTURE!r}; update NODEDB_CAPTURE")
+    path = BOT_PACKETS / entries[0]["path"] / "nodedb.json"
+    if not path.is_file():
+        pytest.fail(f"bot capture {NODEDB_CAPTURE!r} has no nodedb.json at {path}; update test_bot_contract.py")
+    return path
+
+
 def _nodedb_sample() -> list[tuple[str, dict]]:
     """Five x28 NodeDB entries: two zeroed MACs, one 24-byte-cut long name, two ordinary."""
-    nodes = sorted(json.loads(NODEDB.read_text(encoding="utf-8")).items())
+    nodes = sorted(json.loads(_nodedb_path().read_text(encoding="utf-8")).items())
     zeroed = [item for item in nodes if _user(item).get("macaddr") == ZERO_MAC]
     cut = [item for item in nodes if len(_user(item).get("longName", "").encode()) == 24]
     chosen = zeroed[:2] + cut[:1]
     ordinary = [item for item in nodes if item not in chosen and _user(item).get("macaddr") not in (None, "", ZERO_MAC)]
-    return chosen + ordinary[:2]
+    sample = chosen + ordinary[:2]
+    n_zeroed = sum(_user(item).get("macaddr") == ZERO_MAC for item in sample)
+    n_cut = sum(len(_user(item).get("longName", "").encode()) == 24 for item in sample)
+    assert len(sample) == 5 and n_zeroed >= 2 and n_cut >= 1, (
+        f"the bot's x28 nodedb.json no longer yields the NodeDB sample (5 entries, >=2 zeroed MACs, >=1 24-byte name): "
+        f"got {len(sample)} entries, {n_zeroed} zeroed, {n_cut} cut; pick new entries in _nodedb_sample"
+    )
+    return sample
 
 
-NODEDB_SAMPLE = _nodedb_sample()
+@pytest.fixture(scope="module")
+def nodedb_sample():
+    return _nodedb_sample()
 
 
-@pytest.mark.parametrize("node_id,raw", NODEDB_SAMPLE, ids=[item[0] for item in NODEDB_SAMPLE])
-def test_nodedb_upload_does_not_clobber_stored_identity(node_id, raw, feeder):
+@pytest.mark.parametrize("case", NODEDB_CASES)
+def test_nodedb_upload_does_not_clobber_stored_identity(case, nodedb_sample, feeder):
     node, api_key = feeder
+    node_id, raw = nodedb_sample[NODEDB_CASES.index(case)]
     user = raw["user"]
     body = MeshtasticPacketSerializer().serialise_node(node_dict_to_mesh_node(raw))
 
@@ -160,5 +194,5 @@ def test_nodedb_upload_does_not_clobber_stored_identity(node_id, raw, feeder):
 
     assert 200 <= response.status_code < 300, response.content
     observed.refresh_from_db()
-    assert observed.mac_addr == (FULL_MAC if zeroed else user["macaddr"])
-    assert observed.long_name == stored_name
+    assert observed.mac_addr == (FULL_MAC if zeroed else user["macaddr"]), f"{node_id}: MAC was overwritten"
+    assert observed.long_name == stored_name, f"{node_id}: long name was overwritten"
