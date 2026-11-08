@@ -1,14 +1,15 @@
+import logging
+
 from django.utils import timezone
 
 from rest_framework import serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from common.mesh_node_helpers import meshtastic_hex_to_int
-from common.protocol import Protocol
+from common.mesh_node_helpers import meshtastic_hex_to_int, meshtastic_id_to_hex
 from nodes.authentication import NodeAPIKeyAuthentication
-from nodes.models import ObservedNode
 from nodes.permissions import NodeAuthorizationPermission
+from nodes.services.observed_nodes import get_meshtastic_observed_node
 from packets.models import (
     AirQualityMetricsPacket,
     DeviceMetricsPacket,
@@ -40,6 +41,16 @@ from .signals import (
     traceroute_packet_received,
     traffic_management_stats_packet_received,
 )
+
+logger = logging.getLogger(__name__)
+
+
+def _packet_from_label(data) -> str | None:
+    """Return the packet's sender as ``!xxxxxxxx``, or None when ``from`` is missing or not a node number."""
+    try:
+        return meshtastic_id_to_hex(int(data.get("from")))
+    except AttributeError, TypeError, ValueError:
+        return None
 
 
 class PacketIngestView(APIView):
@@ -152,10 +163,12 @@ class PacketIngestView(APIView):
                     status=status.HTTP_201_CREATED,
                 )
             except Exception as e:
-                return Response(
-                    {"status": "error", "message": str(e)},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
+                node_label = _packet_from_label(request.data)
+                logger.exception("Packet ingest failed for node %s: %s", node_label, e)
+                body = {"status": "error", "message": str(e)}
+                if node_label:
+                    body["node"] = node_label
+                return Response(body, status=status.HTTP_400_BAD_REQUEST)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -230,12 +243,10 @@ class BaseNodeUpsertView(APIView):
                         status=status.HTTP_400_BAD_REQUEST,
                     )
 
-        q = ObservedNode.objects.filter(meshtastic_node_id=observed_node_id, protocol=Protocol.MESHTASTIC)
-        if q.exists():
-            node = q.first()
+        node = get_meshtastic_observed_node(observed_node_id)
+        if node is not None:
             serializer = self.serializer_class(instance=node, data=request.data, partial=True)
         else:
-            node = None
             serializer = self.serializer_class(data=request.data, partial=True)
 
         if serializer.is_valid():

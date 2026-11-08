@@ -4,6 +4,7 @@ from django.dispatch import receiver
 
 from common.mesh_node_helpers import meshtastic_id_to_hex
 from nodes.models import NodeLatestStatus, ObservedNode
+from nodes.services.observed_nodes import get_or_create_meshtastic_observed_node
 from traceroute.new_node_baseline import enqueue_new_node_baseline
 
 from .models import (
@@ -72,8 +73,8 @@ def on_packet_received_update_inferred_max_hops(sender, packet, observer, observ
     if sender_node_id is None:
         return
     display_id = getattr(packet, "from_str", None) or meshtastic_id_to_hex(sender_node_id)
-    observed_node, created = ObservedNode.objects.get_or_create(
-        meshtastic_node_id=sender_node_id,
+    observed_node, created = get_or_create_meshtastic_observed_node(
+        sender_node_id,
         defaults={
             "long_name": "Unknown Node " + display_id,
             "short_name": display_id[-4:] if len(display_id) >= 4 else "????",

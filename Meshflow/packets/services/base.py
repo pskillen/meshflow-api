@@ -3,8 +3,8 @@
 import abc
 
 from common.mesh_node_helpers import meshtastic_id_to_hex
-from common.protocol import Protocol
 from nodes.models import ManagedNode, ObservedNode
+from nodes.services.observed_nodes import get_or_create_meshtastic_observed_node
 from packets.models import MtRawPacket, PacketObservation
 from packets.signals import new_node_observed, node_last_heard_advanced, packet_from_node_processed
 from users.models import User
@@ -54,25 +54,20 @@ class BasePacketService(abc.ABC):
     def _get_or_create_from_node(self) -> ObservedNode:
         """Get or create the from node."""
         if self.packet.from_int:
-            try:
-                self.from_node = ObservedNode.objects.get(
-                    meshtastic_node_id=self.packet.from_int,
-                    protocol=Protocol.MESHTASTIC,
-                )
-                self._dx_previous_last_heard = self.from_node.last_heard
-            except ObservedNode.DoesNotExist:
+            display_id = self.packet.from_str if self.packet.from_str else meshtastic_id_to_hex(self.packet.from_int)
+            self.from_node, created = get_or_create_meshtastic_observed_node(
+                self.packet.from_int,
+                defaults={
+                    "long_name": "Unknown Node " + display_id,
+                    "short_name": display_id[-4:] if len(display_id) >= 4 else "????",
+                },
+            )
+            if created:
                 self._dx_previous_last_heard = None
-                display_id = (
-                    self.packet.from_str if self.packet.from_str else meshtastic_id_to_hex(self.packet.from_int)
-                )
-                self.from_node = ObservedNode.objects.create(
-                    protocol=Protocol.MESHTASTIC,
-                    meshtastic_node_id=self.packet.from_int,
-                    long_name="Unknown Node " + display_id,
-                    short_name=display_id[-4:] if len(display_id) >= 4 else "????",
-                )
                 self._dx_from_node_created = True
                 new_node_observed.send(sender=self, node=self.from_node, observer=self.observer)
+            else:
+                self._dx_previous_last_heard = self.from_node.last_heard
         else:
             raise ValueError("Packet has no from_int")
 

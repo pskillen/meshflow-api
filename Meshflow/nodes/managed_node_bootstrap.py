@@ -9,6 +9,7 @@ from common.meshcore_node_helpers import resolve_or_create_mc_observed_node
 from common.protocol import Protocol
 
 from .models import ManagedNode, ObservedNode
+from .services.observed_nodes import get_meshtastic_observed_node, get_or_create_meshtastic_observed_node
 
 
 def _names_from_managed_node(managed_node: ManagedNode) -> tuple[str, str]:
@@ -31,10 +32,7 @@ def find_matching_observed_node(managed_node: ManagedNode) -> ObservedNode | Non
     if managed_node.protocol == Protocol.MESHTASTIC:
         if managed_node.meshtastic_node_id is None:
             raise ValueError("Meshtastic managed node requires meshtastic_node_id")
-        return ObservedNode.objects.filter(
-            protocol=Protocol.MESHTASTIC,
-            meshtastic_node_id=managed_node.meshtastic_node_id,
-        ).first()
+        return get_meshtastic_observed_node(managed_node.meshtastic_node_id)
     if managed_node.protocol == Protocol.MESHCORE:
         if not managed_node.mc_pubkey:
             raise ValueError("MeshCore managed node requires mc_pubkey")
@@ -65,11 +63,9 @@ def ensure_observed_node_for_managed_node(managed_node: ManagedNode) -> tuple[Ob
                 short_name=short_name,
             )
         else:
-            observed = ObservedNode.objects.create(
-                protocol=Protocol.MESHTASTIC,
-                meshtastic_node_id=managed_node.meshtastic_node_id,
-                long_name=long_name,
-                short_name=short_name,
+            observed, _ = get_or_create_meshtastic_observed_node(
+                managed_node.meshtastic_node_id,
+                defaults={"long_name": long_name, "short_name": short_name},
             )
         created = True
 
