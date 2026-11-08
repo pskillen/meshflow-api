@@ -33,6 +33,8 @@ def _ingest(feeder, decoded, packet_id=7001, **extra):
     [
         ({"portnum": "TEXT_MESSAGE_APP", "text": "hi", "bitfield": 1}, 1),
         ({"portnum": "TEXT_MESSAGE_APP", "text": "hi", "bitfield": 0}, 0),
+        ({"portnum": "TEXT_MESSAGE_APP", "text": "hi", "bitfield": 4294967295}, 4294967295),
+        ({"portnum": "TEXT_MESSAGE_APP", "text": "hi", "bitfield": 40000}, 40000),
         ({"portnum": "TEXT_MESSAGE_APP", "text": "hi"}, None),
         ({"portnum": "STORE_FORWARD_APP", "bitfield": 3}, 3),
         ({"portnum": "STORE_FORWARD_APP", "bitfield": 0}, 0),

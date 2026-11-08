@@ -39,6 +39,7 @@ All endpoints under `/api/`:
 - `api/constellations/` – Constellations, memberships, channels
 - `api/monitoring/watches/` – User's mesh monitoring watches (NodeWatch CRUD)
 - `api/packets/` – Packet ingestion
+- `api/v4/feeder/` – Feeder API v4 (key-scoped, one API key per feeder; see `docs/API.md`)
 - `api/stats/` – Packet statistics
 - `api/messages/` – Text messages
 - `api/token/` – JWT obtain, refresh, verify

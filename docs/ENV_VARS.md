@@ -126,7 +126,7 @@ Discord **login** uses the OAuth pair above. **DM notifications** (test message 
 
 See **[docs/features/dx-monitoring/notifications.md](features/dx-monitoring/notifications.md)** for categories and self-service API.
 
-Packet-ingest rules (`new_distant_node`, `returned_dx_node`, `distant_observation`) only run when the `PacketObservation` is **direct**: both `hop_start` and `hop_limit` must be present and `hop_start - hop_limit == 0`. Missing hop metadata or multi-hop observations are ignored for those reasons (multi-hop mesh reachability is normal).
+Packet-ingest rules (`new_distant_node`, `returned_dx_node`, `distant_observation`) only run when the `PacketObservation` is **direct**: both `hop_start` and `hop_limit` must be present and `hop_start - hop_limit == 0`. An observation with `hop_start == 0` and no bitfield is unknown, not direct. Missing hop metadata or multi-hop observations are ignored for those reasons (multi-hop mesh reachability is normal).
 
 See **[docs/features/dx-monitoring/detection.md](features/dx-monitoring/detection.md)** for behaviour.
 
