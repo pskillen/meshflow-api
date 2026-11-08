@@ -25,6 +25,7 @@ from common.meshtastic_identity import (
 from common.protocol import Protocol
 from constellations.models import MessageChannel
 from nodes.models import DeviceMetrics, ManagedNode, NodeLatestStatus, ObservedNode, Position
+from nodes.services.node_firmware import FIRMWARE_FIELDS, refresh_inferred_firmware, refresh_row_numbered_by_key
 
 from .hops import observation_hop_count, observation_is_direct
 from .models import (
@@ -1664,6 +1665,10 @@ class BaseNodeSerializer(serializers.ModelSerializer):
 
         # Create the node
         node = ObservedNode.objects.create(**validated_data)
+        if refresh_inferred_firmware(node):
+            node.save(update_fields=FIRMWARE_FIELDS)
+        if "meshtastic_public_key" in validated_data:
+            refresh_row_numbered_by_key(node)
 
         # Create related objects
         self._create_related_objects(node, position_data, device_metrics_data)
@@ -1692,7 +1697,10 @@ class BaseNodeSerializer(serializers.ModelSerializer):
         # Update the node
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
+        refresh_inferred_firmware(instance)
         instance.save()
+        if "meshtastic_public_key" in validated_data:
+            refresh_row_numbered_by_key(instance)
 
         # Create related objects
         self._create_related_objects(instance, position_data, device_metrics_data)

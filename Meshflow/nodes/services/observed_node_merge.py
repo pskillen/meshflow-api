@@ -10,7 +10,7 @@ Rules, per duplicate set (each set merges in its own ``transaction.atomic()``):
   a placeholder per ``common.meshtastic_identity.is_placeholder_name``) going from the most recently heard row
   down; if no row has one, the keeper's own. Identity fields (``meshtastic_public_key``,
   ``meshtastic_public_key_hex``, ``meshtastic_key_node_id``, ``mac_addr``, ``meshtastic_hw_model``,
-  ``meshtastic_role``) keep the keeper's value and are filled from another row (most recently heard first) only when
+  ``meshtastic_role``, ``inferred_firmware``, ``inferred_firmware_basis``, ``inferred_firmware_at``) keep the keeper's value and are filled from another row (most recently heard first) only when
   the keeper's is blank. ``claimed_by`` is the keeper's, else filled from another row; two different owners in one
   set is a conflict and the set is left alone.
 * **Relations**: every reverse relation in ``ObservedNode._meta.related_objects`` is re-pointed at the keeper.
@@ -45,6 +45,9 @@ IDENTITY_FIELDS = (
     "mac_addr",
     "meshtastic_hw_model",
     "meshtastic_role",
+    "inferred_firmware",
+    "inferred_firmware_basis",
+    "inferred_firmware_at",
 )
 
 # Every reverse relation of ObservedNode, as "app_label.Model.field". The merge handles any relation generically

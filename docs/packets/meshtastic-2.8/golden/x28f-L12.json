@@ -33,6 +33,8 @@
   },
   "observed_node": {
     "environment_exposure": 0,
+    "inferred_firmware": "2.7",
+    "inferred_firmware_basis": "key_identity",
     "long_name": "PDY base \ud83e\udd16\ud83d\udd07",
     "m2m_opt_out": false,
     "mac_addr": "48:ca:43:59:6b:18",

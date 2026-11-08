@@ -15,6 +15,7 @@ from django.db.models import F
 from common.mesh_node_helpers import meshtastic_id_to_hex
 from common.protocol import Protocol
 from nodes.models import ObservedNode
+from nodes.services.node_firmware import predicted_firmware_fields
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +57,7 @@ def get_or_create_meshtastic_observed_node(node_id: int, *, defaults: dict | Non
     node = ObservedNode.objects.create(
         protocol=Protocol.MESHTASTIC,
         meshtastic_node_id=node_id,
+        **predicted_firmware_fields(node_id),
         **(defaults or {}),
     )
     return node, True

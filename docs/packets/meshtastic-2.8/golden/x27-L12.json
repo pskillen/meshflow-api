@@ -38,6 +38,8 @@
   },
   "observed_node": {
     "environment_exposure": 0,
+    "inferred_firmware": null,
+    "inferred_firmware_basis": null,
     "long_name": "Unknown Node !698239c8",
     "m2m_opt_out": false,
     "mac_addr": null,

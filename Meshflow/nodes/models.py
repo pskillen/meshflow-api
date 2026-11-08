@@ -85,7 +85,7 @@ class ManagedNode(models.Model):
         null=True,
         blank=True,
         db_index=True,
-        help_text=_("Predicted Meshtastic 2.8 node number: crc32 of the public key. Unverified on hardware."),
+        help_text=_("Predicted Meshtastic 2.8 node number: crc32 of the public key. Confirmed on hardware."),
     )
     owner = models.ForeignKey(
         "users.User",
@@ -452,8 +452,29 @@ class ObservedNode(models.Model):
         db_index=True,
         help_text=_(
             "Predicted Meshtastic 2.8 node number: crc32 of the 32-byte public key. "
-            "Unverified on hardware; null when there is no usable key."
+            "Confirmed on hardware; null when there is no usable key."
         ),
+    )
+    inferred_firmware = models.CharField(
+        max_length=16,
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text=_(
+            "Inferred firmware generation floor, e.g. '2.8'; '2.7' means 2.7 or earlier. "
+            "Null when there is no evidence (and always for MeshCore). Open set: no choices."
+        ),
+    )
+    inferred_firmware_basis = models.CharField(
+        max_length=32,
+        null=True,
+        blank=True,
+        help_text=_("What the inferred_firmware verdict rests on (key_identity, predicted_id, ...); null with it."),
+    )
+    inferred_firmware_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text=_("When inferred_firmware or its basis last changed."),
     )
     meshtastic_role = models.IntegerField(
         choices=RoleSource.choices,
