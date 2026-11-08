@@ -328,6 +328,8 @@ class PacketObservation(models.Model):
     rx_time = models.DateTimeField(null=False)
     # True when the feeder sent no rxTime and the API used its own clock.
     rx_time_estimated = models.BooleanField(default=False)
+    # True for a 2.8 connect-time replay (stored node record, not a radio reception). See packets/replay.py.
+    replayed = models.BooleanField(default=False)
     rx_rssi = models.FloatField(null=True)
     rx_snr = models.FloatField(null=True)
     upload_time = models.DateTimeField(null=False, default=timezone.now)

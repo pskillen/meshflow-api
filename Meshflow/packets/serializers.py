@@ -27,6 +27,7 @@ from constellations.models import MessageChannel
 from nodes.models import DeviceMetrics, ManagedNode, NodeLatestStatus, ObservedNode, Position
 
 from .hops import observation_hop_count, observation_is_direct
+from .replay import feeder_node_nums, is_replayed_shape, shape_detection_enabled
 from .models import (
     AirQualityMetricsPacket,
     DeviceMetricsPacket,
@@ -91,8 +92,14 @@ def convert_location_source(source):
         return LocationSource.UNSET
 
 
-def find_existing_packet(model_class, from_int, packet_id, rx_time):
-    """Find an existing packet that matches (sender, packet_id) within the dedup window."""
+def find_existing_packet(model_class, from_int, packet_id, rx_time, *, exact: bool = False):
+    """Find an existing packet that matches (sender, packet_id) within the dedup window.
+
+    ``exact=True`` (replayed packets) matches on (sender, packet_id) alone: a replay's rx_time is the node's old
+    last_heard and its id is stable across reconnects, so the window would never match.
+    """
+    if exact:
+        return model_class.objects.filter(from_int=from_int, packet_id=packet_id).first()
     window_minutes = getattr(settings, "PACKET_DEDUP_WINDOW_MINUTES", 10)
     window = timedelta(minutes=window_minutes)
     return model_class.objects.filter(
@@ -130,6 +137,8 @@ class BasePacketSerializer(serializers.Serializer):
     nextHop = serializers.IntegerField(source="next_hop", required=False, allow_null=True)
     priority = serializers.CharField(required=False, allow_null=True)
     raw = serializers.CharField(required=False)
+    # Set by a bot that detected a 2.8 connect-time replay itself. Trusted: a bot can only mark its own observations.
+    replayed = serializers.BooleanField(required=False, default=False)
 
     # non-serialized fields
     observation: PacketObservation
@@ -166,7 +175,27 @@ class BasePacketSerializer(serializers.Serializer):
             validated_data["rx_time"] = django_timezone.now()
             validated_data["rx_time_estimated"] = True
 
+        # Keep the fields replay detection needs; the feeder's numbers are only known at create() time.
+        if hasattr(data, "get"):
+            validated_data["_replay_probe"] = {
+                key: data.get(key) for key in ("from", "rxRssi", "transportMechanism", "priority")
+            }
+
         return validated_data
+
+    def _is_replayed(self, validated_data) -> bool:
+        """Body flag, or (unless the kill switch is off) the replay shape. Cached in validated_data."""
+        if "_replayed" in validated_data:
+            return validated_data["_replayed"]
+        replayed = bool(validated_data.get("replayed"))
+        probe = validated_data.get("_replay_probe")
+        if not replayed and probe is not None and shape_detection_enabled():
+            feeder_nums = self.context.get("feeder_nums")
+            if feeder_nums is None:
+                feeder_nums = feeder_node_nums(self.context.get("observer"))
+            replayed = is_replayed_shape(probe, feeder_nums)
+        validated_data["_replayed"] = replayed
+        return replayed
 
     def _create_observation(self, packet, validated_data):
         """Create a PacketObservation for the packet."""
@@ -211,6 +240,7 @@ class BasePacketSerializer(serializers.Serializer):
             bitfield=validated_data.get("bitfield"),
             rx_time=validated_data.get("rx_time"),
             rx_time_estimated=validated_data.get("rx_time_estimated", False),
+            replayed=self._is_replayed(validated_data),
             rx_rssi=validated_data.get("rx_rssi"),
             rx_snr=validated_data.get("rx_snr"),
             relay_node=validated_data.get("relay_node"),
@@ -252,7 +282,7 @@ class MessagePacketSerializer(BasePacketSerializer):
         from_int = validated_data.get("from_int")
         packet_id = validated_data.get("packet_id")
         rx_time = validated_data.get("rx_time")
-        existing_packet = find_existing_packet(MessagePacket, from_int, packet_id, rx_time)
+        existing_packet = find_existing_packet(MessagePacket, from_int, packet_id, rx_time, exact=self._is_replayed(validated_data))
 
         if existing_packet:
             # If packet exists, just create the observation
@@ -328,7 +358,7 @@ class PositionPacketSerializer(BasePacketSerializer):
         from_int = validated_data.get("from_int")
         packet_id = validated_data.get("packet_id")
         rx_time = validated_data.get("rx_time")
-        existing_packet = find_existing_packet(PositionPacket, from_int, packet_id, rx_time)
+        existing_packet = find_existing_packet(PositionPacket, from_int, packet_id, rx_time, exact=self._is_replayed(validated_data))
 
         if existing_packet:
             # If packet exists, just create the observation
@@ -442,7 +472,7 @@ class NodeInfoPacketSerializer(BasePacketSerializer):
         from_int = validated_data.get("from_int")
         packet_id = validated_data.get("packet_id")
         rx_time = validated_data.get("rx_time")
-        existing_packet = find_existing_packet(NodeInfoPacket, from_int, packet_id, rx_time)
+        existing_packet = find_existing_packet(NodeInfoPacket, from_int, packet_id, rx_time, exact=self._is_replayed(validated_data))
 
         if existing_packet:
             # If packet exists, just create the observation
@@ -523,7 +553,7 @@ class DeviceMetricsPacketSerializer(BasePacketSerializer):
         from_int = validated_data.get("from_int")
         packet_id = validated_data.get("packet_id")
         rx_time = validated_data.get("rx_time")
-        existing_packet = find_existing_packet(DeviceMetricsPacket, from_int, packet_id, rx_time)
+        existing_packet = find_existing_packet(DeviceMetricsPacket, from_int, packet_id, rx_time, exact=self._is_replayed(validated_data))
 
         if existing_packet:
             # If packet exists, just create the observation
@@ -613,7 +643,7 @@ class LocalStatsPacketSerializer(BasePacketSerializer):
         from_int = validated_data.get("from_int")
         packet_id = validated_data.get("packet_id")
         rx_time = validated_data.get("rx_time")
-        existing_packet = find_existing_packet(LocalStatsPacket, from_int, packet_id, rx_time)
+        existing_packet = find_existing_packet(LocalStatsPacket, from_int, packet_id, rx_time, exact=self._is_replayed(validated_data))
 
         if existing_packet:
             # If packet exists, just create the observation
@@ -707,7 +737,7 @@ class EnvironmentMetricsPacketSerializer(BasePacketSerializer):
         from_int = validated_data.get("from_int")
         packet_id = validated_data.get("packet_id")
         rx_time = validated_data.get("rx_time")
-        existing_packet = find_existing_packet(EnvironmentMetricsPacket, from_int, packet_id, rx_time)
+        existing_packet = find_existing_packet(EnvironmentMetricsPacket, from_int, packet_id, rx_time, exact=self._is_replayed(validated_data))
         if existing_packet:
             self._create_observation(existing_packet, validated_data)
             return existing_packet
@@ -809,7 +839,7 @@ class AirQualityMetricsPacketSerializer(BasePacketSerializer):
         from_int = validated_data.get("from_int")
         packet_id = validated_data.get("packet_id")
         rx_time = validated_data.get("rx_time")
-        existing_packet = find_existing_packet(AirQualityMetricsPacket, from_int, packet_id, rx_time)
+        existing_packet = find_existing_packet(AirQualityMetricsPacket, from_int, packet_id, rx_time, exact=self._is_replayed(validated_data))
         if existing_packet:
             self._create_observation(existing_packet, validated_data)
             return existing_packet
@@ -899,7 +929,7 @@ class PowerMetricsPacketSerializer(BasePacketSerializer):
         from_int = validated_data.get("from_int")
         packet_id = validated_data.get("packet_id")
         rx_time = validated_data.get("rx_time")
-        existing_packet = find_existing_packet(PowerMetricsPacket, from_int, packet_id, rx_time)
+        existing_packet = find_existing_packet(PowerMetricsPacket, from_int, packet_id, rx_time, exact=self._is_replayed(validated_data))
         if existing_packet:
             self._create_observation(existing_packet, validated_data)
             return existing_packet
@@ -967,7 +997,7 @@ class HealthMetricsPacketSerializer(BasePacketSerializer):
         from_int = validated_data.get("from_int")
         packet_id = validated_data.get("packet_id")
         rx_time = validated_data.get("rx_time")
-        existing_packet = find_existing_packet(HealthMetricsPacket, from_int, packet_id, rx_time)
+        existing_packet = find_existing_packet(HealthMetricsPacket, from_int, packet_id, rx_time, exact=self._is_replayed(validated_data))
         if existing_packet:
             self._create_observation(existing_packet, validated_data)
             return existing_packet
@@ -1028,7 +1058,7 @@ class HostMetricsPacketSerializer(BasePacketSerializer):
         from_int = validated_data.get("from_int")
         packet_id = validated_data.get("packet_id")
         rx_time = validated_data.get("rx_time")
-        existing_packet = find_existing_packet(HostMetricsPacket, from_int, packet_id, rx_time)
+        existing_packet = find_existing_packet(HostMetricsPacket, from_int, packet_id, rx_time, exact=self._is_replayed(validated_data))
         if existing_packet:
             self._create_observation(existing_packet, validated_data)
             return existing_packet
@@ -1103,7 +1133,7 @@ class TrafficManagementStatsPacketSerializer(BasePacketSerializer):
         from_int = validated_data.get("from_int")
         packet_id = validated_data.get("packet_id")
         rx_time = validated_data.get("rx_time")
-        existing_packet = find_existing_packet(TrafficManagementStatsPacket, from_int, packet_id, rx_time)
+        existing_packet = find_existing_packet(TrafficManagementStatsPacket, from_int, packet_id, rx_time, exact=self._is_replayed(validated_data))
         if existing_packet:
             self._create_observation(existing_packet, validated_data)
             return existing_packet
@@ -1171,7 +1201,7 @@ class TraceroutePacketSerializer(BasePacketSerializer):
         from_int = validated_data.get("from_int")
         packet_id = validated_data.get("packet_id")
         rx_time = validated_data.get("rx_time")
-        existing_packet = find_existing_packet(TraceroutePacket, from_int, packet_id, rx_time)
+        existing_packet = find_existing_packet(TraceroutePacket, from_int, packet_id, rx_time, exact=self._is_replayed(validated_data))
 
         if existing_packet:
             self._create_observation(existing_packet, validated_data)
@@ -1256,7 +1286,7 @@ class GenericPacketSerializer(BasePacketSerializer):
         from_int = validated_data.get("from_int")
         packet_id = validated_data.get("packet_id")
         rx_time = validated_data.get("rx_time")
-        existing_packet = find_existing_packet(GenericPacket, from_int, packet_id, rx_time)
+        existing_packet = find_existing_packet(GenericPacket, from_int, packet_id, rx_time, exact=self._is_replayed(validated_data))
 
         if existing_packet:
             self._create_observation(existing_packet, validated_data)
@@ -1725,6 +1755,7 @@ class PrefetchedPacketObservationSerializer(serializers.ModelSerializer):
             "observer_position",
             "rx_time",
             "rx_rssi",
+            "replayed",
             "rx_snr",
             "direct_from_sender",
             "hop_count",
