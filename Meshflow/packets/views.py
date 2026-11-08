@@ -54,12 +54,12 @@ class PacketIngestView(APIView):
     authentication_classes = [NodeAPIKeyAuthentication]
     permission_classes = [NodeAuthorizationPermission]
 
-    def post(self, request, node_id, format=None):
+    def post(self, request, node_id=None, format=None):
         """Process a packet ingestion request.
 
         Args:
             request: The HTTP request object containing the packet data.
-            node_id: The node ID from the URL.
+            node_id: The node ID from the legacy URL; None on the v4 feeder URL.
             format: The format of the request data (not used).
 
         Returns:
@@ -171,29 +171,31 @@ class BaseNodeUpsertView(APIView):
     permission_classes = [NodeAuthorizationPermission]
     serializer_class = NodeSerializer
 
-    def post(self, request, node_id, format=None):
+    def post(self, request, node_id=None, format=None):
         """
         Process a node upsert request.
 
         Args:
             request: The HTTP request object containing the node data.
-            node_id: The node ID from the URL.
+            node_id: The node ID from the legacy URL; None on the v4 feeder URL, where the API key
+                alone identifies the feeder and there is no path number to check.
             format: The format of the request data (not used).
 
         Returns:
             Response: A DRF Response object with the result of the upsert operation.
         """
-        # Get node_id from request data and sanitize it
-        if not node_id:
-            return Response(
-                {"status": "error", "message": "Node ID is required"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        if not request.auth.node.meshtastic_node_id == node_id:
-            return Response(
-                {"status": "error", "message": "Node ID does not match authenticated node"},
-                status=status.HTTP_403_FORBIDDEN,
-            )
+        if node_id is not None:
+            # Legacy URLs: the path number must be the authenticated feeder's.
+            if not node_id:
+                return Response(
+                    {"status": "error", "message": "Node ID is required"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if not request.auth.node.meshtastic_node_id == node_id:
+                return Response(
+                    {"status": "error", "message": "Node ID does not match authenticated node"},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
 
         # Handle different node_id formats
         warnings = []
@@ -299,13 +301,13 @@ class ManagedNodeBotVersionView(APIView):
     authentication_classes = [NodeAPIKeyAuthentication]
     permission_classes = [NodeAuthorizationPermission]
 
-    def put(self, request, node_id, format=None):
+    def put(self, request, node_id=None, format=None):
         return self._update(request)
 
-    def post(self, request, node_id, format=None):
+    def post(self, request, node_id=None, format=None):
         return self._update(request)
 
-    def patch(self, request, node_id, format=None):
+    def patch(self, request, node_id=None, format=None):
         return self._update(request)
 
     def _update(self, request):
