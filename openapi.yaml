@@ -1818,6 +1818,16 @@ components:
           maximum: 7
           description: Default for TR_HOPS_LIMIT and TEXT_MESSAGE_MAX_HOPS env vars
 
+    ApiKeyAlreadyLinkedError:
+      type: object
+      properties:
+        error:
+          type: string
+          example: This API key is already linked to a feeder. Create a separate key for each feeder.
+        code:
+          type: string
+          enum: [api_key_already_linked]
+
     NodeAPIKey:
       type: object
       description: >
@@ -6296,6 +6306,8 @@ paths:
                   type: integer
                 nodes:
                   type: array
+                  maxItems: 1
+                  description: At most one feeder in total across nodes and managed_node_internal_ids
                   items:
                     type: integer
       responses:
@@ -6305,6 +6317,15 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/NodeAPIKey'
+        '400':
+          description: >-
+            Refused. When a key would be linked to more than one feeder the body is
+            `{"error": "This API key is already linked to a feeder. Create a separate key for each feeder.",
+            "code": "api_key_already_linked"}`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiKeyAlreadyLinkedError'
 
   /nodes/api-keys/{id}/:
     get:
@@ -6404,6 +6425,15 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/NodeAPIKey'
+        '400':
+          description: >-
+            Refused. When a key would be linked to more than one feeder the body is
+            `{"error": "This API key is already linked to a feeder. Create a separate key for each feeder.",
+            "code": "api_key_already_linked"}`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiKeyAlreadyLinkedError'
 
   /nodes/api-keys/{id}/remove_node/:
     post:
