@@ -17,6 +17,8 @@ class NodeConsumer(AsyncWebsocketConsumer):
     WebSocket consumer for ManagedNode bots.
 
     Bots connect with NodeAPIKey via query param: ws/nodes/?api_key=<key>
+    With ``feeder_scoped=1`` the key alone identifies the feeder: it must have exactly one active
+    feeder, as on the v4 feeder URLs, and any feeder_node_id / feeder_pubkey_prefix is ignored.
     On connect, the bot joins its ManagedNode group (see common.ws_groups) and receives commands
     (e.g. traceroute) pushed via the channel layer.
     """
@@ -29,6 +31,15 @@ class NodeConsumer(AsyncWebsocketConsumer):
         if not api_key:
             logger.warning("NodeConsumer: missing api_key in query string")
             await self.close()
+            return
+
+        if query_params.get("feeder_scoped") == "1":
+            managed_node, code = await self._resolve_feeder_scoped(api_key)
+            if not managed_node:
+                logger.warning("NodeConsumer: feeder_scoped connect rejected code=%s", code)
+                await self.close()
+                return
+            await self._join(managed_node)
             return
 
         feeder_pubkey_prefix = query_params.get("feeder_pubkey_prefix")
@@ -62,6 +73,9 @@ class NodeConsumer(AsyncWebsocketConsumer):
             await self.close()
             return
 
+        await self._join(managed_node)
+
+    async def _join(self, managed_node):
         from common.ws_groups import managed_node_ws_group
 
         self.managed_node = managed_node
@@ -90,6 +104,23 @@ class NodeConsumer(AsyncWebsocketConsumer):
         command = event.get("command", {})
         logger.info(f"NodeConsumer: forwarding command to bot: {command}")
         await self.send(text_data=json.dumps(command))
+
+    @database_sync_to_async
+    def _resolve_feeder_scoped(self, api_key):
+        """Resolve the key's single active feeder: (ManagedNode, None) or (None, code)."""
+        from common.feeder_auth import FeederResolutionError, resolve_single_feeder
+        from nodes.models import NodeAPIKey
+
+        try:
+            key_obj = NodeAPIKey.objects.get(key=api_key, is_active=True)
+        except NodeAPIKey.DoesNotExist:
+            return None, "invalid_api_key"
+        key_obj.last_used = timezone.now()
+        key_obj.save(update_fields=["last_used"])
+        try:
+            return resolve_single_feeder(key_obj), None
+        except FeederResolutionError as exc:
+            return None, exc.code
 
     @database_sync_to_async
     def _validate_api_key(
