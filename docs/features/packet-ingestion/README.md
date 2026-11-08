@@ -39,7 +39,7 @@ Sample JSON: [docs/packets/](../../packets/) (MT by portnum), [docs/packets/mesh
 
 | Protocol | Ingest app | Endpoint | Phase |
 | --- | --- | --- | --- |
-| Meshtastic | `packets` | `POST /api/packets/{node_id}/ingest/` (also `/api/v3/packets/…`, and key-scoped `POST /api/v4/feeder/meshtastic/ingest/`) | Production; v4 built, bot support pending |
+| Meshtastic | `packets` | `POST /api/packets/{node_id}/ingest/` (also `/api/v3/packets/…`, and key-scoped `POST /api/v4/feeder/meshtastic/ingest/`) | Production |
 | MeshCore | `meshcore_packets` | `POST /api/meshcore/feeders/{prefix}/packets/ingest/` | Phase 1 MVP (advert + text); [#266](https://github.com/pskillen/meshflow-api/issues/266) for full types |
 
 MeshCore uses a **parallel** schema (pubkeys, `pkt_hash`, no Meshtastic `packet_id`) — see [meshcore.md](meshcore.md) and ADRs under [adr/](adr/README.md).
