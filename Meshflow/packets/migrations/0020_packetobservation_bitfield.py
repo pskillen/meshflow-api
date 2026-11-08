@@ -11,6 +11,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='packetobservation',
             name='bitfield',
-            field=models.SmallIntegerField(null=True),
+            field=models.PositiveIntegerField(null=True),
         ),
     ]
