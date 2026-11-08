@@ -3,10 +3,11 @@ import logging
 from django.dispatch import receiver
 
 from common.mesh_node_helpers import meshtastic_id_to_hex
-from nodes.models import NodeLatestStatus, ObservedNode
+from nodes.models import ObservedNode
 from nodes.services.observed_nodes import get_or_create_meshtastic_observed_node
 from traceroute.new_node_baseline import enqueue_new_node_baseline
 
+from .hops import update_inferred_max_hops
 from .models import (
     AirQualityMetricsPacket,
     DeviceMetricsPacket,
@@ -54,7 +55,7 @@ from .signals import (
 logger = logging.getLogger(__name__)
 
 
-# Packet types that already update NodeLatestStatus (and set meshtastic_inferred_max_hops there)
+# Packet types whose services already call update_inferred_max_hops
 _PACKET_TYPES_WITH_NLS_UPDATE = (
     PositionPacket,
     DeviceMetricsPacket,
@@ -66,13 +67,31 @@ _PACKET_TYPES_WITH_NLS_UPDATE = (
 )
 
 
+# Port for packets whose row has no port_num (hand-built rows); otherwise packet.port_num is used.
+_PORT_BY_PACKET_TYPE = (
+    (MessagePacket, "TEXT_MESSAGE_APP"),
+    (NodeInfoPacket, "NODEINFO_APP"),
+    (TraceroutePacket, "TRACEROUTE_APP"),
+    (LocalStatsPacket, "TELEMETRY_APP"),
+    (TrafficManagementStatsPacket, "TELEMETRY_APP"),
+)
+
+
+def _port_name(packet) -> str | None:
+    if getattr(packet, "port_num", None):
+        return packet.port_num
+    for packet_type, port in _PORT_BY_PACKET_TYPE:
+        if isinstance(packet, packet_type):
+            return port
+    return None
+
+
 @receiver(packet_received)
 def on_packet_received_update_inferred_max_hops(sender, packet, observer, observation, **kwargs):
-    """Update NodeLatestStatus.meshtastic_inferred_max_hops for packet types that don't update NodeLatestStatus."""
+    """Update meshtastic_inferred_max_hops (packets.hops) for packet types whose services don't."""
     if isinstance(packet, _PACKET_TYPES_WITH_NLS_UPDATE):
         return
-    hop_start = observation.hop_start if observation else None
-    if hop_start is None:
+    if observation is None or observation.hop_start is None:
         return
     sender_node_id = getattr(packet, "from_int", None)
     if sender_node_id is None:
@@ -87,13 +106,7 @@ def on_packet_received_update_inferred_max_hops(sender, packet, observer, observ
     )
     if created:
         enqueue_new_node_baseline(observed_node, observer)
-    node_status, created = NodeLatestStatus.objects.get_or_create(
-        node=observed_node,
-        defaults={"meshtastic_inferred_max_hops": hop_start},
-    )
-    if not created and node_status.meshtastic_inferred_max_hops != hop_start:
-        node_status.meshtastic_inferred_max_hops = hop_start
-        node_status.save(update_fields=["meshtastic_inferred_max_hops"])
+    update_inferred_max_hops(observed_node, observation, _port_name(packet))
 
 
 @receiver(position_packet_received)

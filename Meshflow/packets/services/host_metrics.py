@@ -35,6 +35,6 @@ class HostMetricsPacketService(BasePacketService):
                 "host_uptime_seconds": self.packet.uptime_seconds,
                 "host_freemem_bytes": self.packet.freemem_bytes,
                 "host_reported_time": reported_time,
-                "meshtastic_inferred_max_hops": self.observation.hop_start,
             },
         )
+        self._update_inferred_max_hops("TELEMETRY_APP")

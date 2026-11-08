@@ -5,6 +5,7 @@ import abc
 from common.mesh_node_helpers import meshtastic_id_to_hex
 from nodes.models import ManagedNode, ObservedNode
 from nodes.services.observed_nodes import get_or_create_meshtastic_observed_node
+from packets.hops import update_inferred_max_hops
 from packets.models import MtRawPacket, PacketObservation
 from packets.signals import new_node_observed, node_last_heard_advanced, packet_from_node_processed
 from users.models import User
@@ -70,6 +71,10 @@ class BasePacketService(abc.ABC):
                 self._dx_previous_last_heard = self.from_node.last_heard
         else:
             raise ValueError("Packet has no from_int")
+
+    def _update_inferred_max_hops(self, port_num: str) -> None:
+        """Update the sender's inferred max hops from this packet's observation (see packets.hops)."""
+        update_inferred_max_hops(self.from_node, self.observation, port_num)
 
     def _update_node_last_heard(self) -> None:
         """Update the last_heard timestamp of the node that sent the packet."""
