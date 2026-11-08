@@ -2,7 +2,7 @@
 
 Idempotent and batched. Safe to re-run; ``--dry-run`` writes nothing and reports what a real run would write.
 A row with no evidence is left untouched (a verdict is never cleared). Reads the stored ``meshtastic_key_node_id``,
-so run ``backfill_meshtastic_identity`` first in an environment that never ran it.
+and each live feeder's reported firmware, so run ``backfill_meshtastic_identity`` first in an environment that never ran it.
 """
 
 from collections import Counter
@@ -14,7 +14,7 @@ from django.utils import timezone
 from common.meshtastic_firmware import ADOPTION_WINDOW_HOURS, Evidence, classify
 from common.protocol import Protocol
 from nodes.models import ObservedNode
-from nodes.services.node_firmware import FIRMWARE_FIELDS, apply_verdict
+from nodes.services.node_firmware import FIRMWARE_FIELDS, apply_verdict, feeder_firmware_map
 
 
 class Command(BaseCommand):
@@ -40,6 +40,9 @@ class Command(BaseCommand):
                 "meshtastic_key_node_id", flat=True
             )
         )
+
+        # One query for every reporting feeder, rather than one per row.
+        self._feeder_firmware = feeder_firmware_map()
 
         scanned = updated = active = active_with_key = 0
         results = Counter()
@@ -78,12 +81,13 @@ class Command(BaseCommand):
         )
 
     def _evidence(self, node):
-        """What we know about one row. Kept in one place: the feeder-report rule adds its lookup here."""
+        """What we know about one row. Kept in one place; mirrors ``nodes.services.node_firmware.build_evidence``."""
         key_id = node.meshtastic_key_node_id
         return Evidence(
             node_num=node.meshtastic_node_id,
             key_node_id=key_id,
             number_is_another_nodes_key_id=key_id is None and node.meshtastic_node_id in self._key_ids,
+            feeder_firmware=self._feeder_firmware.get(node.meshtastic_node_id),
         )
 
     @staticmethod

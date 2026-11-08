@@ -35,6 +35,7 @@ from prometheus_client import Counter
 from common.mesh_node_helpers import meshtastic_id_to_hex
 from common.protocol import Protocol
 from nodes.models import ManagedNode
+from nodes.services.node_firmware import refresh_feeder_row
 
 logger = logging.getLogger(__name__)
 
@@ -158,6 +159,8 @@ def record_feeder_usage(
         ManagedNode.objects.filter(pk=node.pk).update(**fields)
         for name, value in fields.items():
             setattr(node, name, value)
+        if "reported_firmware_version" in fields:
+            refresh_feeder_row(node, now=now)
     return fields
 
 
