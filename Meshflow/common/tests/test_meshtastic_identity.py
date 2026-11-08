@@ -24,7 +24,7 @@ WORKED_EXAMPLE_PREDICTED = "!4396524c"
 
 
 def test_worked_example_predicts_expected_id():
-    """!da545c78 is predicted to become !4396524c (zlib equals the firmware's crc32, confirmed on hardware 2026-11-08)."""
+    """!da545c78 is predicted to become !4396524c (zlib equals the firmware crc32; hardware-confirmed 2026-11-08)."""
     assert meshtastic_id_to_hex(key_node_id(WORKED_EXAMPLE_B64)) == WORKED_EXAMPLE_PREDICTED
 
 
