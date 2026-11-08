@@ -26,6 +26,7 @@ from common.protocol import Protocol
 from constellations.models import MessageChannel
 from nodes.models import DeviceMetrics, ManagedNode, NodeLatestStatus, ObservedNode, Position
 
+from .hops import observation_hop_count, observation_is_direct
 from .models import (
     AirQualityMetricsPacket,
     DeviceMetricsPacket,
@@ -152,6 +153,11 @@ class BasePacketSerializer(serializers.Serializer):
         if "decoded" in data and "portnum" in data["decoded"]:
             validated_data["port_num"] = normalise_portnum(data["decoded"]["portnum"])
 
+        # decoded.bitfield (2.8+ firmware). Absent stays absent: null is not 0.
+        bitfield = data["decoded"].get("bitfield") if isinstance(data.get("decoded"), dict) else None
+        if isinstance(bitfield, int) and not isinstance(bitfield, bool):
+            validated_data["bitfield"] = bitfield
+
         # Convert rxTime to a datetime object with validation. A feeder with no rxTime (protobuf3 drops 0)
         # gets the API clock, flagged on the observation.
         if validated_data.get("rx_time"):
@@ -202,6 +208,7 @@ class BasePacketSerializer(serializers.Serializer):
             channel=channel_instance,
             hop_limit=validated_data.get("hop_limit"),
             hop_start=validated_data.get("hop_start"),
+            bitfield=validated_data.get("bitfield"),
             rx_time=validated_data.get("rx_time"),
             rx_time_estimated=validated_data.get("rx_time_estimated", False),
             rx_rssi=validated_data.get("rx_rssi"),
@@ -1725,14 +1732,12 @@ class PrefetchedPacketObservationSerializer(serializers.ModelSerializer):
         return False
 
     def get_direct_from_sender(self, obj):
-        """Return True if the packet was heard directly from the sender."""
-        return obj.hop_start == obj.hop_limit
+        """Return True if the packet was heard directly from the sender; False when the hop count is unknown."""
+        return observation_is_direct(obj)
 
     def get_hop_count(self, obj):
-        """Return the hop count (hop_start minus hop_limit)."""
-        if obj.hop_start is None or obj.hop_limit is None:
-            return None
-        return obj.hop_start - obj.hop_limit
+        """Return the hop count (hop_start minus hop_limit); None when unknown (hop_start 0 and no bitfield)."""
+        return observation_hop_count(obj)
 
     def get_observer(self, obj):
         # Pass self as parent so context is inherited
