@@ -322,6 +322,8 @@ class PacketObservation(models.Model):
     channel = models.ForeignKey(MessageChannel, on_delete=models.CASCADE, null=True)
     hop_limit = models.SmallIntegerField(null=True)
     hop_start = models.SmallIntegerField(null=True)
+    # decoded.bitfield. Null = absent (not the same as 0). Sent by 2.8+ firmware.
+    bitfield = models.SmallIntegerField(null=True)
 
     rx_time = models.DateTimeField(null=False)
     # True when the feeder sent no rxTime and the API used its own clock.
