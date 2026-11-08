@@ -8,7 +8,6 @@ from rest_framework.views import APIView
 
 from common.feeder_metrics import FeederApiUsageMixin
 from common.mesh_node_helpers import meshtastic_hex_to_int, meshtastic_id_to_hex
-from common.protocol import Protocol
 from nodes.authentication import NodeAPIKeyAuthentication
 from nodes.permissions import NodeAuthorizationPermission
 from nodes.services.observed_nodes import get_meshtastic_observed_node
