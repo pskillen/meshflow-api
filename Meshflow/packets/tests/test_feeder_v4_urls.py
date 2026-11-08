@@ -7,6 +7,7 @@ from rest_framework.test import APIClient
 
 from common.protocol import Protocol
 from nodes.models import NodeAuth, ObservedNode
+from packets.models import MtRawPacket, PacketObservation
 
 MC_PUBKEY = "cd" * 32
 FEEDER_NUM = 0x1A2B3C4D
@@ -141,6 +142,94 @@ def test_ingest_single_key(single_feeder):
 
     assert response.status_code == 201, response.content
     assert response.data["status"] == "success"
+    observation = PacketObservation.objects.get()
+    assert observation.observer_id == node.pk
+
+
+def _observation_fields():
+    return sorted(
+        (o.observer_id, o.packet.packet_id, o.packet.port_num, o.packet.from_int, o.packet.to_int, o.rx_time)
+        for o in PacketObservation.objects.select_related("packet")
+    )
+
+
+@pytest.mark.django_db
+def test_ingest_matches_v3_and_observer_is_keys_feeder(single_feeder):
+    """v4 stores what v3 stores, attributed to the key's feeder (no node number in the URL)."""
+    node, api_key = single_feeder
+    client = APIClient()
+
+    v3 = client.post(
+        reverse("meshtastic-packet-ingest-v3", kwargs={"node_id": FEEDER_NUM}),
+        _text_packet(),
+        format="json",
+        HTTP_X_API_KEY=api_key.key,
+    )
+    assert v3.status_code == 201, v3.content
+    via_v3 = _observation_fields()
+    PacketObservation.objects.all().delete()
+    MtRawPacket.objects.all().delete()
+
+    v4 = _call("feeder-v4-meshtastic-ingest", api_key, data=_text_packet())
+    assert v4.status_code == 201, v4.content
+    via_v4 = _observation_fields()
+
+    assert via_v4 == via_v3
+    assert {o[0] for o in via_v4} == {node.pk}
+
+
+@pytest.fixture
+def two_single_key_feeders(create_managed_node, create_constellation, create_node_api_key):
+    constellation = create_constellation(protocol=Protocol.MESHTASTIC)
+    node_a = create_managed_node(constellation=constellation, name="A", meshtastic_node_id=FEEDER_NUM)
+    node_b = create_managed_node(constellation=constellation, name="B", meshtastic_node_id=FEEDER_NUM + 1)
+    key_a = create_node_api_key(constellation=constellation)
+    key_b = create_node_api_key(constellation=constellation)
+    NodeAuth.objects.create(api_key=key_a, node=node_a)
+    NodeAuth.objects.create(api_key=key_b, node=node_b)
+    return node_a, node_b, key_a
+
+
+@pytest.mark.django_db
+def test_header_node_number_cannot_select_feeder_on_ingest(two_single_key_feeders):
+    node_a, node_b, key_a = two_single_key_feeders
+
+    response = _call(
+        "feeder-v4-meshtastic-ingest",
+        key_a,
+        data=_text_packet(),
+        HTTP_X_MESHTASTIC_FEEDER_NODE_NUM=str(node_b.meshtastic_node_id),
+    )
+
+    assert response.status_code == 201, response.content
+    assert set(PacketObservation.objects.values_list("observer_id", flat=True)) == {node_a.pk}
+    node_a.refresh_from_db()
+    node_b.refresh_from_db()
+    assert node_a.meshtastic_node_id == FEEDER_NUM
+    assert node_b.meshtastic_node_id == FEEDER_NUM + 1
+    assert node_b.reported_meshtastic_node_id is None
+
+
+@pytest.mark.django_db
+def test_body_node_number_cannot_select_feeder_on_bot_version(two_single_key_feeders):
+    node_a, node_b, key_a = two_single_key_feeders
+
+    response = _call(
+        "feeder-v4-bot-version",
+        key_a,
+        method="put",
+        data={"bot_version": "9.9.9", "meshtastic_node_num": node_b.meshtastic_node_id},
+    )
+
+    assert response.status_code == 200, response.content
+    node_a.refresh_from_db()
+    node_b.refresh_from_db()
+    assert node_a.bot_version == "9.9.9"
+    assert node_b.bot_version != "9.9.9"
+    assert node_a.meshtastic_node_id == FEEDER_NUM
+    assert node_b.meshtastic_node_id == FEEDER_NUM + 1
+    assert node_a.reported_meshtastic_node_id == FEEDER_NUM + 1
+    assert node_b.reported_meshtastic_node_id is None
 
 
 @pytest.mark.django_db
