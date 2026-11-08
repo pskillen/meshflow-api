@@ -68,8 +68,7 @@ jobs:
       - name: Test Report
         uses: dorny/test-reporter@v3
         with:
-          name: contract
+          name: contract-report
           path: reports/contract.xml
           reporter: python-xunit
         if: always()
-        continue-on-error: true
