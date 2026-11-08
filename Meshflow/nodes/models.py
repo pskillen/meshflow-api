@@ -248,6 +248,20 @@ class ManagedNode(models.Model):
         blank=True,
         help_text=_("When reported_meshtastic_node_id was last written."),
     )
+    reported_firmware_version = models.CharField(
+        max_length=64,
+        null=True,
+        blank=True,
+        help_text=_(
+            "Firmware version the bot last reported (X-Meshtastic-Feeder-Firmware), e.g. 2.8.2.d5f1619. "
+            "Meshtastic feeders only. The strongest evidence for the node's firmware generation."
+        ),
+    )
+    firmware_reported_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text=_("When reported_firmware_version was last written."),
+    )
 
     class Meta:
         """Model metadata."""

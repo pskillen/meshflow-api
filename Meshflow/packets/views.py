@@ -335,6 +335,7 @@ class ManagedNodeBotVersionView(FeederApiUsageMixin, APIView):
     permission_classes = [NodeAuthorizationPermission]
     feeder_endpoint = "bot-version"
     reported_node_num_body_field = "meshtastic_node_num"
+    reported_firmware_body_field = "meshtastic_firmware_version"
 
     def put(self, request, node_id=None, format=None):
         return self._update(request)
