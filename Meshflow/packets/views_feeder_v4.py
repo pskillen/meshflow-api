@@ -9,6 +9,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from common.feeder_auth import FeederScopedPermission
+from common.feeder_metrics import API_V4, FeederApiUsageMixin
 from common.protocol import Protocol
 from nodes.authentication import NodeAPIKeyAuthentication
 
@@ -22,19 +23,23 @@ _PROTOCOL_WIRE = {
 
 def identity_mismatch(managed_node) -> bool:
     """True when the feeder last reported a node number other than the stored one."""
-    reported = getattr(managed_node, "reported_meshtastic_node_id", None)
+    reported = managed_node.reported_meshtastic_node_id
     return reported is not None and reported != managed_node.meshtastic_node_id
 
 
-class FeederIdentityView(APIView):
+class FeederIdentityView(FeederApiUsageMixin, APIView):
     """``GET identity/``: which feeder this API key identifies. The bot's v4 probe."""
 
     authentication_classes = [NodeAPIKeyAuthentication]
     permission_classes = [FeederScopedPermission]
     feeder_protocol = None
+    feeder_api = API_V4
+    feeder_endpoint = "identity"
 
     def get(self, request, format=None):
         node = request.auth.node
+        # Record the reported number first so this response reflects the bot's own report.
+        self.record_feeder_usage(request)
         return Response(
             {
                 "internal_id": str(node.internal_id),
@@ -43,7 +48,7 @@ class FeederIdentityView(APIView):
                 "constellation_id": node.constellation_id,
                 "meshtastic_node_id": node.meshtastic_node_id,
                 "node_id_str": node.node_id_str,
-                "reported_meshtastic_node_id": getattr(node, "reported_meshtastic_node_id", None),
+                "reported_meshtastic_node_id": node.reported_meshtastic_node_id,
                 "identity_mismatch": identity_mismatch(node),
             },
             status=status.HTTP_200_OK,
@@ -55,6 +60,7 @@ class FeederBotVersionViewV4(ManagedNodeBotVersionView):
 
     permission_classes = [FeederScopedPermission]
     feeder_protocol = None
+    feeder_api = API_V4
 
 
 class FeederMeshtasticIngestViewV4(PacketIngestView):
@@ -62,6 +68,7 @@ class FeederMeshtasticIngestViewV4(PacketIngestView):
 
     permission_classes = [FeederScopedPermission]
     feeder_protocol = Protocol.MESHTASTIC
+    feeder_api = API_V4
 
 
 class FeederMeshtasticNodeUpsertViewV4(NodeUpsertViewV3):
@@ -69,3 +76,4 @@ class FeederMeshtasticNodeUpsertViewV4(NodeUpsertViewV3):
 
     permission_classes = [FeederScopedPermission]
     feeder_protocol = Protocol.MESHTASTIC
+    feeder_api = API_V4

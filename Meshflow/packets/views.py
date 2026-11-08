@@ -4,6 +4,7 @@ from rest_framework import serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from common.feeder_metrics import FeederApiUsageMixin
 from common.mesh_node_helpers import meshtastic_hex_to_int
 from common.protocol import Protocol
 from nodes.authentication import NodeAPIKeyAuthentication
@@ -42,7 +43,7 @@ from .signals import (
 )
 
 
-class PacketIngestView(APIView):
+class PacketIngestView(FeederApiUsageMixin, APIView):
     """
     Meshtastic packet ingestion endpoint.
 
@@ -53,6 +54,7 @@ class PacketIngestView(APIView):
 
     authentication_classes = [NodeAPIKeyAuthentication]
     permission_classes = [NodeAuthorizationPermission]
+    feeder_endpoint = "ingest"
 
     def post(self, request, node_id=None, format=None):
         """Process a packet ingestion request.
@@ -160,7 +162,7 @@ class PacketIngestView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-class BaseNodeUpsertView(APIView):
+class BaseNodeUpsertView(FeederApiUsageMixin, APIView):
     """
     Meshtastic observed-node upsert for feeders (Node API key).
 
@@ -170,6 +172,7 @@ class BaseNodeUpsertView(APIView):
     authentication_classes = [NodeAPIKeyAuthentication]
     permission_classes = [NodeAuthorizationPermission]
     serializer_class = NodeSerializer
+    feeder_endpoint = "nodes"
 
     def post(self, request, node_id=None, format=None):
         """
@@ -290,7 +293,7 @@ class ManagedNodeBotVersionSerializer(serializers.Serializer):
     bot_version = serializers.CharField(max_length=128, trim_whitespace=True)
 
 
-class ManagedNodeBotVersionView(APIView):
+class ManagedNodeBotVersionView(FeederApiUsageMixin, APIView):
     """
     Update the reporting meshflow-bot version for the authenticated managed node.
 
@@ -300,6 +303,8 @@ class ManagedNodeBotVersionView(APIView):
 
     authentication_classes = [NodeAPIKeyAuthentication]
     permission_classes = [NodeAuthorizationPermission]
+    feeder_endpoint = "bot-version"
+    reported_node_num_body_field = "meshtastic_node_num"
 
     def put(self, request, node_id=None, format=None):
         return self._update(request)

@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from django import forms
 from django.contrib import admin, messages
 from django.contrib.admin.widgets import FilteredSelectMultiple
@@ -5,6 +7,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 from django.db.models import Q
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.html import format_html, format_html_join
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
@@ -67,6 +70,9 @@ MANAGED_NODE_MESHCORE_FEEDER_FIELDS = (
 )
 MANAGED_NODE_COMMON_FIELDS = MANAGED_NODE_MESHTASTIC_FEEDER_FIELDS
 MANAGED_NODE_CHANNEL_FIELDS = tuple(f"meshtastic_channel_{i}" for i in range(8))
+MANAGED_NODE_FEEDER_API_FIELDS = ("feeder_api_generation", "feeder_api_last_used_at", "legacy_api_last_used_at")
+MANAGED_NODE_REPORTED_IDENTITY_FIELDS = ("reported_meshtastic_node_id", "identity_reported_at")
+LEGACY_FEEDER_URL_WINDOW = timedelta(days=7)
 
 
 class ProtocolListFilter(admin.SimpleListFilter):
@@ -81,6 +87,24 @@ class ProtocolListFilter(admin.SimpleListFilter):
     def queryset(self, request, queryset):
         if self.value():
             return queryset.filter(protocol=int(self.value()))
+        return queryset
+
+
+class LegacyFeederUrlFilter(admin.SimpleListFilter):
+    """Feeders whose bot called a legacy (pre-v4) feeder URL in the last 7 days (ADR-0005)."""
+
+    title = _("On legacy URLs (last 7 days)")
+    parameter_name = "legacy_urls_7d"
+
+    def lookups(self, request, model_admin):
+        return (("yes", _("Yes")), ("no", _("No")))
+
+    def queryset(self, request, queryset):
+        since = timezone.now() - LEGACY_FEEDER_URL_WINDOW
+        if self.value() == "yes":
+            return queryset.filter(legacy_api_last_used_at__gte=since)
+        if self.value() == "no":
+            return queryset.exclude(legacy_api_last_used_at__gte=since)
         return queryset
 
 
@@ -559,6 +583,8 @@ class ManagedNodeAdmin(admin.ModelAdmin):
         ("constellation__protocol", admin.ChoicesFieldListFilter),
         ManagedNodeActiveFilter,
         PredictedNodeIdFilter,
+        LegacyFeederUrlFilter,
+        "feeder_api_generation",
         "owner",
         "constellation",
         "allow_auto_traceroute",
@@ -652,8 +678,12 @@ class ManagedNodeAdmin(admin.ModelAdmin):
 
     def get_readonly_fields(self, request, obj=None):
         if obj and obj.protocol == Protocol.MESHCORE:
-            return ("display_id", "mc_channels_mirror", "mc_channels_synced_at")
-        return ("mc_channels_synced_at", "meshtastic_public_key", "predicted_node_id_str")
+            return ("display_id", "mc_channels_mirror", "mc_channels_synced_at") + MANAGED_NODE_FEEDER_API_FIELDS
+        return (
+            ("mc_channels_synced_at", "meshtastic_public_key", "predicted_node_id_str")
+            + MANAGED_NODE_FEEDER_API_FIELDS
+            + MANAGED_NODE_REPORTED_IDENTITY_FIELDS
+        )
 
     def _protocol_for_admin(self, request, obj):
         if obj is not None:
@@ -684,7 +714,7 @@ class ManagedNodeAdmin(admin.ModelAdmin):
                         ),
                     },
                 )
-                return (common, mc_identity, mc_channels)
+                return (common, mc_identity, mc_channels, self._feeder_api_fieldset(MANAGED_NODE_FEEDER_API_FIELDS))
             return (common, mc_identity)
 
         common = (_("Feeder"), {"fields": MANAGED_NODE_MESHTASTIC_FEEDER_FIELDS})
@@ -706,7 +736,25 @@ class ManagedNodeAdmin(admin.ModelAdmin):
                 ),
             },
         )
-        return (common, identity, channels)
+        if obj is None:
+            return (common, identity, channels)
+        usage = self._feeder_api_fieldset(MANAGED_NODE_FEEDER_API_FIELDS + MANAGED_NODE_REPORTED_IDENTITY_FIELDS)
+        return (common, identity, channels, usage)
+
+    @staticmethod
+    def _feeder_api_fieldset(fields):
+        return (
+            _("Feeder API usage"),
+            {
+                "fields": fields,
+                "classes": ("collapse",),
+                "description": _(
+                    "Written by the feeder API at most every 10 minutes. Legacy = the pre-v4 URLs "
+                    "(/api/packets/, /api/v3/packets/, /api/meshcore/feeders/{prefix}/). The reported "
+                    "node number is informational and never changes the stored one."
+                ),
+            },
+        )
 
     def save_model(self, request, obj, form, change):
         super().save_model(request, obj, form, change)
