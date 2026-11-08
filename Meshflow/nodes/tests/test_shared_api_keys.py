@@ -154,3 +154,56 @@ def test_existing_shared_key_still_authorises_legacy_urls(setup):
         view = SimpleNamespace(kwargs={"node_id": node.meshtastic_node_id})
         assert perm.has_permission(request, view) is True
         assert request.auth.node == node
+
+
+def _admin_form(s, nodes, **overrides):
+    from nodes.admin import NodeAPIKeyForm
+
+    data = {
+        "name": s.key.name,
+        "constellation": s.constellation.pk,
+        "owner": s.owner.pk,
+        "is_active": "on",
+        "nodes": [n.pk for n in nodes],
+    }
+    data.update(overrides)
+    return NodeAPIKeyForm(data=data, instance=s.key)
+
+
+@pytest.mark.django_db
+def test_admin_form_adding_second_node_fails(setup):
+    NodeAuth.objects.create(api_key=setup.key, node=setup.a)
+    form = _admin_form(setup, [setup.a, setup.b])
+    assert not form.is_valid()
+    assert API_KEY_ALREADY_LINKED_MESSAGE in form.non_field_errors()
+
+
+@pytest.mark.django_db
+def test_admin_form_first_node_ok(setup):
+    form = _admin_form(setup, [setup.a])
+    assert form.is_valid(), form.errors
+    form.save()
+    assert NodeAuth.objects.filter(api_key=setup.key).count() == 1
+
+
+@pytest.mark.django_db
+def test_admin_form_removing_node_from_shared_key_works(setup):
+    NodeAuth.objects.create(api_key=setup.key, node=setup.a)
+    NodeAuth.objects.create(api_key=setup.key, node=setup.b)
+    form = _admin_form(setup, [setup.a])
+    assert form.is_valid(), form.errors
+    form.save()
+    assert list(NodeAuth.objects.filter(api_key=setup.key).values_list("node", flat=True)) == [setup.a.pk]
+
+
+@pytest.mark.django_db
+def test_admin_form_rename_shared_key_works(setup):
+    NodeAuth.objects.create(api_key=setup.key, node=setup.a)
+    NodeAuth.objects.create(api_key=setup.key, node=setup.b)
+    form = _admin_form(setup, [setup.a, setup.b], name="Renamed", is_active="")
+    assert form.is_valid(), form.errors
+    key = form.save()
+    key.refresh_from_db()
+    assert key.name == "Renamed"
+    assert key.is_active is False
+    assert NodeAuth.objects.filter(api_key=setup.key).count() == 2
