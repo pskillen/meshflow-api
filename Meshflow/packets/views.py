@@ -6,6 +6,7 @@ from rest_framework import serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from common.feeder_metrics import FeederApiUsageMixin
 from common.mesh_node_helpers import meshtastic_hex_to_int, meshtastic_id_to_hex
 from nodes.authentication import NodeAPIKeyAuthentication
 from nodes.permissions import NodeAuthorizationPermission
@@ -53,7 +54,7 @@ def _packet_from_label(data) -> str | None:
         return None
 
 
-class PacketIngestView(APIView):
+class PacketIngestView(FeederApiUsageMixin, APIView):
     """
     Meshtastic packet ingestion endpoint.
 
@@ -64,13 +65,14 @@ class PacketIngestView(APIView):
 
     authentication_classes = [NodeAPIKeyAuthentication]
     permission_classes = [NodeAuthorizationPermission]
+    feeder_endpoint = "ingest"
 
-    def post(self, request, node_id, format=None):
+    def post(self, request, node_id=None, format=None):
         """Process a packet ingestion request.
 
         Args:
             request: The HTTP request object containing the packet data.
-            node_id: The node ID from the URL.
+            node_id: The node ID from the legacy URL; None on the v4 feeder URL.
             format: The format of the request data (not used).
 
         Returns:
@@ -173,7 +175,7 @@ class PacketIngestView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-class BaseNodeUpsertView(APIView):
+class BaseNodeUpsertView(FeederApiUsageMixin, APIView):
     """
     Meshtastic observed-node upsert for feeders (Node API key).
 
@@ -183,30 +185,33 @@ class BaseNodeUpsertView(APIView):
     authentication_classes = [NodeAPIKeyAuthentication]
     permission_classes = [NodeAuthorizationPermission]
     serializer_class = NodeSerializer
+    feeder_endpoint = "nodes"
 
-    def post(self, request, node_id, format=None):
+    def post(self, request, node_id=None, format=None):
         """
         Process a node upsert request.
 
         Args:
             request: The HTTP request object containing the node data.
-            node_id: The node ID from the URL.
+            node_id: The node ID from the legacy URL; None on the v4 feeder URL, where the API key
+                alone identifies the feeder and there is no path number to check.
             format: The format of the request data (not used).
 
         Returns:
             Response: A DRF Response object with the result of the upsert operation.
         """
-        # Get node_id from request data and sanitize it
-        if not node_id:
-            return Response(
-                {"status": "error", "message": "Node ID is required"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        if not request.auth.node.meshtastic_node_id == node_id:
-            return Response(
-                {"status": "error", "message": "Node ID does not match authenticated node"},
-                status=status.HTTP_403_FORBIDDEN,
-            )
+        if node_id is not None:
+            # Legacy URLs: the path number must be the authenticated feeder's.
+            if not node_id:
+                return Response(
+                    {"status": "error", "message": "Node ID is required"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if not request.auth.node.meshtastic_node_id == node_id:
+                return Response(
+                    {"status": "error", "message": "Node ID does not match authenticated node"},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
 
         # Handle different node_id formats
         warnings = []
@@ -299,7 +304,7 @@ class ManagedNodeBotVersionSerializer(serializers.Serializer):
     bot_version = serializers.CharField(max_length=128, trim_whitespace=True)
 
 
-class ManagedNodeBotVersionView(APIView):
+class ManagedNodeBotVersionView(FeederApiUsageMixin, APIView):
     """
     Update the reporting meshflow-bot version for the authenticated managed node.
 
@@ -309,14 +314,16 @@ class ManagedNodeBotVersionView(APIView):
 
     authentication_classes = [NodeAPIKeyAuthentication]
     permission_classes = [NodeAuthorizationPermission]
+    feeder_endpoint = "bot-version"
+    reported_node_num_body_field = "meshtastic_node_num"
 
-    def put(self, request, node_id, format=None):
+    def put(self, request, node_id=None, format=None):
         return self._update(request)
 
-    def post(self, request, node_id, format=None):
+    def post(self, request, node_id=None, format=None):
         return self._update(request)
 
-    def patch(self, request, node_id, format=None):
+    def patch(self, request, node_id=None, format=None):
         return self._update(request)
 
     def _update(self, request):

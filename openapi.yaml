@@ -20,6 +20,10 @@ tags:
     description: JWT token management endpoints
   - name: Meshtastic packets
     description: Meshtastic packet ingestion and feeder node upsert (Node API key)
+  - name: Feeder API v4
+    description: >
+      Feeder URLs authorised on the Node API key alone (one key per feeder, ADR-0005). The legacy
+      ``/packets/{meshtastic_node_id}/`` and ``/v3/packets/{meshtastic_node_id}/`` URLs are unchanged.
   - name: MeshCore packets
     description: MeshCore packet ingestion (Node API key) and read-only packet list
   - name: MeshCore path tracing
@@ -85,6 +89,46 @@ components:
         pattern: '^[0-9a-f]{64}$'
       description: Full 64-char hex feeder pubkey; must match ManagedNode.mc_pubkey when configured
 
+    MeshtasticFeederNodeNumHeader:
+      name: X-Meshtastic-Feeder-Node-Num
+      in: header
+      required: false
+      schema:
+        type: integer
+        minimum: 0
+        maximum: 4294967295
+      description: >
+        The feeder radio's current node number (decimal). Recorded as ``reported_meshtastic_node_id``
+        (informational only; never used for authorisation and never changes the stored number).
+        Read on v4 and legacy Meshtastic feeder URLs.
+    MeshtasticFeederPubkeyHeader:
+      name: X-Meshtastic-Feeder-Pubkey
+      in: header
+      required: false
+      schema:
+        type: string
+      description: The feeder radio's public key (base64). Accepted; not yet stored.
+    MeshtasticFeederFirmwareHeader:
+      name: X-Meshtastic-Feeder-Firmware
+      in: header
+      required: false
+      schema:
+        type: string
+      description: The feeder radio's firmware version. Accepted; not yet stored.
+
+  responses:
+    FeederScopedForbidden:
+      description: >
+        The API key does not identify exactly one feeder of the right protocol. ``code`` is one of
+        ``feeder_not_linked`` (no active feeder), ``shared_api_key`` (more than one active feeder; mint
+        one key per feeder on the API keys page, legacy URLs still accept shared keys) or
+        ``feeder_protocol_mismatch`` (a MeshCore feeder called a ``meshtastic/`` path). A differing
+        reported node number is never a 403.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/FeederAuthError'
+
   securitySchemes:
     BearerAuth:
       description: >
@@ -101,6 +145,73 @@ components:
       name: X-API-Key
 
   schemas:
+    FeederAuthError:
+      type: object
+      required: [detail, code]
+      properties:
+        detail:
+          type: string
+          description: Human-readable reason, for logs and the owner
+        code:
+          type: string
+          enum: [feeder_not_linked, shared_api_key, feeder_protocol_mismatch]
+          description: Stable machine-readable code
+    FeederIdentity:
+      type: object
+      required:
+        - internal_id
+        - protocol
+        - name
+        - constellation_id
+        - meshtastic_node_id
+        - node_id_str
+        - reported_meshtastic_node_id
+        - identity_mismatch
+      properties:
+        internal_id:
+          type: string
+          format: uuid
+          description: ManagedNode primary key (also the WebSocket group key)
+        protocol:
+          type: string
+          enum: [meshtastic, meshcore]
+        name:
+          type: string
+        constellation_id:
+          type: integer
+        meshtastic_node_id:
+          type: [integer, 'null']
+          description: Stored Meshtastic node number; null for MeshCore feeders
+        node_id_str:
+          type: string
+          description: Display id (``!xxxxxxxx`` for Meshtastic, ``mc:<prefix>`` for MeshCore)
+        reported_meshtastic_node_id:
+          type: [integer, 'null']
+          description: Node number the bot last reported (X-Meshtastic-Feeder-Node-Num); null if never reported
+        identity_mismatch:
+          type: boolean
+          description: True when reported_meshtastic_node_id is set and differs from meshtastic_node_id
+    FeederBotVersionReport:
+      type: object
+      required: [bot_version]
+      properties:
+        bot_version:
+          type: string
+          maxLength: 128
+          description: Bot release tag, semver, or git describe output
+        meshtastic_node_num:
+          type: integer
+          description: Optional reported node number; recorded like X-Meshtastic-Feeder-Node-Num
+    FeederBotVersionRecorded:
+      type: object
+      properties:
+        status:
+          type: string
+        bot_version:
+          type: string
+        bot_version_reported_at:
+          type: string
+          format: date-time
     MeshProtocol:
       type: integer
       enum: [1, 2]
@@ -4806,6 +4917,193 @@ paths:
               schema:
                 $ref: '#/components/schemas/ObservedNode'
 
+  /v4/feeder/identity/:
+    get:
+      summary: Identify the feeder for this API key (feeder API v4)
+      description: >
+        Returns the one active ManagedNode linked to the Node API key. The key must be linked to
+        exactly one active feeder (any protocol); the node number is never part of authorisation, so a
+        Meshtastic 2.8 feeder whose number changes keeps working. Bots probe this at start and hourly:
+        200 means use the v4 URLs; 404 (an older API) means use the legacy URLs; 403 ``shared_api_key``
+        means use the legacy URLs and ask the owner for a per-feeder key.
+        The reported number (``X-Meshtastic-Feeder-Node-Num``) is recorded before the response is built,
+        so ``identity_mismatch`` reflects this request's header.
+      tags: [Feeder API v4]
+      security:
+        - NodeApiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/MeshtasticFeederNodeNumHeader'
+        - $ref: '#/components/parameters/MeshtasticFeederPubkeyHeader'
+        - $ref: '#/components/parameters/MeshtasticFeederFirmwareHeader'
+      responses:
+        '200':
+          description: The feeder this key identifies
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeederIdentity'
+        '401':
+          description: Missing or invalid API key
+        '403':
+          $ref: '#/components/responses/FeederScopedForbidden'
+
+  /v4/feeder/bot-version/:
+    put:
+      summary: Report meshflow-bot version (feeder API v4)
+      description: >
+        Same body and response as ``PUT /v3/packets/{meshtastic_node_id}/bot-version/``, for a feeder of
+        either protocol, identified by the API key alone. ``meshtastic_node_num`` in the body is recorded
+        like the ``X-Meshtastic-Feeder-Node-Num`` header (the header wins when both are sent).
+      tags: [Feeder API v4]
+      security:
+        - NodeApiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/MeshtasticFeederNodeNumHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FeederBotVersionReport'
+      responses:
+        '200':
+          description: Version recorded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeederBotVersionRecorded'
+        '400':
+          description: Invalid or empty bot_version
+        '401':
+          description: Missing or invalid API key
+        '403':
+          $ref: '#/components/responses/FeederScopedForbidden'
+    post:
+      summary: Report meshflow-bot version (feeder API v4, alias)
+      description: Same as PUT.
+      tags: [Feeder API v4]
+      security:
+        - NodeApiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/MeshtasticFeederNodeNumHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FeederBotVersionReport'
+      responses:
+        '200':
+          description: Version recorded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeederBotVersionRecorded'
+        '400':
+          description: Invalid or empty bot_version
+        '401':
+          description: Missing or invalid API key
+        '403':
+          $ref: '#/components/responses/FeederScopedForbidden'
+    patch:
+      summary: Report meshflow-bot version (feeder API v4, alias)
+      description: Same as PUT.
+      tags: [Feeder API v4]
+      security:
+        - NodeApiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/MeshtasticFeederNodeNumHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FeederBotVersionReport'
+      responses:
+        '200':
+          description: Version recorded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeederBotVersionRecorded'
+        '400':
+          description: Invalid or empty bot_version
+        '401':
+          description: Missing or invalid API key
+        '403':
+          $ref: '#/components/responses/FeederScopedForbidden'
+
+  /v4/feeder/meshtastic/ingest/:
+    post:
+      summary: Ingest a Meshtastic packet (feeder API v4)
+      description: >
+        Same body and response as ``POST /v3/packets/{meshtastic_node_id}/ingest/``; the observer is the
+        API key's single feeder. A reported node number that differs from the stored one is recorded and
+        logged, never rejected.
+      tags: [Feeder API v4]
+      security:
+        - NodeApiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/MeshtasticFeederNodeNumHeader'
+        - $ref: '#/components/parameters/MeshtasticFeederPubkeyHeader'
+        - $ref: '#/components/parameters/MeshtasticFeederFirmwareHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IncomingPacket'
+      responses:
+        '201':
+          description: Packet ingested successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Success'
+        '304':
+          description: Encrypted packet skipped (body carried ``encrypted``)
+        '400':
+          description: Invalid packet data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Missing or invalid API key
+        '403':
+          $ref: '#/components/responses/FeederScopedForbidden'
+
+  /v4/feeder/meshtastic/nodes/:
+    post:
+      summary: Upsert observed node (feeder API v4)
+      description: >
+        Same body and response as ``POST /v3/packets/{meshtastic_node_id}/nodes/`` (strict ``meshtastic_*``
+        wire), with no node number in the path and so no path-number check.
+      tags: [Feeder API v4]
+      security:
+        - NodeApiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/MeshtasticFeederNodeNumHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ObservedNodeUpdate'
+      responses:
+        '200':
+          description: Node information updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObservedNode'
+        '400':
+          description: Invalid node data
+        '401':
+          description: Missing or invalid API key
+        '403':
+          $ref: '#/components/responses/FeederScopedForbidden'
+
   /constellations/:
     get:
       summary: List constellations
@@ -8123,8 +8421,16 @@ paths:
         ws://{host}/ws/nodes/?api_key={node_api_key}
         ```
 
-        When multiple ManagedNodes share one API key, pass a feeder identity query parameter
-        (same disambiguation as packet ingest):
+        With `feeder_scoped=1` (feeder API v4 bots) the API key alone identifies the feeder: it must be
+        linked to exactly one active ManagedNode, and the connection is closed when it is linked to none
+        (`feeder_not_linked`) or to more than one (`shared_api_key`). Do not pass a feeder id with it;
+        any is ignored.
+        ```
+        ws://{host}/ws/nodes/?api_key={node_api_key}&feeder_scoped=1
+        ```
+
+        Without `feeder_scoped`, when multiple ManagedNodes share one API key, pass a feeder identity
+        query parameter (same disambiguation as the legacy packet ingest URLs):
 
         - Meshtastic: `feeder_node_id` (decimal nodenum) and/or `feeder_node_id_str` (`!` + 8 hex)
         - MeshCore: `feeder_pubkey_prefix` (12-hex device pubkey prefix)
@@ -8157,6 +8463,15 @@ paths:
           schema:
             type: string
             description: NodeAPIKey for authentication (same key used for packet ingest)
+        - name: feeder_scoped
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: ['1']
+            description: >
+              Set to 1 to resolve the feeder from the API key alone (single-feeder rule, as on the v4
+              feeder URLs). Feeder id parameters are then ignored.
         - name: feeder_node_id
           in: query
           required: false
