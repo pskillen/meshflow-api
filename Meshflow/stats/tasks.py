@@ -107,6 +107,7 @@ def _collect_online_nodes(
                 PacketObservation.objects.filter(
                     observer__constellation=constellation,
                     rx_time__gte=threshold,
+                    replayed=False,
                 )
                 .values("packet__from_int")
                 .distinct()
@@ -149,15 +150,16 @@ def _collect_packet_volume(
         return (0, 1)
 
     hour_end = recorded_at + timedelta(hours=1)
+    # A packet whose only observations are 2.8 connect-time replays is not counted.
     base_qs = MtRawPacket.objects.filter(
         first_reported_time__gte=recorded_at,
         first_reported_time__lt=hour_end,
-    )
+    ).filter(Exists(PacketObservation.objects.filter(packet_id=OuterRef("id"), replayed=False)))
     # Exclude device metrics that were only observed by the sender (self-ingested)
     base_qs = base_qs.exclude(
         Q(devicemetricspacket__isnull=False)
         & ~Exists(
-            PacketObservation.objects.filter(packet_id=OuterRef("id")).exclude(
+            PacketObservation.objects.filter(packet_id=OuterRef("id"), replayed=False).exclude(
                 observer__meshtastic_node_id=OuterRef("from_int")
             )
         )
@@ -253,7 +255,7 @@ def _collect_new_nodes(
         else:
             if for_backfill:
                 observed_node_ids = (
-                    PacketObservation.objects.filter(observer__constellation=constellation)
+                    PacketObservation.objects.filter(observer__constellation=constellation, replayed=False)
                     .values_list("packet__from_int", flat=True)
                     .distinct()
                 )
@@ -263,13 +265,14 @@ def _collect_new_nodes(
                         PacketObservation.objects.filter(
                             observer__constellation=constellation,
                             rx_time__gte=last_run_started_at,
+                            replayed=False,
                         )
                         .values_list("packet__from_int", flat=True)
                         .distinct()
                     )
                 else:
                     observed_node_ids = (
-                        PacketObservation.objects.filter(observer__constellation=constellation)
+                        PacketObservation.objects.filter(observer__constellation=constellation, replayed=False)
                         .values_list("packet__from_int", flat=True)
                         .distinct()
                     )

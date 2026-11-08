@@ -152,12 +152,15 @@ def node_packet_stats(request, node_id: int):
         return Response({"status": "error", "message": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
     # Build base query for packets from this node
-    packets = MtRawPacket.objects.filter(from_int=node_id)
+    # A packet whose only observations are 2.8 connect-time replays is not counted.
+    packets = MtRawPacket.objects.filter(from_int=node_id).filter(
+        Exists(PacketObservation.objects.filter(packet_id=OuterRef("id"), replayed=False))
+    )
     # Exclude device metrics that were only observed by the sender (self-ingested)
     packets = packets.exclude(
         Q(devicemetricspacket__isnull=False)
         & ~Exists(
-            PacketObservation.objects.filter(packet_id=OuterRef("id")).exclude(
+            PacketObservation.objects.filter(packet_id=OuterRef("id"), replayed=False).exclude(
                 observer__meshtastic_node_id=OuterRef("from_int")
             )
         )
@@ -243,7 +246,7 @@ def node_received_stats(request, node_id: int):
         return Response({"status": "error", "message": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
     # Build base query for packet observations (exclude self device metrics)
-    observations = PacketObservation.objects.filter(observer=managed_node).exclude(
+    observations = PacketObservation.objects.filter(observer=managed_node, replayed=False).exclude(
         Q(packet__devicemetricspacket__isnull=False) & Q(packet__from_int=F("observer__meshtastic_node_id"))
     )
 
@@ -328,7 +331,7 @@ def node_neighbour_stats(request, node_id: int):
 
     try:
         observations = (
-            PacketObservation.objects.filter(observer=managed_node)
+            PacketObservation.objects.filter(observer=managed_node, replayed=False)
             .exclude(
                 Q(packet__devicemetricspacket__isnull=False) & Q(packet__from_int=F("observer__meshtastic_node_id"))
             )
