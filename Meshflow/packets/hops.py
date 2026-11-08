@@ -25,7 +25,12 @@ def hops_unknown(hop_start: Optional[int], hop_limit: Optional[int], bitfield: O
 
 
 def observation_hop_count(observation) -> Optional[int]:
-    """Hops the packet travelled (hop_start - hop_limit), or None when unknown or inconsistent."""
+    """Hops the packet travelled (hop_start - hop_limit), or None when unknown or inconsistent.
+
+    A replayed observation (2.8 connect-time replay) has hop fields copied from the feeder, not from the air: None.
+    """
+    if getattr(observation, "replayed", False):
+        return None
     if hops_unknown(observation.hop_start, observation.hop_limit, getattr(observation, "bitfield", None)):
         return None
     hops = observation.hop_start - observation.hop_limit
@@ -33,7 +38,9 @@ def observation_hop_count(observation) -> Optional[int]:
 
 
 def observation_is_direct(observation) -> bool:
-    """True when the packet was heard directly from the sender; False when direct is not known."""
+    """True when the packet was heard directly from the sender; False when direct is not known or replayed."""
+    if getattr(observation, "replayed", False):
+        return False
     return observation_hop_count(observation) == 0
 
 
@@ -44,6 +51,8 @@ def update_inferred_max_hops(node, observation, port_num, *, via_mqtt: bool = Fa
     """
     from nodes.models import NodeLatestStatus
 
+    if getattr(observation, "replayed", False):
+        return False
     hop_start = getattr(observation, "hop_start", None) if observation else None
     hop_limit = getattr(observation, "hop_limit", None) if observation else None
     if via_mqtt or hop_start is None:
