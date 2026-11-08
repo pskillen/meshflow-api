@@ -2890,15 +2890,19 @@ components:
           description: When the snapshot was taken
         stat_type:
           type: string
-          enum: [online_nodes, new_nodes, packet_volume, mc_online_nodes, mc_new_nodes, mc_packet_volume]
-          description: Type of stat (mc_* are MeshCore hourly snapshots)
+          enum: [online_nodes, new_nodes, packet_volume, mc_online_nodes, mc_new_nodes, mc_packet_volume, node_firmware]
+          description: Type of stat (mc_* are MeshCore hourly snapshots; node_firmware is a daily global snapshot)
         constellation_id:
           type: integer
           nullable: true
           description: Constellation ID (null for global)
         value:
           type: object
-          description: Stat value (e.g. {"count": N, "window_hours": 2})
+          description: >-
+            Stat value (e.g. {"count": N, "window_hours": 2}). For node_firmware:
+            {"count": N, "window_hours": 168, "by_type": {"2.7": N, "2.8": N, "unknown": N},
+            "by_basis": {"key_identity": N, "predicted_id": N, "reported": N, "none": N}};
+            by_type keys are open (a new firmware generation appears as a new key).
 
     NeighbourStatsCandidate:
       type: object
@@ -7022,7 +7026,7 @@ paths:
           required: false
           schema:
             type: string
-            enum: [online_nodes, new_nodes, packet_volume, mc_online_nodes, mc_new_nodes, mc_packet_volume]
+            enum: [online_nodes, new_nodes, packet_volume, mc_online_nodes, mc_new_nodes, mc_packet_volume, node_firmware]
             description: Filter by stat type
         - name: constellation_id
           in: query

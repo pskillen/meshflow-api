@@ -243,6 +243,8 @@ Implemented in [`Meshflow/stats/tasks.py`](../Meshflow/stats/tasks.py).
 | `ONLINE_NODE_WINDOW_HOURS` | **2 h** | yes | `online_nodes` snapshot window against `last_heard` / `rx_time` / `first_reported_time` |
 | Snapshot lag | **1 h** | no | Snapshots target `current_hour - 1h` so only completed hours are recorded |
 | `_collect_packet_volume` bucket | **1 h** | no | Packet volume snapshot uses `[recorded_at, recorded_at+1h)` on `first_reported_time` |
+| `node_firmware` window | **168 h** (7 d, `ADOPTION_WINDOW_HOURS`) | no | Daily snapshot of Meshtastic nodes by `last_heard`, no upper bound; `recorded_at` is midnight UTC |
+| `backfill_node_firmware_snapshots` span | **90 days** default arg | no | Historical backfill |
 | `backfill_stats_snapshots` span | **30 days** default arg | no | Historical backfill |
 | Stats API interval defaults | `interval=1`, `interval_type=hour` | query | Node/global stats endpoints |
 | Stats API "month" unit | **30 days** | no | `get_interval_delta` month handling |
@@ -251,7 +253,7 @@ Implemented in [`Meshflow/stats/tasks.py`](../Meshflow/stats/tasks.py).
 
 | Task | Cadence |
 | --- | --- |
-| `collect_stats_snapshots` | Every hour at `:05` UTC |
+| `collect_stats_snapshots` | Every hour at `:05` UTC (the `00:05` run also writes `node_firmware`) |
 
 ---
 
