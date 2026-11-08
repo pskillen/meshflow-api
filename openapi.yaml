@@ -771,6 +771,8 @@ components:
                           nullable: true
                     time:
                       type: integer
+                      nullable: true
+                      description: "Unix seconds. Optional; a node with no clock omits it (protobuf drops zero), and the API then uses the packet's rxTime as the reading time."
                     raw:
                       type: string
                       nullable: true
@@ -826,6 +828,8 @@ components:
                           nullable: true
                     time:
                       type: integer
+                      nullable: true
+                      description: "Unix seconds. Optional; a node with no clock omits it (protobuf drops zero), and the API then uses the packet's rxTime as the reading time."
                     raw:
                       type: string
                       nullable: true
@@ -848,6 +852,10 @@ components:
                     environmentMetrics:
                       type: object
                       description: See meshtastic/telemetry.proto EnvironmentMetrics
+                    time:
+                      type: integer
+                      nullable: true
+                      description: "Unix seconds. Optional; a node with no clock omits it (protobuf drops zero), and the API then uses the packet's rxTime as the reading time."
 
     AirQualityTelemetryPacket:
       allOf:
@@ -867,6 +875,10 @@ components:
                     airQualityMetrics:
                       type: object
                       description: See meshtastic/telemetry.proto AirQualityMetrics
+                    time:
+                      type: integer
+                      nullable: true
+                      description: "Unix seconds. Optional; a node with no clock omits it (protobuf drops zero), and the API then uses the packet's rxTime as the reading time."
 
     PowerTelemetryPacket:
       allOf:
@@ -886,6 +898,10 @@ components:
                     powerMetrics:
                       type: object
                       description: See meshtastic/telemetry.proto PowerMetrics
+                    time:
+                      type: integer
+                      nullable: true
+                      description: "Unix seconds. Optional; a node with no clock omits it (protobuf drops zero), and the API then uses the packet's rxTime as the reading time."
 
     HealthTelemetryPacket:
       allOf:
@@ -905,6 +921,10 @@ components:
                     healthMetrics:
                       type: object
                       description: See meshtastic/telemetry.proto HealthMetrics
+                    time:
+                      type: integer
+                      nullable: true
+                      description: "Unix seconds. Optional; a node with no clock omits it (protobuf drops zero), and the API then uses the packet's rxTime as the reading time."
 
     HostTelemetryPacket:
       allOf:
@@ -924,6 +944,10 @@ components:
                     hostMetrics:
                       type: object
                       description: See meshtastic/telemetry.proto HostMetrics
+                    time:
+                      type: integer
+                      nullable: true
+                      description: "Unix seconds. Optional; a node with no clock omits it (protobuf drops zero), and the API then uses the packet's rxTime as the reading time."
 
     TrafficManagementStatsTelemetryPacket:
       allOf:
@@ -943,6 +967,10 @@ components:
                     trafficManagementStats:
                       type: object
                       description: See meshtastic/telemetry.proto TrafficManagementStats
+                    time:
+                      type: integer
+                      nullable: true
+                      description: "Unix seconds. Optional; a node with no clock omits it (protobuf drops zero), and the API then uses the packet's rxTime as the reading time."
 
     TraceroutePacket:
       allOf:
