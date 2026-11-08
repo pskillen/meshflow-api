@@ -31,6 +31,7 @@ The bot sends its radio's firmware with every API call (`X-Meshtastic-Feeder-Fir
 - **It is the top-priority rule** (`feeder_report`, then `key_identity`, then `predicted_id`): a node saying what it runs is better evidence than a number it happens to hold.
 - **It is the only way to see a downgrade.** A node downgraded from 2.8 keeps its key-derived number, so identity evidence keeps reading `2.8`. Only the node's own report can say `2.7`.
 - **The row is found by the reported number**, not the stored one. `ManagedNode.meshtastic_node_id` goes stale after a feeder upgrades to 2.8 and takes a new number; `reported_meshtastic_node_id` is the number it has now. The stored number is used only when no number was ever reported.
+- **The reported number is client-supplied and trusted.** It decides which node row receives the feeder's verdict, so a feeder is trusted to report its own number; API keys are issued to trusted operators.
 - A version that does not parse is no evidence and falls through to the identity rules. A soft-deleted feeder is ignored. If two feeders map to one number, the newest report wins.
 - A later NODEINFO cannot overwrite a `feeder_report` verdict, because the report is evaluated first.
 - If the feeder has no `ObservedNode` yet, nothing is written; the next report picks it up.

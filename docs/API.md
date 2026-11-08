@@ -50,7 +50,8 @@ Errors are 403 with `{"detail": "<text>", "code": "<code>"}`:
 
 A bad or missing key is a 401, as on the legacy URLs. A reported node number
 (`X-Meshtastic-Feeder-Node-Num`) that differs from the stored one is **never** an error: it is recorded on
-the ManagedNode and shown as `identity_mismatch` on `identity/`. The WebSocket takes
+the ManagedNode, shown as `identity_mismatch` on `identity/`, and used to find the feeder's own node row for the
+firmware verdict. The WebSocket takes
 `ws/nodes/?api_key=<key>&feeder_scoped=1` for the same single-feeder rule.
 
 The legacy URLs (`/api/packets/{node_id}/…`, `/api/v3/packets/{node_id}/…`, `/api/meshcore/feeders/{prefix}/…`)

@@ -167,8 +167,11 @@ authorise on the node number, a Meshtastic 2.8 feeder whose number changes keeps
 
 Every feeder view records, at most every 10 minutes per feeder, which URL generation it used
 (`ManagedNode.feeder_api_generation`, `feeder_api_last_used_at`, `legacy_api_last_used_at`) and the
-node number the bot reports in `X-Meshtastic-Feeder-Node-Num` (`reported_meshtastic_node_id`;
-informational, a mismatch is logged and never rejected). Prometheus counts
+node number the bot reports in `X-Meshtastic-Feeder-Node-Num` (`reported_meshtastic_node_id`; a
+mismatch is logged and never rejected, but the number also selects the feeder's own `ObservedNode`
+for the `feeder_report` firmware rule) and the radio firmware it reports in
+`X-Meshtastic-Feeder-Firmware` (`reported_firmware_version`, `firmware_reported_at`; see
+[inferred-firmware](inferred-firmware.md)). Prometheus counts
 `meshflow_feeder_api_requests_total{api,protocol,endpoint,status_class}` and
 `meshflow_feeder_auth_rejections_total{api,code}`. The legacy URLs are unchanged and tracked for
 retirement; staff can list feeders still on them with the admin filter "On legacy URLs (last 7 days)".
