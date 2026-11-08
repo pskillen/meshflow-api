@@ -1,0 +1,75 @@
+name: Bot contract
+
+# Replays the bot's capture subset through the bot's serialiser and this API's ingest and compares with the goldens.
+# Called by this repo's PR and main workflows (bot pinned in .github/contract/bot-ref), by meshflow-bot PRs (api main),
+# nightly (api main x bot main), and by hand.
+
+on:
+  workflow_call:
+    inputs:
+      bot_ref:
+        type: string
+        required: true
+      api_ref:
+        type: string
+        required: false
+        default: ""
+  workflow_dispatch:
+    inputs:
+      bot_ref:
+        type: string
+        default: main
+  schedule:
+    - cron: "17 3 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      # Explicit repository: in a reusable workflow called from the bot, the default checkout is the bot repo.
+      - name: Checkout meshflow-api
+        uses: actions/checkout@v7
+        with:
+          repository: pskillen/meshflow-api
+          ref: ${{ inputs.api_ref || (github.event_name == 'schedule' && 'main') || github.sha }}
+
+      - name: Checkout meshflow-bot
+        uses: actions/checkout@v7
+        with:
+          repository: pskillen/meshflow-bot
+          ref: ${{ inputs.bot_ref || 'main' }}
+          path: _bot
+          sparse-checkout: |
+            src
+            tools
+            docs/meshtastic_packets/2.8
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+
+      # The API's requirements only: the bot's are not installed, which proves its serialiser imports stdlib only.
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r Meshflow/requirements.dev.txt
+
+      - name: Run contract tests
+        env:
+          MESHFLOW_BOT_PATH: ${{ github.workspace }}/_bot
+        run: |
+          mkdir -p reports
+          python -m pytest Meshflow/packets/tests/contract -m contract -v --no-cov --junit-xml=reports/contract.xml
+
+      - name: Test Report
+        uses: dorny/test-reporter@v3
+        with:
+          name: contract
+          path: reports/contract.xml
+          reporter: python-xunit
+        if: always()
+        continue-on-error: true
