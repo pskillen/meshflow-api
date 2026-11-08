@@ -51,7 +51,7 @@ Node information packets contain device details:
 | decoded.user.longName  | string    | Full node name         | UTF-8 encoded         |
 | decoded.user.shortName | string    | Short node name        | Max 4 characters      |
 | decoded.user.macaddr   | string    | MAC address            | Base64 encoded        |
-| decoded.user.hwModel   | string    | Hardware model         | e.g. "HELTEC_V3"      |
+| decoded.user.hwModel   | string    | Hardware model         | Normalised to the enum name: a number (lib 2.7.11 sends 2.8 models as `150`) maps to its name, an unknown number becomes `HW_<n>`, and renamed 2.7 names (`SENSELORA_S3`) map to their 2.8 name. e.g. "HELTEC_V3" |
 | decoded.user.role      | string    | Node role              | e.g. "CLIENT_MUTE"    |
 | decoded.user.publicKey | string    | Public key             | Base64 encoded        |
 | decoded.user.isLicensed | boolean  | Ham radio operator flag | -                    |
