@@ -9,6 +9,12 @@ Reverse-engineered from [`Meshflow/stats/`](../../../Meshflow/stats/) as of 2026
 | **Hourly snapshots** | Dashboard long-range charts, ops trending | `StatsSnapshot` rows |
 | **Live API** | Ad-hoc charts, node detail pages, custom intervals | Computed per request from ORM |
 
+**Replayed observations are excluded.** Stats over observations (`node_received_stats`, `node_neighbour_stats`,
+the `online_nodes` and `new_nodes` snapshots) filter out `PacketObservation.replayed`, and a packet whose only
+observations are replayed is not counted in `node_packet_stats` or `packet_volume` (2.8 connect-time replays are not
+radio receptions). Feeder liveness (`ManagedNodeStatus` from `upload_time`) still counts them: the feeder really is
+uploading.
+
 Snapshots favour **completed hours** and fixed JSON shapes. Live endpoints support `interval` + `interval_type` (hour/day/week/month) over user-supplied `start_date` / `end_date`.
 
 ---

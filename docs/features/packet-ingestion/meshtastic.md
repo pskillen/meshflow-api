@@ -157,6 +157,47 @@ Dual-protocol `TextMessage.protocol` and CHECK constraints: `text_messages.model
 
 ---
 
+## Replayed packets (2.8)
+
+After `config_complete_id`, a 2.8 radio replays its stored per-node records to every client that asks for full
+config (the python lib, so the bot): one synthetic POSITION, TELEMETRY (device, environment) and NODE_STATUS packet
+per NodeDB node (firmware `PhoneAPI.cpp`, `makeReplay*Packet`). They look like received packets but were not heard on
+air. In the dict the bot uploads, a replayed packet has no `rxRssi`, `transportMechanism: TRANSPORT_LORA`,
+`priority: BACKGROUND`, a `rxTime` equal to the node's stored `last_heard`, `hopStart` equal to the **feeder's** own
+hop limit, and an `id` that is stable across reconnects. Live packets always carry `rxRssi` and never carry a
+priority.
+
+**Detection** (`packets/replay.py`, `is_replayed_shape`). A packet is a replay when all four hold:
+
+1. `from` is an int that is not one of the feeder's own node numbers (`ManagedNode.meshtastic_node_id`,
+   `reported_meshtastic_node_id`, or the `X-Meshtastic-Feeder-Node-Num` header, which carries the new number after an
+   upgrade);
+2. `rxRssi` is absent or null;
+3. `transportMechanism` is `TRANSPORT_LORA` (or `1`);
+4. `priority` is `BACKGROUND` (or `10`).
+
+MQTT-downlinked live packets also lack `rxRssi`, but are `TRANSPORT_MQTT`, so rule 3 keeps them out. When none of the
+feeder's numbers is known, nothing is treated as a replay. The bot applies the same rule (`REPLAYED_PACKETS`); keep
+the two in step.
+
+**Body flag.** `replayed: true` in the body marks the observation directly; a bot can only mark its own
+observations. The observation is flagged when the body flag **or** the shape says so. An existing observation is
+never flipped.
+
+**Kill switch.** `MESHTASTIC_REPLAY_SHAPE_DETECTION` (default `true`; see `docs/ENV_VARS.md`). Off, only the body
+flag counts.
+
+**What a replay does.** The typed packet row is stored and `PacketObservation.replayed` is set. It dedupes on
+`(from, id)` with no time window ([DEDUPLICATION.md](DEDUPLICATION.md)), so a reconnect adds nothing. The response is
+the usual 201.
+
+**What a replay does not do.** `PacketIngestView` sends no signal for it ([signals.md](signals.md)), so:
+no `Position`, `DeviceMetrics` or `NodeLatestStatus` change; no `ObservedNode` created and no `last_heard` or
+presence change; no inferred max hops; no baseline traceroute; no DX candidate; no battery alert. A replay for a node
+the API has never seen creates no node (the bot's NodeDB upload still does). `observation_hop_count` returns null and
+`observation_is_direct` false for it, so the observation API shows no hop count and not direct. Stats exclude it
+([packet stats](../packet-stats/meshtastic.md)); feeder liveness still counts the upload.
+
 ## Related docs
 
 - [Packet ingestion hub](README.md)

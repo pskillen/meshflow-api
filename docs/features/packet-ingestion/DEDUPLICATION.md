@@ -48,6 +48,16 @@ A packet is treated as a **new packet** when:
 
 In this case: create a new packet record and an initial `PacketObservation`.
 
+### Replayed packets (2.8)
+
+A 2.8 radio replays its stored node records on every client connect. A replay's `rx_time` is the node's old
+`last_heard` and its `id` is a hash of (node, last_heard, kind), stable across reconnects, while the stored packet's
+`first_reported_time` is the time of the first upload. The time window would therefore never match and every
+reconnect would store the whole replay again. For a replayed packet the match key is `(from_int, packet_id)` alone,
+with **no time window** (`find_existing_packet(..., exact=True)`), and the same observer's existing observation is
+reused ("first wins": later hop fields are ignored). A second feeder gets its own observation. See
+[meshtastic.md](meshtastic.md#replayed-packets-28).
+
 ## Logging / Observation Behavior
 
 - **For duplicates**: Do not create a new packet. Create a `PacketObservation` linking the observer to the existing packet. This records that the second (or Nth) listener heard the same packet.

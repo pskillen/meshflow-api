@@ -19,6 +19,16 @@ All packet types share these common fields:
 | fromId     | string    | Sender's node ID         | String format (e.g. "!433d4494")    |
 | toId       | string    | Recipient's node ID      | String format, "^all" for broadcast |
 | raw        | string    | Raw packet data          | Text format of the complete packet  |
+| rxRssi     | float     | Received signal strength | Absent on a 2.8 replay; feeds replay detection |
+| priority   | string    | Packet priority          | `BACKGROUND` on a 2.8 replay; feeds replay detection |
+| transportMechanism | string | How the packet arrived | `TRANSPORT_LORA` on a 2.8 replay; `TRANSPORT_MQTT` is never a replay. Feeds replay detection, not stored |
+| replayed   | boolean   | Bot-side replay flag     | Optional (body only, default false). Stored as `PacketObservation.replayed` |
+
+### Replayed packets
+
+`PacketObservation.replayed` is true for a 2.8 connect-time replay: the body says `replayed: true`, or the packet has
+the replay shape (no `rxRssi`, `TRANSPORT_LORA`, `BACKGROUND`, not the feeder's own). It is exposed as `replayed` in
+the observation API. See [meshtastic.md](meshtastic.md#replayed-packets-28).
 
 ### Hops, `decoded.bitfield` and unknown hop counts
 

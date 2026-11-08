@@ -684,6 +684,15 @@ components:
           type: number
           nullable: true
           description: The received signal strength of the packet
+        replayed:
+          type: boolean
+          default: false
+          description: >
+            Optional. True when the bot detected a Meshtastic 2.8 connect-time replay (a stored NodeDB record
+            replayed after config_complete_id, not a radio reception). Applies to the legacy, v3 and v4 ingest
+            paths. The API also detects the shape itself (no rxRssi, transportMechanism TRANSPORT_LORA,
+            priority BACKGROUND, not the feeder's own) unless MESHTASTIC_REPLAY_SHAPE_DETECTION is off. A replay
+            is stored and flagged but triggers no processing.
         hopStart:
           type: integer
           nullable: true
@@ -2965,6 +2974,9 @@ components:
           format: float
           description: The RSSI of the received packet
           nullable: true
+        replayed:
+          type: boolean
+          description: True for a Meshtastic 2.8 connect-time replay (not a radio reception). Then hop_count is null and direct_from_sender is false
         rx_snr:
           type: number
           format: float
