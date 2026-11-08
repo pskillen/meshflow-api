@@ -11,8 +11,10 @@ from .models import (
     AirQualityMetricsPacket,
     DeviceMetricsPacket,
     EnvironmentMetricsPacket,
+    GenericPacket,
     HealthMetricsPacket,
     HostMetricsPacket,
+    LocalStatsPacket,
     MessagePacket,
     NodeInfoPacket,
     PacketObservation,
@@ -24,6 +26,7 @@ from .models import (
 from .services.air_quality import AirQualityMetricsPacketService
 from .services.device_metrics import DeviceMetricsPacketService
 from .services.environment_metrics import EnvironmentMetricsPacketService
+from .services.generic import GenericPacketService
 from .services.health_metrics import HealthMetricsPacketService
 from .services.host_metrics import HostMetricsPacketService
 from .services.node_info import NodeInfoPacketService
@@ -35,8 +38,10 @@ from .signals import (
     air_quality_metrics_packet_received,
     device_metrics_packet_received,
     environment_metrics_packet_received,
+    generic_packet_received,
     health_metrics_packet_received,
     host_metrics_packet_received,
+    local_stats_packet_received,
     message_packet_received,
     node_info_packet_received,
     packet_received,
@@ -185,12 +190,31 @@ def on_power_metrics_packet_received(
     service.process_packet(packet, observer, observation, user=None)
 
 
+@receiver(local_stats_packet_received)
+def on_local_stats_packet_received(
+    sender, packet: LocalStatsPacket, observer: ObservedNode, observation: PacketObservation, **kwargs
+):
+    """Handle a local stats packet received signal. Stored by serializer; the no-op service advances last_heard."""
+    logger.info(f"Local stats packet received: {packet.id}")
+    GenericPacketService().process_packet(packet, observer, observation, user=None)
+
+
 @receiver(traffic_management_stats_packet_received)
 def on_traffic_management_stats_packet_received(
     sender, packet: TrafficManagementStatsPacket, observer: ObservedNode, observation: PacketObservation, **kwargs
 ):
-    """Handle a traffic management stats packet received signal. Packet is stored by serializer; no service."""
+    """Handle a traffic management stats packet received signal. Stored by serializer; advances last_heard."""
     logger.info(f"Traffic management stats packet received: {packet.id}")
+    GenericPacketService().process_packet(packet, observer, observation, user=None)
+
+
+@receiver(generic_packet_received)
+def on_generic_packet_received(
+    sender, packet: GenericPacket, observer: ObservedNode, observation: PacketObservation, **kwargs
+):
+    """Handle a generic (unknown port / unknown telemetry variant) packet. Stored by serializer."""
+    logger.info(f"Generic packet received: {packet.id} ({packet.port_num})")
+    GenericPacketService().process_packet(packet, observer, observation, user=None)
 
 
 @receiver(traceroute_packet_received)

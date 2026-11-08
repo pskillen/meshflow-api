@@ -14,6 +14,7 @@ from packets.models import (
     AirQualityMetricsPacket,
     DeviceMetricsPacket,
     EnvironmentMetricsPacket,
+    GenericPacket,
     HealthMetricsPacket,
     HostMetricsPacket,
     LocalStatsPacket,
@@ -30,6 +31,7 @@ from .signals import (
     air_quality_metrics_packet_received,
     device_metrics_packet_received,
     environment_metrics_packet_received,
+    generic_packet_received,
     health_metrics_packet_received,
     host_metrics_packet_received,
     local_stats_packet_received,
@@ -157,6 +159,8 @@ class PacketIngestView(APIView):
                     traceroute_packet_received.send(
                         sender=self, packet=packet, observer=observer, observation=observation
                     )
+                elif isinstance(packet, GenericPacket):
+                    generic_packet_received.send(sender=self, packet=packet, observer=observer, observation=observation)
 
                 return Response(
                     {"status": "success", "message": "Packet ingested successfully"},

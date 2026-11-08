@@ -14,6 +14,7 @@ from common.mesh_node_helpers import (
     observed_node_id_str,
     parse_b64_mac_address,
 )
+from common.meshtastic_enums import normalise_portnum
 from common.meshtastic_identity import (
     clamp_last_heard,
     has_name_fields,
@@ -21,7 +22,6 @@ from common.meshtastic_identity import (
     protect_identity,
     protect_stale_names,
 )
-from common.meshtastic_enums import normalise_portnum
 from common.protocol import Protocol
 from constellations.models import MessageChannel
 from nodes.models import DeviceMetrics, ManagedNode, NodeLatestStatus, ObservedNode, Position
