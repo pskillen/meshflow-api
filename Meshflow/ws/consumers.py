@@ -113,14 +113,16 @@ class NodeConsumer(AsyncWebsocketConsumer):
 
         try:
             key_obj = NodeAPIKey.objects.get(key=api_key, is_active=True)
+            key_obj.last_used = timezone.now()
+            key_obj.save(update_fields=["last_used"])
+            return resolve_single_feeder(key_obj), None
         except NodeAPIKey.DoesNotExist:
             return None, "invalid_api_key"
-        key_obj.last_used = timezone.now()
-        key_obj.save(update_fields=["last_used"])
-        try:
-            return resolve_single_feeder(key_obj), None
         except FeederResolutionError as exc:
             return None, exc.code
+        except Exception as e:
+            logger.exception("NodeConsumer: error resolving feeder-scoped api_key: %s", e)
+            return None, "error"
 
     @database_sync_to_async
     def _validate_api_key(
