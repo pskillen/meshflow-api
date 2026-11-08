@@ -67,7 +67,7 @@ A feeder on a **legacy URL cannot survive the upgrade**. Confirm the bot is on a
 | Public-channel position precision | Restore if wanted | The upgrade sets it to 0 and the public clamp is about 730 m (15 bits) |
 | Telemetry | See step 5 | |
 
-The API ignores the connect-time replay of stored node records a 2.8 radio sends after `config_complete_id`: replayed packets are stored and flagged but change nothing (see [meshtastic.md](meshtastic.md#replayed-packets-28)). Bots with replay detection (bot#160) drop them before upload.
+The API ignores the connect-time replay of stored node records a 2.8 radio sends after `config_complete_id`: replayed packets are stored and flagged but change nothing (see [meshtastic.md](meshtastic.md#replayed-packets-28)). Bots with replay detection drop them before upload.
 
 Expect observation counts from a 2.8 feeder to differ from a 2.7 one even after these settings: pre-hop packets are withheld from the phone/bot, and broadcast hop limits are density-scaled.
 

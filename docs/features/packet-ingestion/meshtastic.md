@@ -164,19 +164,21 @@ config (the python lib, so the bot): one synthetic POSITION, TELEMETRY (device, 
 per NodeDB node (firmware `PhoneAPI.cpp`, `makeReplay*Packet`). They look like received packets but were not heard on
 air. In the dict the bot uploads, a replayed packet has no `rxRssi`, `transportMechanism: TRANSPORT_LORA`,
 `priority: BACKGROUND`, a `rxTime` equal to the node's stored `last_heard`, `hopStart` equal to the **feeder's** own
-hop limit, and an `id` that is stable across reconnects. Live packets always carry `rxRssi` and never carry a
-priority.
+hop limit, and an `id` that is stable across reconnects. Replays lack `rxRssi`, but so do MQTT-downlinked packets and the
+feeder's own packets, which is why the rule below also needs LoRa transport, `BACKGROUND` priority and a non-feeder
+sender. Live packets never carry a priority.
 
-**Detection** (`packets/replay.py`, `is_replayed_shape`). A packet is a replay when all four hold:
+**Detection** (`packets/replay.py`, `is_replayed_shape`). A packet is a replay when all of these hold:
 
 1. `from` is an int that is not one of the feeder's own node numbers (`ManagedNode.meshtastic_node_id`,
    `reported_meshtastic_node_id`, or the `X-Meshtastic-Feeder-Node-Num` header, which carries the new number after an
    upgrade);
 2. `rxRssi` is absent or null;
 3. `transportMechanism` is `TRANSPORT_LORA` (or `1`);
-4. `priority` is `BACKGROUND` (or `10`).
+4. `priority` is `BACKGROUND` (or `10`);
+5. `viaMqtt` is not true and no transport names MQTT.
 
-MQTT-downlinked live packets also lack `rxRssi`, but are `TRANSPORT_MQTT`, so rule 3 keeps them out. When none of the
+An MQTT-sourced packet is never a replay, whatever its RSSI. When none of the
 feeder's numbers is known, nothing is treated as a replay. The bot applies the same rule (`REPLAYED_PACKETS`); keep
 the two in step.
 
