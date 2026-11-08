@@ -4,15 +4,14 @@ After ``config_complete_id`` a 2.8 radio replays its stored per-node records (PO
 one set per NodeDB entry) to every client that asks for full config. They look like received packets but are not
 radio receptions. A replayed packet:
 
-- has no ``rxRssi`` (every real LoRa reception sets it);
+- has no ``rxRssi`` (replays lack it; so do MQTT-downlinked and the feeder's own packets, hence the other rules);
 - carries ``transportMechanism`` ``TRANSPORT_LORA`` and ``priority`` ``BACKGROUND`` (live packets never carry a
   priority);
 - is never the feeder's own packet.
 
-MQTT-downlinked live packets also lack ``rxRssi`` but are ``TRANSPORT_MQTT``, so the transport check keeps them
-out.
+MQTT-sourced packets (``viaMqtt`` true, or a transport naming MQTT) are never replays, whatever their RSSI.
 
-The bot (meshflow-bot, ``REPLAYED_PACKETS``) applies the same four-part rule before upload. Keep the two in step.
+The bot (meshflow-bot, ``REPLAYED_PACKETS``) applies the same rule before upload. Keep the two in step.
 """
 
 from __future__ import annotations
@@ -36,17 +35,24 @@ def _in(value, allowed) -> bool:
     return not isinstance(value, bool) and value in allowed
 
 
+def _names_mqtt(value) -> bool:
+    return isinstance(value, str) and "MQTT" in value.upper()
+
+
 def is_replayed_shape(data: Mapping, feeder_nums: set[int]) -> bool:
     """True when ``data`` has the shape of a 2.8 connect-time replay.
 
     All of: ``from`` is an int and not one of the feeder's own node numbers; ``rxRssi`` absent or null;
-    ``transportMechanism`` is TRANSPORT_LORA (or 1); ``priority`` is BACKGROUND (or 10). An empty ``feeder_nums``
+    ``transportMechanism`` is TRANSPORT_LORA (or 1); ``priority`` is BACKGROUND (or 10); ``viaMqtt`` is not truthy and
+    no transport names MQTT (an MQTT-sourced packet is never a replay, whatever its RSSI). An empty ``feeder_nums``
     means the feeder's identity is unknown, so nothing is treated as a replay (fail towards live data).
     """
     if not feeder_nums:
         return False
     from_num = data.get("from")
     if not _is_int(from_num) or from_num in feeder_nums:
+        return False
+    if data.get("viaMqtt") or _names_mqtt(data.get("transportMechanism")):
         return False
     if data.get("rxRssi") is not None:
         return False

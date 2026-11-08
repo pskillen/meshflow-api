@@ -475,7 +475,10 @@ def global_packet_stats(request):
             return Response(cached)
 
     # Build base query
-    packets = MtRawPacket.objects.all()
+    # A packet whose only observations are 2.8 connect-time replays is not counted.
+    packets = MtRawPacket.objects.filter(
+        Exists(PacketObservation.objects.filter(packet_id=OuterRef("id"), replayed=False))
+    )
 
     # Apply date filters if provided
     if start_date:

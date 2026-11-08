@@ -116,3 +116,11 @@ def test_packet_volume_excludes_replay_only_packets(world):
 
     snap = StatsSnapshot.objects.get(stat_type="packet_volume", recorded_at=RX)
     assert snap.value["count"] == 1
+
+
+@pytest.mark.django_db
+def test_global_packet_stats_excludes_replay_only_packets(world):
+    response = world["client"].get(reverse("stats:global-packet-stats"), RANGE)
+
+    assert response.status_code == 200
+    assert response.data["summary"]["total_packets"] == 1

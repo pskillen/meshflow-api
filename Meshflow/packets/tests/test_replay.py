@@ -47,6 +47,9 @@ def test_int_enum_forms():
         {"rxRssi": -79},
         {"rxRssi": 0},
         {"transportMechanism": "TRANSPORT_MQTT"},
+        {"viaMqtt": True},
+        {"viaMqtt": True, "transportMechanism": "TRANSPORT_LORA"},
+        {"transportMechanism": "TRANSPORT_MULTICAST_MQTT"},
         {"transportMechanism": 5},
         {"transportMechanism": None},
         {"transportMechanism": True},
@@ -61,6 +64,17 @@ def test_int_enum_forms():
 )
 def test_each_missing_condition_is_not_a_replay(overrides):
     assert is_replayed_shape(_replay(**overrides), {FEEDER_OLD, FEEDER_NEW}) is False
+
+
+def test_mqtt_packet_without_rssi_is_live():
+    packet = _replay(viaMqtt=True)
+    packet.pop("rxRssi", None)
+    assert is_replayed_shape(packet, {FEEDER_OLD, FEEDER_NEW}) is False
+
+
+def test_replay_shaped_lora_packet_is_still_replayed():
+    assert is_replayed_shape(_replay(viaMqtt=False), {FEEDER_OLD, FEEDER_NEW}) is True
+    assert is_replayed_shape(_replay(), {FEEDER_OLD, FEEDER_NEW}) is True
 
 
 def test_missing_keys_are_not_a_replay():
