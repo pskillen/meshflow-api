@@ -1,6 +1,7 @@
 # ADR-0005 — Feeder-scoped authentication (one API key per feeder)
 
-**Status:** Proposed. Describes **planned** behaviour; none of the decisions below is built yet.
+**Status:** Proposed. Describes **planned** behaviour; parts are built (below), the rest is not.
+**Built (API, [meshflow-api#438](https://github.com/pskillen/meshflow-api/issues/438) steps 1, 2 and 4):** the Meshtastic and shared v4 URLs (`identity/`, `bot-version/`, `meshtastic/ingest/`, `meshtastic/nodes/`) with single-feeder auth and its three codes, `ws/nodes/?feeder_scoped=1`, the Prometheus usage metrics and `ManagedNode` usage fields (decision 5), and recording of the reported node number (decision 3, record and flag only). Not built: the MeshCore v4 URLs, the bot side, blocking new shared links (7) and re-keying (8).
 **Date:** 2026-11-02
 **Tracking:** [meshflow-api#438](https://github.com/pskillen/meshflow-api/issues/438); epic [meshflow-api#437](https://github.com/pskillen/meshflow-api/issues/437)
 

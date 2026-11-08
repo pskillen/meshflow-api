@@ -16,14 +16,22 @@ Users in the Django **`feeder`** group (or staff) may create keys for **any** co
 
 Managed-node owners are granted the feeder group via migration when the membership model was removed.
 
-## One Key per Node vs One per User
+## One Key per Feeder
 
-Both patterns are supported:
+**Use one API key per feeder.** The v4 feeder URLs (`/api/v4/feeder/…`, see [API.md](API.md#feeder-api-v4))
+identify the feeder from the key alone, so they require the key to be linked to exactly one active
+ManagedNode. A Meshtastic 2.8 feeder whose node number changes keeps working only on the v4 URLs. A bot
+running two radios is two processes with two keys.
 
-- **One key per node**: Create a key and assign it to a single ManagedNode. This is the typical workflow when setting up a new managed node.
-- **One key per user**: Create a key and assign it to multiple ManagedNodes. Useful if one user runs several bots and wants to manage a single key.
+A key linked to more than one active feeder gets 403 `{"code": "shared_api_key", "detail": …}` on every v4
+URL (and the WebSocket closes with `feeder_scoped=1`). The fix is to create a key for each feeder on the
+API keys page and configure each bot with its own key. Soft-deleted feeders do not count.
 
-The integration test seed (`seed_integration_tests`) creates one API key linked to two ManagedNodes, demonstrating shared-key support.
+Shared keys (one key linked to several ManagedNodes) **still work on the legacy URLs**, which are unchanged:
+`/api/packets/{node_id}/…`, `/api/v3/packets/{node_id}/…` and `/api/meshcore/feeders/{prefix}/…`. Legacy use is
+tracked (Prometheus and `ManagedNode.legacy_api_last_used_at`) so the legacy URLs can be retired once unused.
+
+The integration test seed (`seed_integration_tests`) creates one API key linked to two ManagedNodes, demonstrating legacy shared-key support.
 
 ## Packet Ingest: How Packets Are Associated
 
@@ -62,7 +70,9 @@ The WebSocket endpoint (`ws/nodes/?api_key=<key>`) must identify which feeder is
 | Meshtastic | `feeder_node_id_str` (`!` + 8 hex) | `feeder_node_id_str=!433b82f0` |
 | MeshCore | `feeder_pubkey_prefix` (12-hex pubkey prefix) | `feeder_pubkey_prefix=1a37f5aea4a1` |
 
-When only one feeder is linked to the key, no extra query parameter is required.
+When only one feeder is linked to the key, no extra query parameter is required. Bots on the v4 feeder URLs
+connect with `feeder_scoped=1` instead of a feeder id: the key must then have exactly one active feeder,
+and the connection is closed otherwise (`feeder_not_linked` or `shared_api_key` in the server log).
 
 When multiple feeders share a key and the bot omits the correct disambiguator, the connection is **rejected** (same as MeshCore multi-feeder behaviour).
 
@@ -78,8 +88,9 @@ ws://{host}/ws/nodes/?api_key={key}&feeder_pubkey_prefix=1a37f5aea4a1
 ## Authentication
 
 - **Header**: `X-API-KEY: <key>` or `Authorization: Token <key>`
-- **Packet ingest**: Requires `NodeAPIKeyAuthentication` and `NodeAuthorizationPermission`; the key must be linked to the node in the URL path
-- **WebSocket**: Validates the key; uses the sole linked feeder, or resolves via `feeder_node_id` / `feeder_node_id_str` (Meshtastic) or `feeder_pubkey_prefix` (MeshCore)
+- **Packet ingest (legacy URLs)**: Requires `NodeAPIKeyAuthentication` and `NodeAuthorizationPermission`; the key must be linked to the node in the URL path
+- **Feeder API v4**: `NodeAPIKeyAuthentication` and `FeederScopedPermission`; the key must be linked to exactly one active feeder (403 `feeder_not_linked` / `shared_api_key` / `feeder_protocol_mismatch`)
+- **WebSocket**: Validates the key; with `feeder_scoped=1` applies the v4 single-feeder rule; otherwise uses the sole linked feeder, or resolves via `feeder_node_id` / `feeder_node_id_str` (Meshtastic) or `feeder_pubkey_prefix` (MeshCore)
 
 ## API Endpoints
 
