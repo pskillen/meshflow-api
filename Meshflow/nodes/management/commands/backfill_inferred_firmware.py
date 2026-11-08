@@ -1,8 +1,9 @@
 """Backfill ObservedNode.inferred_firmware / inferred_firmware_basis for existing Meshtastic rows.
 
 Idempotent and batched. Safe to re-run; ``--dry-run`` writes nothing and reports what a real run would write.
-A row with no evidence is left untouched (a verdict is never cleared). Reads the stored ``meshtastic_key_node_id``,
-and each live feeder's reported firmware, so run ``backfill_meshtastic_identity`` first in an environment that never ran it.
+A row with no evidence is left untouched (a verdict is never cleared). Reads the stored ``meshtastic_key_node_id``
+and each live feeder's reported firmware, so run ``backfill_meshtastic_identity`` first in an environment that never
+ran it.
 """
 
 from collections import Counter
