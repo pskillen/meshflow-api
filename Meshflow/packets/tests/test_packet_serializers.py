@@ -10,6 +10,7 @@ from constellations.models import Constellation, MessageChannel
 from nodes.models import ManagedNode, NodeLatestStatus, ObservedNode, Position
 from packets.models import (
     DeviceMetricsPacket,
+    GenericPacket,
     LocalStatsPacket,
     LocationSource,
     MessagePacket,
@@ -702,21 +703,29 @@ class PacketIngestSerializerTest(BasePacketSerializerTestCase):
         self.assertEqual(packet.snr_towards, [4.5, -3.0, 1.0])  # Extra value stored, receiver uses i < len
         self.assertEqual(packet.snr_back, [2.0, 0.0, -1.0])
 
-    def test_invalid_packet_type(self):
-        """Test handling of invalid packet type."""
+    def test_unknown_packet_type_is_generic(self):
+        """An unknown port is stored as a GenericPacket, not rejected."""
         data = {
             "id": 123,
             "from": self.from_node.meshtastic_node_id,
             "fromId": self.from_node.node_id_str,
-            "decoded": {
-                "portnum": "INVALID_TYPE",
-            },
+            "decoded": {"portnum": "INVALID_TYPE"},
             "rxTime": 1672531200,
         }
 
         serializer = PacketIngestSerializer(data=data, context=self.context)
+        assert_serializer_valid(serializer)
+        packet = serializer.save()
+        self.assertIsInstance(packet, GenericPacket)
+        self.assertEqual(packet.port_num, "INVALID_TYPE")
+
+    def test_missing_portnum_is_invalid(self):
+        """A packet with no decoded.portnum is still a 400."""
+        data = {"id": 123, "from": self.from_node.meshtastic_node_id, "decoded": {}, "rxTime": 1672531200}
+
+        serializer = PacketIngestSerializer(data=data, context=self.context)
         self.assertFalse(serializer.is_valid())
-        self.assertIn("Unknown packet type", str(serializer.errors))
+        self.assertIn("decoded.portnum", serializer.errors)
 
 
 class NodeSerializerTest(BasePacketSerializerTestCase):

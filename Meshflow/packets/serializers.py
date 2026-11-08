@@ -1,5 +1,6 @@
 """Serializers for the packets app."""
 
+import json
 from datetime import datetime, timedelta, timezone
 
 from django.conf import settings
@@ -20,6 +21,7 @@ from common.meshtastic_identity import (
     protect_identity,
     protect_stale_names,
 )
+from common.meshtastic_enums import normalise_portnum
 from common.protocol import Protocol
 from constellations.models import MessageChannel
 from nodes.models import DeviceMetrics, ManagedNode, NodeLatestStatus, ObservedNode, Position
@@ -28,6 +30,7 @@ from .models import (
     AirQualityMetricsPacket,
     DeviceMetricsPacket,
     EnvironmentMetricsPacket,
+    GenericPacket,
     HealthMetricsPacket,
     HostMetricsPacket,
     LocalStatsPacket,
@@ -116,7 +119,7 @@ class BasePacketSerializer(serializers.Serializer):
     channel = serializers.IntegerField(required=False, allow_null=True)
     hopLimit = serializers.IntegerField(source="hop_limit", required=False, allow_null=True)
     hopStart = serializers.IntegerField(source="hop_start", required=False, allow_null=True)
-    rxTime = serializers.IntegerField(source="rx_time")
+    rxTime = serializers.IntegerField(source="rx_time", required=False, allow_null=True)
     rxRssi = serializers.FloatField(source="rx_rssi", required=False, allow_null=True)
     rxSnr = serializers.FloatField(source="rx_snr", required=False, allow_null=True)
     relayNode = serializers.IntegerField(source="relay_node", required=False, allow_null=True)
@@ -145,13 +148,17 @@ class BasePacketSerializer(serializers.Serializer):
             to_str = meshtastic_id_to_hex(to_int)
             validated_data["to_str"] = to_str
 
-        # Extract portnum from decoded structure
+        # Extract portnum from decoded structure (ints and numeric strings become the enum name)
         if "decoded" in data and "portnum" in data["decoded"]:
-            validated_data["port_num"] = data["decoded"]["portnum"]
+            validated_data["port_num"] = normalise_portnum(data["decoded"]["portnum"])
 
-        # Convert rxTime to a datetime object with validation
-        if "rx_time" in validated_data:
+        # Convert rxTime to a datetime object with validation. A feeder with no rxTime (protobuf3 drops 0)
+        # gets the API clock, flagged on the observation.
+        if validated_data.get("rx_time"):
             validated_data["rx_time"] = convert_timestamp(validated_data["rx_time"])
+        else:
+            validated_data["rx_time"] = django_timezone.now()
+            validated_data["rx_time_estimated"] = True
 
         return validated_data
 
@@ -196,6 +203,7 @@ class BasePacketSerializer(serializers.Serializer):
             hop_limit=validated_data.get("hop_limit"),
             hop_start=validated_data.get("hop_start"),
             rx_time=validated_data.get("rx_time"),
+            rx_time_estimated=validated_data.get("rx_time_estimated", False),
             rx_rssi=validated_data.get("rx_rssi"),
             rx_snr=validated_data.get("rx_snr"),
             relay_node=validated_data.get("relay_node"),
@@ -1176,106 +1184,152 @@ class TraceroutePacketSerializer(BasePacketSerializer):
         return packet
 
 
+TELEMETRY_VARIANT_SERIALIZERS = {
+    "deviceMetrics": DeviceMetricsPacketSerializer,
+    "localStats": LocalStatsPacketSerializer,
+    "environmentMetrics": EnvironmentMetricsPacketSerializer,
+    "airQualityMetrics": AirQualityMetricsPacketSerializer,
+    "powerMetrics": PowerMetricsPacketSerializer,
+    "healthMetrics": HealthMetricsPacketSerializer,
+    "hostMetrics": HostMetricsPacketSerializer,
+    "trafficManagementStats": TrafficManagementStatsPacketSerializer,
+}
+
+PORT_NUM_MAX_LENGTH = 50  # MtRawPacket.port_num max_length
+
+
+def first_unknown_telemetry_variant(telemetry):
+    """Return the first dict-valued key of a decoded telemetry block other than ``time`` (the bot's D23 rule)."""
+    if not isinstance(telemetry, dict):
+        return None
+    for key, value in telemetry.items():
+        if key != "time" and isinstance(value, dict):
+            return key
+    return None
+
+
+class GenericPacketSerializer(BasePacketSerializer):
+    """Serializer for any port (or telemetry variant) without a typed table.
+
+    Stores ``decoded`` minus ``portnum`` as JSON, capped at ``MESHTASTIC_GENERIC_DECODED_MAX_BYTES``; ports in
+    ``MESHTASTIC_METADATA_ONLY_PORTNUMS`` keep no payload at all.
+    """
+
+    def to_internal_value(self, data):
+        """Validate the envelope, then work out the payload to keep and the telemetry variant."""
+        validated_data = super().to_internal_value(data)
+        port_num = validated_data.get("port_num")
+        if not port_num or len(port_num) > PORT_NUM_MAX_LENGTH:
+            raise serializers.ValidationError({"decoded.portnum": "Invalid portnum"})
+
+        decoded = {k: v for k, v in (data.get("decoded") or {}).items() if k != "portnum"}
+        validated_data["telemetry_variant"] = (
+            first_unknown_telemetry_variant(decoded.get("telemetry")) if port_num == "TELEMETRY_APP" else None
+        )
+
+        stored = decoded
+        truncated = False
+        if port_num in getattr(settings, "MESHTASTIC_METADATA_ONLY_PORTNUMS", ["ROUTING_APP"]):
+            stored = None
+        else:
+            max_bytes = getattr(settings, "MESHTASTIC_GENERIC_DECODED_MAX_BYTES", 4096)
+            if len(json.dumps(decoded, separators=(",", ":")).encode("utf-8")) > max_bytes:
+                stored = None
+                truncated = True
+        validated_data["decoded"] = stored
+        validated_data["decoded_truncated"] = truncated
+        return validated_data
+
+    def create(self, validated_data):
+        """Create a GenericPacket (or reuse the one within the dedup window) and the observation."""
+        from_int = validated_data.get("from_int")
+        packet_id = validated_data.get("packet_id")
+        rx_time = validated_data.get("rx_time")
+        existing_packet = find_existing_packet(GenericPacket, from_int, packet_id, rx_time)
+
+        if existing_packet:
+            self._create_observation(existing_packet, validated_data)
+            return existing_packet
+
+        packet = GenericPacket.objects.create(
+            packet_id=packet_id,
+            from_int=from_int,
+            from_str=validated_data.get("from_str"),
+            to_int=validated_data.get("to_int"),
+            to_str=validated_data.get("to_str"),
+            port_num=validated_data.get("port_num"),
+            first_reported_time=validated_data.get("first_reported_time", rx_time),
+            decoded=validated_data.get("decoded"),
+            telemetry_variant=validated_data.get("telemetry_variant"),
+            decoded_truncated=validated_data.get("decoded_truncated", False),
+        )
+        self._create_observation(packet, validated_data)
+        return packet
+
+
 class PacketIngestSerializer(serializers.Serializer):
-    """Serializer for ingesting packets of any type."""
+    """Serializer for ingesting packets of any type.
+
+    Dispatch: ``decoded.portnum`` is normalised first (ints and numeric strings become the enum name, or
+    ``PORT_<n>``). Ports with a typed serializer use it; ``TELEMETRY_APP`` uses the typed serializer for its
+    variant. Everything else, including a telemetry packet with no recognised variant, is a ``GenericPacket``.
+    A missing ``decoded`` or ``decoded.portnum`` is a 400.
+    """
 
     # non-serialized fields
     observation: PacketObservation
     child_serializer: BasePacketSerializer
 
+    TYPED_SERIALIZERS = {
+        "TEXT_MESSAGE_APP": MessagePacketSerializer,
+        "NODEINFO_APP": NodeInfoPacketSerializer,
+        "POSITION_APP": PositionPacketSerializer,
+        "TRACEROUTE_APP": TraceroutePacketSerializer,
+    }
+
     def to_internal_value(self, data):
         """Convert the incoming packet data to the appropriate packet type."""
-        # Determine the packet type based on the portnum
-        portnum = data.get("decoded", {}).get("portnum")
+        decoded = data.get("decoded") if hasattr(data, "get") else None
+        if not isinstance(decoded, dict) or decoded.get("portnum") in (None, ""):
+            raise serializers.ValidationError({"decoded.portnum": "This field is required."})
+        portnum = normalise_portnum(decoded["portnum"])
 
-        if portnum == "TEXT_MESSAGE_APP":
-            validated_data = MessagePacketSerializer().to_internal_value(data)
-        elif portnum == "NODEINFO_APP":
-            validated_data = NodeInfoPacketSerializer().to_internal_value(data)
-        elif portnum == "POSITION_APP":
-            validated_data = PositionPacketSerializer().to_internal_value(data)
-        elif portnum == "TELEMETRY_APP":
-            telemetry = data.get("decoded", {}).get("telemetry", {})
-            if "deviceMetrics" in telemetry:
-                validated_data = DeviceMetricsPacketSerializer().to_internal_value(data)
-                validated_data["_telemetry_variant"] = "deviceMetrics"
-            elif "localStats" in telemetry:
-                validated_data = LocalStatsPacketSerializer().to_internal_value(data)
-                validated_data["_telemetry_variant"] = "localStats"
-            elif "environmentMetrics" in telemetry:
-                validated_data = EnvironmentMetricsPacketSerializer().to_internal_value(data)
-                validated_data["_telemetry_variant"] = "environmentMetrics"
-            elif "airQualityMetrics" in telemetry:
-                validated_data = AirQualityMetricsPacketSerializer().to_internal_value(data)
-                validated_data["_telemetry_variant"] = "airQualityMetrics"
-            elif "powerMetrics" in telemetry:
-                validated_data = PowerMetricsPacketSerializer().to_internal_value(data)
-                validated_data["_telemetry_variant"] = "powerMetrics"
-            elif "healthMetrics" in telemetry:
-                validated_data = HealthMetricsPacketSerializer().to_internal_value(data)
-                validated_data["_telemetry_variant"] = "healthMetrics"
-            elif "hostMetrics" in telemetry:
-                validated_data = HostMetricsPacketSerializer().to_internal_value(data)
-                validated_data["_telemetry_variant"] = "hostMetrics"
-            elif "trafficManagementStats" in telemetry:
-                validated_data = TrafficManagementStatsPacketSerializer().to_internal_value(data)
-                validated_data["_telemetry_variant"] = "trafficManagementStats"
-            else:
-                raise serializers.ValidationError(
-                    {
-                        "decoded.telemetry": "Must contain one of: deviceMetrics, localStats, "
-                        "environmentMetrics, airQualityMetrics, powerMetrics, healthMetrics, "
-                        "hostMetrics, trafficManagementStats"
-                    }
-                )
-        elif portnum == "TRACEROUTE_APP":
-            validated_data = TraceroutePacketSerializer().to_internal_value(data)
-        else:
-            raise serializers.ValidationError({"decoded.portnum": f"Unknown packet type: {portnum}"})
+        if portnum in self.TYPED_SERIALIZERS:
+            return self.TYPED_SERIALIZERS[portnum]().to_internal_value(data)
 
+        if portnum == "TELEMETRY_APP":
+            telemetry = decoded.get("telemetry")
+            if isinstance(telemetry, dict):
+                for variant, serializer_class in TELEMETRY_VARIANT_SERIALIZERS.items():
+                    if variant in telemetry:
+                        validated_data = serializer_class().to_internal_value(data)
+                        validated_data["_telemetry_variant"] = variant
+                        return validated_data
+
+        validated_data = GenericPacketSerializer().to_internal_value(data)
+        validated_data["_generic"] = True
         return validated_data
 
     def create(self, validated_data):
         """Create the appropriate packet type based on the validated data."""
-        # Determine the packet type based on the portnum
         portnum = validated_data.get("port_num")
 
-        if portnum == "TEXT_MESSAGE_APP":
-            self.child_serializer = MessagePacketSerializer(context=self.context)
-        elif portnum == "NODEINFO_APP":
-            self.child_serializer = NodeInfoPacketSerializer(context=self.context)
-        elif portnum == "POSITION_APP":
-            self.child_serializer = PositionPacketSerializer(context=self.context)
+        if validated_data.pop("_generic", False):
+            self.child_serializer = GenericPacketSerializer(context=self.context)
+        elif portnum in self.TYPED_SERIALIZERS:
+            self.child_serializer = self.TYPED_SERIALIZERS[portnum](context=self.context)
         elif portnum == "TELEMETRY_APP":
             variant = validated_data.pop("_telemetry_variant", None)
-            variant_to_serializer = {
-                "deviceMetrics": DeviceMetricsPacketSerializer,
-                "localStats": LocalStatsPacketSerializer,
-                "environmentMetrics": EnvironmentMetricsPacketSerializer,
-                "airQualityMetrics": AirQualityMetricsPacketSerializer,
-                "powerMetrics": PowerMetricsPacketSerializer,
-                "healthMetrics": HealthMetricsPacketSerializer,
-                "hostMetrics": HostMetricsPacketSerializer,
-                "trafficManagementStats": TrafficManagementStatsPacketSerializer,
-            }
-            if variant and variant in variant_to_serializer:
-                self.child_serializer = variant_to_serializer[variant](context=self.context)
+            if variant in TELEMETRY_VARIANT_SERIALIZERS:
+                self.child_serializer = TELEMETRY_VARIANT_SERIALIZERS[variant](context=self.context)
             elif "battery_level" in validated_data:
                 self.child_serializer = DeviceMetricsPacketSerializer(context=self.context)
             elif "num_packets_tx" in validated_data:
                 self.child_serializer = LocalStatsPacketSerializer(context=self.context)
             else:
-                raise serializers.ValidationError(
-                    {
-                        "decoded.telemetry": "Must contain one of: deviceMetrics, localStats, "
-                        "environmentMetrics, airQualityMetrics, powerMetrics, healthMetrics, "
-                        "hostMetrics, trafficManagementStats"
-                    }
-                )
-        elif portnum == "TRACEROUTE_APP":
-            self.child_serializer = TraceroutePacketSerializer(context=self.context)
+                self.child_serializer = GenericPacketSerializer(context=self.context)
         else:
-            raise serializers.ValidationError({"decoded.portnum": f"Unknown packet type: {portnum}"})
+            self.child_serializer = GenericPacketSerializer(context=self.context)
 
         packet = self.child_serializer.create(validated_data)
         self.observation = self.child_serializer.observation

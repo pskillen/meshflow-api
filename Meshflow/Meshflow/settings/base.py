@@ -326,6 +326,14 @@ AUTH_USER_MODEL = "users.User"
 
 # Packet deduplication: time window (minutes) within which same sender+packet_id is treated as duplicate
 PACKET_DEDUP_WINDOW_MINUTES = int(os.environ.get("PACKET_DEDUP_WINDOW_MINUTES", "10"))
+# Meshtastic ports stored without their decoded payload (comma-separated PortNum names).
+MESHTASTIC_METADATA_ONLY_PORTNUMS = [
+    name.strip()
+    for name in os.environ.get("MESHTASTIC_METADATA_ONLY_PORTNUMS", "ROUTING_APP").split(",")
+    if name.strip()
+]
+# GenericPacket.decoded is dropped (decoded_truncated=True) when its JSON is larger than this many bytes.
+MESHTASTIC_GENERIC_DECODED_MAX_BYTES = int(os.environ.get("MESHTASTIC_GENERIC_DECODED_MAX_BYTES", "4096"))
 MESHCORE_PACKET_DEDUP_WINDOW_MINUTES = int(os.environ.get("MESHCORE_PACKET_DEDUP_WINDOW_MINUTES", "10"))
 MESHCORE_DECODED_TWIN_WINDOW_SECONDS = int(os.environ.get("MESHCORE_DECODED_TWIN_WINDOW_SECONDS", "120"))
 
