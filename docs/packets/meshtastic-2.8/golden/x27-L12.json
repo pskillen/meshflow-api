@@ -1,0 +1,84 @@
+{
+  "effects": {
+    "baseline_traceroute_queued": true,
+    "device_metrics_rows": 0,
+    "dx_candidate_called": true,
+    "environment_metrics_rows": 0,
+    "inferred_max_hops": 5,
+    "last_heard_advanced": true,
+    "nls": {
+      "altitude": 185.0,
+      "latitude": 55.9,
+      "longitude": -3.2,
+      "meshtastic_inferred_max_hops": 5,
+      "meshtastic_inferred_max_hops_source": "POSITION_APP",
+      "meshtastic_location_source": 2,
+      "meshtastic_precision_bits": 32
+    },
+    "observation_api": {
+      "direct_from_sender": false,
+      "hop_count": null,
+      "replayed": false
+    },
+    "observed_node_created": true,
+    "position_rows": 1
+  },
+  "key": "x27-L12",
+  "observation": {
+    "bitfield": 0,
+    "channel": 0,
+    "hop_limit": null,
+    "hop_start": 5,
+    "relay_node": 240,
+    "replayed": false,
+    "rx_rssi": -80.0,
+    "rx_snr": 5.0,
+    "rx_time": "2026-11-08T12:55:34Z",
+    "rx_time_estimated": false
+  },
+  "observed_node": {
+    "environment_exposure": 0,
+    "long_name": "Unknown Node !698239c8",
+    "m2m_opt_out": false,
+    "mac_addr": null,
+    "mc_pubkey": null,
+    "mc_pubkey_prefix": null,
+    "meshcore_adv_type": null,
+    "meshtastic_hw_model": null,
+    "meshtastic_is_licensed": null,
+    "meshtastic_is_unmessagable": null,
+    "meshtastic_key_node_id": null,
+    "meshtastic_node_id": 1770142152,
+    "meshtastic_public_key": null,
+    "meshtastic_public_key_hex": null,
+    "meshtastic_role": null,
+    "protocol": 1,
+    "short_name": "39c8",
+    "weather_use": 0
+  },
+  "packet": {
+    "fields": {
+      "altitude": 185.0,
+      "from_int": 1770142152,
+      "from_str": null,
+      "ground_speed": null,
+      "ground_track": null,
+      "heading": null,
+      "latitude": 55.9,
+      "longitude": -3.2,
+      "meshtastic_location_source": 2,
+      "meshtastic_precision_bits": 32,
+      "packet_id": 3696973938,
+      "port_num": "POSITION_APP",
+      "position_time": "2026-11-08T12:56:06Z",
+      "to_int": 4294967295,
+      "to_str": "^all"
+    },
+    "model": "PositionPacket"
+  },
+  "request": {
+    "feeder_num_header": 444845961,
+    "url": "v4"
+  },
+  "status": 201
+}

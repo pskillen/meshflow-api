@@ -1,0 +1,98 @@
+{
+  "effects": {
+    "baseline_traceroute_queued": true,
+    "device_metrics_rows": 0,
+    "dx_candidate_called": true,
+    "environment_metrics_rows": 1,
+    "inferred_max_hops": 7,
+    "last_heard_advanced": true,
+    "nls": {
+      "environment_barometric_pressure": 972.95844,
+      "environment_gas_resistance": 470.46786,
+      "environment_iaq": 142,
+      "environment_relative_humidity": 68.85575,
+      "environment_temperature": 11.590681,
+      "meshtastic_inferred_max_hops": 7,
+      "meshtastic_inferred_max_hops_source": "TELEMETRY_APP"
+    },
+    "observation_api": {
+      "direct_from_sender": false,
+      "hop_count": 5,
+      "replayed": false
+    },
+    "observed_node_created": true,
+    "position_rows": 0
+  },
+  "key": "x28h4-L2",
+  "observation": {
+    "bitfield": 0,
+    "channel": 0,
+    "hop_limit": 2,
+    "hop_start": 7,
+    "relay_node": 240,
+    "replayed": false,
+    "rx_rssi": -79.0,
+    "rx_snr": 6.25,
+    "rx_time": "2026-11-08T14:04:09Z",
+    "rx_time_estimated": false
+  },
+  "observed_node": {
+    "environment_exposure": 0,
+    "long_name": "Unknown Node !229a5f0a",
+    "m2m_opt_out": false,
+    "mac_addr": null,
+    "mc_pubkey": null,
+    "mc_pubkey_prefix": null,
+    "meshcore_adv_type": null,
+    "meshtastic_hw_model": null,
+    "meshtastic_is_licensed": null,
+    "meshtastic_is_unmessagable": null,
+    "meshtastic_key_node_id": null,
+    "meshtastic_node_id": 580542218,
+    "meshtastic_public_key": null,
+    "meshtastic_public_key_hex": null,
+    "meshtastic_role": null,
+    "protocol": 1,
+    "short_name": "5f0a",
+    "weather_use": 0
+  },
+  "packet": {
+    "fields": {
+      "barometric_pressure": 972.95844,
+      "current": null,
+      "distance": null,
+      "from_int": 580542218,
+      "from_str": "!229a5f0a",
+      "gas_resistance": 470.46786,
+      "iaq": 142,
+      "ir_lux": null,
+      "lux": null,
+      "packet_id": 1458788268,
+      "port_num": "TELEMETRY_APP",
+      "radiation": null,
+      "rainfall_1h": null,
+      "rainfall_24h": null,
+      "reading_time": "2026-04-28T09:39:24Z",
+      "relative_humidity": 68.85575,
+      "soil_moisture": null,
+      "soil_temperature": null,
+      "temperature": 11.590681,
+      "to_int": 4294967295,
+      "to_str": "^all",
+      "uv_lux": null,
+      "voltage": null,
+      "weight": null,
+      "white_lux": null,
+      "wind_direction": null,
+      "wind_gust": null,
+      "wind_lull": null,
+      "wind_speed": null
+    },
+    "model": "EnvironmentMetricsPacket"
+  },
+  "request": {
+    "feeder_num_header": 3769067321,
+    "url": "v4"
+  },
+  "status": 201
+}

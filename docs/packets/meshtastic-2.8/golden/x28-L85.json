@@ -1,0 +1,79 @@
+{
+  "effects": {
+    "baseline_traceroute_queued": true,
+    "device_metrics_rows": 0,
+    "dx_candidate_called": true,
+    "environment_metrics_rows": 0,
+    "inferred_max_hops": 2,
+    "last_heard_advanced": true,
+    "nls": {
+      "meshtastic_inferred_max_hops": 2,
+      "meshtastic_inferred_max_hops_source": "NODEINFO_APP"
+    },
+    "observation_api": {
+      "direct_from_sender": false,
+      "hop_count": null,
+      "replayed": false
+    },
+    "observed_node_created": true,
+    "position_rows": 0
+  },
+  "key": "x28-L85",
+  "observation": {
+    "bitfield": 0,
+    "channel": 0,
+    "hop_limit": null,
+    "hop_start": 2,
+    "relay_node": 180,
+    "replayed": false,
+    "rx_rssi": -80.0,
+    "rx_snr": 5.75,
+    "rx_time": "2026-11-08T13:34:52Z",
+    "rx_time_estimated": false
+  },
+  "observed_node": {
+    "environment_exposure": 0,
+    "long_name": "unlobito \ud83c\udfe0 (routing)",
+    "m2m_opt_out": false,
+    "mac_addr": "f0:f5:bd:50:33:9c",
+    "mc_pubkey": null,
+    "mc_pubkey_prefix": null,
+    "meshcore_adv_type": null,
+    "meshtastic_hw_model": "HELTEC_V3",
+    "meshtastic_is_licensed": null,
+    "meshtastic_is_unmessagable": true,
+    "meshtastic_key_node_id": 600032415,
+    "meshtastic_node_id": 600032415,
+    "meshtastic_public_key": "rNZjKF6J675naUkcgU/Rm+THhTQ29J922cNEMPiqFkQ=",
+    "meshtastic_public_key_hex": "acd663285e89ebbe6769491c814fd19be4c7853436f49f76d9c34430f8aa1644",
+    "meshtastic_role": 12,
+    "protocol": 1,
+    "short_name": "lobR",
+    "weather_use": 0
+  },
+  "packet": {
+    "fields": {
+      "from_int": 600032415,
+      "from_str": null,
+      "hw_model": "HELTEC_V3",
+      "is_licensed": null,
+      "is_unmessagable": true,
+      "long_name": "unlobito \ud83c\udfe0 (routing)",
+      "mac_address": "f0:f5:bd:50:33:9c",
+      "node_id": "!23c3c49f",
+      "packet_id": 2373735515,
+      "port_num": "NODEINFO_APP",
+      "public_key": "rNZjKF6J675naUkcgU/Rm+THhTQ29J922cNEMPiqFkQ=",
+      "role": 12,
+      "short_name": "lobR",
+      "to_int": 4294967295,
+      "to_str": "^all"
+    },
+    "model": "NodeInfoPacket"
+  },
+  "request": {
+    "feeder_num_header": 3769067321,
+    "url": "v4"
+  },
+  "status": 201
+}

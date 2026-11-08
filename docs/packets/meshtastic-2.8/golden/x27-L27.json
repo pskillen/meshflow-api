@@ -1,0 +1,83 @@
+{
+  "effects": {
+    "baseline_traceroute_queued": true,
+    "device_metrics_rows": 0,
+    "dx_candidate_called": true,
+    "environment_metrics_rows": 0,
+    "inferred_max_hops": null,
+    "last_heard_advanced": true,
+    "nls": {},
+    "observation_api": {
+      "direct_from_sender": false,
+      "hop_count": null,
+      "replayed": false
+    },
+    "observed_node_created": true,
+    "position_rows": 0
+  },
+  "key": "x27-L27",
+  "observation": {
+    "bitfield": null,
+    "channel": 0,
+    "hop_limit": 6,
+    "hop_start": null,
+    "relay_node": null,
+    "replayed": false,
+    "rx_rssi": null,
+    "rx_snr": null,
+    "rx_time": "2026-11-08T13:02:08Z",
+    "rx_time_estimated": false
+  },
+  "observed_node": {
+    "environment_exposure": 0,
+    "long_name": "Unknown Node !1a83cf89",
+    "m2m_opt_out": false,
+    "mac_addr": null,
+    "mc_pubkey": null,
+    "mc_pubkey_prefix": null,
+    "meshcore_adv_type": null,
+    "meshtastic_hw_model": null,
+    "meshtastic_is_licensed": null,
+    "meshtastic_is_unmessagable": null,
+    "meshtastic_key_node_id": null,
+    "meshtastic_node_id": 444845961,
+    "meshtastic_public_key": null,
+    "meshtastic_public_key_hex": null,
+    "meshtastic_role": null,
+    "protocol": 1,
+    "short_name": "cf89",
+    "weather_use": 0
+  },
+  "packet": {
+    "fields": {
+      "from_int": 444845961,
+      "from_str": "!1a83cf89",
+      "heap_free_bytes": 60584,
+      "heap_total_bytes": 133324,
+      "meshtastic_air_util_tx": 0.4381389,
+      "meshtastic_channel_utilization": 8.408334,
+      "noise_floor": -113,
+      "num_online_nodes": 10,
+      "num_packets_rx": 51,
+      "num_packets_rx_bad": 14,
+      "num_packets_tx": 22,
+      "num_rx_dupe": 9,
+      "num_total_nodes": 80,
+      "num_tx_dropped": null,
+      "num_tx_relay": 20,
+      "num_tx_relay_canceled": 2,
+      "packet_id": 4002046279,
+      "port_num": "TELEMETRY_APP",
+      "reading_time": "2026-11-08T13:02:08Z",
+      "to_int": 4294967295,
+      "to_str": "^all",
+      "uptime_seconds": 1079
+    },
+    "model": "LocalStatsPacket"
+  },
+  "request": {
+    "feeder_num_header": 444845961,
+    "url": "v4"
+  },
+  "status": 201
+}

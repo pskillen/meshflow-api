@@ -1,0 +1,79 @@
+{
+  "effects": {
+    "baseline_traceroute_queued": true,
+    "device_metrics_rows": 0,
+    "dx_candidate_called": true,
+    "environment_metrics_rows": 0,
+    "inferred_max_hops": 3,
+    "last_heard_advanced": true,
+    "nls": {
+      "meshtastic_inferred_max_hops": 3,
+      "meshtastic_inferred_max_hops_source": "NODEINFO_APP"
+    },
+    "observation_api": {
+      "direct_from_sender": false,
+      "hop_count": null,
+      "replayed": false
+    },
+    "observed_node_created": true,
+    "position_rows": 0
+  },
+  "key": "x28-L1",
+  "observation": {
+    "bitfield": 0,
+    "channel": 0,
+    "hop_limit": null,
+    "hop_start": 3,
+    "relay_node": 180,
+    "replayed": false,
+    "rx_rssi": -80.0,
+    "rx_snr": 7.25,
+    "rx_time": "2026-11-08T13:31:52Z",
+    "rx_time_estimated": false
+  },
+  "observed_node": {
+    "environment_exposure": 0,
+    "long_name": "TIGERBAWS",
+    "m2m_opt_out": false,
+    "mac_addr": "50:78:7d:08:5a:bc",
+    "mc_pubkey": null,
+    "mc_pubkey_prefix": null,
+    "meshcore_adv_type": null,
+    "meshtastic_hw_model": "T_LORA_PAGER",
+    "meshtastic_is_licensed": null,
+    "meshtastic_is_unmessagable": false,
+    "meshtastic_key_node_id": 2727472337,
+    "meshtastic_node_id": 2097699516,
+    "meshtastic_public_key": "rmtpWJ02i9cktssjzS8i92vtiBEnCl6VcLxEiZvQpBI=",
+    "meshtastic_public_key_hex": "ae6b69589d368bd724b6cb23cd2f22f76bed8811270a5e9570bc44899bd0a412",
+    "meshtastic_role": null,
+    "protocol": 1,
+    "short_name": "Tbaw",
+    "weather_use": 0
+  },
+  "packet": {
+    "fields": {
+      "from_int": 2097699516,
+      "from_str": "!7d085abc",
+      "hw_model": "T_LORA_PAGER",
+      "is_licensed": null,
+      "is_unmessagable": false,
+      "long_name": "TIGERBAWS",
+      "mac_address": "50:78:7d:08:5a:bc",
+      "node_id": "!7d085abc",
+      "packet_id": 3906867666,
+      "port_num": "NODEINFO_APP",
+      "public_key": "rmtpWJ02i9cktssjzS8i92vtiBEnCl6VcLxEiZvQpBI=",
+      "role": null,
+      "short_name": "Tbaw",
+      "to_int": 4294967295,
+      "to_str": "^all"
+    },
+    "model": "NodeInfoPacket"
+  },
+  "request": {
+    "feeder_num_header": 3769067321,
+    "url": "v4"
+  },
+  "status": 201
+}

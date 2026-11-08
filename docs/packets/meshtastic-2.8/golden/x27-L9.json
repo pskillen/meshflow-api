@@ -1,0 +1,96 @@
+{
+  "effects": {
+    "baseline_traceroute_queued": true,
+    "device_metrics_rows": 0,
+    "dx_candidate_called": true,
+    "environment_metrics_rows": 1,
+    "inferred_max_hops": 7,
+    "last_heard_advanced": true,
+    "nls": {
+      "environment_barometric_pressure": 1016.20874,
+      "environment_relative_humidity": 86.56543,
+      "environment_temperature": 11.09,
+      "meshtastic_inferred_max_hops": 7,
+      "meshtastic_inferred_max_hops_source": "TELEMETRY_APP"
+    },
+    "observation_api": {
+      "direct_from_sender": false,
+      "hop_count": 3,
+      "replayed": false
+    },
+    "observed_node_created": true,
+    "position_rows": 0
+  },
+  "key": "x27-L9",
+  "observation": {
+    "bitfield": 0,
+    "channel": 0,
+    "hop_limit": 4,
+    "hop_start": 7,
+    "relay_node": 240,
+    "replayed": false,
+    "rx_rssi": -79.0,
+    "rx_snr": 6.0,
+    "rx_time": "2026-11-08T12:54:12Z",
+    "rx_time_estimated": false
+  },
+  "observed_node": {
+    "environment_exposure": 0,
+    "long_name": "Unknown Node !e27aee72",
+    "m2m_opt_out": false,
+    "mac_addr": null,
+    "mc_pubkey": null,
+    "mc_pubkey_prefix": null,
+    "meshcore_adv_type": null,
+    "meshtastic_hw_model": null,
+    "meshtastic_is_licensed": null,
+    "meshtastic_is_unmessagable": null,
+    "meshtastic_key_node_id": null,
+    "meshtastic_node_id": 3799707250,
+    "meshtastic_public_key": null,
+    "meshtastic_public_key_hex": null,
+    "meshtastic_role": null,
+    "protocol": 1,
+    "short_name": "ee72",
+    "weather_use": 0
+  },
+  "packet": {
+    "fields": {
+      "barometric_pressure": 1016.20874,
+      "current": null,
+      "distance": null,
+      "from_int": 3799707250,
+      "from_str": null,
+      "gas_resistance": null,
+      "iaq": null,
+      "ir_lux": null,
+      "lux": null,
+      "packet_id": 2634211301,
+      "port_num": "TELEMETRY_APP",
+      "radiation": null,
+      "rainfall_1h": null,
+      "rainfall_24h": null,
+      "reading_time": "2026-11-08T12:54:47Z",
+      "relative_humidity": 86.56543,
+      "soil_moisture": null,
+      "soil_temperature": null,
+      "temperature": 11.09,
+      "to_int": 4294967295,
+      "to_str": "^all",
+      "uv_lux": null,
+      "voltage": null,
+      "weight": null,
+      "white_lux": null,
+      "wind_direction": null,
+      "wind_gust": null,
+      "wind_lull": null,
+      "wind_speed": null
+    },
+    "model": "EnvironmentMetricsPacket"
+  },
+  "request": {
+    "feeder_num_header": 444845961,
+    "url": "v4"
+  },
+  "status": 201
+}
