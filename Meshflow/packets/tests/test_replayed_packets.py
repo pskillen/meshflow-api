@@ -160,9 +160,11 @@ def post(request, post_v4, post_v3):
 def guards(settings):
     """Patch every side-effect entry point a processed packet could reach."""
     settings.DX_MONITORING_DETECTION_ENABLED = True
-    with patch("dx_monitoring.services.maybe_detect_dx_candidate") as dx, patch(
-        "packets.receivers.enqueue_new_node_baseline"
-    ) as baseline_a, patch("traceroute.receivers.enqueue_new_node_baseline") as baseline_b:
+    with (
+        patch("dx_monitoring.services.maybe_detect_dx_candidate") as dx,
+        patch("packets.receivers.enqueue_new_node_baseline") as baseline_a,
+        patch("traceroute.receivers.enqueue_new_node_baseline") as baseline_b,
+    ):
         yield {"dx": dx, "baseline_a": baseline_a, "baseline_b": baseline_b}
 
 
@@ -268,7 +270,10 @@ def test_stable_id_from_a_second_feeder_is_a_second_observation(
     NodeAuth.objects.create(api_key=other_key, node=other)
 
     assert post_v4(replayed_position(id=STABLE_ID, hopStart=3, hopLimit=3)).status_code == 201
-    assert post_v4(replayed_position(id=STABLE_ID, hopStart=4, hopLimit=4), other_key, header=0x2B94D09A).status_code == 201
+    assert (
+        post_v4(replayed_position(id=STABLE_ID, hopStart=4, hopLimit=4), other_key, header=0x2B94D09A).status_code
+        == 201
+    )
 
     assert PositionPacket.objects.count() == 1
     assert PacketObservation.objects.count() == 2
