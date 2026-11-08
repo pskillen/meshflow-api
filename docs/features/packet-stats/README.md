@@ -14,7 +14,6 @@ Django app: [`Meshflow/stats/`](../../../Meshflow/stats/). Related but separate:
 | Area | Status | Notes |
 | --- | --- | --- |
 | Hourly MT snapshots (`online_nodes`, `packet_volume`, `new_nodes`) | Shipped | `collect_stats_snapshots` at `:05` UTC |
-| Daily `node_firmware` snapshot | Shipped | Written on the `00:05` UTC run; `backfill_node_firmware_snapshots` |
 | MT snapshot backfill | Shipped | `backfill_stats_snapshots` + management command |
 | `GET /api/stats/snapshots/` | Shipped | Guest-readable list + filters |
 | Live MT global / per-node stats | Shipped | `GET /api/stats/global/`, `/nodes/{id}/…` |
