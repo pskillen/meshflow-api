@@ -1373,3 +1373,22 @@ class NodeSerializerHwModelTest(BasePacketSerializerTestCase):
         assert_serializer_valid(serializer)
         node = serializer.save()
         self.assertEqual(node.meshtastic_hw_model, "MAKERFABS_RESERVED")
+
+    def test_unknown_hw_model_number_is_valid_and_stored_as_hw_n(self):
+        serializer = NodeSerializer(
+            instance=self.from_node,
+            data={"id": self.from_node.meshtastic_node_id, "meshtastic_hw_model": "999"},
+            partial=True,
+        )
+        assert_serializer_valid(serializer)
+        serializer.save()
+        self.from_node.refresh_from_db()
+        self.assertEqual(self.from_node.meshtastic_hw_model, "HW_999")
+
+    def test_non_ascii_digit_hw_model_does_not_raise(self):
+        serializer = NodeSerializer(
+            instance=self.from_node,
+            data={"id": self.from_node.meshtastic_node_id, "meshtastic_hw_model": "²"},
+            partial=True,
+        )
+        assert_serializer_valid(serializer)

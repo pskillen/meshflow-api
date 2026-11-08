@@ -9,6 +9,10 @@ from nodes.models import ObservedNode
 migration = import_module("nodes.migrations.0056_normalise_hw_model")
 
 
+def test_normalise_leaves_non_ascii_digits_alone():
+    assert migration._normalise("²") == "²"
+
+
 @pytest.mark.django_db
 def test_migration_rewrites_numbers_and_renames_and_leaves_names_alone():
     numeric = ObservedNode.objects.create(meshtastic_node_id=910001, meshtastic_hw_model="150")

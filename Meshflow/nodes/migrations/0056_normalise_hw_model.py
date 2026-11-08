@@ -178,7 +178,7 @@ def _normalise(value):
     if not isinstance(value, str):
         return value
     text = value.strip()
-    if text.isdigit():
+    if text.isascii() and text.isdigit():
         number = int(text)
         return _HARDWARE_MODEL_NAMES.get(number, f"HW_{number}")
     return _RENAMES.get(text, value)

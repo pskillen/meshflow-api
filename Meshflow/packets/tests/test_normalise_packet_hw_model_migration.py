@@ -9,6 +9,10 @@ from packets.models import NodeInfoPacket
 migration = import_module("packets.migrations.0021_normalise_hw_model")
 
 
+def test_normalise_leaves_non_ascii_digits_alone():
+    assert migration._normalise("²") == "²"
+
+
 @pytest.mark.django_db
 def test_migration_rewrites_packet_hw_models(node_info_packet_data):
     def make(packet_id, hw_model):

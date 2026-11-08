@@ -166,6 +166,23 @@ def test_process_node_info_packet_malformed_key_gives_null_prediction(
 
 
 @pytest.mark.django_db
+def test_process_packet_normalises_pre_migration_numeric_hw_model(
+    create_node_info_packet, create_managed_node, create_packet_observation, create_user
+):
+    """A packet row still holding a numeric hw_model is normalised by the service itself."""
+    packet = create_node_info_packet(node_id="!3ade68b1")
+    packet.hw_model = "150"
+    packet.save()
+    observer = create_managed_node()
+    observation = create_packet_observation(packet=packet, observer=observer)
+
+    NodeInfoPacketService().process_packet(packet, observer, observation, create_user())
+
+    node = ObservedNode.objects.get(meshtastic_node_id=packet.from_int)
+    assert node.meshtastic_hw_model == "THINKNODE_MX"
+
+
+@pytest.mark.django_db
 def test_node_info_with_numeric_hw_model_stores_name_on_packet_and_node(create_managed_node, create_user):
     """A 2.8 hardware model sent as a number by lib 2.7.11 is stored as its name on the packet and the node."""
     from packets.models import PacketObservation

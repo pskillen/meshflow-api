@@ -57,7 +57,7 @@ def normalise_portnum(value) -> str:
         return PORTNUM_NAMES.get(value, f"PORT_{value}")
     if isinstance(value, str):
         text = value.strip()
-        if text.isdigit():
+        if text.isascii() and text.isdigit():
             number = int(text)
             return PORTNUM_NAMES.get(number, f"PORT_{number}")
         return value
@@ -243,7 +243,7 @@ def normalise_hw_model(value):
         return HARDWARE_MODEL_NAMES.get(value, f"HW_{value}")
     if isinstance(value, str):
         text = value.strip()
-        if text.isdigit():
+        if text.isascii() and text.isdigit():
             number = int(text)
             return HARDWARE_MODEL_NAMES.get(number, f"HW_{number}")
         return HARDWARE_MODEL_RENAMES.get(text, value)

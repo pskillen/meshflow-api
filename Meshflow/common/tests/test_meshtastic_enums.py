@@ -65,3 +65,9 @@ def test_hw_model_map_has_2_8_additions():
     assert HARDWARE_MODEL_NAMES[255] == "PRIVATE_HW"
     assert HARDWARE_MODEL_NAMES[151] == "NODARA"
     assert len(HARDWARE_MODEL_NAMES) == 154
+
+
+def test_non_ascii_digits_pass_through_without_raising():
+    assert normalise_portnum("²") == "²"
+    assert normalise_hw_model("²") == "²"
+    assert normalise_hw_model("١٥٠") == "١٥٠"
