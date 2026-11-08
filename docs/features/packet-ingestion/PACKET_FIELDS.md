@@ -12,7 +12,7 @@ All packet types share these common fields:
 | to         | integer   | Recipient's node ID      | 4294967295 for broadcast            |
 | channel    | integer   | Channel number           | 0-based                             |
 | id         | integer   | Packet identifier        | Unique per sender, not globally     |
-| rxTime     | integer   | Reception timestamp      | Unix timestamp                      |
+| rxTime     | integer   | Reception timestamp      | Unix timestamp; optional (see below) |
 | rxSnr      | float     | Signal-to-noise ratio    | -                                   |
 | hopLimit   | integer   | Maximum number of hops   | -                                   |
 | hopStart   | integer   | Initial hop count        | -                                   |
@@ -241,3 +241,15 @@ Traceroute packets contain routing path information:
 
 In the response packet, `from` is the target node (responder), `to` is the source node (initiator).
 SNR arrays require firmware 2.5+; older nodes report -128 for unknown hops.
+
+### Other ports
+
+Any `decoded.portnum` without a section above (for example `STORE_FORWARD_APP`, `ROUTING_APP`, or a port the sender could only give as an integer) is accepted and stored as a `GenericPacket`.
+
+| Field Name              | Data Type        | Description                | Notes                                                                 |
+|-------------------------|------------------|----------------------------|-----------------------------------------------------------------------|
+| decoded.portnum         | string or integer | Port                       | Ints and numeric strings become the enum name; unknown numbers become `PORT_<n>` |
+| decoded.*               | object           | Port payload               | Stored as JSON minus `portnum`; null for `ROUTING_APP`, null when over 4 KB |
+| decoded.telemetry.*     | object           | Unknown telemetry variant  | `TELEMETRY_APP` only; the first dict-valued key other than `time` is stored as `telemetry_variant` |
+
+`rxTime` may be omitted (protobuf3 drops zero). The API then uses its own clock and flags the observation `rx_time_estimated`.

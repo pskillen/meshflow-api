@@ -44,9 +44,17 @@ def test_ingest_encrypted_packet_returns_304(api_client):
     assert resp.status_code == 304
 
 
-def test_ingest_invalid_portnum_returns_400(api_client):
-    """Unknown or invalid portnum should return 400."""
+def test_ingest_unknown_portnum_is_stored(api_client):
+    """An unknown portnum is stored as a generic packet and returns 201."""
     payload = load_fixture("TEXT_MESSAGE_APP/minimal.json")
     payload["decoded"]["portnum"] = "UNKNOWN_APP"
+    resp = api_client.post_ingest(payload)
+    assert resp.status_code == 201
+
+
+def test_ingest_missing_portnum_returns_400(api_client):
+    """A packet with no decoded.portnum should return 400."""
+    payload = load_fixture("TEXT_MESSAGE_APP/minimal.json")
+    del payload["decoded"]["portnum"]
     resp = api_client.post_ingest(payload)
     assert resp.status_code == 400

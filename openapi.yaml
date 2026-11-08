@@ -557,7 +557,10 @@ components:
           description: The channel number on which the packet was received
         rxTime:
           type: integer
-          description: The time the packet was received, as a Unix timestamp
+          nullable: true
+          description: >
+            The time the packet was received, as a Unix timestamp. Optional; when absent, null or 0 the API uses
+            its own clock and flags the observation ``rx_time_estimated``.
         rxSnr:
           type: number
           nullable: true
@@ -1168,6 +1171,28 @@ components:
         - $ref: '#/components/schemas/HostTelemetryPacket'
         - $ref: '#/components/schemas/TrafficManagementStatsTelemetryPacket'
         - $ref: '#/components/schemas/TraceroutePacket'
+        - $ref: '#/components/schemas/GenericIncomingPacket'
+
+    GenericIncomingPacket:
+      allOf:
+        - $ref: '#/components/schemas/BaseIncomingPacket'
+        - type: object
+          description: >
+            Any other port (STORE_FORWARD_APP, ROUTING_APP, a port number the sender only knew as an integer, a
+            TELEMETRY_APP packet with an unrecognised variant). Stored as a GenericPacket; never rejected for its
+            port. A missing decoded or decoded.portnum is still a 400.
+          properties:
+            decoded:
+              type: object
+              required: [portnum]
+              additionalProperties: true
+              properties:
+                portnum:
+                  oneOf:
+                    - type: string
+                    - type: integer
+                  description: >
+                    PortNum name, or an integer / numeric string. Unknown numbers are stored as PORT_<n>.
 
     Constellation:
       type: object
