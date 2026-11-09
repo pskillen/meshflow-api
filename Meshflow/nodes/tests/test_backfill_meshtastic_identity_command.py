@@ -101,6 +101,19 @@ def test_backfill_does_not_clear_an_existing_managed_key(create_observed_node, c
 
 
 @pytest.mark.django_db
+def test_backfill_never_replaces_a_stored_managed_key(create_observed_node, create_managed_node):
+    create_observed_node(meshtastic_node_id=2004, meshtastic_public_key=OTHER_KEY_B64)
+    managed = create_managed_node(meshtastic_node_id=2004)
+    ManagedNode.objects.filter(pk=managed.pk).update(meshtastic_public_key=KEY_HEX, meshtastic_key_node_id=0x4396524C)
+
+    _run()
+
+    managed.refresh_from_db()
+    assert managed.meshtastic_public_key == KEY_HEX
+    assert managed.meshtastic_key_node_id == 0x4396524C
+
+
+@pytest.mark.django_db
 def test_backfill_is_idempotent(create_observed_node, create_managed_node):
     create_observed_node(meshtastic_node_id=3001, meshtastic_public_key=KEY_B64)
     create_managed_node(meshtastic_node_id=3001)

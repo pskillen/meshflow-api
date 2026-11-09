@@ -229,7 +229,7 @@ In Meshtastic 2.8 a node's number is `crc32` of its 32-byte public key, and an u
 
 - Helpers: `common/meshtastic_identity.py` (`normalise_pubkey`, `key_node_id`, `identity_fields`). Bad keys give null, never an error.
 - Written by `NodeInfoPacketService` and the node upsert serializer (`BaseNodeSerializer`) whenever a key arrives. Other writers (`ManagedNode` rows) are filled only by the backfill for now.
-- `python manage.py backfill_meshtastic_identity [--dry-run] [--batch-size N]` fills existing rows: it reads `ObservedNode.meshtastic_public_key`, falls back to the latest `NodeInfoPacket.public_key` for that `from_int`, copies the key onto the `ManagedNode` with the same number, and reports keys shared by several nodes. It is idempotent and never clears a stored value. **Run it in each environment straight after deploying.**
+- `python manage.py backfill_meshtastic_identity [--dry-run] [--batch-size N]` fills existing rows: it reads `ObservedNode.meshtastic_public_key`, falls back to the latest `NodeInfoPacket.public_key` for that `from_int`, copies the key onto a `ManagedNode` with the same number and no key (a stored feeder key is never replaced: the observed row is client-writable), and reports keys shared by several nodes. It is idempotent and never clears a stored value. **Run it in each environment straight after deploying.**
 - Django admin: the observed and managed node lists show the predicted id, can be filtered by whether one exists, and search matches `!<predicted id>` or the start of the hex key.
 - **Confirmed on hardware (2026-11-08):** `zlib.crc32` equals the firmware's value (see the runbook). The worked example is the NodeInfo in `docs/packets/nodeinfo_packet.json`: `!da545c78` predicts `!4396524c`. The prediction drives the inferred firmware generation: see [inferred-firmware.md](inferred-firmware.md).
 
@@ -247,7 +247,7 @@ A 2.8 firmware upgrade or re-key changes a feeder's node number. v4 feeder URLs 
 | 6 | Another active Meshtastic feeder already has the reported number | flagged `number_collision` |
 | 7 | An `ObservedNode` at the reported number has a different key, or is claimed by someone else | flagged `key_mismatch` (key), `number_collision` (claimed) |
 | 8 | `MESHTASTIC_FEEDER_AUTO_REKEY` is off, or the newest manual re-point moved the feeder away from the reported number | flagged `auto_rekey_disabled` (a manual reversal holds; it is lifted by a later manual re-point) |
-| 9 | Otherwise | applied: number, key and key-node-id updated atomically (`select_for_update`; a unique-constraint race becomes `number_collision`), `auto_updated` event, `ensure_observed_node_for_managed_node`, then the `nodes.signals.feeder_identity_changed` signal |
+| 9 | Otherwise | applied: number, key and key-node-id updated atomically (`select_for_update`; a unique-constraint race becomes `number_collision`), `auto_updated` event, `ensure_observed_node_for_managed_node` (an unclaimed `ObservedNode` at the new number is claimed for the owner only when the stored key did not come from a feeder report, i.e. has no `key_changed` event; otherwise the normal claim flow applies), then the `nodes.signals.feeder_identity_changed` signal |
 
 crc32 is forgeable, so a match shows only that the report is consistent; see the threat model in [ADR-0005](adr/0005-feeder-scoped-auth.md).
 

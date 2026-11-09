@@ -115,7 +115,7 @@ def test_apply_ensures_and_claims_observed_node(rekey_on, feeder):
         ).ensure_observed_node_for_managed_node,
     ) as ensure:
         _apply(feeder)
-    ensure.assert_called_once_with(feeder)
+    ensure.assert_called_once_with(feeder, claim=True)
     observed = ObservedNode.objects.get(meshtastic_node_id=NEW_NUM)
     assert observed.claimed_by_id == feeder.owner_id
 
@@ -282,6 +282,45 @@ def test_first_key_applies_once_settled(rekey_on, keyless_feeder):
     assert _apply(keyless_feeder).outcome == Outcome.AUTO_UPDATED
     flagged.refresh_from_db()
     assert flagged.resolved_at is not None
+
+
+def _settled_report_key(feeder):
+    """Record ``KEY_HEX`` from a report on the unchanged number and age it past the settle window."""
+    recorded = _apply(feeder, num=OLD_NUM)
+    ManagedNodeIdentityEvent.objects.filter(pk=recorded.pk).update(created_at=timezone.now() - timedelta(hours=2))
+
+
+@pytest.mark.django_db
+def test_key_from_report_applies_without_claiming_existing_target(rekey_on, keyless_feeder, create_observed_node):
+    target = create_observed_node(meshtastic_node_id=NEW_NUM, meshtastic_public_key_hex=None, claimed_by=None)
+    _settled_report_key(keyless_feeder)
+
+    assert _apply(keyless_feeder).outcome == Outcome.AUTO_UPDATED
+
+    target.refresh_from_db()
+    assert target.claimed_by_id is None
+
+
+@pytest.mark.django_db
+def test_key_from_report_creates_target_unclaimed(rekey_on, keyless_feeder):
+    _settled_report_key(keyless_feeder)
+
+    assert _apply(keyless_feeder).outcome == Outcome.AUTO_UPDATED
+
+    assert ObservedNode.objects.get(meshtastic_node_id=NEW_NUM).claimed_by_id is None
+
+
+@pytest.mark.django_db
+def test_key_from_report_leaves_owners_existing_claim(rekey_on, keyless_feeder, create_observed_node):
+    target = create_observed_node(
+        meshtastic_node_id=NEW_NUM, meshtastic_public_key_hex=None, claimed_by=keyless_feeder.owner
+    )
+    _settled_report_key(keyless_feeder)
+
+    assert _apply(keyless_feeder).outcome == Outcome.AUTO_UPDATED
+
+    target.refresh_from_db()
+    assert target.claimed_by_id == keyless_feeder.owner_id
 
 
 @pytest.mark.django_db

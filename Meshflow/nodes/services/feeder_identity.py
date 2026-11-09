@@ -18,7 +18,8 @@ reported number is (re)written. Rules, first match wins, each flagged row leaves
    -> ``number_collision``
 8. ``MESHTASTIC_FEEDER_AUTO_REKEY`` is off, or the newest manual re-point moved the feeder away from the reported
    number (a manual reversal holds) -> ``auto_rekey_disabled``
-9. otherwise apply, atomically, with an ``auto_updated`` event and ``feeder_identity_changed``.
+9. otherwise apply, atomically, with an ``auto_updated`` event and ``feeder_identity_changed``. The ``ObservedNode``
+   at the new number is claimed for the owner only when the key did not come from a feeder report.
 
 crc32 is forgeable, so a match shows the report is consistent, not who sent it. Hence rows 4 and 7.
 
@@ -111,6 +112,11 @@ def _is_trusted_key(node, key_hex: str, now) -> bool:
     return not node.identity_events.filter(
         outcome=Outcome.KEY_CHANGED, reported_public_key=key_hex, created_at__gt=now - FIRST_KEY_SETTLE
     ).exists()
+
+
+def _key_came_from_report(node, key_hex: str) -> bool:
+    """True when a feeder report recorded ``key_hex``, so it proves nothing about who holds the radio."""
+    return node.identity_events.filter(outcome=Outcome.KEY_CHANGED, reported_public_key=key_hex).exists()
 
 
 def _observed_at(num: int) -> Optional[ObservedNode]:
@@ -212,7 +218,7 @@ def _apply(node, *, old_num, new_num, key_hex, now):
     )
     # The number has changed and committed: nothing below may stop the signal or the caller's later steps.
     try:
-        ensure_observed_node_for_managed_node(node)
+        ensure_observed_node_for_managed_node(node, claim=not _key_came_from_report(node, key_hex))
     except Exception:
         logger.exception("Feeder %s: could not ensure ObservedNode after re-key", node.internal_id)
     for receiver, result in feeder_identity_changed.send_robust(
