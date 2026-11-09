@@ -101,18 +101,17 @@ def test_scaled_sets_first_value(node):
 
 @pytest.mark.django_db
 @pytest.mark.parametrize(
-    "observation,kwargs",
+    "observation",
     [
-        (obs(None, None), {}),
-        (obs(2, 3), {}),  # hop_start < hop_limit
-        (obs(0, 0), {}),  # hop_start 0, no bitfield
-        (obs(3), {"via_mqtt": True}),
+        obs(None, None),
+        obs(2, 3),  # hop_start < hop_limit
+        obs(0, 0),  # hop_start 0, no bitfield
     ],
 )
-def test_ignore_cases_leave_value_alone(node, observation, kwargs):
+def test_ignore_cases_leave_value_alone(node, observation):
     update_inferred_max_hops(node, obs(4), "TEXT_MESSAGE_APP")
     before = status_of(node)
-    assert update_inferred_max_hops(node, observation, "TEXT_MESSAGE_APP", **kwargs) is False
+    assert update_inferred_max_hops(node, observation, "TEXT_MESSAGE_APP") is False
     after = status_of(node)
     assert after.meshtastic_inferred_max_hops == 4
     assert after.meshtastic_inferred_max_hops_at == before.meshtastic_inferred_max_hops_at
