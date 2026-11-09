@@ -32,7 +32,9 @@ class NodePresenceAdmin(admin.ModelAdmin):
         "last_verification_notify_at",
         "battery_below_threshold_report_count",
         "battery_alert_confirmed_at",
+        "learned_offline_after_seconds",
     )
+    readonly_fields = ("learned_offline_after_seconds", "learned_offline_computed_at")
     raw_id_fields = ("observed_node",)
 
 

@@ -18,6 +18,7 @@ from .constants import (
     verification_notify_cooldown_seconds,
     verification_window_seconds,
 )
+from .learned_thresholds import learned_threshold_seconds, node_gaps
 from .models import NodeMonitoringConfig, NodePresence, NodeWatch
 from .selection import select_monitoring_sources
 from .services import (
@@ -34,6 +35,32 @@ def _effective_last_heard_offline_after_seconds(obs: ObservedNode) -> int:
     if cfg is not None:
         return int(cfg.last_heard_offline_after_seconds)
     return int(DEFAULT_OFFLINE_AFTER_SECONDS)
+
+
+@shared_task(ignore_result=True)
+def update_learned_offline_thresholds() -> dict:
+    """Daily: learn a silence threshold from each watched Meshtastic node's own packet cadence."""
+    now = timezone.now()
+    watched_ids = (
+        NodeWatch.objects.filter(enabled=True, offline_notifications_enabled=True)
+        .values_list("observed_node_id", flat=True)
+        .distinct()
+    )
+    updated = failed = 0
+    observed_qs = ObservedNode.objects.filter(pk__in=watched_ids, meshtastic_node_id__isnull=False)
+    for obs in observed_qs.iterator(chunk_size=100):
+        try:
+            learned = learned_threshold_seconds(node_gaps(obs, now))
+            NodePresence.objects.update_or_create(
+                observed_node=obs,
+                defaults={"learned_offline_after_seconds": learned, "learned_offline_computed_at": now},
+            )
+            updated += 1
+        except Exception:
+            failed += 1
+            logger.exception("mesh_monitoring: learned threshold failed for observed node %s", obs.pk)
+    logger.info("mesh_monitoring: learned offline thresholds updated for %d nodes (%d failed)", updated, failed)
+    return {"updated": updated, "failed": failed}
 
 
 @shared_task(ignore_result=True)
