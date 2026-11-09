@@ -9,11 +9,17 @@ reported number is (re)written. Rules, first match wins, each flagged row leaves
 
 1. no public key reported -> ``key_not_reported``
 2. ``crc32(key)`` is not the reported number -> ``crc_mismatch``
-3. a stored key differs from the reported one -> ``key_mismatch`` (a blank stored key passes: trust on first use)
-4. another node holds the key (keys are not unique: clones exist) -> ``shared_key``
-5. another active feeder already has the reported number -> ``number_collision``
-6. ``MESHTASTIC_FEEDER_AUTO_REKEY`` is off -> ``auto_rekey_disabled``
-7. otherwise apply, atomically, with an ``auto_updated`` event and ``feeder_identity_changed``.
+3. the number is outside the valid node range -> ``number_collision``
+4. the reported key is not one already trusted for this feeder (stored before this report and settled) ->
+   ``key_mismatch``
+5. another node holds the key (keys are not unique: clones exist) -> ``shared_key``
+6. another active feeder already has the reported number -> ``number_collision``
+7. an ``ObservedNode`` at the reported number carries a different key -> ``key_mismatch``, or belongs to someone else
+   -> ``number_collision``
+8. ``MESHTASTIC_FEEDER_AUTO_REKEY`` is off -> ``auto_rekey_disabled``
+9. otherwise apply, atomically, with an ``auto_updated`` event and ``feeder_identity_changed``.
+
+crc32 is forgeable, so a match shows the report is consistent, not who sent it. Hence rows 4 and 7.
 
 See docs/features/packet-ingestion/adr/0005-feeder-scoped-auth.md and meshtastic.md ("Feeder number change").
 """
@@ -21,6 +27,7 @@ See docs/features/packet-ingestion/adr/0005-feeder-scoped-auth.md and meshtastic
 from __future__ import annotations
 
 import logging
+from datetime import timedelta
 from typing import Optional
 
 from django.conf import settings
@@ -33,7 +40,7 @@ from common.mesh_node_helpers import MESHTASTIC_BROADCAST_ID, meshtastic_id_to_h
 from common.meshtastic_identity import key_node_id, normalise_pubkey
 from common.protocol import Protocol
 from nodes.managed_node_bootstrap import ensure_observed_node_for_managed_node
-from nodes.models import ManagedNode, ManagedNodeIdentityEvent, ObservedNode
+from nodes.models import ManagedNode, ManagedNodeIdentityEvent, NodeOwnerClaim, ObservedNode
 from nodes.services.feeder_identity_notify import notify_owner
 from nodes.signals import feeder_identity_changed
 
@@ -41,6 +48,13 @@ logger = logging.getLogger(__name__)
 
 Outcome = ManagedNodeIdentityEvent.Outcome
 Reason = ManagedNodeIdentityEvent.Reason
+
+# Firmware NodeDB.cpp NUM_RESERVED: numbers below this are never given to a radio.
+MIN_MESHTASTIC_NODE_NUM = 4
+# A first key recorded from a report must be this old before it can back a number change. Longer than the 10-minute
+# report interval, so the very next report can't use it; a real feeder inside the window is re-evaluated and applied
+# by a later report.
+FIRST_KEY_SETTLE = timedelta(hours=1)
 
 FEEDER_IDENTITY_CHANGES = Counter(
     "meshflow_feeder_identity_changes_total",
@@ -82,23 +96,62 @@ def _number_held_by_another_feeder(node, num: int) -> bool:
     )
 
 
+def _is_valid_node_num(num: int) -> bool:
+    return MIN_MESHTASTIC_NODE_NUM <= num < MESHTASTIC_BROADCAST_ID
+
+
+def _is_trusted_key(node, key_hex: str, now) -> bool:
+    """True when ``key_hex`` is the feeder's stored key and was not first recorded from a report just now.
+
+    A key filled in from a report leaves a ``key_changed`` event; a key with no such event came from the backfill.
+    """
+    if normalise_pubkey(node.meshtastic_public_key) != key_hex:
+        return False
+    return not node.identity_events.filter(
+        outcome=Outcome.KEY_CHANGED, reported_public_key=key_hex, created_at__gt=now - FIRST_KEY_SETTLE
+    ).exists()
+
+
+def _observed_at(num: int) -> Optional[ObservedNode]:
+    return ObservedNode.objects.filter(protocol=Protocol.MESHTASTIC, meshtastic_node_id=num).first()
+
+
+def _carries_other_key(observed: Optional[ObservedNode], key_hex: str) -> bool:
+    return (
+        observed is not None
+        and bool(observed.meshtastic_public_key_hex)
+        and observed.meshtastic_public_key_hex != key_hex
+    )
+
+
+def _belongs_to_someone_else(observed: Optional[ObservedNode], owner_id) -> bool:
+    if observed is None:
+        return False
+    if observed.claimed_by_id is not None and observed.claimed_by_id != owner_id:
+        return True
+    return NodeOwnerClaim.objects.filter(node=observed, accepted_at__isnull=False).exclude(user_id=owner_id).exists()
+
+
 def _flag(node, *, old_num, new_num, key_hex, reason, now):
     """Write a flagged event unless an open one already says the same; return the event or None."""
-    open_rows = list(_open_flagged(node))
-    for row in open_rows:
-        if row.new_meshtastic_node_id == new_num and row.reported_public_key == key_hex and row.reason == reason:
-            return None
-    stale = [row.pk for row in open_rows]
-    if stale:
-        ManagedNodeIdentityEvent.objects.filter(pk__in=stale).update(resolved_at=now)
-    event = ManagedNodeIdentityEvent.objects.create(
-        managed_node=node,
-        old_meshtastic_node_id=old_num,
-        new_meshtastic_node_id=new_num,
-        reported_public_key=key_hex,
-        outcome=Outcome.FLAGGED,
-        reason=reason,
-    )
+    with transaction.atomic():
+        # Serialises concurrent reports from one feeder, so the dedupe below can't write two open rows.
+        ManagedNode.objects.select_for_update().filter(pk=node.pk).first()
+        open_rows = list(_open_flagged(node))
+        for row in open_rows:
+            if row.new_meshtastic_node_id == new_num and row.reported_public_key == key_hex and row.reason == reason:
+                return None
+        stale = [row.pk for row in open_rows]
+        if stale:
+            ManagedNodeIdentityEvent.objects.filter(pk__in=stale).update(resolved_at=now)
+        event = ManagedNodeIdentityEvent.objects.create(
+            managed_node=node,
+            old_meshtastic_node_id=old_num,
+            new_meshtastic_node_id=new_num,
+            reported_public_key=key_hex,
+            outcome=Outcome.FLAGGED,
+            reason=reason,
+        )
     _count(Outcome.FLAGGED)
     logger.warning(
         "Feeder %s (%s) reported node number %s (stored %s): not re-keyed (%s)",
@@ -150,40 +203,46 @@ def _apply(node, *, old_num, new_num, key_hex, now):
         meshtastic_id_to_hex(old_num),
         meshtastic_id_to_hex(new_num),
     )
-    ensure_observed_node_for_managed_node(node)
-    feeder_identity_changed.send(
+    # The number has changed and committed: nothing below may stop the signal or the caller's later steps.
+    try:
+        ensure_observed_node_for_managed_node(node)
+    except Exception:
+        logger.exception("Feeder %s: could not ensure ObservedNode after re-key", node.internal_id)
+    for receiver, result in feeder_identity_changed.send_robust(
         sender=ManagedNode, managed_node=node, event=event, old_node_id=old_num, new_node_id=new_num
-    )
+    ):
+        if isinstance(result, Exception):
+            logger.error("Feeder %s: identity signal receiver %r failed: %r", node.internal_id, receiver, result)
     return event
 
 
 def _apply_unchanged_number(node, key_hex: Optional[str], now) -> Optional[ManagedNodeIdentityEvent]:
-    _open_flagged(node).update(resolved_at=now)
-    if key_hex is None:
-        return None
+    number = node.meshtastic_node_id
     stored = normalise_pubkey(node.meshtastic_public_key)
-    if stored == key_hex:
+    if key_hex is not None:
+        contradicted = stored != key_hex if stored is not None else _carries_other_key(_observed_at(number), key_hex)
+        if contradicted:
+            # Evidence only: a report never replaces a key we hold, or it could vouch for a later number change.
+            return _flag(node, old_num=number, new_num=number, key_hex=key_hex, reason=Reason.KEY_MISMATCH, now=now)
+    _open_flagged(node).update(resolved_at=now)
+    if key_hex is None or stored == key_hex:
         return None
+    # First key for this feeder (trust on first use, ADR-0005). The event dates it for _is_trusted_key.
     fields = {"meshtastic_public_key": key_hex, "meshtastic_key_node_id": key_node_id(key_hex)}
-    ManagedNode.objects.filter(pk=node.pk).update(**fields)
+    with transaction.atomic():
+        ManagedNode.objects.filter(pk=node.pk).update(**fields)
+        event = ManagedNodeIdentityEvent.objects.create(
+            managed_node=node,
+            old_meshtastic_node_id=number,
+            new_meshtastic_node_id=number,
+            reported_public_key=key_hex,
+            outcome=Outcome.KEY_CHANGED,
+        )
     for name, value in fields.items():
         setattr(node, name, value)
-    if stored is None:
-        # Trust on first use (ADR-0005): filling a blank key is not an event.
-        return None
-    event = ManagedNodeIdentityEvent.objects.create(
-        managed_node=node,
-        old_meshtastic_node_id=node.meshtastic_node_id,
-        new_meshtastic_node_id=node.meshtastic_node_id,
-        reported_public_key=key_hex,
-        outcome=Outcome.KEY_CHANGED,
-    )
     _count(Outcome.KEY_CHANGED)
     logger.info(
-        "Feeder %s (%s) reported a new public key for %s",
-        node.internal_id,
-        node.name,
-        meshtastic_id_to_hex(node.meshtastic_node_id),
+        "Feeder %s (%s) recorded its first public key on %s", node.internal_id, node.name, meshtastic_id_to_hex(number)
     )
     return event
 
@@ -208,12 +267,18 @@ def apply_reported_identity(
         return flag(Reason.KEY_NOT_REPORTED)
     if key_node_id(key_hex) != reported_node_num:
         return flag(Reason.CRC_MISMATCH)
-    stored = normalise_pubkey(node.meshtastic_public_key)
-    if stored is not None and stored != key_hex:
+    if not _is_valid_node_num(reported_node_num):
+        return flag(Reason.NUMBER_COLLISION)
+    if not _is_trusted_key(node, key_hex, now):
         return flag(Reason.KEY_MISMATCH)
     if _key_held_by_another_node(node, key_hex, old_num, reported_node_num):
         return flag(Reason.SHARED_KEY)
     if _number_held_by_another_feeder(node, reported_node_num):
+        return flag(Reason.NUMBER_COLLISION)
+    target = _observed_at(reported_node_num)
+    if _carries_other_key(target, key_hex):
+        return flag(Reason.KEY_MISMATCH)
+    if _belongs_to_someone_else(target, node.owner_id):
         return flag(Reason.NUMBER_COLLISION)
     if not getattr(settings, "MESHTASTIC_FEEDER_AUTO_REKEY", False):
         return flag(Reason.AUTO_REKEY_DISABLED)

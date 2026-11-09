@@ -99,15 +99,21 @@ components:
         maximum: 4294967295
       description: >
         The feeder radio's current node number (decimal). Recorded as ``reported_meshtastic_node_id``
-        (informational only; never used for authorisation and never changes the stored number).
-        Read on v4 and legacy Meshtastic feeder URLs.
+        Read on v4 and legacy Meshtastic feeder URLs; never used for authorisation. On v4 URLs, with
+        ``X-Meshtastic-Feeder-Pubkey``, it can re-key the feeder: a number that differs from the stored
+        one is applied or flagged by the server's re-key rules, and is only applied when
+        ``MESHTASTIC_FEEDER_AUTO_REKEY`` is on. Ingest is never affected.
     MeshtasticFeederPubkeyHeader:
       name: X-Meshtastic-Feeder-Pubkey
       in: header
       required: false
       schema:
         type: string
-      description: The feeder radio's public key (base64). Accepted; not yet stored.
+      description: >
+        The feeder radio's public key (base64 or hex). On v4 URLs a first key is stored on the feeder's
+        managed node, and a number change is only applied when this key is one already trusted for the
+        feeder (behind ``MESHTASTIC_FEEDER_AUTO_REKEY``). A key that differs from the stored one is flagged
+        and not stored. Ignored on legacy URLs.
     MeshtasticFeederFirmwareHeader:
       name: X-Meshtastic-Feeder-Firmware
       in: header
@@ -208,6 +214,9 @@ components:
           type: string
           maxLength: 64
           description: Optional reported firmware version; recorded like X-Meshtastic-Feeder-Firmware
+        meshtastic_public_key:
+          type: string
+          description: Optional reported public key (v4 only); treated like X-Meshtastic-Feeder-Pubkey
     FeederBotVersionRecorded:
       type: object
       properties:
@@ -5056,7 +5065,9 @@ paths:
         200 means use the v4 URLs; 404 (an older API) means use the legacy URLs; 403 ``shared_api_key``
         means use the legacy URLs and ask the owner for a per-feeder key.
         The reported number (``X-Meshtastic-Feeder-Node-Num``) is recorded before the response is built,
-        so ``identity_mismatch`` reflects this request's header.
+        so ``identity_mismatch`` reflects this request's header. With ``MESHTASTIC_FEEDER_AUTO_REKEY`` on, a
+        number change that passes the re-key rules is applied first, so this same response shows the new
+        ``meshtastic_node_id`` and ``identity_mismatch: false``.
       tags: [Feeder API v4]
       security:
         - NodeApiKeyAuth: []
@@ -5088,6 +5099,7 @@ paths:
         - NodeApiKeyAuth: []
       parameters:
         - $ref: '#/components/parameters/MeshtasticFeederNodeNumHeader'
+        - $ref: '#/components/parameters/MeshtasticFeederPubkeyHeader'
       requestBody:
         required: true
         content:
@@ -5115,6 +5127,7 @@ paths:
         - NodeApiKeyAuth: []
       parameters:
         - $ref: '#/components/parameters/MeshtasticFeederNodeNumHeader'
+        - $ref: '#/components/parameters/MeshtasticFeederPubkeyHeader'
       requestBody:
         required: true
         content:
@@ -5142,6 +5155,7 @@ paths:
         - NodeApiKeyAuth: []
       parameters:
         - $ref: '#/components/parameters/MeshtasticFeederNodeNumHeader'
+        - $ref: '#/components/parameters/MeshtasticFeederPubkeyHeader'
       requestBody:
         required: true
         content:

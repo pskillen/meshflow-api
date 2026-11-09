@@ -7,6 +7,7 @@ from django.urls import reverse
 import pytest
 from rest_framework.test import APIClient
 
+from common.meshtastic_identity import normalise_pubkey
 from common.protocol import Protocol
 from nodes.models import NodeAuth, ObservedNode
 from packets.models import MtRawPacket, PacketObservation
@@ -357,14 +358,18 @@ REKEY_KEY_B64 = "oLOpz1p7W8/Ti8Z0iOU4TqZAYVAXe3Uwm8EF/m1zLFs="
 
 @pytest.fixture
 def rekey_feeder(create_managed_node, create_node_api_key):
-    node = create_managed_node(protocol=Protocol.MESHTASTIC, meshtastic_node_id=REKEY_OLD)
+    node = create_managed_node(
+        protocol=Protocol.MESHTASTIC,
+        meshtastic_node_id=REKEY_OLD,
+        meshtastic_public_key=normalise_pubkey(REKEY_KEY_B64),
+    )
     api_key = create_node_api_key(owner=node.owner, constellation=node.constellation)
     NodeAuth.objects.create(api_key=api_key, node=node)
     return node, api_key
 
 
 def _rekey_headers(num=REKEY_NEW, key=REKEY_KEY_B64):
-    headers = {"HTTP_X_MESHTASTIC_FEEDER_NODE_NUM": str(num)}
+    headers = {"HTTP_X_MESHTASTIC_FEEDER_NODE_NUM": str(num), "HTTP_X_MESHTASTIC_FEEDER_FIRMWARE": "2.8.2.d5f1619"}
     if key is not None:
         headers["HTTP_X_MESHTASTIC_FEEDER_PUBKEY"] = key
     return headers
