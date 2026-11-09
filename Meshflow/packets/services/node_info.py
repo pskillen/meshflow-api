@@ -1,5 +1,6 @@
 from common.meshtastic_enums import normalise_hw_model
 from common.meshtastic_identity import identity_fields, protect_identity
+from nodes.services.node_firmware import refresh_inferred_firmware, refresh_row_numbered_by_key
 from packets.models import NodeInfoPacket
 from packets.services.base import BasePacketService
 
@@ -38,4 +39,7 @@ class NodeInfoPacketService(BasePacketService):
                 setattr(sender, field, value)
         sender.meshtastic_is_licensed = self.packet.is_licensed
         sender.meshtastic_is_unmessagable = self.packet.is_unmessagable
+        refresh_inferred_firmware(sender)
         sender.save()
+        if "meshtastic_public_key" in updates:
+            refresh_row_numbered_by_key(sender)

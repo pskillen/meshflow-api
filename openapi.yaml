@@ -1534,6 +1534,21 @@ components:
           description: >
             Meshtastic-only: inferred from packet hop_start when received; the node's max hops setting.
             Helps identify nodes with suboptimal hop limits (e.g. below recommended 7). Null for MeshCore.
+        inferred_firmware:
+          type: string
+          nullable: true
+          readOnly: true
+          description: >
+            Firmware generation inferred from evidence we hold, as a floor: "2.8" means a 2.8 identity was seen,
+            "2.7" means 2.7 or earlier. Open set: new generations are added over time. Null means no evidence,
+            including every MeshCore node.
+        inferred_firmware_basis:
+          type: string
+          nullable: true
+          readOnly: true
+          description: >
+            What the inferred_firmware verdict rests on (for example key_identity or predicted_id). Open set.
+            Null whenever inferred_firmware is null.
         environment_exposure:
           type: string
           enum: [unknown, indoor, outdoor, sheltered]

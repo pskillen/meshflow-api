@@ -231,7 +231,7 @@ In Meshtastic 2.8 a node's number is `crc32` of its 32-byte public key, and an u
 - Written by `NodeInfoPacketService` and the node upsert serializer (`BaseNodeSerializer`) whenever a key arrives. Other writers (`ManagedNode` rows) are filled only by the backfill for now.
 - `python manage.py backfill_meshtastic_identity [--dry-run] [--batch-size N]` fills existing rows: it reads `ObservedNode.meshtastic_public_key`, falls back to the latest `NodeInfoPacket.public_key` for that `from_int`, copies the key onto the `ManagedNode` with the same number, and reports keys shared by several nodes. It is idempotent and never clears a stored value. **Run it in each environment straight after deploying.**
 - Django admin: the observed and managed node lists show the predicted id, can be filtered by whether one exists, and search matches `!<predicted id>` or the start of the hex key.
-- **Confirmed on hardware (2026-11-08):** `zlib.crc32` equals the firmware's value (see the runbook). The worked example is the NodeInfo in `docs/packets/nodeinfo_packet.json`: `!da545c78` predicts `!4396524c`. Nothing acts on a prediction yet.
+- **Confirmed on hardware (2026-11-08):** `zlib.crc32` equals the firmware's value (see the runbook). The worked example is the NodeInfo in `docs/packets/nodeinfo_packet.json`: `!da545c78` predicts `!4396524c`. The prediction drives the inferred firmware generation: see [inferred-firmware.md](inferred-firmware.md).
 
 ### Identity data is not clobbered by 2.8 feeder NodeDB entries
 

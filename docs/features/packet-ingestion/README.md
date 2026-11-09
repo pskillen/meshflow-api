@@ -28,6 +28,7 @@ stops at "signal emitted".
 | **[meshcore.md](meshcore.md)** | MC upload scope, ingest path, Phase 2 gap vs [#266](https://github.com/pskillen/meshflow-api/issues/266) |
 | [PACKET_FIELDS.md](PACKET_FIELDS.md) | MT wire-level fields per portnum / telemetry variant |
 | [MESHCORE_PACKET_FIELDS.md](MESHCORE_PACKET_FIELDS.md) | MC capture-verified dump shapes |
+| [inferred-firmware.md](inferred-firmware.md) | MT firmware generation inferred from key identity (`2.7` / `2.8` / unknown), fields, backfill, adding a generation |
 | [DEDUPLICATION.md](DEDUPLICATION.md) | MT dedup window; MC see [adr/0004](adr/0004-mc-dedup-key.md) |
 | [signals.md](signals.md) | MT post-processing signals (MC uses `meshcore_packet_received` in-app) |
 | **[meshtastic-2.8-upgrade-runbook.md](meshtastic-2.8-upgrade-runbook.md)** | **DRAFT**, planned: operator steps for upgrading a feeder to Meshtastic 2.8 |

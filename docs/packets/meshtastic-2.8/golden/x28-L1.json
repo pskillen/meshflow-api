@@ -33,6 +33,8 @@
   },
   "observed_node": {
     "environment_exposure": 0,
+    "inferred_firmware": "2.7",
+    "inferred_firmware_basis": "key_identity",
     "long_name": "TIGERBAWS",
     "m2m_opt_out": false,
     "mac_addr": "50:78:7d:08:5a:bc",
