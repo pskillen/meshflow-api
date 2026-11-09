@@ -64,9 +64,13 @@ A Meshtastic 2.8 feeder's node number is the `crc32` of its public key, so it ch
 
 ### Re-pointing a feeder by hand
 
-For a flagged feeder, the owner (or staff) calls `POST /api/nodes/managed-nodes/{internal_id}/repoint-meshtastic-id/`. The body `{"meshtastic_node_id": <int>}` is optional; the default is the number the feeder last reported. It works whether or not `MESHTASTIC_FEEDER_AUTO_REKEY` is on, because a person is deciding. The feeder keeps its row, history and API key; the number is updated, the public key is taken from the open flagged event when that event reported the same number, a `manual` event is written (acknowledged by the caller) and open flagged events are resolved. Passing the old number reverses a re-key.
+For a flagged feeder, the owner (or staff) calls `POST /api/nodes/managed-nodes/{internal_id}/repoint-meshtastic-id/`. The body `{"meshtastic_node_id": <int>}` is optional; the default is the number the feeder last reported. It works whether or not `MESHTASTIC_FEEDER_AUTO_REKEY` is on, because a person is deciding. The feeder keeps its row, history and API key; the number is updated, a `manual` event is written (acknowledged by the caller) and open flagged events are resolved.
 
-Refusals: 400 `{"code": "not_meshtastic" | "no_reported_number" | "invalid_node_id" | "already_current"}`, 409 `{"code": "number_collision"}` when another active feeder has that number, 403 for anyone but the owner or staff.
+An owner can only move a feeder to the number it last reported, and only when `crc32` of the feeder's trusted stored key gives that number (the same trust rule as the automatic re-key: the key is stored, and was not first recorded from a report in the last hour). So a radio that kept its key and moved to the 2.8 number can be accepted by its owner; a radio with a new key, or a number that key does not prove, needs staff. Any other explicit number, including the old number to reverse a re-key, is staff only.
+
+A re-point never claims an `ObservedNode`: an existing row keeps whatever claim it has, and a missing row is created unclaimed. Claims still go through the claim flow. The public key is taken from the open flagged event that reported the same number only when staff re-point; an owner's re-point keeps the stored key.
+
+Refusals: 400 `{"code": "not_meshtastic" | "no_reported_number" | "invalid_node_id" | "already_current"}`, 403 `{"code": "repoint_not_proven"}` when an owner's re-point lacks that proof, 409 `{"code": "number_collision"}` when another active feeder has that number, 403 for anyone but the owner or staff.
 
 ## Deleted Managed Nodes
 

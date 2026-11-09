@@ -26,7 +26,9 @@ SEND_DM = "push_notifications.discord_audit.send_dm"
 
 @pytest.fixture
 def feeder(create_managed_node):
-    return create_managed_node(meshtastic_node_id=OLD_NUM, name="Hill")
+    return create_managed_node(
+        meshtastic_node_id=OLD_NUM, name="Hill", meshtastic_public_key=normalise_pubkey(KEY_B64)
+    )
 
 
 def _event(feeder, outcome, reason=None):
@@ -148,9 +150,10 @@ def test_failing_dm_leaves_rekey_applied(feeder, settings):
 
 
 @pytest.mark.django_db
-def test_manual_repoint_sends_no_dm(feeder):
+def test_manual_repoint_sends_no_dm(feeder, create_user):
+    staff = create_user(is_staff=True)
     with patch(VERIFIED, return_value=True), patch(SEND_DM) as send_dm:
-        event = repoint_feeder(feeder, NEW_NUM, actor=feeder.owner)
+        event = repoint_feeder(feeder, NEW_NUM, actor=staff)
     assert event.outcome == Outcome.MANUAL
     send_dm.assert_not_called()
     assert DiscordNotificationAudit.objects.count() == 0

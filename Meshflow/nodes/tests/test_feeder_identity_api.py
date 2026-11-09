@@ -1,5 +1,6 @@
 """Feeder number change API (ID-4): manual re-point, event list and acknowledge."""
 
+import base64
 from datetime import timedelta
 
 from django.db import connection
@@ -22,6 +23,7 @@ Reason = ManagedNodeIdentityEvent.Reason
 OLD_NUM = 0xDA545C78
 NEW_NUM = 0x4396524C
 KEY_HEX = normalise_pubkey("oLOpz1p7W8/Ti8Z0iOU4TqZAYVAXe3Uwm8EF/m1zLFs=")
+OTHER_KEY_HEX = normalise_pubkey(base64.b64encode(b"\x01" * 32).decode())
 
 LIST_URL = "managed-node-identity-events-list"
 
@@ -60,8 +62,22 @@ def owner(create_user):
 @pytest.fixture
 def feeder(create_managed_node, owner):
     return create_managed_node(
-        owner=owner, meshtastic_node_id=OLD_NUM, name="Hill", reported_meshtastic_node_id=NEW_NUM
+        owner=owner,
+        meshtastic_node_id=OLD_NUM,
+        name="Hill",
+        reported_meshtastic_node_id=NEW_NUM,
+        meshtastic_public_key=KEY_HEX,
     )
+
+
+@pytest.fixture
+def staff(create_user):
+    return create_user(is_staff=True)
+
+
+def _forget_key(node):
+    node.meshtastic_public_key = None
+    node.save(update_fields=["meshtastic_public_key"])
 
 
 @pytest.fixture
@@ -97,39 +113,123 @@ def test_repoint_defaults_to_reported_number(feeder, owner, received):
 
 
 @pytest.mark.django_db
-def test_repoint_creates_observed_node(feeder, owner):
+def test_repoint_creates_missing_observed_node_unclaimed(feeder, owner):
     _client(owner).post(_repoint_url(feeder), {}, format="json")
-    assert ObservedNode.objects.filter(protocol=Protocol.MESHTASTIC, meshtastic_node_id=NEW_NUM).exists()
+    observed = ObservedNode.objects.get(protocol=Protocol.MESHTASTIC, meshtastic_node_id=NEW_NUM)
+    assert observed.claimed_by_id is None
 
 
 @pytest.mark.django_db
-def test_repoint_explicit_number(feeder, owner):
-    response = _client(owner).post(_repoint_url(feeder), {"meshtastic_node_id": 0x12345678}, format="json")
+def test_owner_repoint_leaves_existing_observed_node_unclaimed(feeder, owner, create_observed_node):
+    target = create_observed_node(meshtastic_node_id=NEW_NUM, claimed_by=None)
+    assert _client(owner).post(_repoint_url(feeder), {}, format="json").status_code == 200
+    target.refresh_from_db()
+    assert target.claimed_by_id is None
+
+
+@pytest.mark.django_db
+def test_staff_repoint_leaves_existing_observed_node_unclaimed(feeder, staff, create_observed_node):
+    target = create_observed_node(meshtastic_node_id=0x0BADF00D, claimed_by=None)
+    response = _client(staff).post(_repoint_url(feeder), {"meshtastic_node_id": 0x0BADF00D}, format="json")
+    assert response.status_code == 200, response.data
+    target.refresh_from_db()
+    assert target.claimed_by_id is None
+
+
+@pytest.mark.django_db
+def test_owner_cannot_repoint_to_an_unreported_number(feeder, owner, create_observed_node):
+    victim = create_observed_node(meshtastic_node_id=0x0BADF00D, claimed_by=None)
+    response = _client(owner).post(_repoint_url(feeder), {"meshtastic_node_id": 0x0BADF00D}, format="json")
+    assert response.status_code == 403
+    assert response.data["code"] == "repoint_not_proven"
+    feeder.refresh_from_db()
+    victim.refresh_from_db()
+    assert feeder.meshtastic_node_id == OLD_NUM
+    assert victim.claimed_by_id is None
+    assert not feeder.identity_events.exists()
+
+
+@pytest.mark.django_db
+def test_owner_cannot_repoint_to_a_proven_number_the_feeder_did_not_report(feeder, owner):
+    feeder.reported_meshtastic_node_id = 0x12345678
+    feeder.save(update_fields=["reported_meshtastic_node_id"])
+    response = _client(owner).post(_repoint_url(feeder), {"meshtastic_node_id": NEW_NUM}, format="json")
+    assert response.status_code == 403
+    assert response.data["code"] == "repoint_not_proven"
+
+
+@pytest.mark.django_db
+def test_owner_repoint_needs_a_stored_key(feeder, owner):
+    _forget_key(feeder)
+    response = _client(owner).post(_repoint_url(feeder), {}, format="json")
+    assert response.status_code == 403
+    assert response.data["code"] == "repoint_not_proven"
+
+
+@pytest.mark.django_db
+def test_owner_repoint_needs_the_key_to_give_the_number(feeder, owner):
+    feeder.meshtastic_public_key = OTHER_KEY_HEX
+    feeder.save(update_fields=["meshtastic_public_key"])
+    response = _client(owner).post(_repoint_url(feeder), {}, format="json")
+    assert response.status_code == 403
+    feeder.refresh_from_db()
+    assert feeder.meshtastic_node_id == OLD_NUM
+
+
+@pytest.mark.django_db
+def test_owner_repoint_refuses_a_key_recorded_just_now(feeder, owner):
+    _event(feeder, Outcome.KEY_CHANGED)
+    response = _client(owner).post(_repoint_url(feeder), {}, format="json")
+    assert response.status_code == 403
+    assert response.data["code"] == "repoint_not_proven"
+
+
+@pytest.mark.django_db
+def test_owner_repoint_keeps_the_stored_key_over_a_flagged_report(feeder, owner):
+    ManagedNodeIdentityEvent.objects.create(
+        managed_node=feeder,
+        old_meshtastic_node_id=OLD_NUM,
+        new_meshtastic_node_id=NEW_NUM,
+        reported_public_key=OTHER_KEY_HEX,
+        outcome=Outcome.FLAGGED,
+        reason=Reason.CRC_MISMATCH,
+    )
+    assert _client(owner).post(_repoint_url(feeder), {}, format="json").status_code == 200
+    feeder.refresh_from_db()
+    assert feeder.meshtastic_public_key == KEY_HEX
+    assert ManagedNodeIdentityEvent.objects.get(outcome=Outcome.MANUAL).reported_public_key == KEY_HEX
+
+
+@pytest.mark.django_db
+def test_staff_repoint_explicit_number(feeder, staff):
+    response = _client(staff).post(_repoint_url(feeder), {"meshtastic_node_id": 0x12345678}, format="json")
     assert response.status_code == 200, response.data
     feeder.refresh_from_db()
     assert feeder.meshtastic_node_id == 0x12345678
 
 
 @pytest.mark.django_db
-def test_repoint_takes_key_from_open_flagged_event(feeder, owner):
+def test_staff_repoint_takes_key_from_open_flagged_event(feeder, staff):
+    _forget_key(feeder)
     flagged = _event(feeder, Outcome.FLAGGED, Reason.AUTO_REKEY_DISABLED)
-    response = _client(owner).post(_repoint_url(feeder), {}, format="json")
+    response = _client(staff).post(_repoint_url(feeder), {}, format="json")
     assert response.status_code == 200, response.data
     feeder.refresh_from_db()
     assert feeder.meshtastic_public_key == KEY_HEX
     assert feeder.meshtastic_key_node_id == key_node_id(KEY_HEX) == NEW_NUM
     flagged.refresh_from_db()
     assert flagged.resolved_at is not None
-    assert flagged.acknowledged_by == owner
+    assert flagged.acknowledged_by == staff
     manual = ManagedNodeIdentityEvent.objects.get(outcome=Outcome.MANUAL)
     assert manual.reported_public_key == KEY_HEX
     assert manual.acknowledged_at is not None
 
 
 @pytest.mark.django_db
-def test_repoint_ignores_flagged_event_for_another_number(feeder, owner):
+def test_staff_repoint_ignores_flagged_event_for_another_number(feeder, staff):
+    _forget_key(feeder)
     _event(feeder, Outcome.FLAGGED, Reason.AUTO_REKEY_DISABLED)
-    response = _client(owner).post(_repoint_url(feeder), {"meshtastic_node_id": 0x12345678}, format="json")
+    response = _client(staff).post(_repoint_url(feeder), {"meshtastic_node_id": 0x12345678}, format="json")
     assert response.status_code == 200
     feeder.refresh_from_db()
     assert feeder.meshtastic_public_key is None
@@ -142,10 +242,12 @@ def test_repoint_works_with_auto_rekey_off(feeder, owner, settings):
 
 
 @pytest.mark.django_db
-def test_repoint_can_reverse_a_rekey(feeder, owner):
-    client = _client(owner)
-    assert client.post(_repoint_url(feeder), {}, format="json").status_code == 200
-    response = client.post(_repoint_url(feeder), {"meshtastic_node_id": OLD_NUM}, format="json")
+def test_staff_can_reverse_a_rekey(feeder, owner, staff):
+    assert _client(owner).post(_repoint_url(feeder), {}, format="json").status_code == 200
+    assert (
+        _client(owner).post(_repoint_url(feeder), {"meshtastic_node_id": OLD_NUM}, format="json").status_code == 403
+    )
+    response = _client(staff).post(_repoint_url(feeder), {"meshtastic_node_id": OLD_NUM}, format="json")
     assert response.status_code == 200, response.data
     feeder.refresh_from_db()
     assert feeder.meshtastic_node_id == OLD_NUM

@@ -6737,11 +6737,12 @@ paths:
     post:
       summary: Re-point a Meshtastic feeder at a node number
       description: >-
-        Sets `meshtastic_node_id` by hand, for the owner or staff. Used to accept a flagged feeder number change
-        (the default is the number the feeder last reported), or to reverse a re-key by passing the old number.
-        Not gated by the automatic re-key setting: a person is deciding. If an open flagged event reported the
-        same number, its public key becomes the stored key. Open flagged events are resolved and a `manual`
-        identity event is written (already acknowledged by the caller).
+        Sets `meshtastic_node_id` by hand. An owner can only set the number the feeder last reported, and only when
+        crc32 of the feeder's trusted stored key gives that number; any other number, including the old one to reverse
+        a re-key, is staff only. Not gated by the automatic re-key setting: a person is deciding. Never claims an
+        ObservedNode; a missing one is created unclaimed. When staff re-point and an open flagged event reported the
+        same number, its public key becomes the stored key. Open flagged events are resolved and a `manual` identity
+        event is written (already acknowledged by the caller).
       tags: [Nodes]
       security:
         - BearerAuth: []

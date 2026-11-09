@@ -293,6 +293,7 @@ class FeederRepointError(Exception):
     CODE_INVALID_NODE_ID = "invalid_node_id"
     CODE_ALREADY_CURRENT = "already_current"
     CODE_NUMBER_COLLISION = "number_collision"
+    CODE_NOT_PROVEN = "repoint_not_proven"
 
     def __init__(self, code: str, message: str = ""):
         super().__init__(message or code)
@@ -303,12 +304,26 @@ def _valid_node_number(num) -> bool:
     return isinstance(num, int) and not isinstance(num, bool) and 4 <= num < MESHTASTIC_BROADCAST_ID
 
 
+def _owner_may_repoint(locked, new_number, now) -> bool:
+    """True when ``new_number`` is what the feeder last reported and crc32 of its trusted stored key gives that number."""
+    key_hex = normalise_pubkey(locked.meshtastic_public_key)
+    return (
+        new_number == locked.reported_meshtastic_node_id
+        and key_hex is not None
+        and key_node_id(key_hex) == new_number
+        and _is_trusted_key(locked, key_hex, now)
+    )
+
+
 def repoint_feeder(node, new_number=None, *, actor, now=None) -> ManagedNodeIdentityEvent:
     """Re-point a Meshtastic feeder at ``new_number`` (default: the number its bot last reported) by hand.
 
-    A person is deciding, so ``MESHTASTIC_FEEDER_AUTO_REKEY`` is not consulted. Passing the old number reverses a
-    re-key. The stored key is taken from the newest open flagged event when that event's number matches. Raises
-    ``FeederRepointError``. The manual event (and the flagged rows it resolves) are acknowledged by ``actor``.
+    A person is deciding, so ``MESHTASTIC_FEEDER_AUTO_REKEY`` is not consulted. An owner may only move a feeder to the
+    number it last reported, and only when crc32 of its trusted stored key gives that number; any other number,
+    reversing a re-key included, is staff only. An existing ``ObservedNode`` is never claimed here, and a missing one
+    is created unclaimed. Staff take the stored key from the newest open flagged event when that event's number
+    matches; an owner's re-point keeps the stored key. Raises ``FeederRepointError``. The manual event (and the
+    flagged rows it resolves) are acknowledged by ``actor``.
     """
     if node.protocol != Protocol.MESHTASTIC:
         raise FeederRepointError(FeederRepointError.CODE_NOT_MESHTASTIC, "Only Meshtastic feeders have a node number.")
@@ -331,11 +346,19 @@ def repoint_feeder(node, new_number=None, *, actor, now=None) -> ManagedNodeIden
                 raise FeederRepointError(
                     FeederRepointError.CODE_ALREADY_CURRENT, "The feeder already has that node number."
                 )
+            if not actor.is_staff and not _owner_may_repoint(locked, new_number, now):
+                raise FeederRepointError(
+                    FeederRepointError.CODE_NOT_PROVEN,
+                    "Only the number this feeder reports, proved by its stored public key, can be set without staff.",
+                )
             if _number_held_by_another_feeder(locked, new_number):
                 raise collision
             open_flagged = list(_open_flagged(locked).order_by("-created_at", "-id"))
             matching = next((row for row in open_flagged if row.new_meshtastic_node_id == new_number), None)
             key_hex = normalise_pubkey(matching.reported_public_key) if matching else None
+            if not actor.is_staff:
+                # The proof above rests on the stored key; a flagged report must not replace it.
+                key_hex = normalise_pubkey(locked.meshtastic_public_key)
             fields = ["meshtastic_node_id"]
             locked.meshtastic_node_id = new_number
             if key_hex is not None:
@@ -370,7 +393,7 @@ def repoint_feeder(node, new_number=None, *, actor, now=None) -> ManagedNodeIden
         meshtastic_id_to_hex(old_num),
         meshtastic_id_to_hex(new_number),
     )
-    ensure_observed_node_for_managed_node(node)
+    ensure_observed_node_for_managed_node(node, claim=False)
     feeder_identity_changed.send(
         sender=ManagedNode, managed_node=node, event=event, old_node_id=old_num, new_node_id=new_number
     )

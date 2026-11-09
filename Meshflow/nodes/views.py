@@ -1413,7 +1413,7 @@ class ManagedNodeViewSet(viewsets.ModelViewSet):
         Re-point a Meshtastic feeder at a node number by hand (ID-4).
 
         Body ``{"meshtastic_node_id": <int>}`` is optional; the default is the number the feeder last reported.
-        Used to accept a flagged number change, or to reverse a re-key by passing the old number.
+        Owners can only accept the number the feeder reports, proved by its stored key; any other number is staff only.
         """
         node = self.get_object()
         self._managed_node_mutate_allowed(node)
@@ -1423,11 +1423,10 @@ class ManagedNodeViewSet(viewsets.ModelViewSet):
         try:
             event = repoint_feeder(node, new_number, actor=request.user)
         except FeederRepointError as exc:
-            http_status = (
-                status.HTTP_409_CONFLICT
-                if exc.code == FeederRepointError.CODE_NUMBER_COLLISION
-                else status.HTTP_400_BAD_REQUEST
-            )
+            http_status = {
+                FeederRepointError.CODE_NUMBER_COLLISION: status.HTTP_409_CONFLICT,
+                FeederRepointError.CODE_NOT_PROVEN: status.HTTP_403_FORBIDDEN,
+            }.get(exc.code, status.HTTP_400_BAD_REQUEST)
             return Response({"code": exc.code, "detail": str(exc)}, status=http_status)
         return Response(ManagedNodeIdentityEventSerializer(event).data)
 

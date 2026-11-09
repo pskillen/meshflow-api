@@ -44,12 +44,13 @@ def find_matching_observed_node(managed_node: ManagedNode) -> ObservedNode | Non
 
 
 @transaction.atomic
-def ensure_observed_node_for_managed_node(managed_node: ManagedNode) -> tuple[ObservedNode, bool]:
+def ensure_observed_node_for_managed_node(managed_node: ManagedNode, *, claim: bool = True) -> tuple[ObservedNode, bool]:
     """
     Ensure a matching ObservedNode exists for a ManagedNode.
 
     Returns (observed_node, created) where created is True only when a new row was inserted.
-    When the observed node is unclaimed, sets claimed_by to the managed node owner.
+    When the observed node is unclaimed and ``claim`` is true, sets claimed_by to the managed node owner. Pass
+    ``claim=False`` when nothing proves the owner holds that radio.
     """
     long_name, short_name = _names_from_managed_node(managed_node)
     observed = find_matching_observed_node(managed_node)
@@ -69,7 +70,7 @@ def ensure_observed_node_for_managed_node(managed_node: ManagedNode) -> tuple[Ob
             )
         created = True
 
-    if observed.claimed_by_id is None:
+    if claim and observed.claimed_by_id is None:
         observed.claimed_by = managed_node.owner
         observed.save(update_fields=["claimed_by"])
 
