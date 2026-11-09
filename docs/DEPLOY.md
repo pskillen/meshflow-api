@@ -50,4 +50,19 @@ Run these once per environment after the deploy that introduces them. Back up th
 | Command | Since | What it does |
 | --- | --- | --- |
 | `python manage.py backfill_meshtastic_identity [--dry-run]` | 2.2.0 | Fills the normalised key and predicted 2.8 node id on observed and managed nodes ([details](features/packet-ingestion/meshtastic.md#identity-evidence-and-predicted-28-node-id)). |
-| `python manage.py dedupe_observed_nodes [--dry-run] [--batch-size N]` | 2.2.3 | Merges duplicate Meshtastic `ObservedNode` rows (same node number) into the oldest row and re-points their related rows. Sets whose rows have different `claimed_by` owners are skipped and listed: resolve those by hand, then re-run. The unique-constraint migration (`nodes` 0059) runs the same merge first, so any duplicates left over are merged when you migrate; it stops with an error naming the nodes if a set has two different `claimed_by` owners (fix the claim in admin, then migrate again). Still useful as a check after a restore. |
+| `python manage.py dedupe_observed_nodes [--dry-run] [--batch-size N]` | 2.2.3 | Merges duplicate Meshtastic `ObservedNode` rows (same node number) into the oldest row and re-points their related rows. Sets whose rows have different `claimed_by` owners are skipped and listed: resolve those by hand, then re-run. The unique-constraint migration (`nodes` 0059) runs the same merge first, so any duplicates left over are merged when you migrate; it stops with an error naming the nodes if a set has two different `claimed_by` owners, and changes nothing ([recovery](#unique-constraint-migration-stopped-on-a-claim-conflict)). Still useful as a check after a restore. |
+
+## Unique-constraint migration stopped on a claim conflict
+
+If `nodes` 0059 stops naming a node (`!1a2b3c4d: rows have different claimed_by owners`), the guard is holding the api,
+so admin is unavailable. The schema is still at 0058, which the new image matches. From a one-off container of the new
+image, with the same database environment as the migrations container, take the claim off the rows of the owner who
+should not have it:
+
+```sh
+docker run --rm --env-file <the api env> -e SKIP_MIGRATION_CHECK=true <api image> \
+  python manage.py shell -c "from nodes.models import ObservedNode; print(ObservedNode.objects.filter(protocol=1, meshtastic_node_id=0x1a2b3c4d, claimed_by__username='<wrong owner>').update(claimed_by=None))"
+```
+
+It prints the number of rows changed. Repeat for each node named, then re-run the migrations container (recreate it,
+as above). `SKIP_MIGRATION_CHECK` is for this one-off command only; never set it on the api or workers.
