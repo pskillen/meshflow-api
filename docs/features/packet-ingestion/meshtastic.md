@@ -247,7 +247,7 @@ A 2.8 firmware upgrade or re-key changes a feeder's node number. v4 feeder URLs 
 | 6 | Another active Meshtastic feeder already has the reported number | flagged `number_collision` |
 | 7 | An `ObservedNode` at the reported number has a different key, or is claimed by someone else | flagged `key_mismatch` (key), `number_collision` (claimed) |
 | 8 | `MESHTASTIC_FEEDER_AUTO_REKEY` is off | flagged `auto_rekey_disabled` |
-| 9 | Otherwise | applied: number, key and key-node-id updated atomically (`select_for_update`; a unique-constraint race becomes `number_collision`), `auto_updated` event, `ensure_observed_node_for_managed_node`, then the `nodes.signals.feeder_identity_changed` signal |
+| 9 | Otherwise | applied: number, key and key-node-id updated atomically (`select_for_update`; a unique-constraint race becomes `number_collision`), `auto_updated` event, `ensure_observed_node_for_managed_node` (an unclaimed `ObservedNode` at the new number is claimed for the owner only when the stored key did not come from a feeder report, i.e. has no `key_changed` event; otherwise the normal claim flow applies), then the `nodes.signals.feeder_identity_changed` signal |
 
 crc32 is forgeable, so a match shows only that the report is consistent; see the threat model in [ADR-0005](adr/0005-feeder-scoped-auth.md).
 
