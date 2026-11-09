@@ -65,7 +65,9 @@ def test_node_gaps_excludes_replayed_only_packets(create_observed_node, make_pac
 def test_node_gaps_limited_to_seven_days(create_observed_node, make_packets):
     obs = create_observed_node(meshtastic_node_id=700002)
     now = timezone.now()
-    make_packets(700002, [now - timedelta(days=9), now - timedelta(days=8), now - timedelta(days=2), now - timedelta(days=1)])
+    make_packets(
+        700002, [now - timedelta(days=9), now - timedelta(days=8), now - timedelta(days=2), now - timedelta(days=1)]
+    )
     assert node_gaps(obs, now) == [1 * 24 * H]
 
 
