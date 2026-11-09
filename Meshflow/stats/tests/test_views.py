@@ -1,6 +1,7 @@
 """Tests for stats views."""
 
-from datetime import datetime
+from datetime import datetime, timedelta
+from datetime import timezone as dt_timezone
 
 from django.urls import reverse
 from django.utils import timezone
@@ -501,3 +502,118 @@ def test_stats_snapshots_list_returns_paginated_results(create_user):
     assert item["stat_type"] == "online_nodes"
     assert item["constellation_id"] is None
     assert item["value"]["count"] == 42
+
+
+# --- bucket=1d rollup of hourly snapshots (api#502) ---
+
+
+def _hourly(stat_type, start, hours, value_fn, constellation=None):
+    StatsSnapshot.objects.bulk_create(
+        [
+            StatsSnapshot(
+                recorded_at=start + timedelta(hours=h),
+                stat_type=stat_type,
+                constellation=constellation,
+                value=value_fn(h),
+            )
+            for h in range(hours)
+        ]
+    )
+
+
+def _bucket_get(**params):
+    query = {"bucket": "1d", "page_size": 1000, **params}
+    return APIClient().get(reverse("stats:stats-snapshots"), query)
+
+
+@pytest.mark.django_db
+def test_snapshots_bucket_gauge_mean_and_90_days_on_one_page():
+    start = datetime(2026, 1, 1, tzinfo=dt_timezone.utc)
+    _hourly("online_nodes", start, 90 * 24, lambda h: {"count": 10 if h % 24 < 12 else 21, "window_hours": 2})
+
+    response = _bucket_get(stat_type="online_nodes", constellation_id="-1")
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data["count"] == 90
+    assert len(response.data["results"]) == 90
+    assert response.data["next"] is None
+    newest, oldest = response.data["results"][0], response.data["results"][-1]
+    assert newest["recorded_at"] > oldest["recorded_at"]
+    assert oldest["recorded_at"].startswith("2026-01-01T00:00:00")
+    assert oldest["id"] is None
+    assert oldest["constellation_id"] is None
+    # mean of 12x10 and 12x21 = 15.5, rounded half up
+    assert oldest["value"] == {"count": 16, "samples": 24}
+
+
+@pytest.mark.django_db
+def test_snapshots_bucket_flow_sum_and_by_type_sum():
+    start = datetime(2026, 3, 1, tzinfo=dt_timezone.utc)
+    _hourly("packet_volume", start, 24, lambda h: {"count": 5, "by_type": {"text": 1, "position": h}})
+    _hourly("new_nodes", start, 24, lambda h: {"count": 2})
+
+    pv = _bucket_get(stat_type="packet_volume", constellation_id="-1").data["results"]
+    assert len(pv) == 1
+    assert pv[0]["value"]["count"] == 120
+    assert pv[0]["value"]["by_type"] == {"text": 24, "position": sum(range(24))}
+    assert pv[0]["value"]["samples"] == 24
+
+    nn = _bucket_get(stat_type="new_nodes", constellation_id="-1").data["results"]
+    assert nn[0]["value"] == {"count": 48, "samples": 24}
+
+
+@pytest.mark.django_db
+def test_snapshots_bucket_utc_boundary_and_partial_day():
+    # 22:00 -> 03:00 UTC across midnight: 2 samples on day 1, 3 on day 2
+    _hourly("new_nodes", datetime(2026, 5, 1, 22, tzinfo=dt_timezone.utc), 5, lambda h: {"count": 1})
+
+    results = _bucket_get(stat_type="new_nodes", constellation_id="-1").data["results"]
+    assert [r["value"] for r in results] == [{"count": 3, "samples": 3}, {"count": 2, "samples": 2}]
+    assert results[0]["recorded_at"].startswith("2026-05-02T00:00:00")
+    assert results[1]["recorded_at"].startswith("2026-05-01T00:00:00")
+
+
+@pytest.mark.django_db
+def test_snapshots_bucket_groups_per_constellation_and_filters(create_user):
+    from constellations.models import Constellation
+
+    constellation = Constellation.objects.create(name="C1", created_by=create_user())
+    start = datetime(2026, 5, 1, tzinfo=dt_timezone.utc)
+    _hourly("new_nodes", start, 24, lambda h: {"count": 1})
+    _hourly("new_nodes", start, 24, lambda h: {"count": 3}, constellation=constellation)
+
+    both = _bucket_get(stat_type="new_nodes").data["results"]
+    assert {(r["constellation_id"], r["value"]["count"]) for r in both} == {(None, 24), (constellation.id, 72)}
+    only = _bucket_get(stat_type="new_nodes", constellation_id=str(constellation.id)).data["results"]
+    assert len(only) == 1 and only[0]["value"]["count"] == 72
+    assert _bucket_get(stat_type="new_nodes", recorded_at_after="2026-05-02T00:00:00Z").data["results"] == []
+
+
+@pytest.mark.django_db
+def test_snapshots_bucket_passes_daily_types_through():
+    StatsSnapshot.objects.create(
+        recorded_at=datetime(2026, 5, 1, 6, tzinfo=dt_timezone.utc),
+        stat_type="node_firmware",
+        constellation=None,
+        value={"2.5.0": 3},
+    )
+    results = _bucket_get(stat_type="node_firmware", constellation_id="-1").data["results"]
+    assert len(results) == 1
+    assert results[0]["value"] == {"2.5.0": 3}
+    assert results[0]["id"] is not None
+
+
+@pytest.mark.django_db
+def test_snapshots_bucket_validation():
+    assert _bucket_get(stat_type="online_nodes", bucket="1h").status_code == status.HTTP_400_BAD_REQUEST
+    assert _bucket_get().status_code == status.HTTP_400_BAD_REQUEST
+    assert _bucket_get(stat_type="nonsense").status_code == status.HTTP_400_BAD_REQUEST
+
+
+@pytest.mark.django_db
+def test_snapshots_without_bucket_unchanged():
+    _hourly("online_nodes", datetime(2026, 5, 1, tzinfo=dt_timezone.utc), 30, lambda h: {"count": h, "window_hours": 2})
+    response = APIClient().get(reverse("stats:stats-snapshots"), {"stat_type": "online_nodes", "page_size": 1000})
+    assert response.data["count"] == 30
+    first = response.data["results"][0]
+    assert first["value"] == {"count": 29, "window_hours": 2}
+    assert first["id"] is not None
