@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('nodes', '0058_managednode_reported_firmware'),
+        ('nodes', '0060_managednodeidentityevent'),
     ]
 
     operations = [
