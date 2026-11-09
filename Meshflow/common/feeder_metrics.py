@@ -15,8 +15,10 @@ unless something changed:
 - ``feeder_api_generation`` / ``feeder_api_last_used_at`` (and ``legacy_api_last_used_at`` for
   pre-v4 URLs), so staff can list the feeders still on legacy URLs (ADR-0005);
 - ``reported_meshtastic_node_id`` / ``identity_reported_at`` from ``X-Meshtastic-Feeder-Node-Num``
-  (or ``meshtastic_node_num`` in a bot-version body). Informational only: never authorises,
-  never changes ``meshtastic_node_id``;
+  (or ``meshtastic_node_num`` in a bot-version body). Never authorises. On v4 URLs, when it is
+  (re)written it drives ``nodes.services.feeder_identity.apply_reported_identity``, which re-points
+  ``meshtastic_node_id`` only when the ``X-Meshtastic-Feeder-Pubkey`` key proves the change (flag
+  ``MESHTASTIC_FEEDER_AUTO_REKEY``); legacy URLs never re-key;
 - ``reported_firmware_version`` / ``firmware_reported_at`` from ``X-Meshtastic-Feeder-Firmware`` (or
   ``meshtastic_firmware_version`` in a bot-version body), Meshtastic feeders only. It feeds the ``feeder_report``
   firmware rule (``nodes.services.node_firmware.refresh_feeder_row``).
@@ -35,6 +37,7 @@ from prometheus_client import Counter
 from common.mesh_node_helpers import meshtastic_id_to_hex
 from common.protocol import Protocol
 from nodes.models import ManagedNode
+from nodes.services.feeder_identity import apply_reported_identity
 from nodes.services.node_firmware import refresh_feeder_row
 
 logger = logging.getLogger(__name__)
@@ -66,6 +69,7 @@ REPORTED_NODE_NUM_HEADER = "HTTP_X_MESHTASTIC_FEEDER_NODE_NUM"
 _MAX_MESHTASTIC_NODE_NUM = 0xFFFFFFFF
 REPORTED_FIRMWARE_HEADER = "HTTP_X_MESHTASTIC_FEEDER_FIRMWARE"
 _MAX_FIRMWARE_LENGTH = 64
+REPORTED_PUBKEY_HEADER = "HTTP_X_MESHTASTIC_FEEDER_PUBKEY"
 
 
 def parse_reported_node_num(value) -> Optional[int]:
@@ -124,6 +128,7 @@ def record_feeder_usage(
     api: str,
     reported_node_num: Optional[int] = None,
     reported_firmware: Optional[str] = None,
+    reported_pubkey: Optional[str] = None,
     now=None,
 ) -> dict:
     """Write the usage, reported-identity and reported-firmware fields for ``node`` if due; return what was written."""
@@ -159,6 +164,13 @@ def record_feeder_usage(
         ManagedNode.objects.filter(pk=node.pk).update(**fields)
         for name, value in fields.items():
             setattr(node, name, value)
+        if api == API_V4 and "reported_meshtastic_node_id" in fields:
+            apply_reported_identity(
+                node,
+                reported_node_num=fields["reported_meshtastic_node_id"],
+                reported_pubkey=reported_pubkey,
+                now=now,
+            )
         if "reported_firmware_version" in fields:
             refresh_feeder_row(node, now=now)
     return fields
@@ -175,12 +187,14 @@ class FeederApiUsageMixin:
     - ``reported_node_num_body_field``: body field to read the reported number from when the
       header is absent (bot-version only).
     - ``reported_firmware_body_field``: the same for the reported firmware version.
+    - ``reported_pubkey_body_field``: the same for the reported public key (base64 or hex).
     """
 
     feeder_api: Optional[str] = None
     feeder_endpoint: str = "unknown"
     reported_node_num_body_field: Optional[str] = None
     reported_firmware_body_field: Optional[str] = None
+    reported_pubkey_body_field: Optional[str] = None
 
     def get_feeder_api(self, request) -> str:
         if self.feeder_api:
@@ -230,6 +244,16 @@ class FeederApiUsageMixin:
             firmware = parse_reported_firmware(value)
         return firmware
 
+    def _reported_pubkey(self, request) -> Optional[str]:
+        value = request.META.get(REPORTED_PUBKEY_HEADER)
+        if not (isinstance(value, str) and value.strip()) and self.reported_pubkey_body_field:
+            try:
+                data = request.data
+                value = data.get(self.reported_pubkey_body_field) if hasattr(data, "get") else None
+            except Exception:
+                value = None
+        return value.strip() if isinstance(value, str) and value.strip() else None
+
     def record_feeder_usage(self, request) -> None:
         """Record usage for this request once (views may call it early, e.g. ``identity/``)."""
         if getattr(request, "_feeder_usage_recorded", False):
@@ -244,6 +268,7 @@ class FeederApiUsageMixin:
                 api=self.get_feeder_api(request),
                 reported_node_num=self._reported_node_num(request),
                 reported_firmware=self._reported_firmware(request),
+                reported_pubkey=self._reported_pubkey(request),
             )
         except Exception:
             logger.exception("Failed to record feeder API usage for %s", node.pk)

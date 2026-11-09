@@ -5,6 +5,16 @@ import os
 # Default silence threshold before verification may start (6 hours).
 DEFAULT_OFFLINE_AFTER_SECONDS = 21600
 
+# Default for 2.8 nodes, which may send only NodeInfo (about every 3 h, more on busy meshes): 12 hours.
+TWO_EIGHT_DEFAULT_OFFLINE_AFTER_SECONDS = 43200
+
+# Bounds and sample size for the per-node threshold learned from packet cadence.
+LEARNED_OFFLINE_MIN_SECONDS = DEFAULT_OFFLINE_AFTER_SECONDS
+LEARNED_OFFLINE_MAX_SECONDS = 172800  # 48 hours
+LEARNED_OFFLINE_MIN_INTERVALS = 5
+LEARNED_OFFLINE_HISTORY_DAYS = 7
+LEARNED_OFFLINE_MAX_PACKETS = 5000
+
 # Align with STALE_TR_TIMEOUT_SECONDS / verification window in epic (~3 minutes).
 DEFAULT_VERIFICATION_WINDOW_SECONDS = 180
 

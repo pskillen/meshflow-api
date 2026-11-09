@@ -120,6 +120,9 @@ class Command(BaseCommand):
                     # Never clear a key we already hold just because the observed row has none.
                     stats["no_key"] += 1
                     continue
+                if node.meshtastic_public_key and node.meshtastic_public_key != key_hex:
+                    # The observed row is client-writable, so it must never replace a key we already hold.
+                    continue
                 predicted = key_node_id(key_hex)
                 if node.meshtastic_public_key == key_hex and node.meshtastic_key_node_id == predicted:
                     continue

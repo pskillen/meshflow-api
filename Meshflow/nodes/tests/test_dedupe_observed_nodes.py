@@ -4,6 +4,7 @@ from datetime import timedelta
 from io import StringIO
 
 from django.core.management import call_command
+from django.db import connection
 from django.utils import timezone
 
 import pytest
@@ -18,6 +19,16 @@ pytest_plugins = ["packets.tests.conftest"]
 NODE = 0x1A2B3C4D
 OTHER_NODE = 0x2B3C4D5E
 KEY_HEX = "a0b3a9cf5a7b5bcfd38bc67488e5384ea6406150177b75309bc105fe6d732c5b"
+
+
+@pytest.fixture(autouse=True)
+def allow_duplicate_rows(db):
+    """Duplicates are what these tests merge, and the unique index now forbids them: drop it for the test.
+
+    The test's transaction rolls the drop back, so other tests still see the index.
+    """
+    with connection.cursor() as cursor:
+        cursor.execute("DROP INDEX nodes_observednode_mt_node_id_unique")
 
 
 def _make(node_id=NODE, *, age_days, heard_days=None, **fields):

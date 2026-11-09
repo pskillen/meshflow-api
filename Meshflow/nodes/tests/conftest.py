@@ -40,6 +40,9 @@ _LEGACY_OBSERVED_NODE_FIELD_ALIASES = {
 }
 
 
+_OBSERVED_NODE_ID_KWARGS = {"meshtastic_node_id", "node_id", "node_id_str", "protocol", "mc_pubkey"}
+
+
 def _coerce_observed_node_legacy_kwargs(data: dict) -> dict:
     """Map legacy test kwargs to ``meshtastic_*`` field names (SP-04)."""
     _coerce_meshtastic_node_id_kwargs(data, set(), managed=False)
@@ -108,8 +111,13 @@ def create_managed_node(managed_node_data, create_user, create_constellation):  
 
 @pytest.fixture
 def create_observed_node(observed_node_data):
+    counter = count(1)
+
     def make_observed_node(**kwargs):
         data = observed_node_data.copy()
+        if not _OBSERVED_NODE_ID_KWARGS.intersection(kwargs):
+            # One row per Meshtastic number is enforced, so repeated default calls need distinct numbers.
+            data["meshtastic_node_id"] += next(counter) - 1
         data.update(kwargs)
         _coerce_observed_node_legacy_kwargs(data)
         data.pop("node_id_str", None)
