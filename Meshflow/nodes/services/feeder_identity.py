@@ -34,6 +34,7 @@ from common.meshtastic_identity import key_node_id, normalise_pubkey
 from common.protocol import Protocol
 from nodes.managed_node_bootstrap import ensure_observed_node_for_managed_node
 from nodes.models import ManagedNode, ManagedNodeIdentityEvent, ObservedNode
+from nodes.services.feeder_identity_notify import notify_owner
 from nodes.signals import feeder_identity_changed
 
 logger = logging.getLogger(__name__)
@@ -107,6 +108,7 @@ def _flag(node, *, old_num, new_num, key_hex, reason, now):
         meshtastic_id_to_hex(old_num),
         reason,
     )
+    notify_owner(event)
     return event
 
 
