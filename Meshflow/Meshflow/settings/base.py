@@ -166,6 +166,8 @@ NEO4J_PASSWORD = os.environ.get("NEO4J_PASSWORD", "neo4j")
 _celery_broker_url = f"redis://:{_redis_password}@{_redis_host}:{_redis_port}/1"
 CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", _celery_broker_url)
 CELERY_RESULT_BACKEND = CELERY_BROKER_URL
+# A broker that silently drops packets must not hang a request that publishes a task.
+CELERY_BROKER_TRANSPORT_OPTIONS = {"socket_connect_timeout": 2}
 # Shorter than Celery default (~24h) to limit celery-task-meta-* growth on Redis DB 1.
 CELERY_RESULT_EXPIRES = int(os.environ.get("CELERY_RESULT_EXPIRES", "3600"))
 CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"

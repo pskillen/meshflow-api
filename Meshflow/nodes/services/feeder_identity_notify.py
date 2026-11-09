@@ -58,6 +58,11 @@ def build_message(event) -> str:
             f"Your feeder {name} changed node number: {old} is now {new}. "
             "It keeps its history and API key. Nothing to do."
         )
+    if event.old_meshtastic_node_id == event.new_meshtastic_node_id:
+        return (
+            f"Your feeder {name} reported a public key that differs from the one stored for {old}, so the stored key "
+            "was kept. Ingest continues. If the radio was re-keyed or reset, open My Nodes to review it."
+        )
     reason = _REASON_TEXT.get(event.reason, "the change could not be verified")
     return (
         f"Your feeder {name} reported node number {new} but is stored as {old}, and it could not be updated "
@@ -82,7 +87,8 @@ def queue_owner_notification(event) -> None:
 
     def enqueue():
         try:
-            notify_feeder_identity_event.delay(event_id)
+            # No publish retries: this runs on the feeder's request, so an unreachable broker must fail fast.
+            notify_feeder_identity_event.apply_async(args=(event_id,), retry=False)
         except Exception:
             logger.exception("feeder identity: could not queue notification for event=%s", event_id)
 

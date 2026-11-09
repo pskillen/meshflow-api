@@ -25,7 +25,7 @@ Other features (e.g. [mesh monitoring](../mesh-monitoring/README.md) offline ale
 
 ## Notification kinds
 
-Every DM attempt (sent, skipped or failed) is recorded in `DiscordNotificationAudit` with a `feature` and a `kind` (`push_notifications.constants`).
+Every DM attempt (sent, skipped or failed) is recorded in `DiscordNotificationAudit` with a `feature` and a `kind` (`push_notifications.constants`). The exception is a flagged feeder identity DM suppressed by its per-feeder cooldown, which writes no audit row, so a flapping feeder can't fill the table.
 
 | Feature | Kind | When |
 |---------|------|------|

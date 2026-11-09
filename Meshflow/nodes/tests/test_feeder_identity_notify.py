@@ -9,6 +9,7 @@ import pytest
 
 import nodes.tests.conftest  # noqa: F401
 from common.meshtastic_identity import normalise_pubkey
+from Meshflow.settings import base as settings_base
 from nodes.models import ManagedNodeIdentityEvent
 from nodes.services.feeder_identity import apply_reported_identity, repoint_feeder
 from nodes.services.feeder_identity_notify import _flagged_dm_cooldown_key, build_message, notify_owner
@@ -26,7 +27,7 @@ KEY_B64 = "oLOpz1p7W8/Ti8Z0iOU4TqZAYVAXe3Uwm8EF/m1zLFs="
 
 VERIFIED = "nodes.services.feeder_identity_notify.user_has_verified_discord_dm_target"
 SEND_DM = "push_notifications.discord_audit.send_dm"
-DELAY = "nodes.tasks.notify_feeder_identity_event.delay"
+DELAY = "nodes.tasks.notify_feeder_identity_event.apply_async"
 
 
 @pytest.fixture
@@ -74,6 +75,23 @@ def test_flagged_sends_dm_with_reason(feeder):
     assert "reported node number !4396524c but is stored as !da545c78" in row.message_preview
     assert "another feeder already has that number" in row.message_preview
     assert "Open My Nodes to review it." in row.message_preview
+
+
+@pytest.mark.django_db
+def test_key_mismatch_on_unchanged_number_has_its_own_text(feeder):
+    event = _event(feeder, Outcome.FLAGGED, Reason.KEY_MISMATCH)
+    event.new_meshtastic_node_id = event.old_meshtastic_node_id
+    event.save(update_fields=["new_meshtastic_node_id"])
+    with patch(VERIFIED, return_value=True), patch(SEND_DM):
+        notify_owner(event)
+    preview = DiscordNotificationAudit.objects.get().message_preview
+    assert "differs from the one stored for !da545c78" in preview
+    assert "stored key was kept" in preview
+    assert "but is stored as" not in preview
+
+
+def test_broker_connect_is_bounded():
+    assert settings_base.CELERY_BROKER_TRANSPORT_OPTIONS["socket_connect_timeout"] <= 5
 
 
 @pytest.mark.django_db
@@ -174,7 +192,7 @@ def test_flagged_dm_is_queued_after_commit_not_sent_inline(feeder, settings, dja
             delay.assert_not_called()
         assert len(callbacks) == 1
         callbacks[0]()
-    delay.assert_called_once_with(event.pk)
+    delay.assert_called_once_with(args=(event.pk,), retry=False)
     send_dm.assert_not_called()
 
 
@@ -188,7 +206,7 @@ def test_auto_rekey_dm_is_queued_after_commit(feeder, settings, django_capture_o
         assert len(callbacks) == 1
         callbacks[0]()
     assert event.outcome == Outcome.AUTO_UPDATED
-    delay.assert_called_once_with(event.pk)
+    delay.assert_called_once_with(args=(event.pk,), retry=False)
 
 
 @pytest.mark.django_db(transaction=True)
