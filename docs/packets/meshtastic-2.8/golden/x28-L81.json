@@ -64,7 +64,7 @@
     "fields": {
       "altitude": 10.0,
       "from_int": 2076261521,
-      "from_str": null,
+      "from_str": "!7bc13c91",
       "ground_speed": 0.0,
       "ground_track": 0.0,
       "heading": null,

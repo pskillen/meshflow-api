@@ -151,15 +151,12 @@ class BasePacketSerializer(serializers.Serializer):
         # First, handle the standard DRF conversion
         validated_data = super().to_internal_value(data)
 
-        # override the hex node_id with the integer node_id
-        if "from" in validated_data:
-            from_int = validated_data["from_int"]
-            from_str = meshtastic_id_to_hex(from_int)
-            validated_data["from_str"] = from_str
-        if "to" in validated_data:
-            to_int = validated_data["to_int"]
-            to_str = meshtastic_id_to_hex(to_int)
-            validated_data["to_str"] = to_str
+        # Derive the hex node_id from the integer one when the sender sent none (fromId/toId null: the sender or
+        # recipient is not in the feeder's NodeDB). A supplied hex id is kept as sent.
+        if not validated_data.get("from_str"):
+            validated_data["from_str"] = meshtastic_id_to_hex(validated_data["from_int"])
+        if not validated_data.get("to_str") and validated_data.get("to_int") is not None:
+            validated_data["to_str"] = meshtastic_id_to_hex(validated_data["to_int"])
 
         # Extract portnum from decoded structure (ints and numeric strings become the enum name)
         if "decoded" in data and "portnum" in data["decoded"]:

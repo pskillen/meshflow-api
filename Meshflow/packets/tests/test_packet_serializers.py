@@ -124,6 +124,46 @@ class BasePacketSerializerTest(BasePacketSerializerTestCase):
         self.assertEqual(validated_data["priority"], "RELIABLE")
         self.assertEqual(validated_data["raw"], "raw data")
 
+    def _base_data(self, **extra):
+        data = {"id": 123, "from": 0x1A83CF89, "decoded": {"portnum": "TEXT_MESSAGE_APP"}, "rxTime": 1672531200}
+        data.update(extra)
+        return data
+
+    def test_from_str_derived_when_from_id_null(self):
+        """The bot sends fromId null when the sender is not in the feeder's NodeDB; derive the hex from `from`."""
+        serializer = BasePacketSerializer(data=self._base_data(fromId=None), context=self.context)
+        assert_serializer_valid(serializer)
+        self.assertEqual(serializer.validated_data["from_str"], "!1a83cf89")
+
+    def test_from_str_derived_when_from_id_absent(self):
+        serializer = BasePacketSerializer(data=self._base_data(), context=self.context)
+        assert_serializer_valid(serializer)
+        self.assertEqual(serializer.validated_data["from_str"], "!1a83cf89")
+
+    def test_to_str_derived_when_to_id_null(self):
+        serializer = BasePacketSerializer(data=self._base_data(to=0x0A0B0C0D, toId=None), context=self.context)
+        assert_serializer_valid(serializer)
+        self.assertEqual(serializer.validated_data["to_str"], "!0a0b0c0d")
+
+    def test_to_str_derived_for_broadcast(self):
+        serializer = BasePacketSerializer(data=self._base_data(to=0xFFFFFFFF, toId=None), context=self.context)
+        assert_serializer_valid(serializer)
+        self.assertEqual(serializer.validated_data["to_str"], "^all")
+
+    def test_to_str_not_invented_without_to(self):
+        serializer = BasePacketSerializer(data=self._base_data(toId=None), context=self.context)
+        assert_serializer_valid(serializer)
+        self.assertIsNone(serializer.validated_data.get("to_str"))
+
+    def test_supplied_ids_are_kept(self):
+        """A supplied fromId/toId is stored as sent, as before."""
+        serializer = BasePacketSerializer(
+            data=self._base_data(fromId="!cafef00d", to=789, toId="!789012"), context=self.context
+        )
+        assert_serializer_valid(serializer)
+        self.assertEqual(serializer.validated_data["from_str"], "!cafef00d")
+        self.assertEqual(serializer.validated_data["to_str"], "!789012")
+
     def test_invalid_timestamp(self):
         """Test handling of invalid timestamps."""
         data = {
