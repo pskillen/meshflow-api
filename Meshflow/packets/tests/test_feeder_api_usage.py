@@ -230,3 +230,116 @@ def test_admin_filter_lists_feeders_on_legacy_urls(feeder, create_managed_node):
     flt = LegacyFeederUrlFilter(request, {"legacy_urls_7d": ["yes"]}, ManagedNode, model_admin)
 
     assert list(flt.queryset(request, ManagedNode.objects.all())) == [node]
+
+
+FIRMWARE = "2.8.2.d5f1619"
+
+
+@pytest.mark.django_db
+def test_firmware_header_recorded_on_v4(feeder):
+    node, api_key = feeder
+
+    assert _identity(api_key, HTTP_X_MESHTASTIC_FEEDER_FIRMWARE=FIRMWARE).status_code == 200
+
+    node.refresh_from_db()
+    assert node.reported_firmware_version == FIRMWARE
+    assert node.firmware_reported_at is not None
+
+
+@pytest.mark.django_db
+def test_firmware_header_recorded_on_legacy_url(feeder):
+    node, api_key = feeder
+
+    assert _legacy_bot_version(node, api_key, HTTP_X_MESHTASTIC_FEEDER_FIRMWARE=FIRMWARE).status_code == 200
+
+    node.refresh_from_db()
+    assert node.reported_firmware_version == FIRMWARE
+
+
+@pytest.mark.django_db
+def test_firmware_body_recorded_and_header_wins(feeder):
+    node, api_key = feeder
+    url = reverse("feeder-v4-bot-version")
+    body = {"bot_version": "2.3.0", "meshtastic_firmware_version": "2.7.26"}
+
+    assert APIClient().put(url, body, format="json", HTTP_X_API_KEY=api_key.key).status_code == 200
+    node.refresh_from_db()
+    assert node.reported_firmware_version == "2.7.26"
+
+    response = APIClient().put(
+        url, body, format="json", HTTP_X_API_KEY=api_key.key, HTTP_X_MESHTASTIC_FEEDER_FIRMWARE=FIRMWARE
+    )
+    assert response.status_code == 200
+    node.refresh_from_db()
+    assert node.reported_firmware_version == FIRMWARE
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("value", ["", "   ", "2." * 40])
+def test_blank_or_overlong_firmware_ignored(feeder, value):
+    node, api_key = feeder
+
+    assert _identity(api_key, HTTP_X_MESHTASTIC_FEEDER_FIRMWARE=value).status_code == 200
+
+    node.refresh_from_db()
+    assert node.reported_firmware_version is None
+    assert node.firmware_reported_at is None
+
+
+@pytest.mark.django_db
+def test_firmware_throttle(feeder, django_assert_num_queries):
+    node, _api_key = feeder
+    now = timezone.now()
+
+    record_feeder_usage(node, api="v4", reported_firmware=FIRMWARE, now=now)
+    with django_assert_num_queries(0):
+        assert record_feeder_usage(node, api="v4", reported_firmware=FIRMWARE, now=now + timedelta(minutes=5)) == {}
+
+    written = record_feeder_usage(node, api="v4", reported_firmware="2.7.26", now=now + timedelta(minutes=6))
+    assert written["reported_firmware_version"] == "2.7.26"
+
+    written = record_feeder_usage(node, api="v4", reported_firmware="2.7.26", now=now + timedelta(minutes=20))
+    assert "firmware_reported_at" in written
+
+
+@pytest.mark.django_db
+def test_meshcore_feeder_firmware_never_written(create_managed_node, create_constellation, create_node_api_key):
+    constellation = create_constellation(protocol=Protocol.MESHCORE)
+    node = create_managed_node(
+        protocol=Protocol.MESHCORE, constellation=constellation, meshtastic_node_id=None, mc_pubkey=MC_PUBKEY
+    )
+    api_key = create_node_api_key(constellation=constellation)
+    NodeAuth.objects.create(api_key=api_key, node=node)
+
+    url = reverse("meshcore-feeder-bot-config", kwargs={"feeder_pubkey_prefix": MC_PUBKEY[:12]})
+    response = APIClient().get(url, HTTP_X_API_KEY=api_key.key, HTTP_X_MESHTASTIC_FEEDER_FIRMWARE=FIRMWARE)
+
+    assert response.status_code == 200
+    node.refresh_from_db()
+    assert node.reported_firmware_version is None
+
+
+@pytest.mark.django_db
+def test_serializer_returns_firmware_fields(feeder):
+    from nodes.serializers import ManagedNodeSerializer
+
+    node, _api_key = feeder
+    record_feeder_usage(node, api="v4", reported_firmware=FIRMWARE)
+
+    data = ManagedNodeSerializer(node).data
+
+    assert data["reported_firmware_version"] == FIRMWARE
+    assert data["firmware_reported_at"] is not None
+
+
+@pytest.mark.django_db
+def test_refresh_feeder_row_failure_keeps_the_request_at_200(feeder):
+    node, api_key = feeder
+
+    with mock.patch("common.feeder_metrics.refresh_feeder_row", side_effect=RuntimeError("boom")) as refresh:
+        response = _identity(api_key, HTTP_X_MESHTASTIC_FEEDER_FIRMWARE=FIRMWARE)
+
+    assert refresh.called
+    assert response.status_code == 200
+    node.refresh_from_db()
+    assert node.reported_firmware_version == FIRMWARE

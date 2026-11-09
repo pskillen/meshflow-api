@@ -90,7 +90,7 @@ flowchart LR
 | Sanitise | `StorageAPIWrapper.store_raw_packet` | Drops non-JSON `raw` protobuf; base64 `bytes`; fills `channel` |
 | POST | `POST /api/packets/{my_nodenum}/ingest/` (or `/api/v3/packets/…`) | Legacy: `my_nodenum` = **observer** (feeder), not sender; `NodeAPIKey` auth on (key, path number) |
 | POST (v4) | `POST /api/v4/feeder/meshtastic/ingest/` | Observer = the API key's single feeder; no number in the path, so a 2.8 number change does not break ingest. Needs one key per feeder (403 `shared_api_key` otherwise); bots probe `GET /api/v4/feeder/identity/` first ([ADR-0005](adr/0005-feeder-scoped-auth.md)) |
-| Identity headers | `X-Meshtastic-Feeder-Node-Num` (also `-Pubkey`, `-Firmware`) | The reported number is recorded as `ManagedNode.reported_meshtastic_node_id` on v4 and legacy URLs; a mismatch is logged and shown as `identity_mismatch`, never rejected. Pubkey and firmware are not stored yet |
+| Identity headers | `X-Meshtastic-Feeder-Node-Num` (also `-Pubkey`, `-Firmware`) | The reported number is recorded as `ManagedNode.reported_meshtastic_node_id` on v4 and legacy URLs; a mismatch is logged and shown as `identity_mismatch`, never rejected. The firmware version (`X-Meshtastic-Feeder-Firmware`, or `meshtastic_firmware_version` in a bot-version body) is stored as `ManagedNode.reported_firmware_version` / `firmware_reported_at` and feeds the [`feeder_report` firmware rule](inferred-firmware.md). The pubkey is not stored yet |
 | Legacy | `POST /api/raw-packet/` | Still supported by bot for older deployments |
 | Failure | `failed_packets_dir` JSON dump | No automatic retry |
 

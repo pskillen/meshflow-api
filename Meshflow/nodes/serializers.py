@@ -458,6 +458,8 @@ class ManagedNodeSerializer(serializers.ModelSerializer):
             "mc_flood_advert_interval_hours",
             "bot_version",
             "bot_version_reported_at",
+            "reported_firmware_version",
+            "firmware_reported_at",
             "mc_channels_synced_at",
             "position",
             "device_metrics",
@@ -484,6 +486,8 @@ class ManagedNodeSerializer(serializers.ModelSerializer):
             "constellation",
             "bot_version",
             "bot_version_reported_at",
+            "reported_firmware_version",
+            "firmware_reported_at",
         ]
 
     STATUS_FIELDS = (

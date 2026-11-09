@@ -114,7 +114,9 @@ components:
       required: false
       schema:
         type: string
-      description: The feeder radio's firmware version. Accepted; not yet stored.
+      description: >
+        The feeder radio's firmware version (e.g. 2.8.2.d5f1619). Recorded on the feeder's managed node
+        (Meshtastic feeders only; at most 64 characters) and used as the strongest evidence for its firmware generation.
 
   responses:
     FeederScopedForbidden:
@@ -202,6 +204,10 @@ components:
         meshtastic_node_num:
           type: integer
           description: Optional reported node number; recorded like X-Meshtastic-Feeder-Node-Num
+        meshtastic_firmware_version:
+          type: string
+          maxLength: 64
+          description: Optional reported firmware version; recorded like X-Meshtastic-Feeder-Firmware
     FeederBotVersionRecorded:
       type: object
       properties:
@@ -2288,6 +2294,17 @@ components:
           format: date-time
           nullable: true
           description: When bot_version was last reported by the feeder
+          readOnly: true
+        reported_firmware_version:
+          type: string
+          nullable: true
+          description: Firmware version the feeder last reported (X-Meshtastic-Feeder-Firmware)
+          readOnly: true
+        firmware_reported_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When reported_firmware_version was last written
           readOnly: true
         last_packet_ingested_at:
           type: string

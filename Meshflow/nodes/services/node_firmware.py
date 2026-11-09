@@ -6,11 +6,12 @@ malformed key cannot erase what a good key proved.
 
 from __future__ import annotations
 
+from django.db.models import Q
 from django.utils import timezone
 
 from common.meshtastic_firmware import Evidence, Verdict, classify
 from common.protocol import Protocol
-from nodes.models import ObservedNode
+from nodes.models import ManagedNode, ObservedNode
 
 FIRMWARE_FIELDS = ["inferred_firmware", "inferred_firmware_basis", "inferred_firmware_at"]
 
@@ -24,6 +25,45 @@ def _number_is_another_nodes_key_id(node_num: int | None, *, exclude_pk=None) ->
     return qs.exists()
 
 
+def _reporting_feeders():
+    return ManagedNode.objects.filter(
+        protocol=Protocol.MESHTASTIC, deleted_at__isnull=True, reported_firmware_version__isnull=False
+    ).exclude(reported_firmware_version="")
+
+
+def _feeder_number(feeder: ManagedNode) -> int | None:
+    """The number the feeder's radio has now. ``meshtastic_node_id`` goes stale after an upgrade."""
+    if feeder.reported_meshtastic_node_id is not None:
+        return feeder.reported_meshtastic_node_id
+    return feeder.meshtastic_node_id
+
+
+def feeder_firmware_map() -> dict[int, str]:
+    """Node number -> firmware version for every live feeder that has reported one (newest report wins)."""
+    firmware: dict[int, str] = {}
+    for feeder in _reporting_feeders().order_by("firmware_reported_at", "pk"):
+        number = _feeder_number(feeder)
+        if number is not None:
+            firmware[number] = feeder.reported_firmware_version
+    return firmware
+
+
+def feeder_firmware_for(node_num: int | None) -> str | None:
+    """The firmware version the feeder numbered ``node_num`` reported, or None if it is not a reporting feeder."""
+    if node_num is None:
+        return None
+    feeder = (
+        _reporting_feeders()
+        .filter(
+            Q(reported_meshtastic_node_id=node_num)
+            | Q(reported_meshtastic_node_id__isnull=True, meshtastic_node_id=node_num)
+        )
+        .order_by("-firmware_reported_at", "-pk")
+        .first()
+    )
+    return feeder.reported_firmware_version if feeder else None
+
+
 def build_evidence(node: ObservedNode) -> Evidence:
     key_id = node.meshtastic_key_node_id
     predicted = False
@@ -33,6 +73,7 @@ def build_evidence(node: ObservedNode) -> Evidence:
         node_num=node.meshtastic_node_id,
         key_node_id=key_id,
         number_is_another_nodes_key_id=predicted,
+        feeder_firmware=feeder_firmware_for(node.meshtastic_node_id),
     )
 
 
@@ -55,9 +96,33 @@ def refresh_inferred_firmware(node: ObservedNode, *, now=None) -> bool:
     return apply_verdict(node, classify(build_evidence(node)), now=now)
 
 
+def refresh_feeder_row(managed_node: ManagedNode, *, now=None) -> bool:
+    """Re-evaluate the feeder's own ObservedNode after it reported firmware. Returns whether the row changed.
+
+    The row is found by the number the feeder reports, falling back to the stored one only when none was reported.
+    No row yet is fine: the next report (within 10 minutes) picks it up.
+    """
+    from nodes.services.observed_nodes import get_meshtastic_observed_node  # it imports this module
+
+    number = _feeder_number(managed_node)
+    if number is None:
+        return False
+    observed = get_meshtastic_observed_node(number)
+    if observed is None:
+        return False
+    if refresh_inferred_firmware(observed, now=now):
+        observed.save(update_fields=FIRMWARE_FIELDS)
+        return True
+    return False
+
+
 def predicted_firmware_fields(node_id: int, *, now=None) -> dict:
     """The firmware fields for a brand-new keyless row numbered ``node_id``, or ``{}``."""
-    evidence = Evidence(node_num=node_id, number_is_another_nodes_key_id=_number_is_another_nodes_key_id(node_id))
+    evidence = Evidence(
+        node_num=node_id,
+        number_is_another_nodes_key_id=_number_is_another_nodes_key_id(node_id),
+        feeder_firmware=feeder_firmware_for(node_id),
+    )
     verdict = classify(evidence)
     if verdict is None:
         return {}

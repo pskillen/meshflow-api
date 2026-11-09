@@ -16,7 +16,7 @@ import re
 from dataclasses import dataclass
 from typing import Callable
 
-BASIS_FEEDER_REPORT = "feeder_report"  # used by the later feeder PR
+BASIS_FEEDER_REPORT = "feeder_report"
 BASIS_KEY_IDENTITY = "key_identity"
 BASIS_PREDICTED_ID = "predicted_id"
 
@@ -36,12 +36,21 @@ class Evidence:
     node_num: int | None
     key_node_id: int | None = None
     number_is_another_nodes_key_id: bool = False
+    feeder_firmware: str | None = None  # version string the node itself reported, when it is one of our feeders
 
 
 @dataclass(frozen=True)
 class Verdict:
     generation: str
     basis: str
+
+
+def feeder_report_rule(evidence: Evidence) -> Verdict | None:
+    """A feeder's own reported version. The only evidence that can show a downgrade."""
+    generation = generation_for_version(evidence.feeder_firmware)
+    if generation is None:
+        return None
+    return Verdict(generation, BASIS_FEEDER_REPORT)
 
 
 def key_identity_rule(evidence: Evidence) -> Verdict | None:
@@ -62,8 +71,8 @@ def predicted_id_rule(evidence: Evidence) -> Verdict | None:
     return None
 
 
-# First non-None verdict wins. Prepend stronger evidence (e.g. a feeder report).
-RULES: list[Callable[[Evidence], Verdict | None]] = [key_identity_rule, predicted_id_rule]
+# First non-None verdict wins. Prepend stronger evidence.
+RULES: list[Callable[[Evidence], Verdict | None]] = [feeder_report_rule, key_identity_rule, predicted_id_rule]
 
 
 def classify(evidence: Evidence) -> Verdict | None:
