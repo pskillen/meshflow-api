@@ -2,6 +2,8 @@
 
 import abc
 
+from django.utils import timezone
+
 from common.mesh_node_helpers import meshtastic_id_to_hex
 from nodes.models import ManagedNode, ObservedNode
 from nodes.services.observed_nodes import get_or_create_meshtastic_observed_node
@@ -77,16 +79,20 @@ class BasePacketService(abc.ABC):
         update_inferred_max_hops(self.from_node, self.observation, port_num)
 
     def _update_node_last_heard(self) -> None:
-        """Update the last_heard timestamp of the node that sent the packet."""
+        """Move the sender's last_heard forward only (never back, never past now)."""
         if self.packet.from_int and self.packet.first_reported_time:
             try:
-                last_heard = self.packet.first_reported_time
-                self.from_node.last_heard = last_heard
+                # first_reported_time can be old (late upload) or in the future (feeder clock): cap it at now.
+                candidate = min(self.packet.first_reported_time, timezone.now())
+                current = self.from_node.last_heard
+                if current is not None and candidate <= current:
+                    return
+                self.from_node.last_heard = candidate
                 self.from_node.save(update_fields=["last_heard"])
                 node_last_heard_advanced.send(
                     sender=self.__class__,
                     observed_node=self.from_node,
-                    last_heard=last_heard,
+                    last_heard=candidate,
                 )
             except ObservedNode.DoesNotExist:
                 # If the node doesn't exist, we don't need to update it
