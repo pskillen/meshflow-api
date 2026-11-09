@@ -145,9 +145,9 @@ Base path: `/api/stats/` ([`stats/urls.py`](../../../Meshflow/stats/urls.py)).
 | --- | --- | --- |
 | `GET /api/stats/snapshots/` | Guest read | `stat_type`, `constellation_id` (`-1` = global), `recorded_at_after`, `recorded_at_before`, `bucket`, pagination |
 
-Response: paginated `StatsSnapshot` (`id`, `recorded_at`, `stat_type`, `constellation_id`, `value`), newest first. Pages hold 100 rows by default and at most 1000 (`page_size`), so 90 days of hourly rows (2160) span three pages.
+Response: paginated `StatsSnapshot` (`id`, `recorded_at`, `stat_type`, `constellation_id`, `value`), newest first. Pages hold 100 rows by default and at most 1000 (`page_size`), so 90 days of hourly rows (2160) for one series span three pages at `page_size=1000`.
 
-**`bucket=1d`** (the only bucket so far; `1h` and `6h` are reserved for the node-metric endpoints) returns one row per UTC day and constellation instead, computed at request time from the hourly rows. Nothing is stored. It needs `stat_type`; any other `bucket`, a missing `stat_type` or an unknown one is a 400. A 90-day request is 90 rows, one page.
+**`bucket=1d`** (the only bucket so far; `1h` and `6h` are reserved for the node-metric endpoints) returns one row per UTC day and constellation instead, computed at request time from the hourly rows. Nothing is stored. It needs `stat_type` and `recorded_at_after` (so a guest cannot ask for every hourly row since launch); any other `bucket`, a missing `stat_type` or `recorded_at_after`, or an unknown `stat_type` is a 400. A 90-day request for one series (`constellation_id` set, or `-1` for global) is 90 rows, one page at `page_size=1000`; without `constellation_id` it is `90 × (1 + constellations)` rows.
 
 | `stat_type` | Daily `value.count` |
 | --- | --- |
@@ -155,9 +155,9 @@ Response: paginated `StatsSnapshot` (`id`, `recorded_at`, `stat_type`, `constell
 | `packet_volume`, `mc_packet_volume`, `new_nodes`, `mc_new_nodes` (flows) | sum; `by_type` summed per key |
 | `node_firmware`, `tr_success_daily` (already daily) | unchanged rows, as without `bucket` |
 
-Rolled rows have `id: null`, `recorded_at` at the UTC day start, and `value.samples`, the number of hourly rows that contributed (24 for a full day; fewer marks a partial day or a gap, which means are not corrected for). Code: [`stats/snapshot_rollup.py`](../../../Meshflow/stats/snapshot_rollup.py).
+Rolled rows have `id: null`, `recorded_at` at the UTC day start, and `value.samples`, the number of hourly rows that contributed (24 for a full day; fewer marks a partial day or a gap, which means are not corrected for). If `recorded_at_after` or `recorded_at_before` is not UTC midnight, the first and last days are partial (`samples` < 24). Gauge rows without a numeric `count` are skipped, not counted as samples. Code: [`stats/snapshot_rollup.py`](../../../Meshflow/stats/snapshot_rollup.py).
 
-OpenAPI enum for `stat_type` today: `online_nodes`, `new_nodes`, `packet_volume`, `mc_online_nodes`, `mc_new_nodes`, `mc_packet_volume`, `node_firmware`.
+OpenAPI enum for `stat_type` today: `online_nodes`, `new_nodes`, `packet_volume`, `mc_online_nodes`, `mc_new_nodes`, `mc_packet_volume`, `node_firmware`, `tr_success_daily`.
 
 ### Live aggregation (Meshtastic `node_id` = decimal nodenum)
 
