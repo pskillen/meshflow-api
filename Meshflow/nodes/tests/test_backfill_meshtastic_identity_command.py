@@ -4,6 +4,7 @@ from datetime import timedelta
 from io import StringIO
 
 from django.core.management import call_command
+from django.db import connection
 from django.utils import timezone
 
 import pytest
@@ -16,6 +17,13 @@ pytest_plugins = ["packets.tests.conftest"]
 KEY_B64 = "oLOpz1p7W8/Ti8Z0iOU4TqZAYVAXe3Uwm8EF/m1zLFs="
 KEY_HEX = "a0b3a9cf5a7b5bcfd38bc67488e5384ea6406150177b75309bc105fe6d732c5b"
 OTHER_KEY_B64 = "c1OCe93DrrJwtPKC5VJbneJIrK37WxHBZyPkrYTI/nw="
+
+
+@pytest.fixture
+def allow_duplicates(db):
+    """The unique index forbids duplicate rows; these tests rebuild a pre-constraint database (rolled back after)."""
+    with connection.cursor() as cursor:
+        cursor.execute("DROP INDEX nodes_observednode_mt_node_id_unique")
 
 
 def _run(*args):
@@ -190,7 +198,7 @@ def test_dry_run_managed_and_shared_output_matches_real_run(create_observed_node
 
 
 @pytest.mark.django_db
-def test_duplicate_rows_for_one_number_are_not_a_shared_key(create_observed_node):
+def test_duplicate_rows_for_one_number_are_not_a_shared_key(allow_duplicates, create_observed_node):
     create_observed_node(meshtastic_node_id=8001, meshtastic_public_key=KEY_B64)
     create_observed_node(meshtastic_node_id=8001, meshtastic_public_key=KEY_B64)
 
@@ -201,7 +209,7 @@ def test_duplicate_rows_for_one_number_are_not_a_shared_key(create_observed_node
 
 
 @pytest.mark.django_db
-def test_two_numbers_with_one_key_are_shared_and_listed_once(create_observed_node):
+def test_two_numbers_with_one_key_are_shared_and_listed_once(allow_duplicates, create_observed_node):
     create_observed_node(meshtastic_node_id=8101, meshtastic_public_key=KEY_B64)
     create_observed_node(meshtastic_node_id=8101, meshtastic_public_key=KEY_B64)
     create_observed_node(meshtastic_node_id=8102, meshtastic_public_key=KEY_B64)
@@ -214,7 +222,9 @@ def test_two_numbers_with_one_key_are_shared_and_listed_once(create_observed_nod
 
 
 @pytest.mark.django_db
-def test_managed_choice_among_duplicate_rows_prefers_key_then_latest_heard(create_observed_node, create_managed_node):
+def test_managed_choice_among_duplicate_rows_prefers_key_then_latest_heard(
+    allow_duplicates, create_observed_node, create_managed_node
+):
     now = timezone.now()
     keyed_old = create_observed_node(meshtastic_node_id=8201, meshtastic_public_key=KEY_B64)
     keyless_new = create_observed_node(meshtastic_node_id=8201, meshtastic_public_key=None)
