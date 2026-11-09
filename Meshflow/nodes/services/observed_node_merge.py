@@ -1,6 +1,7 @@
 """Merge duplicate Meshtastic ObservedNode rows (same node number) into one.
 
-Used by the ``dedupe_observed_nodes`` command, and by the migration that adds the unique constraint.
+Used by the ``dedupe_observed_nodes`` command. Migration 0059 holds a frozen copy of these rules against historical
+models, so changes here do not reach it.
 
 Rules, per duplicate set (each set merges in its own ``transaction.atomic()``):
 
