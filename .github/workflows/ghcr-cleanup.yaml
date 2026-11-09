@@ -1,0 +1,35 @@
+name: ghcr-cleanup
+
+# Weekly removal of untagged GHCR versions. Kept off the push path: it walks every version with
+# `docker manifest inspect`, takes 6-10 minutes and can flake, which used to hold up every main build.
+
+on:
+  schedule:
+    - cron: "41 4 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+# Two overlapping runs would list and delete the same untagged versions; the second gets a 404 and the action
+# reports "fail delete N". Queue, never cancel one mid-delete.
+concurrency:
+  group: ghcr-cleanup-meshflow-api
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      # except_untagged_multiplatform stays at its default (true): the images carry provenance attestations,
+      # whose manifests are untagged but referenced by the tagged index.
+      - name: Delete untagged images
+        uses: Chizkiyahu/delete-untagged-ghcr-action@v6.1.1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          repository_owner: ${{ github.repository_owner }}
+          package_name: meshflow-api
+          owner_type: user
+          untagged_only: true
