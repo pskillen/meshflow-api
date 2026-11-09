@@ -193,6 +193,30 @@ def test_one_axis_zero_position_is_kept(service_args):
     assert (position.latitude, position.longitude) == (0.0, 12.3)
 
 
+@pytest.mark.django_db
+@pytest.mark.parametrize("lat,lon", [(None, None), (0.0, 0.0), (5e-8, -5e-8)])
+def test_no_usable_position_still_updates_inferred_max_hops(service_args, lat, lon):
+    """The null path keeps the packet's hop evidence: POSITION_APP sets the sender's inferred max hops."""
+    create_position_packet, create_managed_node, create_packet_observation, create_user = service_args
+    packet = create_position_packet(latitude=lat, longitude=lon)
+    observer = create_managed_node()
+    observation = create_packet_observation(packet=packet, observer=observer, hop_start=4, hop_limit=2)
+    PositionPacketService().process_packet(packet, observer, observation, create_user())
+
+    status = NodeLatestStatus.objects.get(node__meshtastic_node_id=packet.from_int)
+    assert status.meshtastic_inferred_max_hops == 4
+    assert status.meshtastic_inferred_max_hops_source == "POSITION_APP"
+    assert Position.objects.count() == 0
+
+
+@pytest.mark.django_db
+def test_packet_already_stored_at_null_island_writes_no_position(service_args):
+    """A packet stored at 0,0 before deploy can come back through the dedup window: the service must not use it."""
+    _process(service_args, latitude=0.0, longitude=0.0)
+    assert Position.objects.count() == 0
+    assert not NodeLatestStatus.objects.filter(latitude__isnull=False).exists()
+
+
 # --- ingest through the view -----------------------------------------------------------------------
 
 NODE = 0x1A2B3C4D

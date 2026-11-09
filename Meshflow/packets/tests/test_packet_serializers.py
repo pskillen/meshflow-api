@@ -1170,6 +1170,7 @@ class NodeSerializerTest(BasePacketSerializerTestCase):
 
         self._upsert(position=position(55.9, -3.2))
         self._upsert(position=position(0.0, 0.0))
+        self._upsert(position=position(5e-8, -5e-8))  # within the 1e-7 tolerance, like ingest
 
         latest_status = NodeLatestStatus.objects.get(node=self.from_node)
         self.assertEqual(latest_status.latitude, 55.9)

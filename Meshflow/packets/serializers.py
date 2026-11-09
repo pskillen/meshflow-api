@@ -1626,7 +1626,7 @@ class BaseNodeSerializer(serializers.ModelSerializer):
     def _create_related_objects(self, node, position_data, device_metrics_data):
         """Create position and device metrics records for a node."""
         # Create position if provided; a NodeDB (0, 0) means "no fix" and must not overwrite a stored position
-        if position_data and not (position_data.get("latitude") == 0 and position_data.get("longitude") == 0):
+        if position_data and not is_null_island(position_data.get("latitude"), position_data.get("longitude")):
             reported_time = position_data.get("reported_time")
             Position.objects.create(
                 node=node,
