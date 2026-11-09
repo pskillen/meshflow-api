@@ -86,3 +86,11 @@ docker pull ghcr.io/pskillen/meshflow-api:latest-docs
 ## PR Builds
 
 PR builds do **not** push images to the registry. The workflow builds locally and runs smoke + integration tests in a single job.
+
+In the `build-and-smoke` job the API image is built once with buildx (`load: true`, `push: false`) as `meshflow-api:ci`, reading the layer cache that main builds write (GHA cache scope `meshflow-api`; PRs never write it). `docker-compose.test.yaml` tags its API services `${MESHFLOW_API_IMAGE:-meshflow-api:ci}`, so CI runs `up -d --no-build` and reuses that image; a local `docker compose build` still works. The job runs in parallel with `verify` and the bot contract check.
+
+The `VERSION` build arg is declared late in the `Dockerfile` so a new version only invalidates the last layers, not apt/pip.
+
+## GHCR Cleanup
+
+Untagged package versions are removed by [ghcr-cleanup.yaml](../.github/workflows/ghcr-cleanup.yaml), weekly (Sunday 04:41 UTC) or on demand (`workflow_dispatch`). It is not part of the build workflows: the action inspects every version one at a time and takes 6-10 minutes. Runs are serialised (concurrency group `ghcr-cleanup-meshflow-api`, never cancelled mid-delete). Untagged multi-platform manifests (provenance attestations referenced by tagged images) are kept.

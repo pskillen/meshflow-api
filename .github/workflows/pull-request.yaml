@@ -69,7 +69,6 @@ jobs:
         if: always()
 
   build-and-smoke:
-    needs: verify
     runs-on: ubuntu-latest
     env:
       MESHFLOW_API_URL: http://localhost:8000
@@ -78,8 +77,24 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v7
 
-      - name: Build and launch stack
-        run: docker compose -f docker-compose.test.yaml build && docker compose -f docker-compose.test.yaml up -d
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      # Reads the layer cache that main builds write; PRs never write it, so they cannot churn it.
+      - name: Build API image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: Dockerfile
+          platforms: linux/amd64
+          load: true
+          push: false
+          tags: meshflow-api:ci
+          cache-from: type=gha,scope=meshflow-api
+
+      # The compose services are tagged meshflow-api:ci, so --no-build reuses the image built above.
+      - name: Launch stack
+        run: docker compose -f docker-compose.test.yaml up -d --no-build
 
       - name: Smoke test
         run: |

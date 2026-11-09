@@ -44,8 +44,8 @@ jobs:
             ghcr.io/${{ github.repository }}:${{ inputs.ENVIRONMENT == 'dev' && 'latest-dev' || inputs.VERSION_LABEL }}
           build-args: |
             VERSION=${{ inputs.VERSION_LABEL }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=meshflow-api
+          cache-to: type=gha,scope=meshflow-api,mode=max
 
       - name: Build and Push Docs Image
         uses: docker/build-push-action@v7
@@ -56,8 +56,8 @@ jobs:
           push: true
           tags: |
             ghcr.io/${{ github.repository }}:${{ inputs.ENVIRONMENT == 'dev' && 'latest-dev' || inputs.VERSION_LABEL }}-docs
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=meshflow-api-docs
+          cache-to: type=gha,scope=meshflow-api-docs,mode=max
 
   tagging:
     runs-on: ubuntu-latest
