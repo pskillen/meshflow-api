@@ -140,9 +140,12 @@ with the `environment_reported_after` query parameter.
 Set from `MtRawPacket.first_reported_time` in
 [`Meshflow/packets/services/base.py`](../Meshflow/packets/services/base.py),
 as `min(first_reported_time, now)`, and written only when it is later than the
-stored value (or the stored value is null). A late upload or a feeder with a
-bad clock cannot move it back or into the future. Mesh monitoring, traceroute target selection, and all UI "online" tiers
-depend on this.
+stored value (or the stored value is null). The check is a conditional `UPDATE`
+in the database, so a stale instance or a concurrent worker cannot move it
+back. A stored value already in the future (an old bad feeder clock) is
+replaced by the next packet. A late upload or a feeder with a bad clock cannot
+move it back or into the future. Mesh monitoring, traceroute target selection,
+and all UI "online" tiers depend on this.
 
 ---
 
@@ -223,7 +226,7 @@ Node presence lifecycle:
 | `NodeMonitoringConfig.last_heard_offline_after_seconds` | **21600 s (6 h)** (model default) | per-row | Silence threshold on `ObservedNode.last_heard` before verification starts |
 | `DEFAULT_OFFLINE_AFTER_SECONDS` | **21600 s** | no | Fallback used when no `NodePresence` row exists (serializer + tasks) |
 | `TWO_EIGHT_DEFAULT_OFFLINE_AFTER_SECONDS` | **43200 s (12 h)** | no | Default for a 2.8 node (`inferred_firmware == "2.8"`, or node id equals its key-derived id); 2.8 nodes may send only NodeInfo, about every 3 h |
-| `NodePresence.learned_offline_after_seconds` | null until learned | no | `3 x p90` of the gaps between the node's own packets over 7 d (replay-only packets excluded, newest 5000), clamped to **6 h - 48 h**, null with fewer than 5 gaps. Only ever lengthens the default |
+| `NodePresence.learned_offline_after_seconds` | null until learned | no | `3 x p90` of the gaps between the node's own packets over 7 d (replay-only packets excluded, newest 5000), clamped to **6 h - 48 h**, null with fewer than 5 gaps. Never below the applicable default (6 h, or 12 h for a 2.8 node), so it only ever lengthens it |
 | `MESH_MONITORING_VERIFICATION_SECONDS` | **180 s** | yes | Window after `verification_started_at` to confirm the node is offline |
 | `MESH_MONITORING_VERIFICATION_NOTIFY_COOLDOWN_SECONDS` | **3600 s** | yes | Minimum gap between verification-start Discord DMs per watch |
 | `MESH_MONITORING_NOTIFY_VERIFICATION_START` | on (unset) | yes | Feature flag for verification-start DMs |
@@ -234,7 +237,7 @@ Node presence lifecycle:
 **Effective silence threshold**, first match wins:
 
 1. a `NodeMonitoringConfig` value that differs from 21600 (the owner chose it; a row at 21600 is just the default and does not count);
-2. `NodePresence.learned_offline_after_seconds`, when set;
+2. `NodePresence.learned_offline_after_seconds`, when set, but never below the default for that node (12 h for 2.8, else 6 h);
 3. 12 h for a 2.8 node;
 4. 6 h.
 

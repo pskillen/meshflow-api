@@ -368,6 +368,20 @@ def test_threshold_learned_beats_two_eight_default(create_user, create_observed_
 
 
 @pytest.mark.django_db
+def test_threshold_learned_below_two_eight_default_does_not_shorten_it(create_user, create_observed_node):
+    obs = _watched(create_user, create_observed_node, 710010, inferred_firmware="2.8")
+    NodePresence.objects.update_or_create(observed_node=obs, defaults={"learned_offline_after_seconds": 9 * HOUR})
+    assert _effective(obs) == 12 * HOUR
+
+
+@pytest.mark.django_db
+def test_threshold_learned_above_default_lengthens_non_two_eight(create_user, create_observed_node):
+    obs = _watched(create_user, create_observed_node, 710011)
+    NodePresence.objects.update_or_create(observed_node=obs, defaults={"learned_offline_after_seconds": 9 * HOUR})
+    assert _effective(obs) == 9 * HOUR
+
+
+@pytest.mark.django_db
 def test_threshold_non_default_config_beats_learned_and_two_eight(create_user, create_observed_node):
     obs = _watched(create_user, create_observed_node, 710005, offline_after=3 * HOUR, inferred_firmware="2.8")
     NodePresence.objects.update_or_create(observed_node=obs, defaults={"learned_offline_after_seconds": 30 * HOUR})
@@ -399,6 +413,32 @@ def test_nodeinfo_only_node_is_not_silent_at_eight_and_a_half_hours(
 
     update_learned_offline_thresholds()
     assert NodePresence.objects.get(observed_node=obs).learned_offline_after_seconds == 24 * HOUR
+
+    process_node_watch_presence()
+
+    presence = NodePresence.objects.get(observed_node=obs)
+    assert presence.verification_started_at is None
+    assert presence.suspected_offline_at is None
+
+
+@pytest.mark.django_db
+def test_sparse_node_depends_on_learned_threshold_to_stay_not_silent(
+    create_user, create_observed_node, create_raw_packet, create_packet_observation, create_managed_node
+):
+    """A non-2.8 node sending every 10 h, checked at 10.5 h: only the learned threshold (30 h) keeps it quiet."""
+    obs = _watched(create_user, create_observed_node, 710012)
+    observer = create_managed_node()
+    now = timezone.now()
+    for i in range(20):
+        pkt = create_raw_packet(from_int=710012, packet_id=820000 + i)
+        pkt.first_reported_time = now - timedelta(hours=10.5 + 10 * i)
+        pkt.save()
+        create_packet_observation(packet=pkt, observer=observer)
+    obs.last_heard = now - timedelta(hours=10.5)
+    obs.save(update_fields=["last_heard"])
+
+    update_learned_offline_thresholds()
+    assert NodePresence.objects.get(observed_node=obs).learned_offline_after_seconds == 30 * HOUR
 
     process_node_watch_presence()
 
