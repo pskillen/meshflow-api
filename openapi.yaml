@@ -6161,6 +6161,12 @@ paths:
       description: >
         Meshtastic-only: path ``node_id`` is the Meshtastic numeric node number (``ObservedNode.internal_id``).
         Returns device metrics for that node with optional date filtering.
+        With ``bucket=1h|6h|1d`` the response is instead one aggregated row per populated UTC bucket (newest first),
+        with ``reported_time`` = bucket start (UTC-aligned; ``6h`` buckets start 00/06/12/18), ``samples`` = rows in
+        the bucket, ``node``, and each metric field. ``id`` and ``logged_time`` are omitted. Aggregation: mean of
+        non-null values; a field with no values in the bucket is null. ``battery_level`` averages real readings only
+        (101 means powered and is ignored), returning 101 if every sample is 101; ``uptime_seconds`` is the maximum.
+        Without ``bucket`` the response is the raw rows, unchanged.
       tags: [Nodes]
       security:
         - BearerAuth: []
@@ -6171,9 +6177,16 @@ paths:
           schema:
             type: integer
         - $ref: '#/components/schemas/DateRangeQuery'
+        - name: bucket
+          in: query
+          required: false
+          description: Aggregate server-side into UTC buckets (``1h``, ``6h`` or ``1d``). Omit for raw rows.
+          schema:
+            type: string
+            enum: ['1h', '6h', '1d']
       responses:
         '200':
-          description: List of device metrics for the node
+          description: List of device metrics for the node (raw rows, or bucket aggregates when ``bucket`` is set)
           content:
             application/json:
               schema:
@@ -6193,6 +6206,12 @@ paths:
       description: >
         Meshtastic-only: path ``node_id`` is the Meshtastic numeric node number (``ObservedNode.internal_id``).
         Returns environment metrics for that node with optional date filtering.
+        With ``bucket=1h|6h|1d`` the response is instead one aggregated row per populated UTC bucket (newest first),
+        with ``reported_time`` = bucket start (UTC-aligned; ``6h`` buckets start 00/06/12/18), ``samples`` = rows in
+        the bucket, ``node``, and each metric field. ``id`` and ``logged_time`` are omitted. Aggregation: mean of
+        non-null values; a field with no values in the bucket is null. ``wind_direction``, ``rainfall_1h`` and
+        ``rainfall_24h`` are the latest non-null reading in the bucket (angles are not averaged).
+        Without ``bucket`` the response is the raw rows, unchanged.
       tags: [Nodes]
       security:
         - BearerAuth: []
@@ -6203,9 +6222,16 @@ paths:
           schema:
             type: integer
         - $ref: '#/components/schemas/DateRangeQuery'
+        - name: bucket
+          in: query
+          required: false
+          description: Aggregate server-side into UTC buckets (``1h``, ``6h`` or ``1d``). Omit for raw rows.
+          schema:
+            type: string
+            enum: ['1h', '6h', '1d']
       responses:
         '200':
-          description: List of environment metrics for the node
+          description: List of environment metrics for the node (raw rows, or bucket aggregates when ``bucket`` is set)
           content:
             application/json:
               schema:
@@ -6225,6 +6251,11 @@ paths:
       description: >
         Meshtastic-only: path ``node_id`` is the Meshtastic numeric node number (``ObservedNode.internal_id``).
         Returns power metrics for that node with optional date filtering.
+        With ``bucket=1h|6h|1d`` the response is instead one aggregated row per populated UTC bucket (newest first),
+        with ``reported_time`` = bucket start (UTC-aligned; ``6h`` buckets start 00/06/12/18), ``samples`` = rows in
+        the bucket, ``node``, and each metric field. ``id`` and ``logged_time`` are omitted. Aggregation: mean of
+        non-null values; a field with no values in the bucket is null.
+        Without ``bucket`` the response is the raw rows, unchanged.
       tags: [Nodes]
       security:
         - BearerAuth: []
@@ -6235,9 +6266,16 @@ paths:
           schema:
             type: integer
         - $ref: '#/components/schemas/DateRangeQuery'
+        - name: bucket
+          in: query
+          required: false
+          description: Aggregate server-side into UTC buckets (``1h``, ``6h`` or ``1d``). Omit for raw rows.
+          schema:
+            type: string
+            enum: ['1h', '6h', '1d']
       responses:
         '200':
-          description: List of power metrics for the node
+          description: List of power metrics for the node (raw rows, or bucket aggregates when ``bucket`` is set)
           content:
             application/json:
               schema:
