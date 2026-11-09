@@ -15,6 +15,11 @@ observations are replayed is not counted in `node_packet_stats` or `packet_volum
 radio receptions). Feeder liveness (`ManagedNodeStatus` from `upload_time`) still counts them: the feeder really is
 uploading.
 
+**Non-radio observations are excluded from neighbour stats.** `node_neighbour_stats` also drops observations that
+arrived over MQTT, UDP or the API (`via_mqtt`, or a `transport_mechanism` of `TRANSPORT_MQTT`, `TRANSPORT_MULTICAST_UDP`,
+`TRANSPORT_UNICAST_UDP` or `TRANSPORT_API`), because they say nothing about who the feeder hears over the air. A null
+transport counts as radio.
+
 Snapshots favour **completed hours** and fixed JSON shapes. Live endpoints support `interval` + `interval_type` (hour/day/week/month) over user-supplied `start_date` / `end_date`.
 
 ---
@@ -151,7 +156,7 @@ OpenAPI enum for `stat_type` today: `online_nodes`, `new_nodes`, `packet_volume`
 | `GET /api/stats/global/` | Guest read | All `MtRawPacket`; one `packets` count per interval (no per-type breakdown) |
 | `GET /api/stats/nodes/{node_id}/packets/` | Authenticated | Packets **from** node (`from_int`); per-type counts per interval; device-metrics exclusion |
 | `GET /api/stats/nodes/{node_id}/received/` | Authenticated | `PacketObservation` as **managed** feeder; per-type by `rx_time` |
-| `GET /api/stats/nodes/{node_id}/neighbours/` | Authenticated | Counts by source (relay or `from_int`); LSB ambiguity handling |
+| `GET /api/stats/nodes/{node_id}/neighbours/` | Authenticated | Counts by source (relay or `from_int`); LSB ambiguity handling; excludes observations that arrived over MQTT, UDP or the API (null transport counts as radio) |
 
 **Common query params** (`parse_stats_params`):
 
