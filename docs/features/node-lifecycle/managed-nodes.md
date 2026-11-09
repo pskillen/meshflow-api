@@ -56,9 +56,9 @@ A Meshtastic 2.8 feeder's node number is the `crc32` of its public key, so it ch
 ### What the owner sees
 
 - **Automatic change** (`auto_updated`): a Discord DM, if the owner has a verified Discord target (see [Discord notifications](../discord/notifications.md)): "Your feeder <name> changed node number: !old is now !new. It keeps its history and API key. Nothing to do." Without a verified target the DM is skipped and an audit row says so.
-- **Flagged change** (`flagged`): a DM naming the reason ("Your feeder <name> reported node number !new but is stored as !old, and it could not be updated automatically (<reason>). Ingest continues. Open My Nodes to review it."). When the reason is `auto_rekey_disabled`, the text says automatic updates are off on this server. A repeat of the same flagged change writes no new event, so there is one DM per event.
+- **Flagged change** (`flagged`): a DM naming the reason ("Your feeder <name> reported node number !new but is stored as !old, and it could not be updated automatically (<reason>). Ingest continues. Open My Nodes to review it."). When the reason is `auto_rekey_disabled`, the text says automatic updates are off on this server. A repeat of the same flagged change writes no new event. Different flagged changes are still written as events, but the DM is limited to one per feeder every 24 hours, so a feeder flapping between numbers cannot send one per report.
 - `manual` and `key_changed` events are never sent as a DM; `key_changed` is an audit row only.
-- A failed DM never affects the re-key.
+- DMs are sent from a Celery task queued after the event commits, so a slow or failed DM never affects the re-key or the feeder's request.
 
 `GET /api/nodes/managed-node-identity-events/` lists the events for the caller's own feeders (staff see all), newest first. `?unacknowledged=true` hides acknowledged events and `key_changed`; `?managed_node=<internal_id>` filters to one feeder. `needs_action` is true for a flagged event that has not been resolved. `POST /api/nodes/managed-node-identity-events/{id}/acknowledge/` records who saw it and when; calling it again changes nothing.
 

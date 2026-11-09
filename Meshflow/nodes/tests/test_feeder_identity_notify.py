@@ -2,13 +2,17 @@
 
 from unittest.mock import patch
 
+from django.core.cache import cache
+from django.db import connection
+
 import pytest
 
 import nodes.tests.conftest  # noqa: F401
 from common.meshtastic_identity import normalise_pubkey
 from nodes.models import ManagedNodeIdentityEvent
 from nodes.services.feeder_identity import apply_reported_identity, repoint_feeder
-from nodes.services.feeder_identity_notify import notify_owner
+from nodes.services.feeder_identity_notify import _flagged_dm_cooldown_key, notify_owner
+from nodes.tasks import notify_feeder_identity_event
 from push_notifications.constants import DiscordNotificationFeature, DiscordNotificationKind, DiscordNotificationStatus
 from push_notifications.discord import DiscordSendError
 from push_notifications.models import DiscordNotificationAudit
@@ -22,6 +26,7 @@ KEY_B64 = "oLOpz1p7W8/Ti8Z0iOU4TqZAYVAXe3Uwm8EF/m1zLFs="
 
 VERIFIED = "nodes.services.feeder_identity_notify.user_has_verified_discord_dm_target"
 SEND_DM = "push_notifications.discord_audit.send_dm"
+DELAY = "nodes.tasks.notify_feeder_identity_event.delay"
 
 
 @pytest.fixture
@@ -118,21 +123,23 @@ def test_unexpected_error_does_not_propagate(feeder):
 
 
 @pytest.mark.django_db
-def test_auto_rekey_sends_dm_through_receiver(feeder, settings):
+def test_auto_rekey_sends_dm_through_receiver(feeder, settings, django_capture_on_commit_callbacks):
     settings.MESHTASTIC_FEEDER_AUTO_REKEY = True
     with patch(VERIFIED, return_value=True), patch(SEND_DM) as send_dm:
-        event = apply_reported_identity(feeder, reported_node_num=NEW_NUM, reported_pubkey=KEY_B64)
+        with django_capture_on_commit_callbacks(execute=True):
+            event = apply_reported_identity(feeder, reported_node_num=NEW_NUM, reported_pubkey=KEY_B64)
     assert event.outcome == Outcome.AUTO_UPDATED
     send_dm.assert_called_once()
     assert DiscordNotificationAudit.objects.get().kind == DiscordNotificationKind.FEEDER_IDENTITY_CHANGED
 
 
 @pytest.mark.django_db
-def test_flagged_rekey_sends_dm_once(feeder, settings):
+def test_flagged_rekey_sends_dm_once(feeder, settings, django_capture_on_commit_callbacks):
     settings.MESHTASTIC_FEEDER_AUTO_REKEY = False
     with patch(VERIFIED, return_value=True), patch(SEND_DM) as send_dm:
-        first = apply_reported_identity(feeder, reported_node_num=NEW_NUM, reported_pubkey=KEY_B64)
-        second = apply_reported_identity(feeder, reported_node_num=NEW_NUM, reported_pubkey=KEY_B64)
+        with django_capture_on_commit_callbacks(execute=True):
+            first = apply_reported_identity(feeder, reported_node_num=NEW_NUM, reported_pubkey=KEY_B64)
+            second = apply_reported_identity(feeder, reported_node_num=NEW_NUM, reported_pubkey=KEY_B64)
     assert first.outcome == Outcome.FLAGGED
     assert second is None
     send_dm.assert_called_once()
@@ -140,10 +147,11 @@ def test_flagged_rekey_sends_dm_once(feeder, settings):
 
 
 @pytest.mark.django_db
-def test_failing_dm_leaves_rekey_applied(feeder, settings):
+def test_failing_dm_leaves_rekey_applied(feeder, settings, django_capture_on_commit_callbacks):
     settings.MESHTASTIC_FEEDER_AUTO_REKEY = True
     with patch(VERIFIED, return_value=True), patch(SEND_DM, side_effect=DiscordSendError("boom")):
-        event = apply_reported_identity(feeder, reported_node_num=NEW_NUM, reported_pubkey=KEY_B64)
+        with django_capture_on_commit_callbacks(execute=True):
+            event = apply_reported_identity(feeder, reported_node_num=NEW_NUM, reported_pubkey=KEY_B64)
     feeder.refresh_from_db()
     assert event.outcome == Outcome.AUTO_UPDATED
     assert feeder.meshtastic_node_id == NEW_NUM
@@ -157,3 +165,100 @@ def test_manual_repoint_sends_no_dm(feeder, create_user):
     assert event.outcome == Outcome.MANUAL
     send_dm.assert_not_called()
     assert DiscordNotificationAudit.objects.count() == 0
+
+
+@pytest.mark.django_db
+def test_flagged_dm_is_queued_after_commit_not_sent_inline(feeder, settings, django_capture_on_commit_callbacks):
+    settings.MESHTASTIC_FEEDER_AUTO_REKEY = False
+    with patch(DELAY) as delay, patch(SEND_DM) as send_dm:
+        with django_capture_on_commit_callbacks() as callbacks:
+            event = apply_reported_identity(feeder, reported_node_num=NEW_NUM, reported_pubkey=KEY_B64)
+            delay.assert_not_called()
+        assert len(callbacks) == 1
+        callbacks[0]()
+    delay.assert_called_once_with(event.pk)
+    send_dm.assert_not_called()
+
+
+@pytest.mark.django_db
+def test_auto_rekey_dm_is_queued_after_commit(feeder, settings, django_capture_on_commit_callbacks):
+    settings.MESHTASTIC_FEEDER_AUTO_REKEY = True
+    with patch(DELAY) as delay:
+        with django_capture_on_commit_callbacks() as callbacks:
+            event = apply_reported_identity(feeder, reported_node_num=NEW_NUM, reported_pubkey=KEY_B64)
+            delay.assert_not_called()
+        assert len(callbacks) == 1
+        callbacks[0]()
+    assert event.outcome == Outcome.AUTO_UPDATED
+    delay.assert_called_once_with(event.pk)
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.parametrize("auto_rekey", [True, False])
+def test_dm_is_sent_outside_any_transaction(create_managed_node, settings, auto_rekey):
+    settings.MESHTASTIC_FEEDER_AUTO_REKEY = auto_rekey
+    feeder = create_managed_node(
+        meshtastic_node_id=OLD_NUM, name="Hill", meshtastic_public_key=normalise_pubkey(KEY_B64)
+    )
+    seen = []
+
+    def fake_send(*args):
+        seen.append(connection.in_atomic_block)
+
+    with patch(VERIFIED, return_value=True), patch(SEND_DM, side_effect=fake_send):
+        apply_reported_identity(feeder, reported_node_num=NEW_NUM, reported_pubkey=KEY_B64)
+    assert seen == [False]
+
+
+@pytest.mark.django_db
+def test_queueing_failure_does_not_propagate(feeder, settings, django_capture_on_commit_callbacks):
+    settings.MESHTASTIC_FEEDER_AUTO_REKEY = False
+    with patch(DELAY, side_effect=OSError("broker down")), django_capture_on_commit_callbacks(execute=True):
+        event = apply_reported_identity(feeder, reported_node_num=NEW_NUM, reported_pubkey=KEY_B64)
+    assert event.outcome == Outcome.FLAGGED
+
+
+@pytest.mark.django_db
+def test_task_ignores_a_missing_event():
+    with patch(SEND_DM) as send_dm:
+        notify_feeder_identity_event(999999)
+    send_dm.assert_not_called()
+
+
+@pytest.mark.django_db
+def test_alternating_numbers_send_one_flagged_dm(feeder, django_capture_on_commit_callbacks):
+    with patch(VERIFIED, return_value=True), patch(SEND_DM) as send_dm:
+        with django_capture_on_commit_callbacks(execute=True):
+            for i in range(10):
+                number = NEW_NUM if i % 2 else 0x12345678
+                apply_reported_identity(feeder, reported_node_num=number, reported_pubkey=None)
+    assert feeder.identity_events.filter(outcome=Outcome.FLAGGED).count() == 10
+    send_dm.assert_called_once()
+
+
+@pytest.mark.django_db
+def test_flagged_cooldown_is_per_feeder(feeder, create_managed_node):
+    other = create_managed_node(meshtastic_node_id=0x11111111, name="Dale")
+    with patch(VERIFIED, return_value=True), patch(SEND_DM) as send_dm:
+        assert notify_owner(_event(feeder, Outcome.FLAGGED, Reason.CRC_MISMATCH)) is True
+        assert notify_owner(_event(other, Outcome.FLAGGED, Reason.CRC_MISMATCH)) is True
+    assert send_dm.call_count == 2
+
+
+@pytest.mark.django_db
+def test_flagged_dm_sends_again_after_cooldown(feeder):
+    with patch(VERIFIED, return_value=True), patch(SEND_DM) as send_dm:
+        first = _event(feeder, Outcome.FLAGGED, Reason.CRC_MISMATCH)
+        assert notify_owner(first) is True
+        assert notify_owner(_event(feeder, Outcome.FLAGGED, Reason.KEY_NOT_REPORTED)) is False
+        cache.delete(_flagged_dm_cooldown_key(first))
+        assert notify_owner(_event(feeder, Outcome.FLAGGED, Reason.KEY_NOT_REPORTED)) is True
+    assert send_dm.call_count == 2
+
+
+@pytest.mark.django_db
+def test_auto_updated_dm_is_not_limited_by_flagged_cooldown(feeder):
+    with patch(VERIFIED, return_value=True), patch(SEND_DM) as send_dm:
+        assert notify_owner(_event(feeder, Outcome.FLAGGED, Reason.CRC_MISMATCH)) is True
+        assert notify_owner(_event(feeder, Outcome.AUTO_UPDATED)) is True
+    assert send_dm.call_count == 2

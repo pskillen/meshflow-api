@@ -253,7 +253,7 @@ crc32 is forgeable, so a match shows only that the report is consistent; see the
 
 When the number is unchanged: a key that differs from the stored key (or, with none stored, from the feeder's own `ObservedNode` row) is flagged `key_mismatch` and not stored, and stays open until the feeder reports the expected key. Otherwise open flagged events are resolved, and a first key is stored with a `key_changed` audit event. A downgrade to 2.7 keeps the number and key, so it reports no change. Metric: `meshflow_feeder_identity_changes_total{protocol, outcome}` (`manual` counts owner re-points).
 
-The owner is told by Discord DM on `auto_updated` and on each new `flagged` row (`nodes/services/feeder_identity_notify.py`; never raises), and can re-point a flagged feeder with `repoint_feeder` (the `repoint-meshtastic-id/` endpoint), which ignores the flag. See [Managed nodes](../node-lifecycle/managed-nodes.md#node-number-changes-28).
+The owner is told by Discord DM on `auto_updated` and on a new `flagged` row, at most one flagged DM per feeder every 24 hours (`nodes/services/feeder_identity_notify.py`; a Celery task queued after commit, never on the request), and can re-point a flagged feeder with `repoint_feeder` (the `repoint-meshtastic-id/` endpoint), which ignores the flag. See [Managed nodes](../node-lifecycle/managed-nodes.md#node-number-changes-28).
 
 ### Identity data is not clobbered by 2.8 feeder NodeDB entries
 

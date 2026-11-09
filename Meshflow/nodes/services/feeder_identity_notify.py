@@ -3,11 +3,18 @@
 Copies the pattern in ``mesh_monitoring.services.notify_watchers_node_offline``: skip with an audit row when the
 owner has no verified Discord target, and never raise, so a failed DM can't affect the re-key.
 ``manual`` and ``key_changed`` events are never sent: the owner did the first, the second is audit only.
+
+The DM goes through Celery after commit (``queue_owner_notification``), never on the feeder's request. Flagged DMs are
+limited per feeder by ``FLAGGED_DM_COOLDOWN``; the events themselves are always written.
 """
 
 from __future__ import annotations
 
 import logging
+from datetime import timedelta
+
+from django.core.cache import cache
+from django.db import transaction
 
 from common.mesh_node_helpers import meshtastic_id_to_hex
 from nodes.models import ManagedNodeIdentityEvent
@@ -20,6 +27,9 @@ logger = logging.getLogger(__name__)
 
 Outcome = ManagedNodeIdentityEvent.Outcome
 Reason = ManagedNodeIdentityEvent.Reason
+
+# At most one flagged DM per feeder in this window, so a feeder flapping between numbers can't DM on every report.
+FLAGGED_DM_COOLDOWN = timedelta(hours=24)
 
 _REASON_TEXT = {
     Reason.KEY_NOT_REPORTED: "it did not report a public key",
@@ -55,11 +65,38 @@ def build_message(event) -> str:
     )
 
 
+def _flagged_dm_cooldown_key(event) -> str:
+    return f"feeder-identity-flagged-dm:{event.managed_node.internal_id}"
+
+
+def _in_flagged_dm_cooldown(event) -> bool:
+    """True when this feeder had a flagged DM in the window; otherwise starts the window (``add`` is atomic)."""
+    return not cache.add(_flagged_dm_cooldown_key(event), 1, timeout=int(FLAGGED_DM_COOLDOWN.total_seconds()))
+
+
+def queue_owner_notification(event) -> None:
+    """Queue the DM for ``event`` once the current transaction commits. Never raises."""
+    from nodes.tasks import notify_feeder_identity_event
+
+    event_id = event.pk
+
+    def enqueue():
+        try:
+            notify_feeder_identity_event.delay(event_id)
+        except Exception:
+            logger.exception("feeder identity: could not queue notification for event=%s", event_id)
+
+    transaction.on_commit(enqueue)
+
+
 def notify_owner(event) -> bool:
     """DM the owner about ``event``; return True when a DM was sent. Never raises."""
     try:
         kind = _kind_for(event)
         if kind is None:
+            return False
+        if event.outcome == Outcome.FLAGGED and _in_flagged_dm_cooldown(event):
+            logger.info("feeder identity: flagged DM in cooldown, skipped event=%s", event.pk)
             return False
         user = event.managed_node.owner
         text = build_message(event)
