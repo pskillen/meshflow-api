@@ -16,7 +16,8 @@ reported number is (re)written. Rules, first match wins, each flagged row leaves
 6. another active feeder already has the reported number -> ``number_collision``
 7. an ``ObservedNode`` at the reported number carries a different key -> ``key_mismatch``, or belongs to someone else
    -> ``number_collision``
-8. ``MESHTASTIC_FEEDER_AUTO_REKEY`` is off -> ``auto_rekey_disabled``
+8. ``MESHTASTIC_FEEDER_AUTO_REKEY`` is off, or the newest manual re-point moved the feeder away from the reported
+   number (a manual reversal holds) -> ``auto_rekey_disabled``
 9. otherwise apply, atomically, with an ``auto_updated`` event and ``feeder_identity_changed``.
 
 crc32 is forgeable, so a match shows the report is consistent, not who sent it. Hence rows 4 and 7.
@@ -130,6 +131,12 @@ def _belongs_to_someone_else(observed: Optional[ObservedNode], owner_id) -> bool
     if observed.claimed_by_id is not None and observed.claimed_by_id != owner_id:
         return True
     return NodeOwnerClaim.objects.filter(node=observed, accepted_at__isnull=False).exclude(user_id=owner_id).exists()
+
+
+def _reversed_by_hand(node, num: int) -> bool:
+    """True when the feeder's newest manual re-point moved it away from ``num``."""
+    newest = node.identity_events.filter(outcome=Outcome.MANUAL).order_by("-created_at", "-id").first()
+    return newest is not None and newest.old_meshtastic_node_id == num
 
 
 def _flag(node, *, old_num, new_num, key_hex, reason, now):
@@ -280,7 +287,7 @@ def apply_reported_identity(
         return flag(Reason.KEY_MISMATCH)
     if _belongs_to_someone_else(target, node.owner_id):
         return flag(Reason.NUMBER_COLLISION)
-    if not getattr(settings, "MESHTASTIC_FEEDER_AUTO_REKEY", False):
+    if not getattr(settings, "MESHTASTIC_FEEDER_AUTO_REKEY", False) or _reversed_by_hand(node, reported_node_num):
         return flag(Reason.AUTO_REKEY_DISABLED)
     return _apply(node, old_num=old_num, new_num=reported_node_num, key_hex=key_hex, now=now)
 

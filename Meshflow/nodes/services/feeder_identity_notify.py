@@ -37,7 +37,7 @@ _REASON_TEXT = {
     Reason.KEY_MISMATCH: "the reported public key differs from the stored one",
     Reason.SHARED_KEY: "another node uses the same public key",
     Reason.NUMBER_COLLISION: "another feeder already has that number",
-    Reason.AUTO_REKEY_DISABLED: "automatic updates are off on this server",
+    Reason.AUTO_REKEY_DISABLED: "automatic updates are off on this server, or this number was reversed by hand",
 }
 
 

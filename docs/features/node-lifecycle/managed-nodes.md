@@ -56,7 +56,7 @@ A Meshtastic 2.8 feeder's node number is the `crc32` of its public key, so it ch
 ### What the owner sees
 
 - **Automatic change** (`auto_updated`): a Discord DM, if the owner has a verified Discord target (see [Discord notifications](../discord/notifications.md)): "Your feeder <name> changed node number: !old is now !new. It keeps its history and API key. Nothing to do." Without a verified target the DM is skipped and an audit row says so.
-- **Flagged change** (`flagged`): a DM naming the reason ("Your feeder <name> reported node number !new but is stored as !old, and it could not be updated automatically (<reason>). Ingest continues. Open My Nodes to review it."). When the reason is `auto_rekey_disabled`, the text says automatic updates are off on this server. A repeat of the same flagged change writes no new event. Different flagged changes are still written as events, but the DM is limited to one per feeder every 24 hours, so a feeder flapping between numbers cannot send one per report.
+- **Flagged change** (`flagged`): a DM naming the reason ("Your feeder <name> reported node number !new but is stored as !old, and it could not be updated automatically (<reason>). Ingest continues. Open My Nodes to review it."). When the reason is `auto_rekey_disabled`, the text says automatic updates are off on this server, or that the number was reversed by hand. A repeat of the same flagged change writes no new event. Different flagged changes are still written as events, but the DM is limited to one per feeder every 24 hours, so a feeder flapping between numbers cannot send one per report.
 - `manual` and `key_changed` events are never sent as a DM; `key_changed` is an audit row only.
 - DMs are sent from a Celery task queued after the event commits, so a slow or failed DM never affects the re-key or the feeder's request.
 
@@ -67,6 +67,8 @@ A Meshtastic 2.8 feeder's node number is the `crc32` of its public key, so it ch
 For a flagged feeder, the owner (or staff) calls `POST /api/nodes/managed-nodes/{internal_id}/repoint-meshtastic-id/`. The body `{"meshtastic_node_id": <int>}` is optional; the default is the number the feeder last reported. It works whether or not `MESHTASTIC_FEEDER_AUTO_REKEY` is on, because a person is deciding. The feeder keeps its row, history and API key; the number is updated, a `manual` event is written (acknowledged by the caller) and open flagged events are resolved.
 
 An owner can only move a feeder to the number it last reported, and only when `crc32` of the feeder's trusted stored key gives that number (the same trust rule as the automatic re-key: the key is stored, and was not first recorded from a report in the last hour). So a radio that kept its key and moved to the 2.8 number can be accepted by its owner; a radio with a new key, or a number that key does not prove, needs staff. Any other explicit number, including the old number to reverse a re-key, is staff only.
+
+A manual reversal holds. While the radio still reports the number the feeder was moved away from, the automatic re-key flags (`auto_rekey_disabled`) instead of applying, even with the setting on. Any later manual re-point lifts the hold, including an owner accepting that number.
 
 A re-point never claims an `ObservedNode`: an existing row keeps whatever claim it has, and a missing row is created unclaimed. Claims still go through the claim flow. The public key is taken from the open flagged event that reported the same number only when staff re-point; an owner's re-point keeps the stored key.
 

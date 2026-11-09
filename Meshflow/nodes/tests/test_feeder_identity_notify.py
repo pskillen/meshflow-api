@@ -11,7 +11,7 @@ import nodes.tests.conftest  # noqa: F401
 from common.meshtastic_identity import normalise_pubkey
 from nodes.models import ManagedNodeIdentityEvent
 from nodes.services.feeder_identity import apply_reported_identity, repoint_feeder
-from nodes.services.feeder_identity_notify import _flagged_dm_cooldown_key, notify_owner
+from nodes.services.feeder_identity_notify import _flagged_dm_cooldown_key, build_message, notify_owner
 from nodes.tasks import notify_feeder_identity_event
 from push_notifications.constants import DiscordNotificationFeature, DiscordNotificationKind, DiscordNotificationStatus
 from push_notifications.discord import DiscordSendError
@@ -262,3 +262,9 @@ def test_auto_updated_dm_is_not_limited_by_flagged_cooldown(feeder):
         assert notify_owner(_event(feeder, Outcome.FLAGGED, Reason.CRC_MISMATCH)) is True
         assert notify_owner(_event(feeder, Outcome.AUTO_UPDATED)) is True
     assert send_dm.call_count == 2
+
+
+@pytest.mark.django_db
+def test_auto_rekey_disabled_text_covers_a_reversal(feeder):
+    text = build_message(_event(feeder, Outcome.FLAGGED, Reason.AUTO_REKEY_DISABLED))
+    assert "reversed by hand" in text

@@ -15,6 +15,7 @@ import nodes.tests.conftest  # noqa: F401
 from common.meshtastic_identity import key_node_id, normalise_pubkey
 from common.protocol import Protocol
 from nodes.models import ManagedNodeIdentityEvent, ObservedNode
+from nodes.services.feeder_identity import apply_reported_identity
 from nodes.signals import feeder_identity_changed
 
 Outcome = ManagedNodeIdentityEvent.Outcome
@@ -256,6 +257,45 @@ def test_staff_can_reverse_a_rekey(feeder, owner, staff):
         (OLD_NUM, NEW_NUM),
         (NEW_NUM, OLD_NUM),
     ]
+
+
+def _reverse_by_staff(feeder, staff):
+    client = _client(staff)
+    assert client.post(_repoint_url(feeder), {"meshtastic_node_id": NEW_NUM}, format="json").status_code == 200
+    assert client.post(_repoint_url(feeder), {"meshtastic_node_id": OLD_NUM}, format="json").status_code == 200
+    feeder.refresh_from_db()
+
+
+@pytest.mark.django_db
+def test_reversal_holds_while_radio_reports_the_reversed_number(feeder, staff, settings):
+    settings.MESHTASTIC_FEEDER_AUTO_REKEY = True
+    _reverse_by_staff(feeder, staff)
+    event = apply_reported_identity(feeder, reported_node_num=NEW_NUM, reported_pubkey=KEY_HEX)
+    assert (event.outcome, event.reason) == (Outcome.FLAGGED, Reason.AUTO_REKEY_DISABLED)
+    feeder.refresh_from_db()
+    assert feeder.meshtastic_node_id == OLD_NUM
+    assert apply_reported_identity(feeder, reported_node_num=NEW_NUM, reported_pubkey=KEY_HEX) is None
+
+
+@pytest.mark.django_db
+def test_owner_can_accept_a_held_number_by_hand(feeder, owner, staff, settings):
+    settings.MESHTASTIC_FEEDER_AUTO_REKEY = True
+    _reverse_by_staff(feeder, staff)
+    assert _client(owner).post(_repoint_url(feeder), {}, format="json").status_code == 200
+    feeder.refresh_from_db()
+    assert feeder.meshtastic_node_id == NEW_NUM
+
+
+@pytest.mark.django_db
+def test_later_manual_repoint_lifts_the_hold(feeder, staff, settings):
+    settings.MESHTASTIC_FEEDER_AUTO_REKEY = True
+    _reverse_by_staff(feeder, staff)
+    response = _client(staff).post(_repoint_url(feeder), {"meshtastic_node_id": 0x12345678}, format="json")
+    assert response.status_code == 200
+    feeder.refresh_from_db()
+    event = apply_reported_identity(feeder, reported_node_num=NEW_NUM, reported_pubkey=KEY_HEX)
+    assert event.outcome == Outcome.AUTO_UPDATED
+    assert feeder.meshtastic_node_id == NEW_NUM
 
 
 @pytest.mark.django_db

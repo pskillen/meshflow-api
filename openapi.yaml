@@ -6742,7 +6742,8 @@ paths:
         a re-key, is staff only. Not gated by the automatic re-key setting: a person is deciding. Never claims an
         ObservedNode; a missing one is created unclaimed. When staff re-point and an open flagged event reported the
         same number, its public key becomes the stored key. Open flagged events are resolved and a `manual` identity
-        event is written (already acknowledged by the caller).
+        event is written (already acknowledged by the caller). A reversal holds: while the radio still reports the number
+        the feeder was moved away from, automatic re-key flags it instead of applying it, until a later manual re-point.
       tags: [Nodes]
       security:
         - BearerAuth: []
