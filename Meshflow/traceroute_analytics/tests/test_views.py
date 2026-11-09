@@ -318,6 +318,72 @@ class TestTracerouteStats:
         assert row_b["completed"] == 0
         assert row_b["failed"] == 1
 
+    def _make_tr(self, create_auto_traceroute, mn, on, user, st, when):
+        tr = create_auto_traceroute(source_node=mn, target_node=on, triggered_by=user, status=st)
+        AutoTraceRoute.objects.filter(pk=tr.pk).update(triggered_at=when)
+
+    def test_success_over_time_default_has_no_bucket_start(self, api_client, create_user):
+        api_client.force_authenticate(user=create_user())
+        resp = api_client.get("/api/traceroutes/stats/")
+        assert resp.status_code == 200
+        rows = resp.json()["success_over_time"]
+        assert len(rows) == 14
+        assert set(rows[0]) == {"date", "completed", "failed"}
+        assert api_client.get("/api/traceroutes/stats/", {"bucket": "1d"}).json()["success_over_time"] == rows
+
+    def test_success_over_time_hourly_zero_fill_and_counts(
+        self, api_client, create_user, create_managed_node, create_observed_node, create_auto_traceroute
+    ):
+        user = create_user()
+        mn_a = create_managed_node(meshtastic_node_id=888_888_811)
+        mn_b = create_managed_node(meshtastic_node_id=888_888_812)
+        on = create_observed_node()
+        hour = timezone.now().replace(minute=0, second=0, microsecond=0)
+        after = hour - timedelta(hours=5) + timedelta(minutes=10)
+        args = (create_auto_traceroute, mn_a, on, user)
+        self._make_tr(*args, AutoTraceRoute.STATUS_COMPLETED, hour - timedelta(hours=2) + timedelta(minutes=5))
+        self._make_tr(*args, AutoTraceRoute.STATUS_COMPLETED, hour - timedelta(hours=2) + timedelta(minutes=50))
+        self._make_tr(*args, AutoTraceRoute.STATUS_FAILED, hour - timedelta(hours=2) + timedelta(minutes=20))
+        self._make_tr(create_auto_traceroute, mn_b, on, user, AutoTraceRoute.STATUS_FAILED, hour)
+        self._make_tr(*args, AutoTraceRoute.STATUS_PENDING, hour - timedelta(hours=1))
+
+        resp = api_client.get("/api/traceroutes/stats/", {"bucket": "1h", "triggered_at_after": after.isoformat()})
+        assert resp.status_code == 200
+        rows = resp.json()["success_over_time"]
+        assert len(rows) == 6  # hour-5 .. hour, inclusive
+        assert rows[0]["bucket_start"] == (hour - timedelta(hours=5)).isoformat()
+        assert rows[-1]["bucket_start"] == hour.isoformat()
+        by_start = {r["bucket_start"]: r for r in rows}
+        h2 = by_start[(hour - timedelta(hours=2)).isoformat()]
+        assert (h2["completed"], h2["failed"]) == (2, 1)
+        assert h2["date"] == (hour - timedelta(hours=2)).date().isoformat()
+        assert by_start[hour.isoformat()]["failed"] == 1
+        assert sum(r["completed"] + r["failed"] for r in rows) == 4  # pending ignored
+        assert by_start[(hour - timedelta(hours=1)).isoformat()]["completed"] == 0
+
+        resp_a = api_client.get(
+            "/api/traceroutes/stats/",
+            {"bucket": "1h", "triggered_at_after": after.isoformat(), "source_node": str(mn_a.meshtastic_node_id)},
+        )
+        rows_a = resp_a.json()["success_over_time"]
+        assert len(rows_a) == 6
+        assert sum(r["failed"] for r in rows_a) == 1
+        assert rows_a[-1]["failed"] == 0
+
+    def test_success_over_time_hourly_defaults_to_24_hours(self, api_client, create_user):
+        api_client.force_authenticate(user=create_user())
+        resp = api_client.get("/api/traceroutes/stats/", {"bucket": "1h"})
+        assert resp.status_code == 200
+        assert len(resp.json()["success_over_time"]) == 25
+
+    def test_success_over_time_hourly_rejects_long_window_and_bad_bucket(self, api_client, create_user):
+        api_client.force_authenticate(user=create_user())
+        old = (timezone.now() - timedelta(days=8)).isoformat()
+        assert api_client.get("/api/traceroutes/stats/", {"bucket": "1h", "triggered_at_after": old}).status_code == 400
+        ok = (timezone.now() - timedelta(days=6)).isoformat()
+        assert api_client.get("/api/traceroutes/stats/", {"bucket": "1h", "triggered_at_after": ok}).status_code == 200
+        assert api_client.get("/api/traceroutes/stats/", {"bucket": "6h"}).status_code == 400
+
     def test_by_strategy_split_for_external_trigger_type(
         self,
         api_client,

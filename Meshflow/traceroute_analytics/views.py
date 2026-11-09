@@ -8,7 +8,7 @@ from collections import Counter
 from datetime import timedelta
 
 from django.db.models import CharField, Count, Q, Value
-from django.db.models.functions import Coalesce, TruncDate
+from django.db.models.functions import Coalesce, TruncDate, TruncHour
 from django.utils import timezone
 
 from rest_framework import status
@@ -20,6 +20,10 @@ from common.mesh_node_helpers import MESHTASTIC_BROADCAST_ID
 from common.throttling import GUEST_EXPENSIVE_THROTTLE_CLASSES
 from nodes.models import ManagedNode, ObservedNode
 from traceroute.models import AutoTraceRoute
+
+BUCKET_HOUR = "1h"
+BUCKET_DAY = "1d"
+HOURLY_MAX_WINDOW = timedelta(days=7)
 
 
 def _route_hop_node_id(entry) -> int | None:
@@ -373,11 +377,16 @@ def constellation_coverage(request):
 def traceroute_stats(request):
     """Traceroute statistics: sources, success/failure, top routers, by source, success over time.
 
-    Optional query params: triggered_at_after, source_node (managed mesh node_id, same as list).
+    Optional query params: triggered_at_after, source_node (managed mesh node_id, same as list),
+    bucket (``1d`` default, or ``1h``).
     ``success_over_time`` is one row per calendar day from ``triggered_at_after`` (date) through
     today (default window when omitted: last 14 days), using the same ``qs`` filters as other aggregates.
     ``by_strategy`` includes all trigger types; ``by_strategy_excluding_external`` omits external
     mesh reports for success-rate style breakdowns (no hypothesis).
+
+    With ``bucket=1h``, ``success_over_time`` is instead one row per UTC hour from the hour containing
+    ``triggered_at_after`` (default window when omitted: last 24 hours) through the current hour; rows carry
+    ``bucket_start`` (ISO 8601 UTC) as well as ``date``. Windows longer than ``HOURLY_MAX_WINDOW`` get a 400.
     """
     from django.utils.dateparse import parse_datetime
 
@@ -388,6 +397,18 @@ def traceroute_stats(request):
         dt = parse_datetime(request.query_params["triggered_at_after"])
         if dt:
             triggered_after = dt
+
+    bucket = request.query_params.get("bucket", BUCKET_DAY)
+    if bucket not in (BUCKET_HOUR, BUCKET_DAY):
+        return Response(
+            {"detail": f"Invalid bucket {bucket!r}; expected one of: {BUCKET_HOUR}, {BUCKET_DAY}."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    if bucket == BUCKET_HOUR and triggered_after and timezone.now() - triggered_after > HOURLY_MAX_WINDOW:
+        return Response(
+            {"detail": "bucket=1h supports windows of at most 7 days; use bucket=1d for longer windows."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
 
     qs = AutoTraceRoute.objects.all()
     if triggered_after:
@@ -531,15 +552,20 @@ def traceroute_stats(request):
         )
     by_target.sort(key=lambda x: (-x["total"], x["node_id_str"]))
 
-    # Daily completed/failed counts over the same window as ``qs`` (triggered_at_after + source_node).
-    end_date = timezone.now().date()
-    if triggered_after:
-        start_date = timezone.localtime(triggered_after).date()
+    if bucket == BUCKET_HOUR:
+        now = timezone.now()
+        hourly_start = triggered_after if triggered_after else now - timedelta(hours=24)
+        success_over_time = _success_over_time_hourly(qs, hourly_start, now)
     else:
-        start_date = end_date - timedelta(days=13)
-    if start_date > end_date:
-        start_date = end_date
-    success_over_time = _success_over_time_daily(qs, start_date, end_date)
+        # Daily completed/failed counts over the same window as ``qs`` (triggered_at_after + source_node).
+        end_date = timezone.now().date()
+        if triggered_after:
+            start_date = timezone.localtime(triggered_after).date()
+        else:
+            start_date = end_date - timedelta(days=13)
+        if start_date > end_date:
+            start_date = end_date
+        success_over_time = _success_over_time_daily(qs, start_date, end_date)
 
     return Response(
         {
@@ -553,6 +579,45 @@ def traceroute_stats(request):
             "by_strategy_excluding_external": by_strategy_excluding_external,
         }
     )
+
+
+def _success_over_time_hourly(qs, start, end):
+    """Return [{date, bucket_start, completed, failed}, ...] for each UTC hour from start's hour through end's hour.
+
+    ``date`` is the UTC calendar date of the hour (kept so clients written for the daily shape still parse rows).
+    ``qs`` already carries the time window and ``source_node`` filters; the first bucket is floored to the hour
+    but only counts rows from ``triggered_at_after`` onwards.
+    """
+    from datetime import timezone as dt_timezone
+
+    first = start.astimezone(dt_timezone.utc).replace(minute=0, second=0, microsecond=0)
+    last = end.astimezone(dt_timezone.utc).replace(minute=0, second=0, microsecond=0)
+
+    result = {}
+    h = first
+    while h <= last:
+        result[h] = {"date": h.date().isoformat(), "bucket_start": h.isoformat(), "completed": 0, "failed": 0}
+        h += timedelta(hours=1)
+
+    agg_rows = (
+        qs.filter(
+            triggered_at__gte=first,
+            triggered_at__lt=last + timedelta(hours=1),
+            status__in=[AutoTraceRoute.STATUS_COMPLETED, AutoTraceRoute.STATUS_FAILED],
+        )
+        .annotate(hour=TruncHour("triggered_at", tzinfo=dt_timezone.utc))
+        .values("hour", "status")
+        .annotate(count=Count("id"))
+    )
+    for row in agg_rows:
+        bucket_row = result.get(row["hour"])
+        if bucket_row is None:
+            continue
+        if row["status"] == AutoTraceRoute.STATUS_COMPLETED:
+            bucket_row["completed"] += row["count"]
+        elif row["status"] == AutoTraceRoute.STATUS_FAILED:
+            bucket_row["failed"] += row["count"]
+    return list(result.values())
 
 
 def _success_over_time_daily(qs, start_date, end_date):
