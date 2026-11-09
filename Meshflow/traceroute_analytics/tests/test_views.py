@@ -346,6 +346,9 @@ class TestTracerouteStats:
         self._make_tr(*args, AutoTraceRoute.STATUS_FAILED, hour - timedelta(hours=2) + timedelta(minutes=20))
         self._make_tr(create_auto_traceroute, mn_b, on, user, AutoTraceRoute.STATUS_FAILED, hour)
         self._make_tr(*args, AutoTraceRoute.STATUS_PENDING, hour - timedelta(hours=1))
+        # First bucket is partial: a row before ``after`` is excluded, one after it is counted.
+        self._make_tr(*args, AutoTraceRoute.STATUS_COMPLETED, hour - timedelta(hours=5) + timedelta(minutes=5))
+        self._make_tr(*args, AutoTraceRoute.STATUS_COMPLETED, hour - timedelta(hours=5) + timedelta(minutes=30))
 
         resp = api_client.get("/api/traceroutes/stats/", {"bucket": "1h", "triggered_at_after": after.isoformat()})
         assert resp.status_code == 200
@@ -358,7 +361,8 @@ class TestTracerouteStats:
         assert (h2["completed"], h2["failed"]) == (2, 1)
         assert h2["date"] == (hour - timedelta(hours=2)).date().isoformat()
         assert by_start[hour.isoformat()]["failed"] == 1
-        assert sum(r["completed"] + r["failed"] for r in rows) == 4  # pending ignored
+        assert (rows[0]["completed"], rows[0]["failed"]) == (1, 0)  # only the row at +30min
+        assert sum(r["completed"] + r["failed"] for r in rows) == 5  # pending and pre-``after`` row ignored
         assert by_start[(hour - timedelta(hours=1)).isoformat()]["completed"] == 0
 
         resp_a = api_client.get(
