@@ -6,6 +6,7 @@ from channels.routing import URLRouter
 from channels.testing import WebsocketCommunicator
 
 import Meshflow.routing  # noqa: F401
+from common.meshtastic_identity import normalise_pubkey
 from common.protocol import Protocol
 from nodes.models import ManagedNode, NodeAuth
 from nodes.services.feeder_identity import apply_reported_identity
@@ -32,7 +33,9 @@ async def test_ws_follows_rekey(settings, create_managed_node, create_node_api_k
 
     @database_sync_to_async
     def setup():
-        node = create_managed_node(meshtastic_node_id=OLD_NUM, protocol=Protocol.MESHTASTIC)
+        node = create_managed_node(
+            meshtastic_node_id=OLD_NUM, protocol=Protocol.MESHTASTIC, meshtastic_public_key=normalise_pubkey(KEY_B64)
+        )
         api_key = create_node_api_key(owner=node.owner, constellation=node.constellation)
         NodeAuth.objects.create(api_key=api_key, node=node)
         return node.pk, api_key.key
