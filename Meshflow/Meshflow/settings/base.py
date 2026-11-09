@@ -166,6 +166,8 @@ NEO4J_PASSWORD = os.environ.get("NEO4J_PASSWORD", "neo4j")
 _celery_broker_url = f"redis://:{_redis_password}@{_redis_host}:{_redis_port}/1"
 CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", _celery_broker_url)
 CELERY_RESULT_BACKEND = CELERY_BROKER_URL
+# A broker that silently drops packets must not hang a request that publishes a task.
+CELERY_BROKER_TRANSPORT_OPTIONS = {"socket_connect_timeout": 2}
 # Shorter than Celery default (~24h) to limit celery-task-meta-* growth on Redis DB 1.
 CELERY_RESULT_EXPIRES = int(os.environ.get("CELERY_RESULT_EXPIRES", "3600"))
 CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
@@ -329,6 +331,14 @@ PACKET_DEDUP_WINDOW_MINUTES = int(os.environ.get("PACKET_DEDUP_WINDOW_MINUTES", 
 # Meshtastic 2.8 connect-time replay: flag packets by shape (no rxRssi, TRANSPORT_LORA, BACKGROUND, not the
 # feeder's own). Off = only the body "replayed" flag counts. See docs/features/packet-ingestion/meshtastic.md.
 MESHTASTIC_REPLAY_SHAPE_DETECTION = os.environ.get("MESHTASTIC_REPLAY_SHAPE_DETECTION", "true").strip().lower() in (
+    "1",
+    "true",
+    "yes",
+    "on",
+)
+# Meshtastic 2.8: re-point a feeder's ManagedNode when it reports a new node number backed by a matching public key
+# (v4 feeder URLs only). Off = a provable change is recorded as a flagged event and nothing is changed.
+MESHTASTIC_FEEDER_AUTO_REKEY = os.environ.get("MESHTASTIC_FEEDER_AUTO_REKEY", "false").strip().lower() in (
     "1",
     "true",
     "yes",

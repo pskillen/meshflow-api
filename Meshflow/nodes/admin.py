@@ -30,7 +30,15 @@ from meshcore_packets.services.channel_apply import apply_mc_channels_to_feeder
 
 from .api_key_linking import API_KEY_ALREADY_LINKED_CODE, API_KEY_ALREADY_LINKED_MESSAGE
 from .managed_node_bootstrap import ensure_observed_node_for_managed_node, find_matching_observed_node
-from .models import ManagedNode, ManagedNodeStatus, NodeAPIKey, NodeAuth, NodeLatestStatus, ObservedNode
+from .models import (
+    ManagedNode,
+    ManagedNodeIdentityEvent,
+    ManagedNodeStatus,
+    NodeAPIKey,
+    NodeAuth,
+    NodeLatestStatus,
+    ObservedNode,
+)
 
 
 class ManagedNodeActiveFilter(admin.SimpleListFilter):
@@ -815,6 +823,36 @@ class ManagedNodeStatusAdmin(admin.ModelAdmin):
         return False
 
     def has_change_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(ManagedNodeIdentityEvent)
+class ManagedNodeIdentityEventAdmin(admin.ModelAdmin):
+    list_display = (
+        "created_at",
+        "managed_node",
+        "old_meshtastic_node_id",
+        "new_meshtastic_node_id",
+        "outcome",
+        "reason",
+        "resolved_at",
+        "acknowledged_at",
+    )
+    list_select_related = ("managed_node",)
+    list_filter = ("outcome", "reason")
+    search_fields = ("managed_node__name", "old_meshtastic_node_id", "new_meshtastic_node_id")
+    date_hierarchy = "created_at"
+
+    def get_readonly_fields(self, request, obj=None):
+        return [field.name for field in self.model._meta.fields]
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
         return False
 
 

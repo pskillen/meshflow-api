@@ -3,6 +3,7 @@
 from unittest.mock import patch
 
 import pytest
+import requests
 
 from push_notifications.constants import (
     DiscordNotificationFeature,
@@ -126,3 +127,22 @@ def test_record_discord_notification_skip_swallows_db_error(create_user):
             reason="r",
         )
     assert out is None
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("error", [requests.Timeout("slow"), requests.ConnectionError("down")])
+def test_network_error_from_discord_writes_failed_audit(error, create_user, settings):
+    settings.DISCORD_BOT_TOKEN = "token"
+    user = create_user()
+    with patch("push_notifications.discord.requests.post", side_effect=error):
+        with pytest.raises(DiscordSendError):
+            send_discord_dm_with_audit(
+                feature=DiscordNotificationFeature.NODE_WATCH,
+                kind=DiscordNotificationKind.NODE_OFFLINE,
+                user=user,
+                discord_user_id="snowflake",
+                content="body text",
+            )
+    row = DiscordNotificationAudit.objects.get()
+    assert row.status == DiscordNotificationStatus.FAILED
+    assert type(error).__name__ in row.reason
