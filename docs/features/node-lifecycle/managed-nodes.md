@@ -49,6 +49,10 @@ Managed-node mutation and removal permissions are:
 - Constellation admins are not system admins for managed-node removal.
 - Removing managed-node status does not unclaim the observed node.
 
+## Node number changes (2.8)
+
+A Meshtastic 2.8 feeder's node number is the `crc32` of its public key, so it changes on a firmware upgrade or re-key. On v4 feeder URLs the API re-points the feeder's `ManagedNode.meshtastic_node_id` (same row, same history) when the feeder reports the new number with a public key that proves it, and records a `ManagedNodeIdentityEvent` either way (applied, or flagged with a reason). Anything unprovable (no key, a key that does not match, a key shared with other nodes, a number already taken) is flagged and left alone, and ingest is never affected. It is behind `MESHTASTIC_FEEDER_AUTO_REKEY`; the decision table is in [Meshtastic packet ingestion](../packet-ingestion/meshtastic.md#feeder-number-change-auto-re-key).
+
 ## Deleted Managed Nodes
 
 When a managed node is removed, the row should be soft-deleted rather than hard-deleted so historical references remain intact. A soft-deleted managed node should not appear in normal managed-node lists, maps, traceroute source selection, statistics, or monitoring views.

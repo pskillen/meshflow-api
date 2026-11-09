@@ -233,6 +233,22 @@ In Meshtastic 2.8 a node's number is `crc32` of its 32-byte public key, and an u
 - Django admin: the observed and managed node lists show the predicted id, can be filtered by whether one exists, and search matches `!<predicted id>` or the start of the hex key.
 - **Confirmed on hardware (2026-11-08):** `zlib.crc32` equals the firmware's value (see the runbook). The worked example is the NodeInfo in `docs/packets/nodeinfo_packet.json`: `!da545c78` predicts `!4396524c`. The prediction drives the inferred firmware generation: see [inferred-firmware.md](inferred-firmware.md).
 
+### Feeder number change (auto re-key)
+
+A 2.8 firmware upgrade or re-key changes a feeder's node number. v4 feeder URLs keep ingesting (the API key identifies the feeder); `nodes/services/feeder_identity.py` then keeps `ManagedNode.meshtastic_node_id` in step. The bot sends `X-Meshtastic-Feeder-Node-Num` and `X-Meshtastic-Feeder-Pubkey` (the `bot-version` body fields `meshtastic_node_num` and `meshtastic_public_key` also work). When the reported number is (re)written (on a change, and at most every 10 minutes), a **v4** request runs the decision table below; legacy URLs never re-key. Every row except the last leaves the feeder untouched and writes one `ManagedNodeIdentityEvent` (`outcome=flagged`, with the reason); a repeat with the same number, key and reason writes nothing, and a flagged row is resolved when a later report changes the verdict or the number is back to normal.
+
+| # | Check | Result |
+| --- | --- | --- |
+| 1 | No public key reported | flagged `key_not_reported` |
+| 2 | `crc32(key)` is not the reported number | flagged `crc_mismatch` (on a 2.7 radio the number comes from the MAC, so this usually means a config copied to another radio) |
+| 3 | A stored feeder key differs from the reported one | flagged `key_mismatch` (a blank stored key passes: trust on first use) |
+| 4 | Another node holds the key: an `ObservedNode` with that key and a number that is neither the old nor the new one, or another active `ManagedNode` | flagged `shared_key` (keys are not unique; a crc32 match on a cloned key proves nothing) |
+| 5 | Another active Meshtastic feeder already has the reported number | flagged `number_collision` |
+| 6 | `MESHTASTIC_FEEDER_AUTO_REKEY` is off | flagged `auto_rekey_disabled` |
+| 7 | Otherwise | applied: number, key and key-node-id updated atomically (`select_for_update`; a unique-constraint race becomes `number_collision`), `auto_updated` event, `ensure_observed_node_for_managed_node`, then the `nodes.signals.feeder_identity_changed` signal |
+
+When the number is unchanged: open flagged events are resolved, a blank stored key is filled silently, and a different key is stored with a `key_changed` event (not gated by the flag). A downgrade to 2.7 keeps the number and key, so it reports no change. Metric: `meshflow_feeder_identity_changes_total{protocol, outcome}`.
+
 ### Identity data is not clobbered by 2.8 feeder NodeDB entries
 
 2.8 feeders hand the bot NodeDB entries with a zero-filled `macaddr` and a long name cut to 24 bytes (firmware `TypeConversions.cpp`). The node upsert (`BaseNodeSerializer.create/update`) and `NodeInfoPacketService` both pass incoming values through `common.meshtastic_identity.protect_identity`, which drops:
