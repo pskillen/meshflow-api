@@ -3,7 +3,6 @@
 from datetime import datetime
 from types import SimpleNamespace
 
-from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 

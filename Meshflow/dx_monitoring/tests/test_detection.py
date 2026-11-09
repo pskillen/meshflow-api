@@ -676,7 +676,6 @@ def test_traceroute_skips_hop_when_relay_has_no_position(
     assert not evs.filter(destination=relay_no_pos).exists()
 
 
-
 @pytest.mark.django_db
 @override_settings(
     DX_MONITORING_DETECTION_ENABLED=True,
