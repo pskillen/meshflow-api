@@ -26,6 +26,7 @@ from packets.models import MtRawPacket, PacketObservation
 
 from .models import StatsSnapshot
 from .serializers import GlobalStatsSerializer, NeighbourStatsSerializer, NodeStatsSerializer, StatsSnapshotSerializer
+from .snapshot_rollup import DAILY_STAT_TYPES, FLOW_STAT_TYPES, GAUGE_STAT_TYPES, SUPPORTED_BUCKETS, rollup_daily
 
 
 def parse_stats_params(request) -> Tuple[Optional[datetime], Optional[datetime], int, str]:
@@ -561,9 +562,29 @@ def stats_snapshots_list(request):
     """
     List stored stats snapshots with optional filters.
 
-    Query params: stat_type, constellation_id, recorded_at_after, recorded_at_before
+    Query params: stat_type, constellation_id, recorded_at_after, recorded_at_before, bucket
+
+    ``bucket=1d`` (requires ``stat_type``) returns one row per UTC day and constellation,
+    computed at request time from the hourly rows: gauges (``online_nodes``) are averaged,
+    flows (``packet_volume``, ``new_nodes``) are summed, daily types pass through unchanged.
     """
     from rest_framework.pagination import PageNumberPagination
+
+    bucket = request.query_params.get("bucket")
+    bucket_stat_type = request.query_params.get("stat_type")
+    if bucket:
+        if bucket not in SUPPORTED_BUCKETS:
+            return Response(
+                {"detail": f"Unsupported bucket '{bucket}'. Supported: {', '.join(SUPPORTED_BUCKETS)}."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not bucket_stat_type:
+            return Response({"detail": "stat_type is required with bucket."}, status=status.HTTP_400_BAD_REQUEST)
+        if bucket_stat_type not in (DAILY_STAT_TYPES | GAUGE_STAT_TYPES | FLOW_STAT_TYPES):
+            return Response(
+                {"detail": f"stat_type '{bucket_stat_type}' cannot be bucketed."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
     qs = StatsSnapshot.objects.all().order_by("-recorded_at")
 
@@ -593,7 +614,12 @@ def stats_snapshots_list(request):
     paginator.page_size = 100
     paginator.page_size_query_param = "page_size"
     paginator.max_page_size = 1000
-    page = paginator.paginate_queryset(qs, request)
+
+    if bucket and bucket_stat_type not in DAILY_STAT_TYPES:
+        rolled = rollup_daily(bucket_stat_type, qs.values_list("recorded_at", "constellation_id", "value"))
+        page = paginator.paginate_queryset(rolled, request)
+    else:
+        page = paginator.paginate_queryset(qs, request)
 
     serializer = StatsSnapshotSerializer(page, many=True)
     return paginator.get_paginated_response(serializer.data)
