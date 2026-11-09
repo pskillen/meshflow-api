@@ -48,6 +48,10 @@ When **`NodeMonitoringConfig.battery_alert_enabled`** is true, consecutive low *
 
 If the deadline passes without success, **`NodePresence.offline_confirmed_at`** is set, **`verification_started_at`** is cleared, and **watchers** are notified (deduped per user). **Discord** delivery uses **`push_notifications.discord.send_dm`** and the same verified-user rules as the test endpoint ([Discord notifications](../discord/notifications.md)).
 
+### How long silence counts as offline
+
+The silence threshold is not always 6 h. A threshold the owner set on **`NodeMonitoringConfig`** wins; otherwise a daily task (**`update_learned_offline_thresholds`**, 03:30 UTC) learns one per watched Meshtastic node from its own cadence (3 x the p90 gap between its packets over the last 7 days, between 6 h and 48 h, **`NodePresence.learned_offline_after_seconds`**); otherwise a 2.8 node gets 12 h and everything else 6 h. This stops a 2.8 node that sends only NodeInfo every few hours being called offline. Offline alerts for such nodes can wait up to 48 h. `last_heard` only moves forward, so a late or badly clocked upload cannot make a node look silent. Details: [Recency](../../RECENCY.md).
+
 ### Recovery
 
 Any packet that advances **`last_heard`** should clear **`offline_confirmed_at`** and **`verification_started_at`** on **`NodePresence`** (via a small hook from packet processing into **`mesh_monitoring.services`**). The node is then treated as **online** again for monitoring purposes.

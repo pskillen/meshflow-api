@@ -190,6 +190,20 @@ class NodePresence(models.Model):
         help_text=_("When battery last recovered above threshold."),
     )
 
+    learned_offline_after_seconds = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text=_(
+            "Silence threshold learned from this node's own packet cadence (3 x p90 of recent gaps, "
+            "clamped to 6 h - 48 h); null when there is too little history. Written daily."
+        ),
+    )
+    learned_offline_computed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text=_("When learned_offline_after_seconds was last computed."),
+    )
+
     class Meta:
         verbose_name = _("Node presence (mesh monitoring)")
         verbose_name_plural = _("Node presences (mesh monitoring)")
