@@ -37,23 +37,24 @@ def _effective_last_heard_offline_after_seconds(obs: ObservedNode) -> int:
     Silence threshold for one node, first match wins:
 
     1. a NodeMonitoringConfig value that differs from the default (the owner chose it);
-    2. the threshold learned from the node's own cadence (never below the default);
+    2. the threshold learned from the node's own cadence, never below the default that applies to the node
+       (12 h for a 2.8 node, else 6 h), so a learned value only ever lengthens it;
     3. 12 h for a 2.8 node (inferred firmware, or its node id is its key-derived id);
     4. the 6 h default.
     """
     cfg = NodeMonitoringConfig.objects.filter(pk=obs.pk).first()
     if cfg is not None and int(cfg.last_heard_offline_after_seconds) != DEFAULT_OFFLINE_AFTER_SECONDS:
         return int(cfg.last_heard_offline_after_seconds)
+    key_id = obs.meshtastic_key_node_id
+    is_two_eight = obs.inferred_firmware == "2.8" or (key_id is not None and key_id == obs.meshtastic_node_id)
+    default = TWO_EIGHT_DEFAULT_OFFLINE_AFTER_SECONDS if is_two_eight else DEFAULT_OFFLINE_AFTER_SECONDS
     try:
         learned = obs.mesh_presence.learned_offline_after_seconds
     except ObjectDoesNotExist:
         learned = None
     if learned:
-        return int(learned)
-    key_id = obs.meshtastic_key_node_id
-    if obs.inferred_firmware == "2.8" or (key_id is not None and key_id == obs.meshtastic_node_id):
-        return TWO_EIGHT_DEFAULT_OFFLINE_AFTER_SECONDS
-    return int(DEFAULT_OFFLINE_AFTER_SECONDS)
+        return max(int(learned), int(default))
+    return int(default)
 
 
 @shared_task(ignore_result=True)
