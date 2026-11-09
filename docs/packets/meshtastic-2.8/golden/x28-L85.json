@@ -12,7 +12,7 @@
     },
     "observation_api": {
       "direct_from_sender": false,
-      "hop_count": null,
+      "hop_count": 2,
       "replayed": false
     },
     "observed_node_created": true,
@@ -22,14 +22,16 @@
   "observation": {
     "bitfield": 0,
     "channel": 0,
-    "hop_limit": null,
+    "hop_limit": 0,
     "hop_start": 2,
     "relay_node": 180,
     "replayed": false,
     "rx_rssi": -80.0,
     "rx_snr": 5.75,
     "rx_time": "2026-11-08T13:34:52Z",
-    "rx_time_estimated": false
+    "rx_time_estimated": false,
+    "transport_mechanism": "TRANSPORT_LORA",
+    "via_mqtt": false
   },
   "observed_node": {
     "environment_exposure": 0,

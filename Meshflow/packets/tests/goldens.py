@@ -191,6 +191,8 @@ def observation_snapshot(observation: PacketObservation) -> dict:
         "rx_time": _jsonable(observation.rx_time),
         "rx_time_estimated": observation.rx_time_estimated,
         "relay_node": observation.relay_node,
+        "via_mqtt": observation.via_mqtt,
+        "transport_mechanism": observation.transport_mechanism,
         "replayed": observation.replayed,
         "channel": _channel_index(observation),
     }

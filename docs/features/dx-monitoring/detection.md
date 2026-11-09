@@ -203,6 +203,7 @@ tested against real Meshtastic packet semantics, but the reference behaviour is:
 - multi-hop observations are not eligible for packet-ingest DX detection;
 - a replayed observation (2.8 connect-time replay) is never direct and never starts a candidate: no signal is sent
   for it and `observation_is_direct` returns false;
+- a non-RF observation (`via_mqtt` or an MQTT, UDP or API transport) is never direct, as for a replay;
 - missing or ambiguous hop metadata is treated conservatively and does not open a
   packet-ingest DX event.
 
