@@ -8,6 +8,7 @@ from django.db.migrations.executor import MigrationExecutor
 from django.utils import timezone
 
 import pytest
+from rest_framework.test import APIClient
 
 from common.protocol import Protocol
 from nodes.models import NodeLatestStatus, ObservedNode, Position
@@ -126,3 +127,19 @@ def test_migration_operations_are_merge_with_noop_reverse_then_constraint():
     ops = migration.Migration.operations
     assert ops[0].reverse_code is migration.migrations.RunPython.noop
     assert ops[1].constraint.name == INDEX
+
+
+@pytest.mark.django_db
+def test_put_without_the_number_leaves_it_unchanged(django_user_model):
+    node = _mt(long_name="Before", short_name="B4")
+    client = APIClient()
+    client.force_authenticate(django_user_model.objects.create_user(username="putter", password="x"))
+
+    response = client.put(
+        f"/api/nodes/observed-nodes/{node.pk}/", {"long_name": "After", "short_name": "AFTR"}, format="json"
+    )
+
+    assert response.status_code == 200, response.content
+    node.refresh_from_db()
+    assert node.meshtastic_node_id == NODE
+    assert node.long_name == "After"
