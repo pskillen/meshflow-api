@@ -44,7 +44,9 @@ def find_matching_observed_node(managed_node: ManagedNode) -> ObservedNode | Non
 
 
 @transaction.atomic
-def ensure_observed_node_for_managed_node(managed_node: ManagedNode, *, claim: bool = True) -> tuple[ObservedNode, bool]:
+def ensure_observed_node_for_managed_node(
+    managed_node: ManagedNode, *, claim: bool = True
+) -> tuple[ObservedNode, bool]:
     """
     Ensure a matching ObservedNode exists for a ManagedNode.
 

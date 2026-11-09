@@ -31,9 +31,7 @@ DELAY = "nodes.tasks.notify_feeder_identity_event.delay"
 
 @pytest.fixture
 def feeder(create_managed_node):
-    return create_managed_node(
-        meshtastic_node_id=OLD_NUM, name="Hill", meshtastic_public_key=normalise_pubkey(KEY_B64)
-    )
+    return create_managed_node(meshtastic_node_id=OLD_NUM, name="Hill", meshtastic_public_key=normalise_pubkey(KEY_B64))
 
 
 def _event(feeder, outcome, reason=None):

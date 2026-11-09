@@ -312,7 +312,7 @@ def _valid_node_number(num) -> bool:
 
 
 def _owner_may_repoint(locked, new_number, now) -> bool:
-    """True when ``new_number`` is what the feeder last reported and crc32 of its trusted stored key gives that number."""
+    """True when ``new_number`` is the feeder's last reported number and crc32 of its trusted stored key gives it."""
     key_hex = normalise_pubkey(locked.meshtastic_public_key)
     return (
         new_number == locked.reported_meshtastic_node_id

@@ -246,9 +246,7 @@ def test_repoint_works_with_auto_rekey_off(feeder, owner, settings):
 @pytest.mark.django_db
 def test_staff_can_reverse_a_rekey(feeder, owner, staff):
     assert _client(owner).post(_repoint_url(feeder), {}, format="json").status_code == 200
-    assert (
-        _client(owner).post(_repoint_url(feeder), {"meshtastic_node_id": OLD_NUM}, format="json").status_code == 403
-    )
+    assert _client(owner).post(_repoint_url(feeder), {"meshtastic_node_id": OLD_NUM}, format="json").status_code == 403
     response = _client(staff).post(_repoint_url(feeder), {"meshtastic_node_id": OLD_NUM}, format="json")
     assert response.status_code == 200, response.data
     feeder.refresh_from_db()
