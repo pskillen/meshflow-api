@@ -75,6 +75,29 @@ we can evaluate this node's position" from ordinary repeated packets. A local
 node that receives its first position inside the cluster range remains a
 non-event.
 
+## Position Precision
+
+Meshtastic 2.8 clamps public positions to 15 bits by default (about 730 m), and
+senders can pick much coarser ones. A node's `meshtastic_precision_bits` in
+`NodeLatestStatus` says how coarse the stored position is. The uncertainty is
+half the cell size, `(2 ** (31 - bits)) * 1e-7 * 111.32` km: about 0.73 km at 15
+bits, 2.9 km at 13, 23.3 km at 10 and 46.7 km at 9. Unknown precision (null, 0, or
+32 and above) counts as exact, as before.
+
+A distance rule does not fire when the destination's uncertainty exceeds 25% of
+that rule's threshold (`MAX_UNCERTAINTY_FRACTION`), because a node known only to
+within tens of km is not evidence of DX:
+
+- `new_distant_node` compares against the cluster-distance threshold.
+- `distant_observation` compares against the direct-distance threshold.
+- `traceroute_distant_hop` compares against the hop threshold, for either end of
+  the hop. A managed source's own configured position counts as exact.
+- `returned_dx_node` does not depend on distance and is unaffected.
+
+When the uncertainty is non-zero, the event observation's metadata carries
+`uncertainty_km`. RF propagation is unaffected: it reads only the owner-entered
+RF profile coordinates, never a reported position.
+
 ## Inputs
 
 Each detection pass receives:

@@ -90,7 +90,7 @@ Position packets contain location data:
 | decoded.position.altitude       | integer   | Altitude in meters     | -                     |
 | decoded.position.time           | integer   | Position timestamp     | Unix timestamp        |
 | decoded.position.locationSource | string    | Source of location     | e.g. "LOC_MANUAL"     |
-| decoded.position.groundSpeed    | integer   | Speed in m/s           | -                     |
+| decoded.position.groundSpeed    | integer   | Speed in km/h          | -                     |
 | decoded.position.groundTrack    | integer   | Track in degrees       | 0-359                 |
 | decoded.position.precisionBits  | integer   | Position precision     | -                     |
 | decoded.position.latitude       | float     | Latitude (decimal)     | -                     |
