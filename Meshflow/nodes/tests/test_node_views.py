@@ -618,3 +618,136 @@ def test_infrastructure_list_filters_by_protocol(create_observed_node, create_us
     mc_ids = {r["node_id_str"] for r in mc_resp.data["results"]}
     assert mc.node_id_str in mc_ids
     assert mt.node_id_str not in mc_ids
+
+
+# --- Node metric history: raw and bucketed -------------------------------------------------
+
+
+def _metric_url(name, node):
+    return reverse(f"observed-node-{name.replace('_', '-')}", kwargs={"internal_id": node.internal_id})
+
+
+def _utc(day, hour, minute=0):
+    from datetime import datetime
+    from datetime import timezone as dt_tz
+
+    return datetime(2026, 3, day, hour, minute, tzinfo=dt_tz.utc)
+
+
+@pytest.fixture
+def metrics_client(create_user):
+    client = APIClient()
+    client.force_authenticate(user=create_user())
+    return client
+
+
+def _device(node, when, **kw):
+    from nodes.models import DeviceMetrics
+
+    values = dict(
+        battery_level=50, voltage=4.0, meshtastic_channel_utilization=10, meshtastic_air_util_tx=1, uptime_seconds=100
+    )
+    values.update(kw)
+    return DeviceMetrics.objects.create(node=node, reported_time=when, logged_time=when, **values)
+
+
+@pytest.mark.django_db
+def test_device_metrics_unbucketed_unchanged(create_observed_node, metrics_client):
+    node = create_observed_node()
+    _device(node, _utc(1, 1))
+    _device(node, _utc(1, 2))
+    response = metrics_client.get(_metric_url("device_metrics", node))
+    assert response.status_code == 200
+    assert len(response.data) == 2
+    assert {"id", "logged_time", "battery_level"} <= set(response.data[0])
+    assert "samples" not in response.data[0]
+
+
+@pytest.mark.django_db
+def test_metrics_bad_bucket_is_400(create_observed_node, metrics_client):
+    node = create_observed_node()
+    for name in ("device_metrics", "environment_metrics", "power_metrics"):
+        response = metrics_client.get(_metric_url(name, node), {"bucket": "2h"})
+        assert response.status_code == 400, name
+
+
+@pytest.mark.django_db
+def test_device_metrics_bucket_6h_rules(create_observed_node, metrics_client):
+    node = create_observed_node()
+    # 00:00-05:59 bucket: powered + real battery readings, uptime max, voltage mean
+    _device(node, _utc(1, 0, 10), battery_level=101, voltage=3.0, uptime_seconds=500)
+    _device(node, _utc(1, 5, 59), battery_level=80, voltage=4.0, uptime_seconds=900)
+    _device(node, _utc(1, 3), battery_level=60, voltage=5.0, uptime_seconds=100)
+    # 06:00 starts a new bucket
+    _device(node, _utc(1, 6, 0), battery_level=101, voltage=3.3)
+    response = metrics_client.get(_metric_url("device_metrics", node), {"bucket": "6h"})
+    assert response.status_code == 200
+    newest, oldest = response.data
+    assert oldest["reported_time"] == _utc(1, 0)
+    assert oldest["samples"] == 3
+    assert oldest["battery_level"] == 70
+    assert oldest["voltage"] == 4.0
+    assert oldest["uptime_seconds"] == 900
+    assert newest["reported_time"] == _utc(1, 6)
+    assert newest["samples"] == 1
+    assert newest["battery_level"] == 101
+
+
+@pytest.mark.django_db
+def test_device_metrics_bucket_1h_and_1d_boundaries(create_observed_node, metrics_client):
+    node = create_observed_node()
+    _device(node, _utc(1, 23, 59))
+    _device(node, _utc(2, 0, 0))
+    url = _metric_url("device_metrics", node)
+    hourly = metrics_client.get(url, {"bucket": "1h"}).data
+    assert [r["reported_time"] for r in hourly] == [_utc(2, 0), _utc(1, 23)]
+    daily = metrics_client.get(url, {"bucket": "1d"}).data
+    assert [r["reported_time"] for r in daily] == [_utc(2, 0), _utc(1, 0)]
+
+
+@pytest.mark.django_db
+def test_device_metrics_bucket_respects_date_filter(create_observed_node, metrics_client):
+    node = create_observed_node()
+    _device(node, _utc(1, 1))
+    _device(node, _utc(3, 1))
+    response = metrics_client.get(
+        _metric_url("device_metrics", node), {"bucket": "1d", "start_date": "2026-03-02", "end_date": "2026-03-03"}
+    )
+    assert [r["reported_time"] for r in response.data] == [_utc(3, 0)]
+
+
+@pytest.mark.django_db
+def test_environment_metrics_bucket_nulls_and_last_reading(create_observed_node, metrics_client):
+    from nodes.models import EnvironmentMetrics
+
+    node = create_observed_node()
+    for when, temp, wind, rain in [
+        (_utc(1, 1), 10.0, 90, 1.0),
+        (_utc(1, 2), None, 180, None),
+        (_utc(1, 3), 20.0, 270, 3.0),
+    ]:
+        EnvironmentMetrics.objects.create(
+            node=node, reported_time=when, temperature=temp, wind_direction=wind, rainfall_1h=rain
+        )
+    response = metrics_client.get(_metric_url("environment_metrics", node), {"bucket": "6h"})
+    (row,) = response.data
+    assert row["samples"] == 3
+    assert row["temperature"] == 15.0
+    assert row["wind_direction"] == 270
+    assert row["rainfall_1h"] == 3.0
+    assert row["relative_humidity"] is None
+
+
+@pytest.mark.django_db
+def test_power_metrics_bucket_mean(create_observed_node, metrics_client):
+    from nodes.models import PowerMetrics
+
+    node = create_observed_node()
+    PowerMetrics.objects.create(node=node, reported_time=_utc(1, 1), ch1_voltage=4.0, ch1_current=100.0)
+    PowerMetrics.objects.create(node=node, reported_time=_utc(1, 2), ch1_voltage=5.0)
+    response = metrics_client.get(_metric_url("power_metrics", node), {"bucket": "1d"})
+    (row,) = response.data
+    assert row["ch1_voltage"] == 4.5
+    assert row["ch1_current"] == 100.0
+    assert row["ch2_voltage"] is None
+    assert row["samples"] == 2
