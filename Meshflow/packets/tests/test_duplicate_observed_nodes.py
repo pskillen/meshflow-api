@@ -8,6 +8,7 @@ from datetime import timedelta
 from unittest import mock
 
 from django.db import IntegrityError, connection
+from django.db.models import QuerySet
 from django.urls import reverse
 from django.utils import timezone
 
@@ -175,22 +176,63 @@ def test_ingest_400_names_the_node(feeder, monkeypatch):
     assert response.json()["message"] == "kaboom"
 
 
+@pytest.fixture
+def lost_race_lookups():
+    """The winner committed after our lookups ran: the helper's first lookup misses, and so does every ``.get()``.
+
+    Django's ``get_or_create`` retries its own ``.get()`` after an IntegrityError, so that has to miss as well for the
+    error to reach the helper. The insert hits the real unique index.
+    """
+    real_lookup = get_meshtastic_observed_node
+    calls = {"n": 0}
+
+    def lookup(node_id):
+        calls["n"] += 1
+        return None if calls["n"] == 1 else real_lookup(node_id)
+
+    real_get = QuerySet.get
+
+    def get(self, *args, **kwargs):
+        if self.model is ObservedNode:
+            raise ObservedNode.DoesNotExist
+        return real_get(self, *args, **kwargs)
+
+    with (
+        mock.patch("nodes.services.observed_nodes.get_meshtastic_observed_node", side_effect=lookup),
+        mock.patch.object(QuerySet, "get", get),
+    ):
+        yield
+
+
 @pytest.mark.django_db
-def test_get_or_create_loses_a_create_race_and_returns_the_winner():
-    """Both callers miss the lookup; the second create hits the unique index and falls back to the winner's row."""
+def test_get_or_create_loses_a_create_race_and_returns_the_winner(lost_race_lookups):
+    """The create raises IntegrityError from the unique index; the helper re-reads and returns the winner's row."""
     winner = ObservedNode.objects.create(
         protocol=Protocol.MESHTASTIC, meshtastic_node_id=NODE, long_name="Winner", short_name="WIN"
     )
-    lookups = iter([None, winner])  # the first lookup misses; the re-read after the IntegrityError finds the winner
 
-    with mock.patch(
-        "nodes.services.observed_nodes.get_meshtastic_observed_node", side_effect=lambda _id: next(lookups)
-    ):
-        node, created = get_or_create_meshtastic_observed_node(NODE, defaults={"long_name": "Loser", "short_name": "L"})
+    node, created = get_or_create_meshtastic_observed_node(NODE, defaults={"long_name": "Loser", "short_name": "L"})
 
     assert not created
     assert node.pk == winner.pk
     assert ObservedNode.objects.filter(meshtastic_node_id=NODE).count() == 1
+
+
+@pytest.mark.django_db
+def test_feeder_upsert_that_loses_the_race_updates_the_winner(feeder):
+    winner = ObservedNode.objects.create(
+        protocol=Protocol.MESHTASTIC, meshtastic_node_id=NODE, long_name="Unknown Node !1a2b3c4d", short_name="3c4d"
+    )
+    url = reverse("feeder-v4-meshtastic-nodes")
+    body = {"id": NODE, "long_name": "Real Name", "short_name": "REAL"}
+
+    with mock.patch("packets.views.get_meshtastic_observed_node", return_value=None):
+        response = feeder["client"].post(url, body, format="json")
+
+    assert response.status_code == 200, response.content
+    assert ObservedNode.objects.filter(meshtastic_node_id=NODE).count() == 1
+    winner.refresh_from_db()
+    assert winner.long_name == "Real Name"
 
 
 @pytest.mark.django_db

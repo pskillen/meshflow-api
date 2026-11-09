@@ -4,6 +4,7 @@ import json
 from datetime import datetime, timedelta, timezone
 
 from django.conf import settings
+from django.db import IntegrityError, transaction
 from django.utils import timezone as django_timezone
 
 from rest_framework import serializers
@@ -26,6 +27,7 @@ from common.protocol import Protocol
 from constellations.models import MessageChannel
 from nodes.models import DeviceMetrics, ManagedNode, NodeLatestStatus, ObservedNode, Position
 from nodes.services.node_firmware import FIRMWARE_FIELDS, refresh_inferred_firmware, refresh_row_numbered_by_key
+from nodes.services.observed_nodes import get_meshtastic_observed_node
 
 from .hops import observation_hop_count, observation_is_direct
 from .models import (
@@ -1654,6 +1656,7 @@ class BaseNodeSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         """Create a new node instance."""
+        submitted = dict(validated_data)  # create() and update() each consume theirs
         # Handle position and device metrics data
         position_data = validated_data.pop("position", None)
         device_metrics_data = validated_data.pop("device_metrics", None)
@@ -1664,7 +1667,15 @@ class BaseNodeSerializer(serializers.ModelSerializer):
             validated_data.update(identity_fields(validated_data["meshtastic_public_key"]))
 
         # Create the node
-        node = ObservedNode.objects.create(**validated_data)
+        try:
+            with transaction.atomic():
+                node = ObservedNode.objects.create(**validated_data)
+        except IntegrityError:
+            # Lost a race with another feeder or with packet ingest: this report updates the winner's row.
+            winner = get_meshtastic_observed_node(submitted.get("meshtastic_node_id"))
+            if winner is None:
+                raise
+            return self.update(winner, submitted)
         if refresh_inferred_firmware(node):
             node.save(update_fields=FIRMWARE_FIELDS)
         if "meshtastic_public_key" in validated_data:

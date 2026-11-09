@@ -1,7 +1,8 @@
 """Lookup and creation of Meshtastic ObservedNodes by node number.
 
 A partial unique constraint (``nodes_observednode_mt_node_id_unique``) allows one Meshtastic ObservedNode per node
-number. Every code path that finds or creates one by number goes through these helpers. The
+number. Code that finds or creates one by number goes through these helpers; the one exception is the feeder node
+upsert (``packets.serializers.BaseNodeSerializer.create``), which takes the lost-race path itself. The
 ``dedupe_observed_nodes`` command (``nodes.services.observed_node_merge``) stays as a check, useful after a restore.
 
 The keeper when merging is the oldest row: ``created_at`` (nulls last), then ``internal_id``.
