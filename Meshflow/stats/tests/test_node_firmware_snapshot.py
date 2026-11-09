@@ -9,6 +9,7 @@ from django.test.utils import CaptureQueriesContext
 import pytest
 
 from common.protocol import Protocol
+from packets.models import PacketObservation
 from stats.models import StatsSnapshot
 from stats.tasks import (
     NODE_FIRMWARE_STAT,
@@ -58,16 +59,20 @@ def test_value_builder_maps_and_seeds():
 
 
 @pytest.mark.django_db
-def test_written_at_midnight_only_and_idempotent():
+def test_written_once_a_day_at_midnight_and_idempotent():
+    _run_at(RUN_AT)
+    _run_at(RUN_AT)
     _run_at(dt.datetime(2025, 6, 10, 13, 5, tzinfo=UTC))
-    assert _fw_snapshots().count() == 0
-
-    _run_at(RUN_AT)
-    _run_at(RUN_AT)
     snaps = list(_fw_snapshots())
     assert len(snaps) == 1
     assert snaps[0].recorded_at == MIDNIGHT
     assert snaps[0].constellation is None
+
+
+@pytest.mark.django_db
+def test_missed_midnight_run_is_written_by_the_next_run():
+    _run_at(dt.datetime(2025, 6, 10, 1, 5, tzinfo=UTC))
+    assert [s.recorded_at for s in _fw_snapshots()] == [MIDNIGHT]
 
 
 @pytest.mark.django_db
@@ -132,21 +137,25 @@ def test_new_generation_appears_as_key(create_observed_node):
 # --- backfill ---
 
 
-def _packet(create_raw_packet, packet_id, from_int, when):
+def _packet(create_raw_packet, observer, packet_id, from_int, when, replayed=False):
     packet = create_raw_packet(packet_id=packet_id, from_int=from_int)
     packet.first_reported_time = when
     packet.save()
+    PacketObservation.objects.create(
+        packet=packet, observer=observer, channel=observer.meshtastic_channel_0, rx_time=when, replayed=replayed
+    )
 
 
 @pytest.fixture
-def backfill_data(create_observed_node, create_raw_packet):
+def backfill_data(create_observed_node, create_raw_packet, create_managed_node):
     """Today is 2025-06-10 12:00 UTC; node A heard 06-08, node B and unknown C heard 06-09."""
+    observer = create_managed_node()
     _node(create_observed_node, 5001, None, "2.8", "key_identity")
     _node(create_observed_node, 5002, None, "2.7", "feeder_report")
-    _packet(create_raw_packet, 1, 5001, dt.datetime(2025, 6, 8, 23, 0, tzinfo=UTC))
-    _packet(create_raw_packet, 2, 5001, dt.datetime(2025, 6, 8, 23, 30, tzinfo=UTC))
-    _packet(create_raw_packet, 3, 5002, dt.datetime(2025, 6, 9, 1, 0, tzinfo=UTC))
-    _packet(create_raw_packet, 4, 5003, dt.datetime(2025, 6, 9, 2, 0, tzinfo=UTC))
+    _packet(create_raw_packet, observer, 1, 5001, dt.datetime(2025, 6, 8, 23, 0, tzinfo=UTC))
+    _packet(create_raw_packet, observer, 2, 5001, dt.datetime(2025, 6, 8, 23, 30, tzinfo=UTC))
+    _packet(create_raw_packet, observer, 3, 5002, dt.datetime(2025, 6, 9, 1, 0, tzinfo=UTC))
+    _packet(create_raw_packet, observer, 4, 5003, dt.datetime(2025, 6, 9, 2, 0, tzinfo=UTC))
     return dt.datetime(2025, 6, 10, 12, 0, tzinfo=UTC)
 
 
@@ -169,6 +178,16 @@ def test_backfill_per_day_values(backfill_data):
         "by_type": {"2.8": 1, "2.7": 1, "unknown": 1},
         "by_basis": {"key_identity": 1, "predicted_id": 0, "reported": 1, "none": 1},
     }
+
+
+@pytest.mark.django_db
+def test_backfill_ignores_packets_only_seen_as_replays(create_raw_packet, create_managed_node, backfill_data):
+    observer = create_managed_node()
+    _packet(create_raw_packet, observer, 5, 5004, dt.datetime(2025, 6, 9, 3, 0, tzinfo=UTC), replayed=True)
+
+    _backfill(backfill_data, days=1)
+
+    assert _fw_snapshots().get().value["count"] == 3
 
 
 @pytest.mark.django_db
@@ -230,12 +249,13 @@ def test_live_run_skips_midnight_written_by_backfill(backfill_data):
 
 
 @pytest.mark.django_db
-def test_backfill_seven_day_edge(create_observed_node, create_raw_packet):
+def test_backfill_seven_day_edge(create_observed_node, create_raw_packet, create_managed_node):
+    observer = create_managed_node()
     _node(create_observed_node, 6001, None, "2.8", "key_identity")
     _node(create_observed_node, 6002, None, "2.7", "feeder_report")
     # Window for the 06-10 midnight is 06-03..06-09 (UTC days).
-    _packet(create_raw_packet, 11, 6001, dt.datetime(2025, 6, 3, 0, 0, tzinfo=UTC))
-    _packet(create_raw_packet, 12, 6002, dt.datetime(2025, 6, 2, 23, 59, tzinfo=UTC))
+    _packet(create_raw_packet, observer, 11, 6001, dt.datetime(2025, 6, 3, 0, 0, tzinfo=UTC))
+    _packet(create_raw_packet, observer, 12, 6002, dt.datetime(2025, 6, 2, 23, 59, tzinfo=UTC))
 
     _backfill(dt.datetime(2025, 6, 10, 12, 0, tzinfo=UTC), days=1)
     snap = _fw_snapshots().get(recorded_at=MIDNIGHT)

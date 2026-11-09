@@ -111,12 +111,12 @@ Two modes:
 
 Daily count of active Meshtastic nodes per firmware generation (see [inferred firmware](../packet-ingestion/inferred-firmware.md)).
 
-- **`recorded_at`** is midnight UTC of the day the task runs (not the previous hour). `collect_stats_snapshots` writes it on the `00:05` run, idempotently. A missed run is not retried; re-run the backfill to fill the gap.
+- **`recorded_at`** is midnight UTC of the day the task runs (not the previous hour). `collect_stats_snapshots` writes it on the first hourly run of the day that finds it missing, normally `00:05`, so a late or failed run does not lose the day. A whole day with no successful run is not retried; re-run the backfill to fill the gap.
 - **Window:** `ObservedNode` with `protocol=MESHTASTIC` and `last_heard >= recorded_at - 168h` (`ADOPTION_WINDOW_HOURS`). There is **no upper bound** on `last_heard`: it only moves forward, so a bound would drop a node heard just after midnight.
 - **`by_type`:** open keys, one per stored `inferred_firmware` value; nodes with none are `unknown`. A new generation appears with no API change.
 - **`by_basis`:** `key_identity`, `predicted_id`, `reported` (stored `feeder_report`) and `none` (null) are always present, at 0 if empty; any other stored basis passes through.
 - A node that upgrades (new row) counts twice for up to 7 days.
-- **Backfill:** `python manage.py backfill_node_firmware_snapshots [--days N] [--dry-run]` (default 90 days, idempotent). It does one `MtRawPacket` scan for `(day, from_int)` pairs and unions the 7 preceding days per target midnight, using today's classification. Backfilled days, including the current day's midnight, are derived from packets, not from `last_heard`, so a midnight written by the backfill before that day's `00:05` run can differ slightly from what the live run would have written; the live run then skips it. It prints the scan size and time. Run it after `backfill_inferred_firmware`.
+- **Backfill:** `python manage.py backfill_node_firmware_snapshots [--days N] [--dry-run]` (default 90 days, idempotent). It does one `MtRawPacket` scan for `(day, from_int)` pairs and unions the 7 preceding days per target midnight, using today's classification. Backfilled days, including the current day's midnight, are derived from packets, not from `last_heard`, so a midnight written by the backfill before that day's `00:05` run can differ slightly from what the live run would have written; the live run then skips it. Packets whose only observations are 2.8 connect-time replays are not counted. It prints the scan size and time. `--dry-run` writes nothing but costs the same full scan, so run either form off-peak. Run it after `backfill_inferred_firmware`.
 
 ---
 

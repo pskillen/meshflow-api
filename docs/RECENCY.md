@@ -253,7 +253,7 @@ Implemented in [`Meshflow/stats/tasks.py`](../Meshflow/stats/tasks.py).
 
 | Task | Cadence |
 | --- | --- |
-| `collect_stats_snapshots` | Every hour at `:05` UTC (the `00:05` run also writes `node_firmware`) |
+| `collect_stats_snapshots` | Every hour at `:05` UTC (each run writes the day's `node_firmware` row if it is missing) |
 
 ---
 

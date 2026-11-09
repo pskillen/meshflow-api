@@ -502,7 +502,6 @@ def _collect_mc_new_nodes(
 
 
 NODE_FIRMWARE_STAT = "node_firmware"
-NODE_FIRMWARE_HOUR_UTC = 0
 
 UNKNOWN_FIRMWARE = "unknown"
 NO_BASIS = "none"
@@ -595,6 +594,8 @@ def backfill_node_firmware_snapshots(days: int = 90, dry_run: bool = False) -> d
     scanned = 0
     pairs = (
         MtRawPacket.objects.filter(first_reported_time__gte=scan_start, first_reported_time__lt=end)
+        # A packet whose only observations are 2.8 connect-time replays is not node activity.
+        .filter(Exists(PacketObservation.objects.filter(packet_id=OuterRef("id"), replayed=False)))
         .annotate(day=TruncDate("first_reported_time", tzinfo=utc))
         .values_list("day", "from_int")
         .distinct()
@@ -676,9 +677,9 @@ def collect_stats_snapshots():
     created += c
     c, _ = _collect_mc_new_nodes(hour_start, run_id=run_id, last_run_started_at=last_run_mc)
     created += c
-    if current_hour.hour == NODE_FIRMWARE_HOUR_UTC:
-        c, _ = _collect_node_firmware(current_hour, run_id=run_id, skip_existing=True)
-        created += c
+    # Every run, so a late or failed 00:05 run does not lose the day; skip_existing makes it once a day.
+    c, _ = _collect_node_firmware(current_hour.replace(hour=0), run_id=run_id, skip_existing=True)
+    created += c
 
     logger.info(
         "collect_stats_snapshots: completed run_id=%s, created=%d",
