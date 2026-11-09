@@ -66,3 +66,16 @@ def test_buckets_split_and_ordered_newest_first():
     out = bucket_rows(rows, ["voltage"], "6h")
     assert [o["reported_time"] for o in out] == [_t(6), _t(0)]
     assert [o["voltage"] for o in out] == [3.0, 1.0]
+
+
+def test_last_reading_ties_break_on_id():
+    t = _t(1)
+    rows = [
+        _row(t, id=7, wind_direction=70),
+        _row(t, id=9, wind_direction=90),
+        _row(t, id=8, wind_direction=80),
+    ]
+    (out,) = bucket_rows(rows, ["wind_direction"], "1h")
+    assert out["wind_direction"] == 90
+    (out,) = bucket_rows(list(reversed(rows)), ["wind_direction"], "1h")
+    assert out["wind_direction"] == 90

@@ -563,7 +563,7 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
                 for f in model._meta.get_fields()
                 if f.concrete and not f.is_relation and f.name not in ("id", "logged_time", "reported_time")
             ]
-            rows = metrics.values("node_id", "reported_time", *fields).iterator(chunk_size=2000)
+            rows = metrics.values("id", "node_id", "reported_time", *fields).iterator(chunk_size=2000)
             return Response(bucket_rows(rows, fields, bucket))
 
         serializer = serializer_class(metrics, many=True)
