@@ -29,9 +29,6 @@ from packets.hops import observation_is_direct
 from packets.models import MtRawPacket, PacketObservation, TraceroutePacket
 from traceroute.models import AutoTraceRoute
 
-# A position is too coarse for a distance rule when its uncertainty exceeds this fraction of the threshold.
-MAX_UNCERTAINTY_FRACTION = 0.25
-
 
 def is_direct_packet_observation(observation: PacketObservation) -> bool:
     """True when the packet reached the observer without remaining relay hops.
@@ -83,14 +80,13 @@ def _destination_position(from_node: ObservedNode) -> tuple[float | None, float 
     return float(status.latitude), float(status.longitude), status.meshtastic_precision_bits
 
 
-def _destination_coords(from_node: ObservedNode) -> tuple[float | None, float | None]:
-    lat, lon, _ = _destination_position(from_node)
-    return lat, lon
+def _exceeds_threshold(distance_km: float, uncertainty_km: float, threshold_km: float) -> bool:
+    """True when the distance beats the threshold even if the position error is all in our favour.
 
-
-def _too_uncertain(precision_bits: int | None, threshold_km: float) -> bool:
-    """True when a position is too coarse to support a distance rule with this threshold."""
-    return position_uncertainty_km(precision_bits) > MAX_UNCERTAINTY_FRACTION * threshold_km
+    A coarse position only suppresses an event the uncertainty could explain: a node known to within 47 km that is
+    535 km away is still far, but one 85 km away against an 80 km threshold is not evidence.
+    """
+    return distance_km - uncertainty_km > threshold_km
 
 
 def _observer_coords(observer: ManagedNode) -> tuple[float | None, float | None]:
@@ -108,11 +104,6 @@ def _position_for_mesh_node(node_id: int, source_managed: ManagedNode) -> tuple[
     if observed is None:
         return None, None, None
     return _destination_position(observed)
-
-
-def _coords_for_mesh_node(node_id: int, source_managed: ManagedNode) -> tuple[float | None, float | None]:
-    lat, lon, _ = _position_for_mesh_node(node_id, source_managed)
-    return lat, lon
 
 
 def _prior_dx_events_exist(constellation_id: int, destination_id) -> bool:
@@ -337,7 +328,7 @@ def maybe_detect_dx_candidate(
             if not meta.cluster_position_evaluated_for_dx:
                 meta.cluster_position_evaluated_for_dx = True
                 meta.save(update_fields=["cluster_position_evaluated_for_dx", "updated_at"])
-            if min_cluster_km > cluster_km and not _too_uncertain(dest_bits, cluster_km):
+            if _exceeds_threshold(min_cluster_km, dest_uncertainty_km, cluster_km):
                 _get_or_create_active_event(
                     constellation=constellation,
                     destination=from_node,
@@ -385,7 +376,7 @@ def maybe_detect_dx_candidate(
 
         if dest_lat is not None and dest_lon is not None and obs_lat is not None and obs_lon is not None:
             direct_dist = haversine_km(obs_lat, obs_lon, dest_lat, dest_lon)
-            if direct_dist > direct_km and not _too_uncertain(dest_bits, direct_km):
+            if _exceeds_threshold(direct_dist, dest_uncertainty_km, direct_km):
                 _get_or_create_active_event(
                     constellation=constellation,
                     destination=from_node,
@@ -439,11 +430,10 @@ def maybe_detect_dx_from_completed_traceroute(
             if la is None or loa is None or lb is None or lob is None:
                 continue
             dist = haversine_km(la, loa, lb, lob)
-            if dist <= hop_km:
+            # Both ends can be off, in opposite directions: their uncertainties add.
+            uncertainty_km = position_uncertainty_km(bits_a) + position_uncertainty_km(bits_b)
+            if not _exceeds_threshold(dist, uncertainty_km, hop_km):
                 continue
-            if _too_uncertain(bits_a, hop_km) or _too_uncertain(bits_b, hop_km):
-                continue
-            uncertainty_km = max(position_uncertainty_km(bits_a), position_uncertainty_km(bits_b))
             dest_node = ObservedNode.objects.filter(meshtastic_node_id=b_id, protocol=Protocol.MESHTASTIC).first()
             if dest_node is None:
                 continue
