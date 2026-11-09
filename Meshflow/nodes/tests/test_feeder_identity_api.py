@@ -2,6 +2,7 @@
 
 import base64
 from datetime import timedelta
+from unittest.mock import patch
 
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
@@ -336,6 +337,27 @@ def test_repoint_collision_is_409(feeder, owner, create_managed_node):
     feeder.refresh_from_db()
     assert feeder.meshtastic_node_id == OLD_NUM
     assert not ManagedNodeIdentityEvent.objects.exists()
+
+
+@pytest.mark.django_db
+def test_repoint_non_object_body_is_400(feeder, owner):
+    response = _client(owner).post(_repoint_url(feeder), [1, 2], format="json")
+    assert response.status_code == 400
+    assert response.data["code"] == "invalid_node_id"
+    feeder.refresh_from_db()
+    assert feeder.meshtastic_node_id == OLD_NUM
+
+
+@pytest.mark.django_db
+def test_repoint_constraint_race_is_409(feeder, owner, create_managed_node):
+    create_managed_node(meshtastic_node_id=NEW_NUM, name="Other")
+    with patch("nodes.services.feeder_identity._number_held_by_another_feeder", return_value=False):
+        response = _client(owner).post(_repoint_url(feeder), {}, format="json")
+    assert response.status_code == 409
+    assert response.data["code"] == "number_collision"
+    feeder.refresh_from_db()
+    assert feeder.meshtastic_node_id == OLD_NUM
+    assert not feeder.identity_events.exists()
 
 
 @pytest.mark.django_db

@@ -1,6 +1,7 @@
 import logging
 import re
 import uuid
+from collections.abc import Mapping
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -1417,7 +1418,9 @@ class ManagedNodeViewSet(viewsets.ModelViewSet):
         """
         node = self.get_object()
         self._managed_node_mutate_allowed(node)
-        new_number = request.data.get("meshtastic_node_id") if hasattr(request.data, "get") else None
+        if not isinstance(request.data, Mapping):
+            return Response({"code": FeederRepointError.CODE_INVALID_NODE_ID}, status=status.HTTP_400_BAD_REQUEST)
+        new_number = request.data.get("meshtastic_node_id")
         if new_number is not None and (isinstance(new_number, bool) or not isinstance(new_number, int)):
             return Response({"code": FeederRepointError.CODE_INVALID_NODE_ID}, status=status.HTTP_400_BAD_REQUEST)
         try:
