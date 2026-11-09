@@ -837,6 +837,13 @@ class OwnedManagedNodeSerializer(ManagedNodeSerializer):
 
         return attrs
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        request = self.context.get("request")
+        if self.instance is not None and not (request is not None and request.user.is_staff):
+            # An owner changes the number through repoint_feeder only: it checks the proof and writes the audit event.
+            self.fields["meshtastic_node_id"].read_only = True
+
     def update(self, instance, validated_data):
         request = self.context.get("request")
         if request is not None and not request.user.is_staff:

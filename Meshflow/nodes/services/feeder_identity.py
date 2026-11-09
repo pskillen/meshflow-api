@@ -307,6 +307,8 @@ class FeederRepointError(Exception):
     CODE_ALREADY_CURRENT = "already_current"
     CODE_NUMBER_COLLISION = "number_collision"
     CODE_NOT_PROVEN = "repoint_not_proven"
+    CODE_TARGET_KEY_MISMATCH = "repoint_target_key_mismatch"
+    CODE_TARGET_CLAIMED = "repoint_target_claimed"
 
     def __init__(self, code: str, message: str = ""):
         super().__init__(message or code)
@@ -328,12 +330,24 @@ def _owner_may_repoint(locked, new_number, now) -> bool:
     )
 
 
+def _check_owner_target(locked, new_number) -> None:
+    """Refuse an owner's re-point onto a node the automatic re-key would flag: another key, or someone else's."""
+    target = _observed_at(new_number)
+    if _carries_other_key(target, normalise_pubkey(locked.meshtastic_public_key)):
+        raise FeederRepointError(
+            FeederRepointError.CODE_TARGET_KEY_MISMATCH, "The node at that number has a different public key."
+        )
+    if _belongs_to_someone_else(target, locked.owner_id):
+        raise FeederRepointError(FeederRepointError.CODE_TARGET_CLAIMED, "The node at that number belongs to someone else.")
+
+
 def repoint_feeder(node, new_number=None, *, actor, now=None) -> ManagedNodeIdentityEvent:
     """Re-point a Meshtastic feeder at ``new_number`` (default: the number its bot last reported) by hand.
 
     A person is deciding, so ``MESHTASTIC_FEEDER_AUTO_REKEY`` is not consulted. An owner may only move a feeder to the
     number it last reported, and only when crc32 of its trusted stored key gives that number; any other number,
-    reversing a re-key included, is staff only. An existing ``ObservedNode`` is never claimed here, and a missing one
+    reversing a re-key included, is staff only. An owner is also refused a target with a different key or belonging to
+    someone else, as the automatic re-key is. An existing ``ObservedNode`` is never claimed here, and a missing one
     is created unclaimed. Staff take the stored key from the newest open flagged event when that event's number
     matches; an owner's re-point keeps the stored key. Raises ``FeederRepointError``. The manual event (and the
     flagged rows it resolves) are acknowledged by ``actor``.
@@ -366,6 +380,8 @@ def repoint_feeder(node, new_number=None, *, actor, now=None) -> ManagedNodeIden
                 )
             if _number_held_by_another_feeder(locked, new_number):
                 raise collision
+            if not actor.is_staff:
+                _check_owner_target(locked, new_number)
             open_flagged = list(_open_flagged(locked).order_by("-created_at", "-id"))
             matching = next((row for row in open_flagged if row.new_meshtastic_node_id == new_number), None)
             key_hex = normalise_pubkey(matching.reported_public_key) if matching else None

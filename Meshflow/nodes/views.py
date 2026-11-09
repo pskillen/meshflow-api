@@ -1429,6 +1429,8 @@ class ManagedNodeViewSet(viewsets.ModelViewSet):
             http_status = {
                 FeederRepointError.CODE_NUMBER_COLLISION: status.HTTP_409_CONFLICT,
                 FeederRepointError.CODE_NOT_PROVEN: status.HTTP_403_FORBIDDEN,
+                FeederRepointError.CODE_TARGET_KEY_MISMATCH: status.HTTP_409_CONFLICT,
+                FeederRepointError.CODE_TARGET_CLAIMED: status.HTTP_409_CONFLICT,
             }.get(exc.code, status.HTTP_400_BAD_REQUEST)
             return Response({"code": exc.code, "detail": str(exc)}, status=http_status)
         return Response(ManagedNodeIdentityEventSerializer(event).data)

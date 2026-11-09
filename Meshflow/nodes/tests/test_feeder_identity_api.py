@@ -346,6 +346,94 @@ def test_repoint_non_object_body_is_400(feeder, owner):
     assert feeder.meshtastic_node_id == OLD_NUM
 
 
+def _detail_url(node):
+    return reverse("managed-nodes-detail", kwargs={"internal_id": node.internal_id})
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("method", ["patch", "put"])
+def test_owner_update_cannot_change_the_number(feeder, owner, method):
+    body = {"meshtastic_node_id": NEW_NUM, "name": "Renamed", "constellation_id": feeder.constellation_id}
+
+    response = getattr(_client(owner), method)(_detail_url(feeder), body, format="json")
+
+    assert response.status_code == 200
+    feeder.refresh_from_db()
+    assert (feeder.meshtastic_node_id, feeder.name) == (OLD_NUM, "Renamed")
+    assert not feeder.identity_events.exists()
+
+
+@pytest.mark.django_db
+def test_owner_update_to_an_active_feeders_number_is_ignored(feeder, owner, create_managed_node):
+    create_managed_node(meshtastic_node_id=NEW_NUM, name="Taken")
+
+    response = _client(owner).patch(_detail_url(feeder), {"meshtastic_node_id": NEW_NUM}, format="json")
+
+    assert response.status_code == 200
+    feeder.refresh_from_db()
+    assert feeder.meshtastic_node_id == OLD_NUM
+
+
+@pytest.mark.django_db
+def test_staff_update_can_still_change_the_number(feeder, staff):
+    response = _client(staff).patch(_detail_url(feeder), {"meshtastic_node_id": NEW_NUM}, format="json")
+
+    assert response.status_code == 200
+    feeder.refresh_from_db()
+    assert feeder.meshtastic_node_id == NEW_NUM
+
+
+@pytest.mark.django_db
+def test_owner_repoint_refuses_a_target_claimed_by_someone_else(feeder, owner, create_observed_node, create_user):
+    target = create_observed_node(meshtastic_node_id=NEW_NUM, meshtastic_public_key_hex=KEY_HEX, claimed_by=create_user())
+
+    response = _client(owner).post(_repoint_url(feeder), {}, format="json")
+
+    assert response.status_code == 409
+    assert response.data["code"] == "repoint_target_claimed"
+    feeder.refresh_from_db()
+    assert feeder.meshtastic_node_id == OLD_NUM
+    target.refresh_from_db()
+    assert target.claimed_by_id != owner.pk
+
+
+@pytest.mark.django_db
+def test_owner_repoint_refuses_a_target_with_a_different_key(feeder, owner, create_observed_node):
+    create_observed_node(meshtastic_node_id=NEW_NUM, meshtastic_public_key_hex=OTHER_KEY_HEX, claimed_by=None)
+
+    response = _client(owner).post(_repoint_url(feeder), {}, format="json")
+
+    assert response.status_code == 409
+    assert response.data["code"] == "repoint_target_key_mismatch"
+    feeder.refresh_from_db()
+    assert feeder.meshtastic_node_id == OLD_NUM
+
+
+@pytest.mark.django_db
+def test_owner_repoint_without_proof_gets_not_proven_before_target_checks(feeder, owner, create_observed_node):
+    _forget_key(feeder)
+    create_observed_node(meshtastic_node_id=NEW_NUM, meshtastic_public_key_hex=OTHER_KEY_HEX, claimed_by=None)
+
+    response = _client(owner).post(_repoint_url(feeder), {}, format="json")
+
+    assert response.status_code == 403
+    assert response.data["code"] == "repoint_not_proven"
+
+
+@pytest.mark.django_db
+def test_owner_repoint_to_their_own_claimed_target(feeder, owner, create_observed_node):
+    create_observed_node(meshtastic_node_id=NEW_NUM, meshtastic_public_key_hex=KEY_HEX, claimed_by=owner)
+
+    assert _client(owner).post(_repoint_url(feeder), {}, format="json").status_code == 200
+
+
+@pytest.mark.django_db
+def test_staff_repoint_is_exempt_from_target_checks(feeder, staff, create_observed_node, create_user):
+    create_observed_node(meshtastic_node_id=NEW_NUM, meshtastic_public_key_hex=OTHER_KEY_HEX, claimed_by=create_user())
+
+    assert _client(staff).post(_repoint_url(feeder), {}, format="json").status_code == 200
+
+
 @pytest.mark.django_db
 def test_repoint_constraint_race_is_409(feeder, owner, create_managed_node):
     create_managed_node(meshtastic_node_id=NEW_NUM, name="Other")

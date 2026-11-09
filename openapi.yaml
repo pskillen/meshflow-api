@@ -6739,7 +6739,8 @@ paths:
       description: >-
         Sets `meshtastic_node_id` by hand. An owner can only set the number the feeder last reported, and only when
         crc32 of the feeder's trusted stored key gives that number; any other number, including the old one to reverse
-        a re-key, is staff only. Not gated by the automatic re-key setting: a person is deciding. Never claims an
+        a re-key, is staff only. An owner is also refused a target with a different key or belonging to someone else.
+        Not gated by the automatic re-key setting: a person is deciding. Never claims an
         ObservedNode; a missing one is created unclaimed. When staff re-point and an open flagged event reported the
         same number, its public key becomes the stored key. Open flagged events are resolved and a `manual` identity
         event is written (already acknowledged by the caller). A reversal holds: while the radio still reports the number
@@ -6785,11 +6786,27 @@ paths:
                   detail:
                     type: string
         '403':
-          description: Caller is neither the owner nor staff
+          description: >-
+            Refused. With `code: repoint_not_proven`, the caller is the owner but the number is not one the owner may
+            set: it is not the number the feeder last reported, or crc32 of a trusted stored key does not give it. With
+            no `code`, the caller is neither the owner nor staff.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: string
+                    enum: [repoint_not_proven]
+                  detail:
+                    type: string
         '404':
           description: No such managed node
         '409':
-          description: Another active feeder already has that node number
+          description: >-
+            Refused; `code` says why. `number_collision`: another active feeder already has that node number.
+            `repoint_target_key_mismatch`: an ObservedNode at that number has a different public key (owner only).
+            `repoint_target_claimed`: an ObservedNode at that number belongs to someone else (owner only).
           content:
             application/json:
               schema:
@@ -6798,7 +6815,7 @@ paths:
                 properties:
                   code:
                     type: string
-                    enum: [number_collision]
+                    enum: [number_collision, repoint_target_key_mismatch, repoint_target_claimed]
                   detail:
                     type: string
 
