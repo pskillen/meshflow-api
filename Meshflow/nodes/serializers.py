@@ -6,7 +6,7 @@ from rest_framework import serializers
 from rest_framework.fields import empty
 
 from common.access import AccessLevel, get_access_level, user_can_manage_api_keys
-from common.mesh_node_helpers import observed_node_id_str
+from common.mesh_node_helpers import meshtastic_id_to_hex, observed_node_id_str
 from common.protocol import Protocol
 from constellations.models import Constellation, MessageChannel
 from meshcore_packets.serializers_channel import FeederMcChannelMirrorSerializer
@@ -20,6 +20,7 @@ from .models import (
     EnvironmentMetrics,
     LocationSource,
     ManagedNode,
+    ManagedNodeIdentityEvent,
     NodeAPIKey,
     NodeAuth,
     NodeOwnerClaim,
@@ -836,6 +837,13 @@ class OwnedManagedNodeSerializer(ManagedNodeSerializer):
                 )
 
         return attrs
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        request = self.context.get("request")
+        if self.instance is not None and not (request is not None and request.user.is_staff):
+            # An owner changes the number through repoint_feeder only: it checks the proof and writes the audit event.
+            self.fields["meshtastic_node_id"].read_only = True
 
     def update(self, instance, validated_data):
         request = self.context.get("request")
@@ -1656,3 +1664,41 @@ class NearbyInfrastructureNodeSerializer(serializers.Serializer):
 
     def get_distance_km(self, obj):
         return obj._distance_km
+
+
+class ManagedNodeIdentityEventSerializer(serializers.ModelSerializer):
+    """Feeder node number change, for the owner's notice (ID-4). Read-only."""
+
+    managed_node = serializers.UUIDField(source="managed_node.internal_id", read_only=True)
+    managed_node_name = serializers.CharField(source="managed_node.name", read_only=True)
+    old_node_id_str = serializers.SerializerMethodField()
+    new_node_id_str = serializers.SerializerMethodField()
+    needs_action = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ManagedNodeIdentityEvent
+        fields = [
+            "id",
+            "managed_node",
+            "managed_node_name",
+            "old_meshtastic_node_id",
+            "old_node_id_str",
+            "new_meshtastic_node_id",
+            "new_node_id_str",
+            "outcome",
+            "reason",
+            "needs_action",
+            "created_at",
+            "resolved_at",
+            "acknowledged_at",
+        ]
+        read_only_fields = fields
+
+    def get_old_node_id_str(self, obj):
+        return meshtastic_id_to_hex(obj.old_meshtastic_node_id)
+
+    def get_new_node_id_str(self, obj):
+        return meshtastic_id_to_hex(obj.new_meshtastic_node_id)
+
+    def get_needs_action(self, obj):
+        return obj.outcome == ManagedNodeIdentityEvent.Outcome.FLAGGED and obj.resolved_at is None

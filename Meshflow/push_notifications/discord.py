@@ -27,6 +27,15 @@ def _bot_headers() -> dict[str, str]:
     }
 
 
+def _post(url: str, payload: dict, headers: dict[str, str]) -> requests.Response:
+    """POST to Discord; a timeout or connection failure is a DiscordSendError like any other failed send."""
+    try:
+        return requests.post(url, json=payload, headers=headers, timeout=30)
+    except requests.RequestException as exc:
+        logger.warning("Discord request failed: %s", type(exc).__name__)
+        raise DiscordSendError(f"Discord request failed ({type(exc).__name__})") from exc
+
+
 def send_dm(recipient_discord_user_id: str, content: str) -> None:
     """
     Open (or reuse) a DM channel with the recipient and post a message.
@@ -43,11 +52,10 @@ def send_dm(recipient_discord_user_id: str, content: str) -> None:
         raise DiscordSendError("message content exceeds Discord 2000 character limit")
 
     headers = _bot_headers()
-    channel_resp = requests.post(
+    channel_resp = _post(
         f"{DISCORD_API_BASE}/users/@me/channels",
-        json={"recipient_id": rid},
-        headers=headers,
-        timeout=30,
+        {"recipient_id": rid},
+        headers,
     )
     if not channel_resp.ok:
         logger.warning(
@@ -61,11 +69,10 @@ def send_dm(recipient_discord_user_id: str, content: str) -> None:
     if not channel_id:
         raise DiscordSendError("Discord create DM response missing channel id")
 
-    msg_resp = requests.post(
+    msg_resp = _post(
         f"{DISCORD_API_BASE}/channels/{channel_id}/messages",
-        json={"content": text},
-        headers=headers,
-        timeout=30,
+        {"content": text},
+        headers,
     )
     if not msg_resp.ok:
         logger.warning(

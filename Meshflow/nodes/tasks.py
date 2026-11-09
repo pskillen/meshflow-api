@@ -10,8 +10,17 @@ from celery import shared_task
 from common.protocol import Protocol
 from meshcore_packets.models import MeshCorePacketObservation
 from nodes.managed_node_liveness import schedule_traceroute_source_recency_seconds
-from nodes.models import ManagedNode, ManagedNodeStatus
+from nodes.models import ManagedNode, ManagedNodeIdentityEvent, ManagedNodeStatus
+from nodes.services.feeder_identity_notify import notify_owner
 from packets.models import PacketObservation
+
+
+@shared_task(ignore_result=True)
+def notify_feeder_identity_event(event_id: int) -> None:
+    """DM a feeder's owner about one identity event (queued after commit by ``queue_owner_notification``)."""
+    event = ManagedNodeIdentityEvent.objects.select_related("managed_node__owner").filter(pk=event_id).first()
+    if event is not None:
+        notify_owner(event)
 
 
 @shared_task(ignore_result=True)

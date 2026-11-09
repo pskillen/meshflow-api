@@ -246,12 +246,14 @@ A 2.8 firmware upgrade or re-key changes a feeder's node number. v4 feeder URLs 
 | 5 | Another node holds the key: an `ObservedNode` with that key and a number that is neither the old nor the new one, or another active `ManagedNode` | flagged `shared_key` (keys are not unique; a crc32 match on a cloned key proves nothing) |
 | 6 | Another active Meshtastic feeder already has the reported number | flagged `number_collision` |
 | 7 | An `ObservedNode` at the reported number has a different key, or is claimed by someone else | flagged `key_mismatch` (key), `number_collision` (claimed) |
-| 8 | `MESHTASTIC_FEEDER_AUTO_REKEY` is off | flagged `auto_rekey_disabled` |
+| 8 | `MESHTASTIC_FEEDER_AUTO_REKEY` is off, or the newest manual re-point moved the feeder away from the reported number | flagged `auto_rekey_disabled` (a manual reversal holds; it is lifted by a later manual re-point) |
 | 9 | Otherwise | applied: number, key and key-node-id updated atomically (`select_for_update`; a unique-constraint race becomes `number_collision`), `auto_updated` event, `ensure_observed_node_for_managed_node` (an unclaimed `ObservedNode` at the new number is claimed for the owner only when the stored key did not come from a feeder report, i.e. has no `key_changed` event; otherwise the normal claim flow applies), then the `nodes.signals.feeder_identity_changed` signal |
 
 crc32 is forgeable, so a match shows only that the report is consistent; see the threat model in [ADR-0005](adr/0005-feeder-scoped-auth.md).
 
-When the number is unchanged: a key that differs from the stored key (or, with none stored, from the feeder's own `ObservedNode` row) is flagged `key_mismatch` and not stored, and stays open until the feeder reports the expected key. Otherwise open flagged events are resolved, and a first key is stored with a `key_changed` audit event. A downgrade to 2.7 keeps the number and key, so it reports no change. Metric: `meshflow_feeder_identity_changes_total{protocol, outcome}`.
+When the number is unchanged: a key that differs from the stored key (or, with none stored, from the feeder's own `ObservedNode` row) is flagged `key_mismatch` and not stored, and stays open until the feeder reports the expected key. Otherwise open flagged events are resolved, and a first key is stored with a `key_changed` audit event. A downgrade to 2.7 keeps the number and key, so it reports no change. Metric: `meshflow_feeder_identity_changes_total{protocol, outcome}` (`manual` counts owner re-points).
+
+The owner is told by Discord DM on `auto_updated` and on a new `flagged` row, at most one flagged DM per feeder every 24 hours (`nodes/services/feeder_identity_notify.py`; a Celery task queued after commit, never on the request), and can re-point a flagged feeder with `repoint_feeder` (the `repoint-meshtastic-id/` endpoint), which ignores the flag. See [Managed nodes](../node-lifecycle/managed-nodes.md#node-number-changes-28).
 
 ### Identity data is not clobbered by 2.8 feeder NodeDB entries
 
