@@ -2373,6 +2373,62 @@ components:
         latest_host_metrics:
           $ref: '#/components/schemas/LatestHostMetrics'
 
+    ManagedNodeIdentityEvent:
+      type: object
+      description: A feeder's Meshtastic node number changed, or needs review (ID-4).
+      required:
+        - id
+        - managed_node
+        - managed_node_name
+        - old_meshtastic_node_id
+        - old_node_id_str
+        - new_meshtastic_node_id
+        - new_node_id_str
+        - outcome
+        - needs_action
+        - created_at
+      properties:
+        id:
+          type: integer
+        managed_node:
+          type: string
+          format: uuid
+          description: ManagedNode internal_id
+        managed_node_name:
+          type: string
+        old_meshtastic_node_id:
+          type: integer
+        old_node_id_str:
+          type: string
+          example: '!da545c78'
+        new_meshtastic_node_id:
+          type: integer
+        new_node_id_str:
+          type: string
+          example: '!4396524c'
+        outcome:
+          type: string
+          enum: [auto_updated, flagged, manual, key_changed]
+        reason:
+          type: string
+          nullable: true
+          enum: [key_not_reported, crc_mismatch, key_mismatch, shared_key, number_collision, auto_rekey_disabled, null]
+          description: Why a flagged change was not applied automatically.
+        needs_action:
+          type: boolean
+          description: outcome is `flagged` and the event is not resolved.
+        created_at:
+          type: string
+          format: date-time
+        resolved_at:
+          type: string
+          format: date-time
+          nullable: true
+        acknowledged_at:
+          type: string
+          format: date-time
+          nullable: true
+
     OwnedManagedNode:
       allOf:
         - $ref: '#/components/schemas/ManagedNodeRead'
@@ -6662,6 +6718,137 @@ paths:
           description: Not the node owner and not staff
         '404':
           description: Managed node not found or already soft-deleted
+
+  /nodes/managed-nodes/{internal_id}/repoint-meshtastic-id/:
+    post:
+      summary: Re-point a Meshtastic feeder at a node number
+      description: >-
+        Sets `meshtastic_node_id` by hand, for the owner or staff. Used to accept a flagged feeder number change
+        (the default is the number the feeder last reported), or to reverse a re-key by passing the old number.
+        Not gated by the automatic re-key setting: a person is deciding. If an open flagged event reported the
+        same number, its public key becomes the stored key. Open flagged events are resolved and a `manual`
+        identity event is written (already acknowledged by the caller).
+      tags: [Nodes]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: internal_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                meshtastic_node_id:
+                  type: integer
+                  description: Node number to set. Defaults to the feeder's reported_meshtastic_node_id.
+      responses:
+        '200':
+          description: The `manual` identity event
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ManagedNodeIdentityEvent'
+        '400':
+          description: Refused; `code` says why
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [code]
+                properties:
+                  code:
+                    type: string
+                    enum: [not_meshtastic, no_reported_number, invalid_node_id, already_current]
+                  detail:
+                    type: string
+        '403':
+          description: Caller is neither the owner nor staff
+        '404':
+          description: No such managed node
+        '409':
+          description: Another active feeder already has that node number
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [code]
+                properties:
+                  code:
+                    type: string
+                    enum: [number_collision]
+                  detail:
+                    type: string
+
+  /nodes/managed-node-identity-events/:
+    get:
+      summary: List feeder node number changes
+      description: >-
+        Events for the caller's own feeders (staff see all), newest first. `needs_action` is true for a flagged
+        event that has not been resolved. `key_changed` events are audit only and are never returned when
+        `unacknowledged=true`.
+      tags: [Nodes]
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PaginationPage'
+        - $ref: '#/components/parameters/PaginationPageSize'
+        - name: unacknowledged
+          in: query
+          required: false
+          description: When true, only events not yet acknowledged, excluding `key_changed`.
+          schema:
+            type: boolean
+        - name: managed_node
+          in: query
+          required: false
+          description: Only events for this managed node (internal_id).
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Paginated identity events
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedResponse'
+                  - type: object
+                    properties:
+                      results:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ManagedNodeIdentityEvent'
+
+  /nodes/managed-node-identity-events/{id}/acknowledge/:
+    post:
+      summary: Acknowledge a feeder node number change
+      description: Records the caller and the time. Acknowledging again changes nothing.
+      tags: [Nodes]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: The event
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ManagedNodeIdentityEvent'
+        '404':
+          description: No such event, or it belongs to another user's feeder
 
   /nodes/api-keys/:
     get:
