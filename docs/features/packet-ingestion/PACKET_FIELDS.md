@@ -96,6 +96,14 @@ Position packets contain location data:
 | decoded.position.latitude       | float     | Latitude (decimal)     | -                     |
 | decoded.position.longitude      | float     | Longitude (decimal)    | -                     |
 
+**0,0 and missing coordinates.** Fixed-position nodes on Meshtastic 2.7.24-2.7.26 broadcast 0,0 ("null island").
+The packet is accepted (201, not 400) and still counts as hearing the node (`last_heard`, inferred max hops), but
+it is stored with null `latitude` and `longitude`, no `nodes.Position` row is created, and `NodeLatestStatus`
+keeps its previous position. A position counts as 0,0 when both coordinates are within 1e-7 of zero
+(`common.geo.is_null_island`). A packet missing either coordinate is treated the same way. A position on one axis
+only (for example 0, 12.3) is a real position and is kept. Rows stored before this rule are cleaned up with
+`python manage.py cleanup_null_island_positions` (dry run by default; `--apply` writes).
+
 ### TELEMETRY_APP
 
 Telemetry packets contain device and sensor metrics. All TELEMETRY_APP packets share common fields, and **exactly one** of the variant objects (deviceMetrics, localStats, environmentMetrics, etc.) appears in `decoded.telemetry` per packet.

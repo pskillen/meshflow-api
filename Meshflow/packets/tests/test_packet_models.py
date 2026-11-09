@@ -30,8 +30,8 @@ def test_position_packet_creation(create_position_packet):
     """Test position packet creation."""
     packet = create_position_packet()
     assert packet.packet_id == 123456789
-    assert packet.latitude == 0.0
-    assert packet.longitude == 0.0
+    assert packet.latitude == 51.5
+    assert packet.longitude == -0.1
     assert packet.altitude == 0.0
     assert packet.heading == 0.0
     assert packet.meshtastic_location_source == LocationSource.INTERNAL

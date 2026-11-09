@@ -9,6 +9,7 @@ from django.utils import timezone as django_timezone
 
 from rest_framework import serializers
 
+from common.geo import is_null_island
 from common.mesh_node_helpers import (
     meshtastic_hex_to_int,
     meshtastic_id_to_hex,
@@ -332,8 +333,8 @@ class PositionPacketSerializer(BasePacketSerializer):
         """Serializer for position packet decoded data."""
 
         class PositionSerializer(serializers.Serializer):
-            latitude = serializers.FloatField()
-            longitude = serializers.FloatField()
+            latitude = serializers.FloatField(required=False, allow_null=True)
+            longitude = serializers.FloatField(required=False, allow_null=True)
             altitude = serializers.FloatField(required=False, allow_null=True)
             heading = serializers.FloatField(required=False, allow_null=True)
             locationSource = serializers.CharField(source="meshtastic_location_source", required=False, allow_null=True)
@@ -356,6 +357,14 @@ class PositionPacketSerializer(BasePacketSerializer):
         if "position" in validated_data:
             position_data = validated_data.pop("position")
             validated_data.update(position_data)
+
+        # No coordinates, or a 0,0 "no fix" position: keep the packet (it still hears the node)
+        # but store null coordinates so it is never treated as a position.
+        lat = validated_data.get("latitude")
+        lon = validated_data.get("longitude")
+        if lat is None or lon is None or is_null_island(lat, lon):
+            validated_data["latitude"] = None
+            validated_data["longitude"] = None
 
         # Convert position_time to a datetime object if it exists
         if "position_time" in validated_data and validated_data["position_time"] is not None:
@@ -1619,7 +1628,7 @@ class BaseNodeSerializer(serializers.ModelSerializer):
     def _create_related_objects(self, node, position_data, device_metrics_data):
         """Create position and device metrics records for a node."""
         # Create position if provided; a NodeDB (0, 0) means "no fix" and must not overwrite a stored position
-        if position_data and not (position_data.get("latitude") == 0 and position_data.get("longitude") == 0):
+        if position_data and not is_null_island(position_data.get("latitude"), position_data.get("longitude")):
             reported_time = position_data.get("reported_time")
             Position.objects.create(
                 node=node,

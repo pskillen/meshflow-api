@@ -1,5 +1,6 @@
 """Service for processing position packets."""
 
+from common.geo import is_null_island
 from nodes.models import LocationSource, NodeLatestStatus, Position
 from packets.models import PositionPacket
 from packets.services.base import BasePacketService
@@ -12,6 +13,15 @@ class PositionPacketService(BasePacketService):
         """Process the position packet and create a Position record."""
         if not isinstance(self.packet, PositionPacket):
             raise ValueError("Packet must be a PositionPacket")
+
+        if (
+            self.packet.latitude is None
+            or self.packet.longitude is None
+            or is_null_island(self.packet.latitude, self.packet.longitude)
+        ):
+            # No usable position (0,0 or absent): the packet still heard the node, but is no position.
+            self._update_inferred_max_hops("POSITION_APP")
+            return
 
         reported_time = self.packet.position_time or self.packet.first_reported_time
 
