@@ -62,7 +62,7 @@
     "fields": {
       "battery_level": 77.0,
       "from_int": 580542218,
-      "from_str": null,
+      "from_str": "!229a5f0a",
       "meshtastic_air_util_tx": 3.4764442,
       "meshtastic_channel_utilization": 13.336666,
       "packet_id": 238837673,
