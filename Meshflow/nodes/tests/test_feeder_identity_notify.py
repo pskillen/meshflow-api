@@ -7,7 +7,7 @@ import pytest
 import nodes.tests.conftest  # noqa: F401
 from common.meshtastic_identity import normalise_pubkey
 from nodes.models import ManagedNodeIdentityEvent
-from nodes.services.feeder_identity import apply_reported_identity
+from nodes.services.feeder_identity import apply_reported_identity, repoint_feeder
 from nodes.services.feeder_identity_notify import notify_owner
 from push_notifications.constants import DiscordNotificationFeature, DiscordNotificationKind, DiscordNotificationStatus
 from push_notifications.discord import DiscordSendError
@@ -145,3 +145,12 @@ def test_failing_dm_leaves_rekey_applied(feeder, settings):
     feeder.refresh_from_db()
     assert event.outcome == Outcome.AUTO_UPDATED
     assert feeder.meshtastic_node_id == NEW_NUM
+
+
+@pytest.mark.django_db
+def test_manual_repoint_sends_no_dm(feeder):
+    with patch(VERIFIED, return_value=True), patch(SEND_DM) as send_dm:
+        event = repoint_feeder(feeder, NEW_NUM, actor=feeder.owner)
+    assert event.outcome == Outcome.MANUAL
+    send_dm.assert_not_called()
+    assert DiscordNotificationAudit.objects.count() == 0

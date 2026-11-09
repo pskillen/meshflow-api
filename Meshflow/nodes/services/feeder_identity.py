@@ -29,7 +29,7 @@ from django.utils import timezone
 
 from prometheus_client import Counter
 
-from common.mesh_node_helpers import meshtastic_id_to_hex
+from common.mesh_node_helpers import MESHTASTIC_BROADCAST_ID, meshtastic_id_to_hex
 from common.meshtastic_identity import key_node_id, normalise_pubkey
 from common.protocol import Protocol
 from nodes.managed_node_bootstrap import ensure_observed_node_for_managed_node
@@ -218,3 +218,95 @@ def apply_reported_identity(
     if not getattr(settings, "MESHTASTIC_FEEDER_AUTO_REKEY", False):
         return flag(Reason.AUTO_REKEY_DISABLED)
     return _apply(node, old_num=old_num, new_num=reported_node_num, key_hex=key_hex, now=now)
+
+
+class FeederRepointError(Exception):
+    """A manual re-point was refused; ``code`` is one of the ``CODE_*`` values (the API's ``code`` field)."""
+
+    CODE_NOT_MESHTASTIC = "not_meshtastic"
+    CODE_NO_REPORTED_NUMBER = "no_reported_number"
+    CODE_INVALID_NODE_ID = "invalid_node_id"
+    CODE_ALREADY_CURRENT = "already_current"
+    CODE_NUMBER_COLLISION = "number_collision"
+
+    def __init__(self, code: str, message: str = ""):
+        super().__init__(message or code)
+        self.code = code
+
+
+def _valid_node_number(num) -> bool:
+    return isinstance(num, int) and not isinstance(num, bool) and 4 <= num < MESHTASTIC_BROADCAST_ID
+
+
+def repoint_feeder(node, new_number=None, *, actor, now=None) -> ManagedNodeIdentityEvent:
+    """Re-point a Meshtastic feeder at ``new_number`` (default: the number its bot last reported) by hand.
+
+    A person is deciding, so ``MESHTASTIC_FEEDER_AUTO_REKEY`` is not consulted. Passing the old number reverses a
+    re-key. The stored key is taken from the newest open flagged event when that event's number matches. Raises
+    ``FeederRepointError``. The manual event (and the flagged rows it resolves) are acknowledged by ``actor``.
+    """
+    if node.protocol != Protocol.MESHTASTIC:
+        raise FeederRepointError(FeederRepointError.CODE_NOT_MESHTASTIC, "Only Meshtastic feeders have a node number.")
+    if new_number is None:
+        new_number = node.reported_meshtastic_node_id
+        if new_number is None:
+            raise FeederRepointError(
+                FeederRepointError.CODE_NO_REPORTED_NUMBER, "This feeder has not reported a node number."
+            )
+    if not _valid_node_number(new_number):
+        raise FeederRepointError(FeederRepointError.CODE_INVALID_NODE_ID, "Not a valid Meshtastic node number.")
+    now = now or timezone.now()
+
+    collision = FeederRepointError(FeederRepointError.CODE_NUMBER_COLLISION, "Another feeder already has that number.")
+    try:
+        with transaction.atomic():
+            locked = _lock(node)
+            old_num = locked.meshtastic_node_id
+            if old_num == new_number:
+                raise FeederRepointError(
+                    FeederRepointError.CODE_ALREADY_CURRENT, "The feeder already has that node number."
+                )
+            if _number_held_by_another_feeder(locked, new_number):
+                raise collision
+            open_flagged = list(_open_flagged(locked).order_by("-created_at", "-id"))
+            matching = next((row for row in open_flagged if row.new_meshtastic_node_id == new_number), None)
+            key_hex = normalise_pubkey(matching.reported_public_key) if matching else None
+            fields = ["meshtastic_node_id"]
+            locked.meshtastic_node_id = new_number
+            if key_hex is not None:
+                locked.meshtastic_public_key = key_hex
+                locked.meshtastic_key_node_id = key_node_id(key_hex)
+                fields += ["meshtastic_public_key", "meshtastic_key_node_id"]
+            locked.save(update_fields=fields)
+            seen = {"acknowledged_at": now, "acknowledged_by": actor}
+            ManagedNodeIdentityEvent.objects.filter(pk__in=[row.pk for row in open_flagged]).update(
+                resolved_at=now, **seen
+            )
+            event = ManagedNodeIdentityEvent.objects.create(
+                managed_node=locked,
+                old_meshtastic_node_id=old_num,
+                new_meshtastic_node_id=new_number,
+                reported_public_key=key_hex,
+                outcome=Outcome.MANUAL,
+                resolved_at=now,
+                **seen,
+            )
+    except IntegrityError:
+        raise collision from None
+
+    for name in fields:
+        setattr(node, name, getattr(locked, name))
+    _count(Outcome.MANUAL)
+    logger.info(
+        "Feeder %s (%s) re-pointed by user %s: %s -> %s",
+        node.internal_id,
+        node.name,
+        getattr(actor, "pk", None),
+        meshtastic_id_to_hex(old_num),
+        meshtastic_id_to_hex(new_number),
+    )
+    ensure_observed_node_for_managed_node(node)
+    feeder_identity_changed.send(
+        sender=ManagedNode, managed_node=node, event=event, old_node_id=old_num, new_node_id=new_number
+    )
+    return event

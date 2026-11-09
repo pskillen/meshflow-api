@@ -24,7 +24,7 @@ from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
 from django.utils import timezone
 
-from rest_framework import permissions, status, viewsets
+from rest_framework import mixins, permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
@@ -54,6 +54,7 @@ from nodes.models import (
     EnvironmentExposure,
     EnvironmentMetrics,
     ManagedNode,
+    ManagedNodeIdentityEvent,
     ManagedNodeStatus,
     NodeAPIKey,
     NodeAuth,
@@ -80,6 +81,7 @@ from nodes.serializers import (
     DeviceMetricsSerializer,
     EnvironmentMetricsBulkSerializer,
     EnvironmentMetricsSerializer,
+    ManagedNodeIdentityEventSerializer,
     ManagedNodeSerializer,
     NodeOwnerClaimSerializer,
     NodeRfProfileSerializer,
@@ -94,6 +96,7 @@ from nodes.serializers import (
 )
 from nodes.services.device_metrics import get_device_metrics_bulk
 from nodes.services.environment_metrics import get_environment_metrics_bulk
+from nodes.services.feeder_identity import FeederRepointError, repoint_feeder
 from nodes.services.nearby_infrastructure import (
     NearbyParamError,
     get_nearby_infrastructure_cached,
@@ -1403,6 +1406,71 @@ class ManagedNodeViewSet(viewsets.ModelViewSet):
             return self.get_paginated_response(serializer.data)
         serializer = self.get_serializer(nodes, many=True)
         return Response(serializer.data)
+
+    @action(detail=True, methods=["post"], url_path="repoint-meshtastic-id")
+    def repoint_meshtastic_id(self, request, internal_id=None):
+        """
+        Re-point a Meshtastic feeder at a node number by hand (ID-4).
+
+        Body ``{"meshtastic_node_id": <int>}`` is optional; the default is the number the feeder last reported.
+        Used to accept a flagged number change, or to reverse a re-key by passing the old number.
+        """
+        node = self.get_object()
+        self._managed_node_mutate_allowed(node)
+        new_number = request.data.get("meshtastic_node_id") if hasattr(request.data, "get") else None
+        if new_number is not None and (isinstance(new_number, bool) or not isinstance(new_number, int)):
+            return Response({"code": FeederRepointError.CODE_INVALID_NODE_ID}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            event = repoint_feeder(node, new_number, actor=request.user)
+        except FeederRepointError as exc:
+            http_status = (
+                status.HTTP_409_CONFLICT
+                if exc.code == FeederRepointError.CODE_NUMBER_COLLISION
+                else status.HTTP_400_BAD_REQUEST
+            )
+            return Response({"code": exc.code, "detail": str(exc)}, status=http_status)
+        return Response(ManagedNodeIdentityEventSerializer(event).data)
+
+
+class ManagedNodeIdentityEventViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
+    """
+    Feeder node number changes for the caller's own feeders (staff see all): ``GET`` list, and an ``acknowledge``
+    action (ID-4). ``?unacknowledged=true`` hides acknowledged rows and ``key_changed`` (audit only);
+    ``?managed_node=<uuid>`` filters to one feeder.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = ManagedNodeIdentityEventSerializer
+
+    def get_queryset(self):
+        queryset = ManagedNodeIdentityEvent.objects.filter(managed_node__deleted_at__isnull=True).select_related(
+            "managed_node"
+        )
+        user = self.request.user
+        if not user.is_staff:
+            queryset = queryset.filter(managed_node__owner=user)
+        if self.action == "list":
+            params = self.request.query_params
+            if params.get("managed_node"):
+                try:
+                    queryset = queryset.filter(managed_node__internal_id=uuid.UUID(params["managed_node"]))
+                except ValueError:
+                    queryset = queryset.none()
+            if params.get("unacknowledged", "").lower() in ("true", "1"):
+                queryset = queryset.filter(acknowledged_at__isnull=True).exclude(
+                    outcome=ManagedNodeIdentityEvent.Outcome.KEY_CHANGED
+                )
+        return queryset.order_by("-created_at", "-id")
+
+    @action(detail=True, methods=["post"])
+    def acknowledge(self, request, pk=None):
+        """Record that the caller has seen this event. Idempotent: a second call changes nothing."""
+        event = self.get_object()
+        if event.acknowledged_at is None:
+            event.acknowledged_at = timezone.now()
+            event.acknowledged_by = request.user
+            event.save(update_fields=["acknowledged_at", "acknowledged_by"])
+        return Response(self.get_serializer(event).data)
 
 
 class ObservedNodeClaimView(APIView):
