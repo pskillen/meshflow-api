@@ -68,7 +68,7 @@ Each run assigns a shared **`run_id`** (`uuid4`) on every snapshot created in th
 
 ### `online_nodes`
 
-**Window:** the closed interval `[recorded_at - ONLINE_NODE_WINDOW_HOURS, recorded_at]` (env, default **2**). A point at `recorded_at` means "nodes heard in the 2 hours up to that time". `recorded_at` is the start of the hour the job records, and the job runs at `:05` an hour later, so a point lags real time by about 1 h 05.
+**Window:** `ONLINE_NODE_WINDOW_HOURS` (env, default **2**) is the window length, centred on `recorded_at`: the closed interval `[recorded_at - N/2 h, recorded_at + N/2 h]`, so with the default the point at hour H counts `[H - 1h, H + 1h]`. `recorded_at` is the start of the hour the job records and the job runs at `:05` after that hour has finished, so the window includes the hour just completed. That is the same hour the `packet_volume` point at H covers, so the two lines line up at the same x.
 
 | Scope | Query |
 | --- | --- |
@@ -79,13 +79,20 @@ The live job and the backfill use the same queries. Any transport (RF or MQTT) c
 
 **Why not `last_heard`:** it only moves forward, so a bound `last_heard <= recorded_at` would drop every node heard again after the snapshot hour. Counting from packets keeps those nodes in.
 
-**Cut-over (api#501):** before this change the window had no upper bound (`>= recorded_at - 2h` only), so each point covered everything heard since then, up to the moment the job ran (about 3 h 05). Historic points therefore sit higher than new ones, and the online line steps down where the new rule begins unless the history is rewritten:
+**Cut-over:** before this change the window had no upper bound (`>= recorded_at - 2h` only), so each point covered everything heard since then, up to the moment the job ran (about 3 h 05). Historic points therefore sit higher than new ones, and the online line steps down where the new rule begins unless the history is rewritten. Run a dry run for one day first, which prints the counts and the earliest hour it would change, then the full rewrite:
 
 ```bash
-python manage.py backfill_stats_snapshots --rewrite-online --days 30 [--dry-run]
+python manage.py backfill_stats_snapshots --rewrite-online --dry-run --days 1
+python manage.py backfill_stats_snapshots --rewrite-online --days 30
 ```
 
-`--rewrite-online` recomputes `count` (and `window_hours`) on **existing** `online_nodes` and `mc_online_nodes` rows from raw packets. It never inserts rows, so the accepted snapshot gaps stay gaps, and it leaves a row alone when no raw packet exists in its window (recomputing would turn real history into zero). It is idempotent, and prints the earliest corrected hour and the earliest row that had raw packets, so you can see how far back the correction reaches. Rows older than the raw packets keep their old, higher values.
+`--dry-run` is only valid with `--rewrite-online`.
+
+`--rewrite-online` recomputes `count` (and `window_hours`) on **existing** `online_nodes` and `mc_online_nodes` rows from raw packets. It never inserts rows, so the accepted snapshot gaps stay gaps, and it only rewrites a row when raw packets cover its whole window, meaning the oldest raw packet of that protocol is at or before the window start. Otherwise (packets pruned or never stored, or raw data starting partway through the window) the row is left alone, because recomputing would undercount it or turn real history into zero. It is idempotent, and prints the earliest corrected hour and the earliest row it could rewrite, so you can see how far back the correction reaches. Rows older than the raw packets keep their old, higher values.
+
+**Cost:** per row it runs one count query for the global row and one per constellation, each over a 2 h range of `first_reported_time` (global) or `rx_time` (constellation), for both Meshtastic and MeshCore, so 30 days is about 720 hours x (1 + constellations) x 2 protocols of range counts. Both `first_reported_time` and `rx_time` are indexed (migration `packets/0024_mt_time_indexes`), so each is an index range scan. That is an estimate, not a measurement on production data: time the one-day dry run first (multiply by 30 for the full run) and run the full rewrite off-peak.
+
+**Time bases:** the global count uses `first_reported_time` (this API's clock), the per-constellation count uses `rx_time` (the feeder's clock). They differ by feeder clock skew and upload delay, so constellation counts need not sum to the global one.
 
 ### `packet_volume`
 
@@ -230,7 +237,7 @@ print(StatsSnapshot.objects.order_by('-recorded_at')[:5].values('recorded_at','s
 
 ## Known gaps (Meshtastic doc scope)
 
-- ~~Global `online_nodes` / `new_nodes` included MeshCore rows~~ — fixed ([#365](https://github.com/pskillen/meshflow-api/issues/365)) via `protocol=MESHTASTIC` filter on global ObservedNode queries.
+- ~~Global `online_nodes` / `new_nodes` included MeshCore rows~~ — fixed ([#365](https://github.com/pskillen/meshflow-api/issues/365)). `new_nodes` filters `protocol=MESHTASTIC` on `ObservedNode`; `online_nodes` is now counted from Meshtastic raw packets (see above), not from `ObservedNode`, so it never sees MeshCore rows.
 - Live stats views do not accept MeshCore identity (pubkey / `internal_id`).
 - `packet_volume` has no constellation-scoped snapshots.
 - Traceroute success daily stats use a different `stat_type` (`tr_success_daily`) — not covered here.
