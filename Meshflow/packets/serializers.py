@@ -22,6 +22,7 @@ from common.meshtastic_identity import (
     protect_identity,
     protect_stale_names,
 )
+from common.geo import is_null_island
 from common.protocol import Protocol
 from constellations.models import MessageChannel
 from nodes.models import DeviceMetrics, ManagedNode, NodeLatestStatus, ObservedNode, Position
@@ -330,8 +331,8 @@ class PositionPacketSerializer(BasePacketSerializer):
         """Serializer for position packet decoded data."""
 
         class PositionSerializer(serializers.Serializer):
-            latitude = serializers.FloatField()
-            longitude = serializers.FloatField()
+            latitude = serializers.FloatField(required=False, allow_null=True)
+            longitude = serializers.FloatField(required=False, allow_null=True)
             altitude = serializers.FloatField(required=False, allow_null=True)
             heading = serializers.FloatField(required=False, allow_null=True)
             locationSource = serializers.CharField(source="meshtastic_location_source", required=False, allow_null=True)
@@ -354,6 +355,14 @@ class PositionPacketSerializer(BasePacketSerializer):
         if "position" in validated_data:
             position_data = validated_data.pop("position")
             validated_data.update(position_data)
+
+        # No coordinates, or a 0,0 "no fix" position: keep the packet (it still hears the node)
+        # but store null coordinates so it is never treated as a position.
+        lat = validated_data.get("latitude")
+        lon = validated_data.get("longitude")
+        if lat is None or lon is None or is_null_island(lat, lon):
+            validated_data["latitude"] = None
+            validated_data["longitude"] = None
 
         # Convert position_time to a datetime object if it exists
         if "position_time" in validated_data and validated_data["position_time"] is not None:
