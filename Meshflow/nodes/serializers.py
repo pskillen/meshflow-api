@@ -3,6 +3,7 @@ import secrets
 from django.urls import reverse
 
 from rest_framework import serializers
+from rest_framework.fields import empty
 
 from common.access import AccessLevel, get_access_level, user_can_manage_api_keys
 from common.mesh_node_helpers import meshtastic_id_to_hex, observed_node_id_str
@@ -1236,6 +1237,13 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
     battery_alert_confirmed_at = serializers.SerializerMethodField()
     owner = OwnerSerializer(source="claimed_by", read_only=True)
     claim = serializers.SerializerMethodField()
+
+    def get_fields(self):
+        fields = super().get_fields()
+        # DRF gives fields of a nullable unique constraint default=None, which would make a PUT that omits the number
+        # write NULL over it. Leave an omitted number alone.
+        fields["meshtastic_node_id"].default = empty
+        return fields
 
     def get_node_id_str(self, obj):
         return observed_node_id_str(obj)

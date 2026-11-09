@@ -3,6 +3,7 @@
 import logging
 from datetime import timedelta
 
+from django.core.exceptions import ObjectDoesNotExist
 from django.utils import timezone
 
 from celery import shared_task
@@ -14,10 +15,12 @@ from traceroute.models import AutoTraceRoute
 
 from .constants import (
     DEFAULT_OFFLINE_AFTER_SECONDS,
+    TWO_EIGHT_DEFAULT_OFFLINE_AFTER_SECONDS,
     notify_verification_start_enabled,
     verification_notify_cooldown_seconds,
     verification_window_seconds,
 )
+from .learned_thresholds import learned_threshold_seconds, node_gaps
 from .models import NodeMonitoringConfig, NodePresence, NodeWatch
 from .selection import select_monitoring_sources
 from .services import (
@@ -30,10 +33,54 @@ logger = logging.getLogger(__name__)
 
 
 def _effective_last_heard_offline_after_seconds(obs: ObservedNode) -> int:
+    """
+    Silence threshold for one node, first match wins:
+
+    1. a NodeMonitoringConfig value that differs from the default (the owner chose it);
+    2. the threshold learned from the node's own cadence, never below the default that applies to the node
+       (12 h for a 2.8 node, else 6 h), so a learned value only ever lengthens it;
+    3. 12 h for a 2.8 node (inferred firmware, or its node id is its key-derived id);
+    4. the 6 h default.
+    """
     cfg = NodeMonitoringConfig.objects.filter(pk=obs.pk).first()
-    if cfg is not None:
+    if cfg is not None and int(cfg.last_heard_offline_after_seconds) != DEFAULT_OFFLINE_AFTER_SECONDS:
         return int(cfg.last_heard_offline_after_seconds)
-    return int(DEFAULT_OFFLINE_AFTER_SECONDS)
+    key_id = obs.meshtastic_key_node_id
+    is_two_eight = obs.inferred_firmware == "2.8" or (key_id is not None and key_id == obs.meshtastic_node_id)
+    default = TWO_EIGHT_DEFAULT_OFFLINE_AFTER_SECONDS if is_two_eight else DEFAULT_OFFLINE_AFTER_SECONDS
+    try:
+        learned = obs.mesh_presence.learned_offline_after_seconds
+    except ObjectDoesNotExist:
+        learned = None
+    if learned:
+        return max(int(learned), int(default))
+    return int(default)
+
+
+@shared_task(ignore_result=True)
+def update_learned_offline_thresholds() -> dict:
+    """Daily: learn a silence threshold from each watched Meshtastic node's own packet cadence."""
+    now = timezone.now()
+    watched_ids = (
+        NodeWatch.objects.filter(enabled=True, offline_notifications_enabled=True)
+        .values_list("observed_node_id", flat=True)
+        .distinct()
+    )
+    updated = failed = 0
+    observed_qs = ObservedNode.objects.filter(pk__in=watched_ids, meshtastic_node_id__isnull=False)
+    for obs in observed_qs.iterator(chunk_size=100):
+        try:
+            learned = learned_threshold_seconds(node_gaps(obs, now))
+            NodePresence.objects.update_or_create(
+                observed_node=obs,
+                defaults={"learned_offline_after_seconds": learned, "learned_offline_computed_at": now},
+            )
+            updated += 1
+        except Exception:
+            failed += 1
+            logger.exception("mesh_monitoring: learned threshold failed for observed node %s", obs.pk)
+    logger.info("mesh_monitoring: learned offline thresholds updated for %d nodes (%d failed)", updated, failed)
+    return {"updated": updated, "failed": failed}
 
 
 @shared_task(ignore_result=True)
@@ -92,7 +139,7 @@ def process_node_watch_presence() -> dict:
     if not watched_ids:
         return {"watched": 0}
 
-    observed_qs = ObservedNode.objects.filter(pk__in=watched_ids).select_related("latest_status")
+    observed_qs = ObservedNode.objects.filter(pk__in=watched_ids).select_related("latest_status", "mesh_presence")
     processed = 0
     for obs in observed_qs.iterator(chunk_size=100):
         processed += 1

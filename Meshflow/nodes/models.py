@@ -598,6 +598,11 @@ class ObservedNode(models.Model):
                 condition=models.Q(protocol=Protocol.MESHCORE, mc_pubkey__isnull=False),
                 name="nodes_observednode_mc_pubkey_unique",
             ),
+            models.UniqueConstraint(
+                fields=["meshtastic_node_id"],
+                condition=models.Q(protocol=Protocol.MESHTASTIC),
+                name="nodes_observednode_mt_node_id_unique",
+            ),
         ]
 
     @property
