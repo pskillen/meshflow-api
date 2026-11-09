@@ -8,6 +8,7 @@ from django.utils import timezone as django_timezone
 
 from rest_framework import serializers
 
+from common.geo import is_null_island
 from common.mesh_node_helpers import (
     meshtastic_hex_to_int,
     meshtastic_id_to_hex,
@@ -22,7 +23,6 @@ from common.meshtastic_identity import (
     protect_identity,
     protect_stale_names,
 )
-from common.geo import is_null_island
 from common.protocol import Protocol
 from constellations.models import MessageChannel
 from nodes.models import DeviceMetrics, ManagedNode, NodeLatestStatus, ObservedNode, Position
