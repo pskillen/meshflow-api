@@ -75,6 +75,55 @@ we can evaluate this node's position" from ordinary repeated packets. A local
 node that receives its first position inside the cluster range remains a
 non-event.
 
+## Position Precision
+
+Meshtastic 2.8 clamps public positions to 15 bits by default (about 730 m), and
+senders can pick much coarser ones. A node's `meshtastic_precision_bits` in
+`NodeLatestStatus` says how coarse the stored position is. The position is the
+centre of a cell, so the error is at most half a cell on each axis. The figure used
+is the half-cell in latitude, `(2 ** (31 - bits)) * 1e-7 * 111.32` km: about 0.73 km
+at 15 bits, 2.9 km at 13, 23.3 km at 10 and 46.7 km at 9. It is a per-axis bound,
+not a radius: the error in longitude is smaller by `cos(latitude)`, and the
+straight-line error can reach about 1.4 times the figure. Unknown precision (null,
+0, or 32 and above) counts as exact, as before.
+
+A distance rule raises an event only when the distance beats the threshold even
+if the position error is entirely in our favour: `distance - uncertainty >
+threshold`. A coarse position suppresses only the events its uncertainty could
+explain, so a 9-bit node 535 km away still raises one, while the same node 100 km
+away against an 80 km threshold does not.
+
+- `new_distant_node` compares against the cluster-distance threshold, with the
+  destination's uncertainty.
+- `distant_observation` compares against the direct-distance threshold, with the
+  destination's uncertainty.
+- `traceroute_distant_hop` compares against the hop threshold, with the uncertainties
+  of both ends added (they can be off in opposite directions). A managed source's own
+  configured position counts as exact.
+- `returned_dx_node` does not depend on distance and is unaffected.
+
+When the uncertainty is non-zero, the event observation's metadata carries
+`uncertainty_km` (for a traceroute hop, the sum of both ends). RF propagation is
+unaffected: it reads only the owner-entered RF profile coordinates, never a reported
+position.
+
+### Where the precision comes from
+
+On-air position packets carry `precision_bits`, and the position service stores them
+beside the position. A node upsert (the feeder's NodeDB sync) uses the precision bits
+from its position block (`meshtastic_precision_bits`) when the payload has one.
+Otherwise it leaves the stored bits alone, even when it changes the latitude or
+longitude: precision is a property of the sender's setting, not of one position, so
+the bits last seen on air still describe the node. A coarse node whose NodeDB position
+differs slightly from its on-air one therefore stays coarse and raises no false event.
+
+Known limitation: a node known only through a feeder's NodeDB has unknown precision,
+which counts as exact. In 2.8 that stored position is already clamped by the sender,
+so such a node, once heard directly, can raise a distance event on a position
+that is only good to the sender's precision. The NodeDB position record carries no
+precision field, so the upsert cannot learn it. The next on-air position packet from the node
+sets the bits.
+
 ## Inputs
 
 Each detection pass receives:

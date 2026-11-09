@@ -67,7 +67,7 @@ class PositionPacket(MtRawPacket):
     meshtastic_location_source = models.IntegerField(choices=LocationSource.choices, null=True)
     meshtastic_precision_bits = models.SmallIntegerField(null=True)
     position_time = models.DateTimeField(null=True)  # Unix timestamp converted to datetime
-    ground_speed = models.FloatField(null=True)  # in m/s
+    ground_speed = models.FloatField(null=True)  # in km/h
     ground_track = models.FloatField(null=True)  # in degrees (0-359)
 
     class Meta:

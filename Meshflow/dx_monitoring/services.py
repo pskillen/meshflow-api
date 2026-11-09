@@ -13,7 +13,7 @@ from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
-from common.geo import haversine_km
+from common.geo import haversine_km, position_uncertainty_km
 from common.protocol import Protocol
 from constellations.models import Constellation
 from dx_monitoring.exploration import exploration_links_auto_traceroute_to_destination
@@ -72,11 +72,21 @@ def _min_distance_to_footprint_km(dest_lat: float, dest_lon: float, footprint: l
     return min(haversine_km(dest_lat, dest_lon, lat, lon) for lat, lon in footprint)
 
 
-def _destination_coords(from_node: ObservedNode) -> tuple[float | None, float | None]:
+def _destination_position(from_node: ObservedNode) -> tuple[float | None, float | None, int | None]:
+    """Latest (lat, lon, precision_bits) for a node; precision is None when unknown."""
     status = NodeLatestStatus.objects.filter(node=from_node).first()
     if status is None or status.latitude is None or status.longitude is None:
-        return None, None
-    return float(status.latitude), float(status.longitude)
+        return None, None, None
+    return float(status.latitude), float(status.longitude), status.meshtastic_precision_bits
+
+
+def _exceeds_threshold(distance_km: float, uncertainty_km: float, threshold_km: float) -> bool:
+    """True when the distance beats the threshold even if the position error is all in our favour.
+
+    A coarse position only suppresses an event the uncertainty could explain: a node known to within 47 km that is
+    535 km away is still far, but one 85 km away against an 80 km threshold is not evidence.
+    """
+    return distance_km - uncertainty_km > threshold_km
 
 
 def _observer_coords(observer: ManagedNode) -> tuple[float | None, float | None]:
@@ -85,13 +95,15 @@ def _observer_coords(observer: ManagedNode) -> tuple[float | None, float | None]
     return float(observer.default_location_latitude), float(observer.default_location_longitude)
 
 
-def _coords_for_mesh_node(node_id: int, source_managed: ManagedNode) -> tuple[float | None, float | None]:
+def _position_for_mesh_node(node_id: int, source_managed: ManagedNode) -> tuple[float | None, float | None, int | None]:
+    """(lat, lon, precision_bits) for a mesh node; the managed source's own position is exact."""
     if int(node_id) == int(source_managed.meshtastic_node_id):
-        return _observer_coords(source_managed)
+        lat, lon = _observer_coords(source_managed)
+        return lat, lon, None
     observed = ObservedNode.objects.filter(meshtastic_node_id=node_id, protocol=Protocol.MESHTASTIC).first()
     if observed is None:
-        return None, None
-    return _destination_coords(observed)
+        return None, None, None
+    return _destination_position(observed)
 
 
 def _prior_dx_events_exist(constellation_id: int, destination_id) -> bool:
@@ -296,7 +308,9 @@ def maybe_detect_dx_candidate(
 
     prior_dx = _prior_dx_events_exist(constellation.id, from_node.pk)
 
-    dest_lat, dest_lon = _destination_coords(from_node)
+    dest_lat, dest_lon, dest_bits = _destination_position(from_node)
+    dest_uncertainty_km = position_uncertainty_km(dest_bits)
+    uncertainty_meta = {"uncertainty_km": dest_uncertainty_km} if dest_uncertainty_km else {}
     obs_lat, obs_lon = _observer_coords(observer)
     footprint = _cluster_footprint(constellation.id)
 
@@ -314,7 +328,7 @@ def maybe_detect_dx_candidate(
             if not meta.cluster_position_evaluated_for_dx:
                 meta.cluster_position_evaluated_for_dx = True
                 meta.save(update_fields=["cluster_position_evaluated_for_dx", "updated_at"])
-            if min_cluster_km > cluster_km:
+            if _exceeds_threshold(min_cluster_km, dest_uncertainty_km, cluster_km):
                 _get_or_create_active_event(
                     constellation=constellation,
                     destination=from_node,
@@ -326,6 +340,7 @@ def maybe_detect_dx_candidate(
                     evidence_metadata={
                         "min_cluster_distance_km": min_cluster_km,
                         "cluster_threshold_km": cluster_km,
+                        **uncertainty_meta,
                         "hop_start": observation.hop_start,
                         "hop_limit": observation.hop_limit,
                     },
@@ -361,7 +376,7 @@ def maybe_detect_dx_candidate(
 
         if dest_lat is not None and dest_lon is not None and obs_lat is not None and obs_lon is not None:
             direct_dist = haversine_km(obs_lat, obs_lon, dest_lat, dest_lon)
-            if direct_dist > direct_km:
+            if _exceeds_threshold(direct_dist, dest_uncertainty_km, direct_km):
                 _get_or_create_active_event(
                     constellation=constellation,
                     destination=from_node,
@@ -373,6 +388,7 @@ def maybe_detect_dx_candidate(
                     evidence_metadata={
                         "direct_distance_km": direct_dist,
                         "direct_threshold_km": direct_km,
+                        **uncertainty_meta,
                         "hop_start": observation.hop_start,
                         "hop_limit": observation.hop_limit,
                     },
@@ -409,12 +425,14 @@ def maybe_detect_dx_from_completed_traceroute(
         for hop_index, (a_id, b_id) in enumerate(pairs):
             if is_node_suppressed_for_dx(a_id) or is_node_suppressed_for_dx(b_id):
                 continue
-            la, loa = _coords_for_mesh_node(a_id, source)
-            lb, lob = _coords_for_mesh_node(b_id, source)
+            la, loa, bits_a = _position_for_mesh_node(a_id, source)
+            lb, lob, bits_b = _position_for_mesh_node(b_id, source)
             if la is None or loa is None or lb is None or lob is None:
                 continue
             dist = haversine_km(la, loa, lb, lob)
-            if dist <= hop_km:
+            # Both ends can be off, in opposite directions: their uncertainties add.
+            uncertainty_km = position_uncertainty_km(bits_a) + position_uncertainty_km(bits_b)
+            if not _exceeds_threshold(dist, uncertainty_km, hop_km):
                 continue
             dest_node = ObservedNode.objects.filter(meshtastic_node_id=b_id, protocol=Protocol.MESHTASTIC).first()
             if dest_node is None:
@@ -437,6 +455,7 @@ def maybe_detect_dx_from_completed_traceroute(
                     "to_node_id": b_id,
                     "distance_km": dist,
                     "threshold_km": hop_km,
+                    **({"uncertainty_km": uncertainty_km} if uncertainty_km else {}),
                 },
                 raw_packet=raw_packet,
                 packet_observation=packet_observation,

@@ -831,7 +831,7 @@ class Position(BaseNodeItem):
         help_text=_("Provenance: MeshCore ingest packet that produced this position row."),
     )
     meshtastic_precision_bits = models.SmallIntegerField(null=True, blank=True)
-    ground_speed = models.FloatField(null=True, blank=True, help_text="Speed in m/s")
+    ground_speed = models.FloatField(null=True, blank=True, help_text="Speed in km/h")
     ground_track = models.FloatField(null=True, blank=True, help_text="Track in degrees (0-359)")
     sats_in_view = models.SmallIntegerField(null=True, blank=True, help_text="Number of satellites in view")
     pdop = models.FloatField(null=True, blank=True, help_text="Position Dilution of Precision")

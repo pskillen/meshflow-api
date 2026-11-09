@@ -23,3 +23,13 @@ def is_null_island(lat, lon) -> bool:
     if lat is None or lon is None:
         return False
     return abs(lat) < NULL_ISLAND_EPSILON and abs(lon) < NULL_ISLAND_EPSILON
+
+
+def position_uncertainty_km(precision_bits) -> float:
+    """Half the cell size (km) of a position truncated to ``precision_bits`` bits.
+
+    Unknown precision (None, 0, or 32 and above) returns 0.0, i.e. treated as exact.
+    """
+    if precision_bits is None or precision_bits <= 0 or precision_bits >= 32:
+        return 0.0
+    return (2 ** (31 - int(precision_bits))) * 1e-7 * 111.32

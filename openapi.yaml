@@ -2547,7 +2547,7 @@ components:
           nullable: true
         ground_speed:
           type: number
-          description: The ground speed of the node in m/s
+          description: The ground speed of the node in km/h
           nullable: true
         ground_track:
           type: number

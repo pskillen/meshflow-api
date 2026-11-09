@@ -1454,6 +1454,8 @@ def _normalize_position_block(position_data, *, allow_legacy_fields):
     }
     if position_data.get("heading") is not None:
         block["heading"] = position_data.get("heading")
+    if position_data.get("meshtastic_precision_bits") is not None:
+        block["meshtastic_precision_bits"] = position_data.get("meshtastic_precision_bits")
     return block
 
 
@@ -1509,6 +1511,7 @@ class PositionSerializer(serializers.Serializer):
     altitude = serializers.FloatField()
     heading = serializers.FloatField(required=False, allow_null=True)
     meshtastic_location_source = serializers.CharField()
+    meshtastic_precision_bits = serializers.IntegerField(required=False, allow_null=True, min_value=0, max_value=32)
 
     def to_internal_value(self, data):
         """Convert location source from string to integer."""
@@ -1637,18 +1640,22 @@ class BaseNodeSerializer(serializers.ModelSerializer):
                 longitude=position_data.get("longitude"),
                 altitude=position_data.get("altitude"),
                 meshtastic_location_source=position_data.get("meshtastic_location_source"),
+                meshtastic_precision_bits=position_data.get("meshtastic_precision_bits"),
             )
             # Update NodeLatestStatus with latest position
-            NodeLatestStatus.objects.update_or_create(
-                node=node,
-                defaults={
-                    "latitude": position_data.get("latitude"),
-                    "longitude": position_data.get("longitude"),
-                    "altitude": position_data.get("altitude"),
-                    "meshtastic_location_source": position_data.get("meshtastic_location_source"),
-                    "position_reported_time": reported_time,
-                },
-            )
+            defaults = {
+                "latitude": position_data.get("latitude"),
+                "longitude": position_data.get("longitude"),
+                "altitude": position_data.get("altitude"),
+                "meshtastic_location_source": position_data.get("meshtastic_location_source"),
+                "position_reported_time": reported_time,
+            }
+            # Precision is a property of the sender's setting, not of one position: use the payload's bits when it
+            # carries them, otherwise leave the stored bits alone (even if the position changed).
+            precision_bits = position_data.get("meshtastic_precision_bits")
+            if precision_bits is not None:
+                defaults["meshtastic_precision_bits"] = precision_bits
+            NodeLatestStatus.objects.update_or_create(node=node, defaults=defaults)
 
         # Create device metrics if provided
         if device_metrics_data:
