@@ -8,7 +8,7 @@ import uuid
 from datetime import datetime, timedelta
 from typing import Optional
 
-from django.db.models import Count, Exists, OuterRef, Q
+from django.db.models import Count, Exists, Min, OuterRef, Q
 from django.db.models.functions import Coalesce, Substr, TruncDate
 from django.utils import timezone
 
@@ -56,19 +56,29 @@ def _snapshot_exists(recorded_at: datetime, stat_type: str, constellation_id: Op
 
 
 def _online_window(recorded_at: datetime) -> tuple[datetime, datetime]:
-    """The closed window [recorded_at - ONLINE_NODE_WINDOW_HOURS, recorded_at] an online snapshot counts."""
-    return recorded_at - timedelta(hours=ONLINE_NODE_WINDOW_HOURS), recorded_at
+    """
+    The closed window an online snapshot counts: ONLINE_NODE_WINDOW_HOURS long, centred on recorded_at.
+
+    recorded_at is the start of the hour the point is plotted at, so with the default 2 h the point at H
+    counts [H - 1h, H + 1h]. That includes the hour just finished (H to H + 1h), the same hour the
+    packet-volume point at H covers, and the job only runs once that hour is complete.
+    """
+    half = timedelta(hours=ONLINE_NODE_WINDOW_HOURS) / 2
+    return recorded_at - half, recorded_at + half
 
 
 def _mt_online_count(recorded_at: datetime, constellation: Optional[Constellation] = None) -> int:
     """
-    Distinct Meshtastic senders heard in [recorded_at - window, recorded_at].
+    Distinct Meshtastic senders heard in the online window around recorded_at (see _online_window).
 
     Counted from packets, not ObservedNode.last_heard: last_heard only moves forward, so a node heard
     again after recorded_at would drop out of a last_heard upper bound. Packets whose only observations
     are 2.8 connect-time replays are ignored. Any transport (RF or MQTT) counts as heard.
     """
     start, end = _online_window(recorded_at)
+    # Two time bases: the global count uses first_reported_time (this API's clock when the packet was first
+    # stored), the constellation count uses rx_time (the feeder's clock). They differ by feeder clock skew
+    # and upload delay, so the constellation counts need not sum to the global one.
     if constellation is None:
         return (
             MtRawPacket.objects.filter(
@@ -84,6 +94,7 @@ def _mt_online_count(recorded_at: datetime, constellation: Optional[Constellatio
     return (
         PacketObservation.objects.filter(
             observer__constellation=constellation,
+            packet__from_int__isnull=False,
             rx_time__gte=start,
             rx_time__lte=end,
             replayed=False,
@@ -102,7 +113,7 @@ def _collect_online_nodes(
 ) -> tuple[int, int]:
     """
     Collect online_nodes snapshots (hourly) for global and per-constellation: nodes heard in the
-    ONLINE_NODE_WINDOW_HOURS up to recorded_at (see _mt_online_count). Returns (created, skipped).
+    ONLINE_NODE_WINDOW_HOURS centred on recorded_at (see _online_window, _mt_online_count). Returns (created, skipped).
     """
     created = 0
     skipped = 0
@@ -317,7 +328,7 @@ def _mc_sender_key():
 
 
 def _mc_online_count(recorded_at: datetime, constellation: Optional[Constellation] = None) -> int:
-    """Distinct MeshCore senders heard in [recorded_at - window, recorded_at]; see _mt_online_count."""
+    """Distinct MeshCore senders heard in the online window around recorded_at; see _mt_online_count."""
     start, end = _online_window(recorded_at)
     if constellation is None:
         return (
@@ -760,19 +771,25 @@ ONLINE_SNAPSHOT_TYPES = {
 def rewrite_online_node_snapshots(days: int = 30, dry_run: bool = False):
     """
     Recompute the count of existing online_nodes / mc_online_nodes rows from raw packets, using the
-    bounded [recorded_at - window, recorded_at] definition (api#501).
+    bounded window centred on recorded_at (see _online_window).
 
     Rewrites rows in place and never inserts: an hour with no row stays without one (the snapshot gap is
-    accepted). A row whose window holds no raw packets at all (packets pruned or never stored) is left
-    as it is, since recomputing would turn real history into zero. Idempotent: a second run changes
-    nothing. Returns the counts and `earliest_corrected`, the first hour whose value changed.
+    accepted). A row is only rewritten when raw packets cover its whole window, i.e. the oldest raw packet
+    of that protocol is at or before the window start; otherwise (packets pruned or never stored) it is
+    left as it is, since recomputing would undercount or turn real history into zero. Idempotent: a second
+    run changes nothing. Returns the counts and `earliest_corrected`, the first hour whose value changed.
     """
     end_hour = timezone.now().replace(minute=0, second=0, microsecond=0)
     start_hour = end_hour - timedelta(days=days)
 
-    rewritten = unchanged = no_raw_packets = 0
+    rewritten = unchanged = left_alone = 0
     earliest_corrected: Optional[datetime] = None
-    earliest_with_packets: Optional[datetime] = None
+    earliest_covered: Optional[datetime] = None
+    # One Min per protocol: where raw packets begin. A window starting before that is only partly covered.
+    oldest_raw = {
+        stat_type: raw_model.objects.aggregate(oldest=Min("first_reported_time"))["oldest"]
+        for stat_type, (raw_model, _) in ONLINE_SNAPSHOT_TYPES.items()
+    }
 
     rows = (
         StatsSnapshot.objects.filter(
@@ -781,20 +798,14 @@ def rewrite_online_node_snapshots(days: int = 30, dry_run: bool = False):
         .select_related("constellation")
         .order_by("recorded_at")
     )
-    has_packets: dict[tuple[str, datetime], bool] = {}
     for row in tqdm(rows.iterator(), unit="rows", desc="Rewriting online snapshots"):
         raw_model, count_fn = ONLINE_SNAPSHOT_TYPES[row.stat_type]
-        key = (row.stat_type, row.recorded_at)
-        if key not in has_packets:
-            start, end = _online_window(row.recorded_at)
-            has_packets[key] = raw_model.objects.filter(
-                first_reported_time__gte=start, first_reported_time__lte=end
-            ).exists()
-        if not has_packets[key]:
-            no_raw_packets += 1
+        oldest = oldest_raw[row.stat_type]
+        if oldest is None or oldest > _online_window(row.recorded_at)[0]:
+            left_alone += 1
             continue
-        if earliest_with_packets is None:
-            earliest_with_packets = row.recorded_at
+        if earliest_covered is None:
+            earliest_covered = row.recorded_at
 
         new_count = count_fn(row.recorded_at, row.constellation)
         if row.value.get("count") == new_count and row.value.get("window_hours") == ONLINE_NODE_WINDOW_HOURS:
@@ -808,19 +819,19 @@ def rewrite_online_node_snapshots(days: int = 30, dry_run: bool = False):
             row.save(update_fields=["value"])
 
     logger.info(
-        "rewrite_online_node_snapshots: days=%d dry_run=%s rewritten=%d unchanged=%d no_raw_packets=%d",
+        "rewrite_online_node_snapshots: days=%d dry_run=%s rewritten=%d unchanged=%d left_alone=%d",
         days,
         dry_run,
         rewritten,
         unchanged,
-        no_raw_packets,
+        left_alone,
     )
     return {
         "rewritten": rewritten,
         "unchanged": unchanged,
-        "no_raw_packets": no_raw_packets,
+        "left_alone": left_alone,
         "earliest_corrected": earliest_corrected.isoformat() if earliest_corrected else None,
-        "earliest_with_raw_packets": earliest_with_packets.isoformat() if earliest_with_packets else None,
+        "earliest_covered": earliest_covered.isoformat() if earliest_covered else None,
         "days": days,
         "dry_run": dry_run,
     }
