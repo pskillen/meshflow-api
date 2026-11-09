@@ -62,7 +62,7 @@ def _aggregate_field(field: str, values: Sequence):
 
 
 def bucket_rows(rows: Iterable[dict], fields: Sequence[str], bucket: str) -> list[dict]:
-    """Roll ``rows`` (dicts with ``node_id`` and ``reported_time``) up into buckets.
+    """Roll ``rows`` (dicts with ``node_id``, ``reported_time`` and optionally ``id``) up into buckets.
 
     Returns one dict per populated bucket, newest first (matching the unbucketed
     ordering): ``node``, ``reported_time`` (bucket start), ``samples`` and each
@@ -74,7 +74,8 @@ def bucket_rows(rows: Iterable[dict], fields: Sequence[str], bucket: str) -> lis
 
     result = []
     for start in sorted(groups, reverse=True):
-        group = sorted(groups[start], key=lambda r: r["reported_time"])
+        # Ties on reported_time fall back to id so "latest" is deterministic.
+        group = sorted(groups[start], key=lambda r: (r["reported_time"], r.get("id", 0)))
         out = {"node": group[0]["node_id"], "reported_time": start, "samples": len(group)}
         for field in fields:
             out[field] = _aggregate_field(field, [r[field] for r in group])
