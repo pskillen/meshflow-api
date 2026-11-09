@@ -1,63 +1,50 @@
 """Lookup and creation of Meshtastic ObservedNodes by node number.
 
-``ObservedNode`` has no unique constraint on ``meshtastic_node_id`` yet, so concurrent first-sightings can leave
-duplicate rows. Every code path that finds or creates a Meshtastic ObservedNode by number goes through these helpers,
-so a duplicate degrades to "use the oldest row" instead of ``MultipleObjectsReturned``. The ``dedupe_observed_nodes``
-command (``nodes.services.observed_node_merge``) merges the duplicates away.
+A partial unique constraint (``nodes_observednode_mt_node_id_unique``) allows one Meshtastic ObservedNode per node
+number. Every code path that finds or creates one by number goes through these helpers. The
+``dedupe_observed_nodes`` command (``nodes.services.observed_node_merge``) stays as a check, useful after a restore.
 
-The keeper is the oldest row: ``created_at`` (nulls last), then ``internal_id``.
+The keeper when merging is the oldest row: ``created_at`` (nulls last), then ``internal_id``.
 """
 
-import logging
-
+from django.db import IntegrityError, transaction
 from django.db.models import F
 
-from common.mesh_node_helpers import meshtastic_id_to_hex
 from common.protocol import Protocol
 from nodes.models import ObservedNode
 from nodes.services.node_firmware import predicted_firmware_fields
-
-logger = logging.getLogger(__name__)
 
 # The order that picks the keeper among rows sharing a node number (also used by the merge).
 KEEPER_ORDERING = (F("created_at").asc(nulls_last=True), "internal_id")
 
 
 def get_meshtastic_observed_node(node_id: int) -> ObservedNode | None:
-    """Return the Meshtastic ObservedNode for ``node_id``, or None.
-
-    When duplicates exist, returns the oldest row and logs one WARNING naming the node and the row count.
-    """
-    rows = list(
-        ObservedNode.objects.filter(protocol=Protocol.MESHTASTIC, meshtastic_node_id=node_id).order_by(
-            *KEEPER_ORDERING
-        )[:2]
+    """Return the Meshtastic ObservedNode for ``node_id``, or None."""
+    return (
+        ObservedNode.objects.filter(protocol=Protocol.MESHTASTIC, meshtastic_node_id=node_id)
+        .order_by(*KEEPER_ORDERING)
+        .first()
     )
-    if not rows:
-        return None
-    if len(rows) > 1:
-        count = ObservedNode.objects.filter(protocol=Protocol.MESHTASTIC, meshtastic_node_id=node_id).count()
-        logger.warning(
-            "Duplicate ObservedNode rows for %s: %d rows share this node number; using the oldest (%s)",
-            meshtastic_id_to_hex(node_id),
-            count,
-            rows[0].internal_id,
-        )
-    return rows[0]
 
 
 def get_or_create_meshtastic_observed_node(node_id: int, *, defaults: dict | None = None) -> tuple[ObservedNode, bool]:
     """Return ``(node, created)`` for a Meshtastic node number, creating the row only when none exists.
 
-    Not atomic: a concurrent create can still produce a duplicate until the unique constraint lands.
+    Atomic: the lookup tolerates legacy duplicates (oldest row wins); a create that races another hits the unique
+    constraint, and the loser re-reads the winner's row and returns ``(existing, False)``.
     """
-    node = get_meshtastic_observed_node(node_id)
-    if node is not None:
-        return node, False
-    node = ObservedNode.objects.create(
-        protocol=Protocol.MESHTASTIC,
-        meshtastic_node_id=node_id,
-        **predicted_firmware_fields(node_id),
-        **(defaults or {}),
-    )
-    return node, True
+    existing = get_meshtastic_observed_node(node_id)
+    if existing is not None:
+        return existing, False
+    try:
+        with transaction.atomic():
+            return ObservedNode.objects.get_or_create(
+                protocol=Protocol.MESHTASTIC,
+                meshtastic_node_id=node_id,
+                defaults={**predicted_firmware_fields(node_id), **(defaults or {})},
+            )
+    except IntegrityError:
+        existing = get_meshtastic_observed_node(node_id)
+        if existing is None:
+            raise
+        return existing, False

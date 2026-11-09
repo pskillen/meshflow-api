@@ -1,8 +1,13 @@
-"""Duplicate Meshtastic ObservedNode rows must not break ingest (#480 part 1)."""
+"""Duplicate Meshtastic ObservedNode rows must not break ingest (#480 part 1), and creates are atomic (part 2).
 
-import logging
+The unique index normally forbids duplicates; the legacy-state tests drop it to rebuild what a pre-constraint
+database (or a restore) could hold, and the test transaction rolls the drop back.
+"""
+
 from datetime import timedelta
+from unittest import mock
 
+from django.db import IntegrityError, connection
 from django.urls import reverse
 from django.utils import timezone
 
@@ -28,7 +33,13 @@ def feeder(create_node_auth):
 
 
 @pytest.fixture
-def duplicates():
+def allow_duplicates(db):
+    with connection.cursor() as cursor:
+        cursor.execute("DROP INDEX nodes_observednode_mt_node_id_unique")
+
+
+@pytest.fixture
+def duplicates(allow_duplicates):
     """Two Meshtastic rows for NODE: the older one is the keeper."""
     now = timezone.now()
     keeper = ObservedNode.objects.create(
@@ -74,19 +85,13 @@ def _text_payload(packet_id=1002):
 
 
 @pytest.mark.django_db
-def test_helper_returns_oldest_row_and_warns_once(duplicates, caplog):
+def test_helper_returns_oldest_row_when_legacy_duplicates_exist(duplicates):
     keeper, _ = duplicates
-    with caplog.at_level(logging.WARNING, logger="nodes.services.observed_nodes"):
-        found = get_meshtastic_observed_node(NODE)
-    assert found.pk == keeper.pk
-    warnings = [r for r in caplog.records if r.levelno == logging.WARNING]
-    assert len(warnings) == 1
-    assert NODE_STR in warnings[0].getMessage()
-    assert "2 rows" in warnings[0].getMessage()
+    assert get_meshtastic_observed_node(NODE).pk == keeper.pk
 
 
 @pytest.mark.django_db
-def test_helper_orders_null_created_at_last():
+def test_helper_orders_null_created_at_last(allow_duplicates):
     older = ObservedNode.objects.create(
         protocol=Protocol.MESHTASTIC, meshtastic_node_id=NODE, long_name="A", short_name="A"
     )
@@ -106,7 +111,7 @@ def test_helper_ignores_meshcore_rows_and_missing():
 
 
 @pytest.mark.django_db
-def test_get_or_create_creates_then_reuses(caplog):
+def test_get_or_create_creates_then_reuses():
     node, created = get_or_create_meshtastic_observed_node(NODE, defaults={"long_name": "New", "short_name": "NEW"})
     assert created
     assert node.protocol == Protocol.MESHTASTIC
@@ -116,15 +121,13 @@ def test_get_or_create_creates_then_reuses(caplog):
 
 
 @pytest.mark.django_db
-def test_position_ingest_with_duplicates_attaches_to_keeper(feeder, duplicates, caplog):
+def test_position_ingest_with_duplicates_attaches_to_keeper(feeder, duplicates):
     keeper, other = duplicates
-    with caplog.at_level(logging.WARNING, logger="nodes.services.observed_nodes"):
-        response = _ingest(feeder, _position_payload())
+    response = _ingest(feeder, _position_payload())
     assert response.status_code == 201, response.content
     assert PositionPacket.objects.filter(from_int=NODE).count() == 1
     assert Position.objects.filter(node=keeper).count() == 1
     assert Position.objects.filter(node=other).count() == 0
-    assert any(NODE_STR in r.getMessage() for r in caplog.records if r.levelno == logging.WARNING)
 
 
 @pytest.mark.django_db
@@ -170,3 +173,26 @@ def test_ingest_400_names_the_node(feeder, monkeypatch):
     assert response.status_code == 400
     assert response.json()["node"] == NODE_STR
     assert response.json()["message"] == "kaboom"
+
+
+@pytest.mark.django_db
+def test_get_or_create_loses_a_create_race_and_returns_the_winner():
+    """Both callers miss the lookup; the second create hits the unique index and falls back to the winner's row."""
+    winner = ObservedNode.objects.create(
+        protocol=Protocol.MESHTASTIC, meshtastic_node_id=NODE, long_name="Winner", short_name="WIN"
+    )
+    lookups = iter([None, winner])  # the first lookup misses; the re-read after the IntegrityError finds the winner
+
+    with mock.patch("nodes.services.observed_nodes.get_meshtastic_observed_node", side_effect=lambda _id: next(lookups)):
+        node, created = get_or_create_meshtastic_observed_node(NODE, defaults={"long_name": "Loser", "short_name": "L"})
+
+    assert not created
+    assert node.pk == winner.pk
+    assert ObservedNode.objects.filter(meshtastic_node_id=NODE).count() == 1
+
+
+@pytest.mark.django_db
+def test_get_or_create_reraises_an_integrity_error_that_is_not_the_race():
+    with mock.patch.object(type(ObservedNode.objects), "get_or_create", side_effect=IntegrityError("other")):
+        with pytest.raises(IntegrityError):
+            get_or_create_meshtastic_observed_node(NODE)
