@@ -80,8 +80,8 @@ Labels come from the bot's subset (`labels` in `manifest.json`):
 | `kind:live` / `kind:replay` / `kind:self` | Heard on air / 2.8 connect-time replay / the feeder's own packet |
 | `port:<APP>`, `variant:<x>` | Portnum, and the telemetry variant |
 | `sender-id:mac` / `crc32` / `unknown` | How the sender's number was derived: from its MAC (2.7), from the crc32 of its key (2.8), or unknown (no user record, or only a zeroed MAC) |
-| `from-id-null` | `fromId` is present and null; the API derives `from_str` from `from` (G45, fixed) |
-| `hops-exhausted` | live packets only: `hopLimit` absent, proto3 drops zero, so the real value is 0, and the API stores `hop_limit` 0 (G44, fixed: the hop count is `hop_start`). On replays the absent `hopLimit` is firmware-fabricated, not an exhausted packet |
+| `from-id-null` | `fromId` is present and null; the API derives `from_str` from `from` |
+| `hops-exhausted` | live packets only: `hopLimit` absent, proto3 drops zero, so the real value is 0, and the API stores `hop_limit` 0; the hop count is then `hop_start`. On replays the absent `hopLimit` is firmware-fabricated, not an exhausted packet |
 | `fake-direct` | A replay whose hop fields look direct (`hopStart == hopLimit`); the API reports no hop count and not direct |
 | `stable-replay-id` | A replay keeps the same packet id across reconnects |
 | `no-rx-time` | The capture has no `rxTime`; the bot fills it from its clock, so the API sees one |

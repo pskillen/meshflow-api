@@ -234,7 +234,7 @@ class BasePacketSerializer(serializers.Serializer):
                     raise serializers.ValidationError({"channel": f"Observer has no {channel_field} mapping"})
                 channel_instance = getattr(observer, channel_field)
 
-        # G44: proto3 JSON omits a zero hopLimit. With hopStart present the fields are real, so absent means 0 (the
+        # proto3 JSON omits a zero hopLimit. With hopStart present the fields are real, so absent means 0 (the
         # packet used its last hop). A replay's fields are copied from the feeder: the absent value stays unknown.
         replayed = self._is_replayed(validated_data)
         hop_limit = validated_data.get("hop_limit")

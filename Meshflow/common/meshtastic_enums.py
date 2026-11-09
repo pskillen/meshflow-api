@@ -78,25 +78,36 @@ TRANSPORT_NAMES: dict[int, str] = {
 }
 
 
+TRANSPORT_MAX_LENGTH = 32  # ``PacketObservation.transport_mechanism`` column width
+
+
 def normalise_transport(value) -> "str | None":
     """Return the ``TransportMechanism`` name for a value given as a name, an int or a numeric string.
 
     A name passes through; an int maps; an unknown int gives ``TRANSPORT_<n>``; None and blank stay None. Absent
     is not LoRa: protobuf JSON omits 0 (``TRANSPORT_INTERNAL``), so callers store None for an absent field.
+    A result the column cannot hold (over 32 characters, or containing control characters) is None.
     """
     if value is None or isinstance(value, bool):
         return None
     if isinstance(value, int):
-        return TRANSPORT_NAMES.get(value, f"TRANSPORT_{value}")
-    if isinstance(value, str):
+        result = TRANSPORT_NAMES.get(value, f"TRANSPORT_{value}")
+    elif isinstance(value, str):
         text = value.strip()
         if not text:
             return None
         if text.isascii() and text.isdigit():
+            if len(text) > 9:  # also keeps int() clear of the interpreter's digit-string limit
+                return None
             number = int(text)
-            return TRANSPORT_NAMES.get(number, f"TRANSPORT_{number}")
-        return text
-    return None
+            result = TRANSPORT_NAMES.get(number, f"TRANSPORT_{number}")
+        else:
+            result = text
+    else:
+        return None
+    if len(result) > TRANSPORT_MAX_LENGTH or not result.isprintable():
+        return None
+    return result
 
 
 # Copied from v2.8.2 ``mesh.proto`` ``HardwareModel``; 141-152 are new in 2.8.

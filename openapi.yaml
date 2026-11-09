@@ -6991,7 +6991,8 @@ paths:
       description: >
         Meshtastic-only: ``node_id`` is the Meshtastic numeric node number of the managed/observed
         node. Returns packet counts grouped by source (direct sender or last-hop relay) for
-        Meshtastic packets received by that node.
+        Meshtastic packets received by that node. Excludes replayed observations and observations
+        that arrived over MQTT, UDP or the API (a null transport counts as radio).
       tags: [Nodes]
       security:
         - BearerAuth: []
