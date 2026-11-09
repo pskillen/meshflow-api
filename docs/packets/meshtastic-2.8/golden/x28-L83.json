@@ -67,7 +67,7 @@
       },
       "decoded_truncated": false,
       "from_int": 2740643160,
-      "from_str": null,
+      "from_str": "!a35ae558",
       "packet_id": 3209050879,
       "port_num": "STORE_FORWARD_APP",
       "telemetry_variant": null,
