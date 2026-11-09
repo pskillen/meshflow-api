@@ -34,7 +34,7 @@ Snapshots favour **completed hours** and fixed JSON shapes. Live endpoints suppo
 | Beat | Every hour at **minute :05 UTC** |
 | Migration | [`stats/migrations/0002_add_collect_stats_snapshots_periodic_task.py`](../../../Meshflow/stats/migrations/0002_add_collect_stats_snapshots_periodic_task.py) |
 | Backfill task | `stats.tasks.backfill_stats_snapshots` (default **30 days**) |
-| Management command | `python manage.py backfill_stats_snapshots [--days N]` |
+| Management command | `python manage.py backfill_stats_snapshots [--days N]` (add `--rewrite-online [--dry-run]` to correct existing online counts, see `online_nodes`) |
 
 ### “Previous completed hour” lag
 
@@ -68,14 +68,24 @@ Each run assigns a shared **`run_id`** (`uuid4`) on every snapshot created in th
 
 ### `online_nodes`
 
-**Window:** `threshold = recorded_at - ONLINE_NODE_WINDOW_HOURS` (env, default **2**). A node counts as “online” if heard at or after `threshold` relative to the snapshot hour boundary.
+**Window:** the closed interval `[recorded_at - ONLINE_NODE_WINDOW_HOURS, recorded_at]` (env, default **2**). A point at `recorded_at` means "nodes heard in the 2 hours up to that time". `recorded_at` is the start of the hour the job records, and the job runs at `:05` an hour later, so a point lags real time by about 1 h 05.
 
-| Scope | Query (normal collection) |
+| Scope | Query |
 | --- | --- |
-| Global | `ObservedNode.objects.filter(last_heard__gte=threshold).count()` — **all protocols today** (MC nodes included if they have `last_heard`) |
-| Per-constellation | Distinct `packet__from_int` on `PacketObservation` where `observer__constellation=…` and `rx_time__gte=threshold` |
+| Global | Distinct `from_int` on `MtRawPacket` with `first_reported_time` in the window, counting only packets with a non-replayed `PacketObservation` |
+| Per-constellation | Distinct `packet__from_int` on non-replayed `PacketObservation` where `observer__constellation=…` and `rx_time` in the window |
 
-**Backfill global variant:** `use_raw_packet_for_global=True` counts distinct `from_int` on `MtRawPacket` with `first_reported_time` in `[threshold, recorded_at]` instead of `last_heard`. Used when historical `last_heard` may not extend far enough (bulk-imported history).
+The live job and the backfill use the same queries. Any transport (RF or MQTT) counts as heard; this differs from neighbour stats, which are RF-only.
+
+**Why not `last_heard`:** it only moves forward, so a bound `last_heard <= recorded_at` would drop every node heard again after the snapshot hour. Counting from packets keeps those nodes in.
+
+**Cut-over (api#501):** before this change the window had no upper bound (`>= recorded_at - 2h` only), so each point covered everything heard since then, up to the moment the job ran (about 3 h 05). Historic points therefore sit higher than new ones, and the online line steps down where the new rule begins unless the history is rewritten:
+
+```bash
+python manage.py backfill_stats_snapshots --rewrite-online --days 30 [--dry-run]
+```
+
+`--rewrite-online` recomputes `count` (and `window_hours`) on **existing** `online_nodes` and `mc_online_nodes` rows from raw packets. It never inserts rows, so the accepted snapshot gaps stay gaps, and it leaves a row alone when no raw packet exists in its window (recomputing would turn real history into zero). It is idempotent, and prints the earliest corrected hour and the earliest row that had raw packets, so you can see how far back the correction reaches. Rows older than the raw packets keep their old, higher values.
 
 ### `packet_volume`
 
@@ -129,7 +139,7 @@ Daily count of active Meshtastic nodes per firmware generation (see [inferred fi
 
 | Variable | Default | Used by |
 | --- | --- | --- |
-| `ONLINE_NODE_WINDOW_HOURS` | `2` | `online_nodes` snapshot `window_hours` and threshold |
+| `ONLINE_NODE_WINDOW_HOURS` | `2` | `online_nodes` snapshot `window_hours` and window length |
 
 See also [RECENCY.md](../../RECENCY.md) § `stats/`.
 
