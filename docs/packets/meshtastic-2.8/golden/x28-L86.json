@@ -36,7 +36,9 @@
     "rx_rssi": -80.0,
     "rx_snr": 6.0,
     "rx_time": "2026-11-08T13:34:55Z",
-    "rx_time_estimated": false
+    "rx_time_estimated": false,
+    "transport_mechanism": "TRANSPORT_LORA",
+    "via_mqtt": false
   },
   "observed_node": {
     "environment_exposure": 0,

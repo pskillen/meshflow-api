@@ -674,3 +674,40 @@ def test_traceroute_skips_hop_when_relay_has_no_position(
     evs = DxEvent.objects.filter(reason_code=DxReasonCode.TRACEROUTE_DISTANT_HOP)
     assert evs.filter(destination=target).count() == 1
     assert not evs.filter(destination=relay_no_pos).exists()
+
+
+@pytest.mark.django_db
+@override_settings(
+    DX_MONITORING_DETECTION_ENABLED=True,
+    DX_MONITORING_CLUSTER_DISTANCE_KM=150.0,
+    DX_MONITORING_DIRECT_DISTANCE_KM=80.0,
+)
+@pytest.mark.parametrize("kwargs", [{"via_mqtt": True}, {"transport_mechanism": "TRANSPORT_MQTT"}])
+def test_mqtt_observation_does_not_emit_packet_ingest_dx(
+    create_managed_node,
+    create_packet_observation,
+    create_user,
+    create_position_packet,
+    kwargs,
+):
+    """A packet downlinked from MQTT looks direct (hop_start == hop_limit) but did not arrive by radio."""
+    observer = create_managed_node(
+        meshtastic_node_id=0xE2000013,
+        default_location_latitude=55.95,
+        default_location_longitude=-3.19,
+    )
+    user = create_user()
+    remote_id = 0xBEEF0213
+    pos = create_position_packet(
+        packet_id=960003,
+        from_int=remote_id,
+        from_str=meshtastic_id_to_hex(remote_id),
+        latitude=51.5,
+        longitude=-0.12,
+    )
+    pos.first_reported_time = timezone.now()
+    pos.save(update_fields=["first_reported_time"])
+    obs = create_packet_observation(packet=pos, observer=observer, **kwargs)
+    PositionPacketService().process_packet(pos, observer, obs, user)
+
+    assert not DxEvent.objects.exists()

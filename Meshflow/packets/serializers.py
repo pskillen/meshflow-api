@@ -15,7 +15,7 @@ from common.mesh_node_helpers import (
     observed_node_id_str,
     parse_b64_mac_address,
 )
-from common.meshtastic_enums import normalise_hw_model, normalise_portnum
+from common.meshtastic_enums import normalise_hw_model, normalise_portnum, normalise_transport
 from common.meshtastic_identity import (
     clamp_last_heard,
     has_name_fields,
@@ -134,6 +134,9 @@ class BasePacketSerializer(serializers.Serializer):
     rxRssi = serializers.FloatField(source="rx_rssi", required=False, allow_null=True)
     rxSnr = serializers.FloatField(source="rx_snr", required=False, allow_null=True)
     relayNode = serializers.IntegerField(source="relay_node", required=False, allow_null=True)
+    viaMqtt = serializers.BooleanField(source="via_mqtt", required=False, allow_null=True)
+    # Name or int (lib 2.7.11 sends ints it has no name for); normalised in to_internal_value.
+    transportMechanism = serializers.JSONField(source="transport_mechanism", required=False, allow_null=True)
 
     # Additional fields from OpenAPI spec
     pkiEncrypted = serializers.BooleanField(source="pki_encrypted", required=False, allow_null=True)
@@ -166,6 +169,8 @@ class BasePacketSerializer(serializers.Serializer):
         bitfield = data["decoded"].get("bitfield") if isinstance(data.get("decoded"), dict) else None
         if isinstance(bitfield, int) and not isinstance(bitfield, bool):
             validated_data["bitfield"] = bitfield
+
+        validated_data["transport_mechanism"] = normalise_transport(data.get("transportMechanism"))
 
         # Convert rxTime to a datetime object with validation. A feeder with no rxTime (protobuf3 drops 0)
         # gets the API clock, flagged on the observation.
@@ -230,17 +235,27 @@ class BasePacketSerializer(serializers.Serializer):
                     raise serializers.ValidationError({"channel": f"Observer has no {channel_field} mapping"})
                 channel_instance = getattr(observer, channel_field)
 
+        # proto3 JSON omits a zero hopLimit. With hopStart present the fields are real, so absent means 0 (the
+        # packet used its last hop). A replay's fields are copied from the feeder: the absent value stays unknown.
+        replayed = self._is_replayed(validated_data)
+        hop_limit = validated_data.get("hop_limit")
+        hop_start = validated_data.get("hop_start")
+        if hop_limit is None and hop_start and not replayed:
+            hop_limit = 0
+
         # Create new observation
         self.observation = PacketObservation.objects.create(
             packet=packet,
             observer=observer,
             channel=channel_instance,
-            hop_limit=validated_data.get("hop_limit"),
-            hop_start=validated_data.get("hop_start"),
+            hop_limit=hop_limit,
+            hop_start=hop_start,
             bitfield=validated_data.get("bitfield"),
             rx_time=validated_data.get("rx_time"),
             rx_time_estimated=validated_data.get("rx_time_estimated", False),
-            replayed=self._is_replayed(validated_data),
+            replayed=replayed,
+            via_mqtt=bool(validated_data.get("via_mqtt")),
+            transport_mechanism=normalise_transport(validated_data.get("transport_mechanism")),
             rx_rssi=validated_data.get("rx_rssi"),
             rx_snr=validated_data.get("rx_snr"),
             relay_node=validated_data.get("relay_node"),
@@ -1798,6 +1813,8 @@ class PrefetchedPacketObservationSerializer(serializers.ModelSerializer):
             "rx_time",
             "rx_rssi",
             "replayed",
+            "via_mqtt",
+            "transport_mechanism",
             "rx_snr",
             "direct_from_sender",
             "hop_count",

@@ -716,6 +716,21 @@ components:
           type: integer
           nullable: true
           description: The ID of the node that relayed the packet
+        viaMqtt:
+          type: boolean
+          nullable: true
+          description: >
+            True when the packet came from MQTT rather than the feeder's radio. Absent is false. Stored as
+            PacketObservation.via_mqtt; a non-RF observation has no hop count and is never direct.
+        transportMechanism:
+          oneOf:
+            - type: string
+            - type: integer
+          nullable: true
+          description: >
+            How the packet reached the feeder (TRANSPORT_LORA, TRANSPORT_MQTT, TRANSPORT_MULTICAST_UDP,
+            TRANSPORT_UNICAST_UDP, TRANSPORT_API, ...), as a name or the enum number. Absent means
+            TRANSPORT_INTERNAL (protobuf JSON omits 0) and is stored null, not LoRa.
         pkiEncrypted:
           type: boolean
           nullable: true
@@ -3078,6 +3093,16 @@ components:
         replayed:
           type: boolean
           description: True for a Meshtastic 2.8 connect-time replay (not a radio reception). Then hop_count is null and direct_from_sender is false
+        via_mqtt:
+          type: boolean
+          nullable: true
+          description: True when the packet reached the feeder over MQTT. Null for rows from before this field
+        transport_mechanism:
+          type: string
+          nullable: true
+          description: >
+            How the packet reached the feeder (e.g. TRANSPORT_LORA, TRANSPORT_MQTT). Null for rows from before this
+            field and for the feeder's own packets. A non-RF transport gives hop_count null and direct_from_sender false
         rx_snr:
           type: number
           format: float
@@ -7186,7 +7211,8 @@ paths:
       description: >
         Meshtastic-only: ``node_id`` is the Meshtastic numeric node number of the managed/observed
         node. Returns packet counts grouped by source (direct sender or last-hop relay) for
-        Meshtastic packets received by that node.
+        Meshtastic packets received by that node. Excludes replayed observations and observations
+        that arrived over MQTT, UDP or the API (a null transport counts as radio).
       tags: [Nodes]
       security:
         - BearerAuth: []

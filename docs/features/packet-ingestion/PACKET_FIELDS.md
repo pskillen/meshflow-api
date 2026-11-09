@@ -21,8 +21,19 @@ All packet types share these common fields:
 | raw        | string    | Raw packet data          | Text format of the complete packet  |
 | rxRssi     | float     | Received signal strength | Absent on a 2.8 replay; feeds replay detection |
 | priority   | string    | Packet priority          | `BACKGROUND` on a 2.8 replay; feeds replay detection |
-| transportMechanism | string | How the packet arrived | `TRANSPORT_LORA` on a 2.8 replay; `TRANSPORT_MQTT` is never a replay. Feeds replay detection, not stored |
+| transportMechanism | string or int | How the packet arrived | `TRANSPORT_LORA` on a 2.8 replay; `TRANSPORT_MQTT` is never a replay. Feeds replay detection and is stored as `PacketObservation.transport_mechanism` (an int becomes its name, an unknown int `TRANSPORT_<n>`). **Absent means `TRANSPORT_INTERNAL`** (protobuf JSON omits 0: the feeder's own packet), not LoRa: stored null |
+| viaMqtt    | boolean   | Packet came from MQTT    | Stored as `PacketObservation.via_mqtt`; absent is false |
 | replayed   | boolean   | Bot-side replay flag     | Optional (body only, default false). Stored as `PacketObservation.replayed` |
+
+### Transport and hop limit
+
+`PacketObservation.via_mqtt` and `transport_mechanism` record how the packet reached the feeder. Both are null on rows
+from before they existed, and `transport_mechanism` is null for the feeder's own packets (absent means
+`TRANSPORT_INTERNAL`). Null counts as radio. MQTT, multicast UDP, unicast UDP and API packets are not radio: see
+[meshtastic.md](meshtastic.md#non-rf-transports). The observation API returns both fields.
+
+`hopLimit` absent with a non-zero `hopStart` is stored as `hop_limit` 0 (proto3 JSON omits zero: the packet used its
+last hop). On a replay, or with no `hopStart`, it stays null (unknown).
 
 ### Replayed packets
 

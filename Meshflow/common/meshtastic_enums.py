@@ -64,6 +64,52 @@ def normalise_portnum(value) -> str:
     return str(value)
 
 
+# Copied from v2.8.2 ``mesh.proto`` ``MeshPacket.TransportMechanism``.
+TRANSPORT_NAMES: dict[int, str] = {
+    0: "TRANSPORT_INTERNAL",
+    1: "TRANSPORT_LORA",
+    2: "TRANSPORT_LORA_ALT1",
+    3: "TRANSPORT_LORA_ALT2",
+    4: "TRANSPORT_LORA_ALT3",
+    5: "TRANSPORT_MQTT",
+    6: "TRANSPORT_MULTICAST_UDP",
+    7: "TRANSPORT_API",
+    8: "TRANSPORT_UNICAST_UDP",
+}
+
+
+TRANSPORT_MAX_LENGTH = 32  # ``PacketObservation.transport_mechanism`` column width
+
+
+def normalise_transport(value) -> "str | None":
+    """Return the ``TransportMechanism`` name for a value given as a name, an int or a numeric string.
+
+    A name passes through; an int maps; an unknown int gives ``TRANSPORT_<n>``; None and blank stay None. Absent
+    is not LoRa: protobuf JSON omits 0 (``TRANSPORT_INTERNAL``), so callers store None for an absent field.
+    A result the column cannot hold (over 32 characters, or containing control characters) is None.
+    """
+    if value is None or isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        result = TRANSPORT_NAMES.get(value, f"TRANSPORT_{value}")
+    elif isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return None
+        if text.isascii() and text.isdigit():
+            if len(text) > 9:  # also keeps int() clear of the interpreter's digit-string limit
+                return None
+            number = int(text)
+            result = TRANSPORT_NAMES.get(number, f"TRANSPORT_{number}")
+        else:
+            result = text
+    else:
+        return None
+    if len(result) > TRANSPORT_MAX_LENGTH or not result.isprintable():
+        return None
+    return result
+
+
 # Copied from v2.8.2 ``mesh.proto`` ``HardwareModel``; 141-152 are new in 2.8.
 HARDWARE_MODEL_NAMES: dict[int, str] = {
     0: "UNSET",

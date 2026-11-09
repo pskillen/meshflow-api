@@ -32,7 +32,9 @@
     "rx_rssi": null,
     "rx_snr": null,
     "rx_time": "2026-11-08T14:37:06Z",
-    "rx_time_estimated": false
+    "rx_time_estimated": false,
+    "transport_mechanism": null,
+    "via_mqtt": false
   },
   "observed_node": {
     "environment_exposure": 0,

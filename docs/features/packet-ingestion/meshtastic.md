@@ -200,6 +200,22 @@ the API has never seen creates no node (the bot's NodeDB upload still does). `ob
 `observation_is_direct` false for it, so the observation API shows no hop count and not direct. Stats exclude it
 ([packet stats](../packet-stats/meshtastic.md)); feeder liveness still counts the upload.
 
+## Non-RF transports
+
+A feeder also receives packets that did not come over its radio. `viaMqtt` and `transportMechanism` are stored on
+`PacketObservation` (`via_mqtt`, `transport_mechanism`). An observation is **non-RF** when `via_mqtt` is true or the
+transport is `TRANSPORT_MQTT`, `TRANSPORT_MULTICAST_UDP`, `TRANSPORT_UNICAST_UDP` or `TRANSPORT_API`
+(`packets.hops.NON_RF_TRANSPORTS`). A null transport is RF: history, and the feeder's own packets (absent
+`transportMechanism` is `TRANSPORT_INTERNAL`, not LoRa).
+
+A non-RF observation is treated like a replay by the hop helpers: `observation_hop_count` returns null,
+`observation_is_direct` false (so no DX candidate), and `update_inferred_max_hops` ignores it. Neighbour stats read
+`rf_observations(...)`, which drops non-RF rows and keeps nulls. Packet-volume stats are unchanged: they count what a
+feeder uploaded. RF propagation uses the owner-entered RF profile and reads no observations.
+
+`hopLimit` absent with a non-zero `hopStart` is stored as 0 (last hop used), not unknown; see
+[PACKET_FIELDS.md](PACKET_FIELDS.md#transport-and-hop-limit).
+
 ## Fixtures and goldens
 
 `docs/packets/meshtastic-2.8/` holds the API's side of the 2.7/2.8 capture subset the bot labels (36 packets from three

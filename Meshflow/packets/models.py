@@ -334,6 +334,10 @@ class PacketObservation(models.Model):
     rx_snr = models.FloatField(null=True)
     upload_time = models.DateTimeField(null=False, default=timezone.now)
     relay_node = models.BigIntegerField(null=True)
+    # How the packet reached the feeder. Null = a row from before these fields (counts as RF). An absent
+    # transportMechanism on a new row is also null: it means TRANSPORT_INTERNAL, the feeder's own packet.
+    via_mqtt = models.BooleanField(null=True)
+    transport_mechanism = models.CharField(max_length=32, null=True)
 
     class Meta:
         verbose_name = _("Packet observation")
