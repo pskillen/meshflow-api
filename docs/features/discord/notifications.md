@@ -34,7 +34,7 @@ Every DM attempt (sent, skipped or failed) is recorded in `DiscordNotificationAu
 | `feeder_identity` | `feeder_identity_changed` | A feeder's node number was re-pointed automatically. Sent to the feeder's owner: "Your feeder <name> changed node number: !old is now !new. It keeps its history and API key. Nothing to do." |
 | `feeder_identity` | `feeder_identity_flagged` | A feeder reported a new node number that could not be applied automatically. Sent to the owner with the reason and "Open My Nodes to review it." |
 
-See [Managed nodes](../node-lifecycle/managed-nodes.md#node-number-changes-28) for the feeder events. Manual re-points and `key_changed` events send no DM.
+See [Managed nodes](../node-lifecycle/managed-nodes.md#node-number-changes-28) for the feeder events. Manual re-points and `key_changed` events (first public key recorded) send no DM. Flagged DMs are limited to one per feeder every 24 hours.
 
 ## Bot setup
 

@@ -34,7 +34,7 @@ FLAGGED_DM_COOLDOWN = timedelta(hours=24)
 _REASON_TEXT = {
     Reason.KEY_NOT_REPORTED: "it did not report a public key",
     Reason.CRC_MISMATCH: "the reported public key does not match the new number",
-    Reason.KEY_MISMATCH: "the reported public key differs from the stored one",
+    Reason.KEY_MISMATCH: "the reported public key is not one we can trust for this feeder yet",
     Reason.SHARED_KEY: "another node uses the same public key",
     Reason.NUMBER_COLLISION: "another feeder already has that number",
     Reason.AUTO_REKEY_DISABLED: "automatic updates are off on this server, or this number was reversed by hand",
