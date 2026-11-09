@@ -21,6 +21,7 @@ from common.protocol import Protocol
 from common.throttling import GUEST_EXPENSIVE_THROTTLE_CLASSES, GUEST_READ_THROTTLE_CLASSES
 from nodes.models import ManagedNode, ObservedNode
 from nodes.services.observed_nodes import get_meshtastic_observed_node
+from packets.hops import rf_observations
 from packets.models import MtRawPacket, PacketObservation
 
 from .models import StatsSnapshot
@@ -331,7 +332,7 @@ def node_neighbour_stats(request, node_id: int):
 
     try:
         observations = (
-            PacketObservation.objects.filter(observer=managed_node, replayed=False)
+            rf_observations(PacketObservation.objects.filter(observer=managed_node, replayed=False))
             .exclude(
                 Q(packet__devicemetricspacket__isnull=False) & Q(packet__from_int=F("observer__meshtastic_node_id"))
             )
