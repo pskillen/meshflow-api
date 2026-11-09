@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 
 from django.db.models import Count, Exists, OuterRef, Q
-from django.db.models.functions import TruncDate
+from django.db.models.functions import Coalesce, Substr, TruncDate
 from django.utils import timezone
 
 from celery import shared_task
@@ -55,78 +55,79 @@ def _snapshot_exists(recorded_at: datetime, stat_type: str, constellation_id: Op
     return qs.exists()
 
 
+def _online_window(recorded_at: datetime) -> tuple[datetime, datetime]:
+    """The closed window [recorded_at - ONLINE_NODE_WINDOW_HOURS, recorded_at] an online snapshot counts."""
+    return recorded_at - timedelta(hours=ONLINE_NODE_WINDOW_HOURS), recorded_at
+
+
+def _mt_online_count(recorded_at: datetime, constellation: Optional[Constellation] = None) -> int:
+    """
+    Distinct Meshtastic senders heard in [recorded_at - window, recorded_at].
+
+    Counted from packets, not ObservedNode.last_heard: last_heard only moves forward, so a node heard
+    again after recorded_at would drop out of a last_heard upper bound. Packets whose only observations
+    are 2.8 connect-time replays are ignored. Any transport (RF or MQTT) counts as heard.
+    """
+    start, end = _online_window(recorded_at)
+    if constellation is None:
+        return (
+            MtRawPacket.objects.filter(
+                from_int__isnull=False,
+                first_reported_time__gte=start,
+                first_reported_time__lte=end,
+            )
+            .filter(Exists(PacketObservation.objects.filter(packet_id=OuterRef("id"), replayed=False)))
+            .values("from_int")
+            .distinct()
+            .count()
+        )
+    return (
+        PacketObservation.objects.filter(
+            observer__constellation=constellation,
+            rx_time__gte=start,
+            rx_time__lte=end,
+            replayed=False,
+        )
+        .values("packet__from_int")
+        .distinct()
+        .count()
+    )
+
+
 def _collect_online_nodes(
     recorded_at: datetime,
     *,
     run_id: Optional[uuid.UUID] = None,
     skip_existing: bool = False,
-    use_raw_packet_for_global: bool = False,
 ) -> tuple[int, int]:
     """
-    Collect online_nodes snapshots (hourly) for global and per-constellation.
-    Uses threshold = recorded_at - ONLINE_NODE_WINDOW_HOURS for consistency.
-    Returns (created, skipped).
-
-    When use_raw_packet_for_global=True, derives global count from MtRawPacket
-    (distinct from_int in window) instead of ObservedNode.last_heard. Use for
-    backfill when last_heard may not extend far back (e.g. bulk-imported packets).
+    Collect online_nodes snapshots (hourly) for global and per-constellation: nodes heard in the
+    ONLINE_NODE_WINDOW_HOURS up to recorded_at (see _mt_online_count). Returns (created, skipped).
     """
-    window = timedelta(hours=ONLINE_NODE_WINDOW_HOURS)
-    threshold = recorded_at - window
     created = 0
     skipped = 0
 
-    # Global: ObservedNode.last_heard or MtRawPacket-based (for backfill)
     if skip_existing and _snapshot_exists(recorded_at, "online_nodes", None):
         skipped += 1
     else:
-        if use_raw_packet_for_global:
-            # Derive from MtRawPacket for historical hours when last_heard may be incomplete.
-            # Window [threshold, recorded_at] = nodes heard in the 2h before the hour boundary.
-            global_count = (
-                MtRawPacket.objects.filter(
-                    from_int__isnull=False,
-                    first_reported_time__gte=threshold,
-                    first_reported_time__lte=recorded_at,
-                )
-                .values_list("from_int", flat=True)
-                .distinct()
-                .count()
-            )
-        else:
-            global_count = ObservedNode.objects.filter(
-                protocol=Protocol.MESHTASTIC,
-                last_heard__gte=threshold,
-            ).count()
         StatsSnapshot.objects.create(
             recorded_at=recorded_at,
             stat_type="online_nodes",
             constellation=None,
-            value={"count": global_count, "window_hours": ONLINE_NODE_WINDOW_HOURS},
+            value={"count": _mt_online_count(recorded_at), "window_hours": ONLINE_NODE_WINDOW_HOURS},
             run_id=run_id,
         )
         created += 1
 
-    # Per-constellation: distinct nodes via PacketObservation
     for constellation in Constellation.objects.all():
         if skip_existing and _snapshot_exists(recorded_at, "online_nodes", constellation.id):
             skipped += 1
         else:
-            count = (
-                PacketObservation.objects.filter(
-                    observer__constellation=constellation,
-                    rx_time__gte=threshold,
-                    replayed=False,
-                )
-                .values("packet__from_int")
-                .distinct()
-                .count()
-            )
             StatsSnapshot.objects.create(
                 recorded_at=recorded_at,
                 stat_type="online_nodes",
                 constellation=constellation,
-                value={"count": count, "window_hours": ONLINE_NODE_WINDOW_HOURS},
+                value={"count": _mt_online_count(recorded_at, constellation), "window_hours": ONLINE_NODE_WINDOW_HOURS},
                 run_id=run_id,
             )
             created += 1
@@ -306,43 +307,59 @@ MC_PACKET_TYPE_FILTERS = {
 }
 
 
+def _mc_sender_key():
+    """
+    Identity of a MeshCore sender: the 12-hex pubkey prefix. from_pubkey is nullable (contact texts and
+    some adverts carry only the prefix, and those still advance last_heard), so key on the prefix of the
+    full key where there is one, else the stored prefix.
+    """
+    return Coalesce(Substr("from_pubkey", 1, 12), "from_pubkey_prefix")
+
+
+def _mc_online_count(recorded_at: datetime, constellation: Optional[Constellation] = None) -> int:
+    """Distinct MeshCore senders heard in [recorded_at - window, recorded_at]; see _mt_online_count."""
+    start, end = _online_window(recorded_at)
+    if constellation is None:
+        return (
+            MeshCoreRawPacket.objects.filter(first_reported_time__gte=start, first_reported_time__lte=end)
+            .annotate(_sender=_mc_sender_key())
+            .filter(_sender__isnull=False)
+            .values("_sender")
+            .distinct()
+            .count()
+        )
+    return (
+        MeshCorePacketObservation.objects.filter(
+            observer__constellation=constellation,
+            rx_time__gte=start,
+            rx_time__lte=end,
+        )
+        .annotate(_sender=Coalesce(Substr("packet__from_pubkey", 1, 12), "packet__from_pubkey_prefix"))
+        .filter(_sender__isnull=False)
+        .values("_sender")
+        .distinct()
+        .count()
+    )
+
+
 def _collect_mc_online_nodes(
     recorded_at: datetime,
     *,
     run_id: Optional[uuid.UUID] = None,
     skip_existing: bool = False,
-    use_raw_packet_for_global: bool = False,
 ) -> tuple[int, int]:
     """Collect mc_online_nodes snapshots (hourly) for global and per-constellation."""
-    window = timedelta(hours=ONLINE_NODE_WINDOW_HOURS)
-    threshold = recorded_at - window
     created = 0
     skipped = 0
 
     if skip_existing and _snapshot_exists(recorded_at, "mc_online_nodes", None):
         skipped += 1
     else:
-        if use_raw_packet_for_global:
-            global_count = (
-                MeshCoreRawPacket.objects.filter(
-                    from_pubkey__isnull=False,
-                    first_reported_time__gte=threshold,
-                    first_reported_time__lte=recorded_at,
-                )
-                .values_list("from_pubkey", flat=True)
-                .distinct()
-                .count()
-            )
-        else:
-            global_count = ObservedNode.objects.filter(
-                protocol=Protocol.MESHCORE,
-                last_heard__gte=threshold,
-            ).count()
         StatsSnapshot.objects.create(
             recorded_at=recorded_at,
             stat_type="mc_online_nodes",
             constellation=None,
-            value={"count": global_count, "window_hours": ONLINE_NODE_WINDOW_HOURS},
+            value={"count": _mc_online_count(recorded_at), "window_hours": ONLINE_NODE_WINDOW_HOURS},
             run_id=run_id,
         )
         created += 1
@@ -351,20 +368,14 @@ def _collect_mc_online_nodes(
         if skip_existing and _snapshot_exists(recorded_at, "mc_online_nodes", constellation.id):
             skipped += 1
         else:
-            count = (
-                MeshCorePacketObservation.objects.filter(
-                    observer__constellation=constellation,
-                    rx_time__gte=threshold,
-                )
-                .values("packet__from_pubkey")
-                .distinct()
-                .count()
-            )
             StatsSnapshot.objects.create(
                 recorded_at=recorded_at,
                 stat_type="mc_online_nodes",
                 constellation=constellation,
-                value={"count": count, "window_hours": ONLINE_NODE_WINDOW_HOURS},
+                value={
+                    "count": _mc_online_count(recorded_at, constellation),
+                    "window_hours": ONLINE_NODE_WINDOW_HOURS,
+                },
                 run_id=run_id,
             )
             created += 1
@@ -706,7 +717,7 @@ def backfill_stats_snapshots(days: int = 30):
 
     for i in tqdm(range(total_hours), unit="stats", desc="Backfilling stats"):
         hour = start_hour + timedelta(hours=i)
-        c, s = _collect_online_nodes(hour, run_id=run_id, skip_existing=True, use_raw_packet_for_global=True)
+        c, s = _collect_online_nodes(hour, run_id=run_id, skip_existing=True)
         created += c
         skipped += s
 
@@ -718,7 +729,7 @@ def backfill_stats_snapshots(days: int = 30):
         created += c3
         skipped += s3
 
-        c4, s4 = _collect_mc_online_nodes(hour, run_id=run_id, skip_existing=True, use_raw_packet_for_global=True)
+        c4, s4 = _collect_mc_online_nodes(hour, run_id=run_id, skip_existing=True)
         created += c4
         skipped += s4
 
@@ -737,3 +748,79 @@ def backfill_stats_snapshots(days: int = 30):
         skipped,
     )
     return {"created": created, "skipped": skipped, "days": days}
+
+
+ONLINE_SNAPSHOT_TYPES = {
+    "online_nodes": (MtRawPacket, _mt_online_count),
+    "mc_online_nodes": (MeshCoreRawPacket, _mc_online_count),
+}
+
+
+@shared_task
+def rewrite_online_node_snapshots(days: int = 30, dry_run: bool = False):
+    """
+    Recompute the count of existing online_nodes / mc_online_nodes rows from raw packets, using the
+    bounded [recorded_at - window, recorded_at] definition (api#501).
+
+    Rewrites rows in place and never inserts: an hour with no row stays without one (the snapshot gap is
+    accepted). A row whose window holds no raw packets at all (packets pruned or never stored) is left
+    as it is, since recomputing would turn real history into zero. Idempotent: a second run changes
+    nothing. Returns the counts and `earliest_corrected`, the first hour whose value changed.
+    """
+    end_hour = timezone.now().replace(minute=0, second=0, microsecond=0)
+    start_hour = end_hour - timedelta(days=days)
+
+    rewritten = unchanged = no_raw_packets = 0
+    earliest_corrected: Optional[datetime] = None
+    earliest_with_packets: Optional[datetime] = None
+
+    rows = (
+        StatsSnapshot.objects.filter(
+            stat_type__in=ONLINE_SNAPSHOT_TYPES, recorded_at__gte=start_hour, recorded_at__lt=end_hour
+        )
+        .select_related("constellation")
+        .order_by("recorded_at")
+    )
+    has_packets: dict[tuple[str, datetime], bool] = {}
+    for row in tqdm(rows.iterator(), unit="rows", desc="Rewriting online snapshots"):
+        raw_model, count_fn = ONLINE_SNAPSHOT_TYPES[row.stat_type]
+        key = (row.stat_type, row.recorded_at)
+        if key not in has_packets:
+            start, end = _online_window(row.recorded_at)
+            has_packets[key] = raw_model.objects.filter(
+                first_reported_time__gte=start, first_reported_time__lte=end
+            ).exists()
+        if not has_packets[key]:
+            no_raw_packets += 1
+            continue
+        if earliest_with_packets is None:
+            earliest_with_packets = row.recorded_at
+
+        new_count = count_fn(row.recorded_at, row.constellation)
+        if row.value.get("count") == new_count and row.value.get("window_hours") == ONLINE_NODE_WINDOW_HOURS:
+            unchanged += 1
+            continue
+        if earliest_corrected is None or row.recorded_at < earliest_corrected:
+            earliest_corrected = row.recorded_at
+        rewritten += 1
+        if not dry_run:
+            row.value = {**row.value, "count": new_count, "window_hours": ONLINE_NODE_WINDOW_HOURS}
+            row.save(update_fields=["value"])
+
+    logger.info(
+        "rewrite_online_node_snapshots: days=%d dry_run=%s rewritten=%d unchanged=%d no_raw_packets=%d",
+        days,
+        dry_run,
+        rewritten,
+        unchanged,
+        no_raw_packets,
+    )
+    return {
+        "rewritten": rewritten,
+        "unchanged": unchanged,
+        "no_raw_packets": no_raw_packets,
+        "earliest_corrected": earliest_corrected.isoformat() if earliest_corrected else None,
+        "earliest_with_raw_packets": earliest_with_packets.isoformat() if earliest_with_packets else None,
+        "days": days,
+        "dry_run": dry_run,
+    }

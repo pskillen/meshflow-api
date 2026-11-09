@@ -8,6 +8,7 @@ import pytest
 
 from common.protocol import Protocol
 from meshcore_packets.models import MeshCorePacketObservation, MeshCorePayloadType, MeshCoreRawPacket
+from packets.models import MtRawPacket, PacketObservation
 from stats.models import StatsSnapshot
 from stats.tasks import (
     _collect_mc_new_nodes,
@@ -18,20 +19,26 @@ from stats.tasks import (
 
 
 @pytest.mark.django_db
-def test_mt_online_nodes_excludes_meshcore_observed_node(create_observed_node):
-    """#365: MC ObservedNode must not count toward online_nodes."""
+def test_mt_online_nodes_excludes_meshcore_packets(meshcore_feeder, create_managed_node):
+    """#365: MeshCore traffic must not count toward online_nodes."""
     hour = timezone.make_aware(datetime(2025, 3, 15, 12, 0, 0))
-    mc_node = create_observed_node(
-        meshtastic_node_id=None,
-        protocol=Protocol.MESHCORE,
-        mc_pubkey="b" * 64,
+    heard = timezone.make_aware(datetime(2025, 3, 15, 11, 30, 0))
+    mc_observer = meshcore_feeder["node"]
+    MeshCoreRawPacket.objects.create(
+        observer=mc_observer,
+        payload_type=MeshCorePayloadType.ADVERT,
+        event_type="advertisement",
+        from_pubkey="b" * 64,
+        rx_time=heard,
+        first_reported_time=heard,
+        raw_json={},
     )
-    mc_node.last_heard = timezone.make_aware(datetime(2025, 3, 15, 11, 30, 0))
-    mc_node.save()
 
-    mt_node = create_observed_node(meshtastic_node_id=222222222)
-    mt_node.last_heard = timezone.make_aware(datetime(2025, 3, 15, 11, 30, 0))
-    mt_node.save()
+    mt_observer = create_managed_node(meshtastic_node_id=111111111)
+    packet = MtRawPacket.objects.create(packet_id=1, from_int=222222222, first_reported_time=heard)
+    PacketObservation.objects.create(
+        packet=packet, observer=mt_observer, channel=mt_observer.meshtastic_channel_0, rx_time=heard
+    )
 
     _collect_online_nodes(hour, run_id=None)
 
@@ -73,17 +80,9 @@ def test_mc_packet_volume_by_type(meshcore_feeder):
 
 
 @pytest.mark.django_db
-def test_mc_online_nodes_global_and_constellation(meshcore_feeder, create_observed_node):
-    """mc_online_nodes uses MC last_heard globally and observations per constellation."""
+def test_mc_online_nodes_global_and_constellation(meshcore_feeder):
+    """mc_online_nodes counts senders heard in the window, globally and per constellation."""
     hour = timezone.make_aware(datetime(2025, 3, 15, 12, 0, 0))
-    mc_node = create_observed_node(
-        meshtastic_node_id=None,
-        protocol=Protocol.MESHCORE,
-        mc_pubkey="d" * 64,
-    )
-    mc_node.last_heard = timezone.make_aware(datetime(2025, 3, 15, 11, 30, 0))
-    mc_node.save()
-
     observer = meshcore_feeder["node"]
     packet = MeshCoreRawPacket.objects.create(
         observer=observer,
