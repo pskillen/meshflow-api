@@ -338,7 +338,9 @@ def _check_owner_target(locked, new_number) -> None:
             FeederRepointError.CODE_TARGET_KEY_MISMATCH, "The node at that number has a different public key."
         )
     if _belongs_to_someone_else(target, locked.owner_id):
-        raise FeederRepointError(FeederRepointError.CODE_TARGET_CLAIMED, "The node at that number belongs to someone else.")
+        raise FeederRepointError(
+            FeederRepointError.CODE_TARGET_CLAIMED, "The node at that number belongs to someone else."
+        )
 
 
 def repoint_feeder(node, new_number=None, *, actor, now=None) -> ManagedNodeIdentityEvent:

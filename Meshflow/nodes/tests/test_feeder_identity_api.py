@@ -385,7 +385,9 @@ def test_staff_update_can_still_change_the_number(feeder, staff):
 
 @pytest.mark.django_db
 def test_owner_repoint_refuses_a_target_claimed_by_someone_else(feeder, owner, create_observed_node, create_user):
-    target = create_observed_node(meshtastic_node_id=NEW_NUM, meshtastic_public_key_hex=KEY_HEX, claimed_by=create_user())
+    target = create_observed_node(
+        meshtastic_node_id=NEW_NUM, meshtastic_public_key_hex=KEY_HEX, claimed_by=create_user()
+    )
 
     response = _client(owner).post(_repoint_url(feeder), {}, format="json")
 
