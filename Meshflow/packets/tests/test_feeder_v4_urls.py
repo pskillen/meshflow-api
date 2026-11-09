@@ -1,5 +1,7 @@
 """v4 feeder URLs (``/api/v4/feeder/``): key-scoped auth, no node number in the path."""
 
+from unittest import mock
+
 from django.urls import reverse
 
 import pytest
@@ -344,3 +346,118 @@ def test_legacy_node_upsert_still_checks_path_number(shared_key):
     url = reverse("meshtastic-node-upsert-v3", kwargs={"node_id": 999})
     response = client.post(url, _node_body(), format="json", HTTP_X_API_KEY=api_key.key)
     assert response.status_code == 403
+
+
+# --- ID-4: automatic re-key on a reported number change --------------------------------------------------------
+
+REKEY_OLD = 0xDA545C78
+REKEY_NEW = 0x4396524C
+REKEY_KEY_B64 = "oLOpz1p7W8/Ti8Z0iOU4TqZAYVAXe3Uwm8EF/m1zLFs="
+
+
+@pytest.fixture
+def rekey_feeder(create_managed_node, create_node_api_key):
+    node = create_managed_node(protocol=Protocol.MESHTASTIC, meshtastic_node_id=REKEY_OLD)
+    api_key = create_node_api_key(owner=node.owner, constellation=node.constellation)
+    NodeAuth.objects.create(api_key=api_key, node=node)
+    return node, api_key
+
+
+def _rekey_headers(num=REKEY_NEW, key=REKEY_KEY_B64):
+    headers = {"HTTP_X_MESHTASTIC_FEEDER_NODE_NUM": str(num)}
+    if key is not None:
+        headers["HTTP_X_MESHTASTIC_FEEDER_PUBKEY"] = key
+    return headers
+
+
+@pytest.mark.django_db
+def test_v4_ingest_applies_rekey(settings, rekey_feeder):
+    from nodes.models import ManagedNodeIdentityEvent
+
+    settings.MESHTASTIC_FEEDER_AUTO_REKEY = True
+    node, api_key = rekey_feeder
+
+    response = _call("feeder-v4-meshtastic-ingest", api_key, data=_text_packet(), **_rekey_headers())
+
+    assert response.status_code == 201, response.content
+    node.refresh_from_db()
+    assert node.meshtastic_node_id == REKEY_NEW
+    assert node.reported_meshtastic_node_id == REKEY_NEW
+    assert PacketObservation.objects.get().observer_id == node.pk
+    assert ManagedNodeIdentityEvent.objects.get().outcome == ManagedNodeIdentityEvent.Outcome.AUTO_UPDATED
+
+
+@pytest.mark.django_db
+def test_v4_identity_endpoint_not_mismatched_on_applying_request(settings, rekey_feeder):
+    settings.MESHTASTIC_FEEDER_AUTO_REKEY = True
+    _, api_key = rekey_feeder
+
+    response = _call("feeder-v4-identity", api_key, method="get", **_rekey_headers())
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["meshtastic_node_id"] == REKEY_NEW
+    assert body["identity_mismatch"] is False
+
+
+@pytest.mark.django_db
+def test_v4_flag_off_flags_and_keeps_number(settings, rekey_feeder):
+    from nodes.models import ManagedNodeIdentityEvent
+
+    settings.MESHTASTIC_FEEDER_AUTO_REKEY = False
+    node, api_key = rekey_feeder
+
+    response = _call("feeder-v4-meshtastic-ingest", api_key, data=_text_packet(), **_rekey_headers())
+
+    assert response.status_code == 201
+    node.refresh_from_db()
+    assert node.meshtastic_node_id == REKEY_OLD
+    event = ManagedNodeIdentityEvent.objects.get()
+    assert event.reason == ManagedNodeIdentityEvent.Reason.AUTO_REKEY_DISABLED
+
+
+@pytest.mark.django_db
+def test_v4_bot_version_body_pubkey(settings, rekey_feeder):
+    settings.MESHTASTIC_FEEDER_AUTO_REKEY = True
+    node, api_key = rekey_feeder
+
+    response = _call(
+        "feeder-v4-bot-version",
+        api_key,
+        data={
+            "bot_version": "1.2.3",
+            "meshtastic_node_num": REKEY_NEW,
+            "meshtastic_public_key": REKEY_KEY_B64,
+        },
+    )
+
+    assert response.status_code in (200, 201), response.content
+    node.refresh_from_db()
+    assert node.meshtastic_node_id == REKEY_NEW
+
+
+@pytest.mark.django_db
+def test_legacy_url_never_calls_rekey_service(settings, rekey_feeder):
+    settings.MESHTASTIC_FEEDER_AUTO_REKEY = True
+    node, api_key = rekey_feeder
+    url = reverse("meshtastic-packet-ingest-v3", kwargs={"node_id": REKEY_OLD})
+
+    with mock.patch("common.feeder_metrics.apply_reported_identity") as service:
+        response = APIClient().post(url, _text_packet(), format="json", HTTP_X_API_KEY=api_key.key, **_rekey_headers())
+
+    assert response.status_code == 201, response.content
+    service.assert_not_called()
+    node.refresh_from_db()
+    assert node.meshtastic_node_id == REKEY_OLD
+
+
+@pytest.mark.django_db
+def test_service_exception_does_not_change_ingest(settings, rekey_feeder):
+    settings.MESHTASTIC_FEEDER_AUTO_REKEY = True
+    _, api_key = rekey_feeder
+
+    with mock.patch("common.feeder_metrics.apply_reported_identity", side_effect=RuntimeError("boom")):
+        response = _call("feeder-v4-meshtastic-ingest", api_key, data=_text_packet(), **_rekey_headers())
+
+    assert response.status_code == 201, response.content
+    assert PacketObservation.objects.count() == 1
