@@ -6,6 +6,7 @@ protocol-aware stats once MeshCore traceroutes are stored.
 
 from collections import Counter
 from datetime import timedelta
+from datetime import timezone as dt_timezone
 
 from django.db.models import CharField, Count, Q, Value
 from django.db.models.functions import Coalesce, TruncDate, TruncHour
@@ -24,6 +25,8 @@ from traceroute.models import AutoTraceRoute
 BUCKET_HOUR = "1h"
 BUCKET_DAY = "1d"
 HOURLY_MAX_WINDOW = timedelta(days=7)
+# Slack so a client sending exactly ``now - 7d`` is not rejected by the time the request lands.
+HOURLY_WINDOW_TOLERANCE = timedelta(hours=1)
 
 
 def _route_hop_node_id(entry) -> int | None:
@@ -396,15 +399,18 @@ def traceroute_stats(request):
     if request.query_params.get("triggered_at_after"):
         dt = parse_datetime(request.query_params["triggered_at_after"])
         if dt:
+            if timezone.is_naive(dt):
+                dt = timezone.make_aware(dt, dt_timezone.utc)
             triggered_after = dt
 
-    bucket = request.query_params.get("bucket", BUCKET_DAY)
+    bucket = request.query_params.get("bucket") or BUCKET_DAY  # empty ``bucket=`` means default
     if bucket not in (BUCKET_HOUR, BUCKET_DAY):
         return Response(
             {"detail": f"Invalid bucket {bucket!r}; expected one of: {BUCKET_HOUR}, {BUCKET_DAY}."},
             status=status.HTTP_400_BAD_REQUEST,
         )
-    if bucket == BUCKET_HOUR and triggered_after and timezone.now() - triggered_after > HOURLY_MAX_WINDOW:
+    window_limit = HOURLY_MAX_WINDOW + HOURLY_WINDOW_TOLERANCE
+    if bucket == BUCKET_HOUR and triggered_after and timezone.now() - triggered_after > window_limit:
         return Response(
             {"detail": "bucket=1h supports windows of at most 7 days; use bucket=1d for longer windows."},
             status=status.HTTP_400_BAD_REQUEST,
@@ -555,6 +561,8 @@ def traceroute_stats(request):
     if bucket == BUCKET_HOUR:
         now = timezone.now()
         hourly_start = triggered_after if triggered_after else now - timedelta(hours=24)
+        if hourly_start > now:
+            hourly_start = now
         success_over_time = _success_over_time_hourly(qs, hourly_start, now)
     else:
         # Daily completed/failed counts over the same window as ``qs`` (triggered_at_after + source_node).
@@ -588,8 +596,6 @@ def _success_over_time_hourly(qs, start, end):
     ``qs`` already carries the time window and ``source_node`` filters; the first bucket is floored to the hour
     but only counts rows from ``triggered_at_after`` onwards.
     """
-    from datetime import timezone as dt_timezone
-
     first = start.astimezone(dt_timezone.utc).replace(minute=0, second=0, microsecond=0)
     last = end.astimezone(dt_timezone.utc).replace(minute=0, second=0, microsecond=0)
 

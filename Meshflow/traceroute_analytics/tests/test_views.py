@@ -388,6 +388,30 @@ class TestTracerouteStats:
         assert api_client.get("/api/traceroutes/stats/", {"bucket": "1h", "triggered_at_after": ok}).status_code == 200
         assert api_client.get("/api/traceroutes/stats/", {"bucket": "6h"}).status_code == 400
 
+    def test_success_over_time_naive_triggered_at_after_treated_as_utc(self, api_client, create_user):
+        api_client.force_authenticate(user=create_user())
+        naive = (timezone.now() - timedelta(hours=3)).replace(tzinfo=None).isoformat()
+        resp_h = api_client.get("/api/traceroutes/stats/", {"bucket": "1h", "triggered_at_after": naive})
+        assert resp_h.status_code == 200
+        assert len(resp_h.json()["success_over_time"]) in (4, 5)
+        resp_d = api_client.get("/api/traceroutes/stats/", {"triggered_at_after": naive})
+        assert resp_d.status_code == 200
+
+    def test_success_over_time_hourly_future_after_clamps_to_one_row(self, api_client, create_user):
+        api_client.force_authenticate(user=create_user())
+        future = (timezone.now() + timedelta(hours=5)).isoformat()
+        resp = api_client.get("/api/traceroutes/stats/", {"bucket": "1h", "triggered_at_after": future})
+        assert resp.status_code == 200
+        assert len(resp.json()["success_over_time"]) == 1
+
+    def test_success_over_time_hourly_seven_day_tolerance_and_empty_bucket(self, api_client, create_user):
+        api_client.force_authenticate(user=create_user())
+        exact = (timezone.now() - timedelta(days=7)).isoformat()
+        assert (
+            api_client.get("/api/traceroutes/stats/", {"bucket": "1h", "triggered_at_after": exact}).status_code == 200
+        )
+        assert api_client.get("/api/traceroutes/stats/", {"bucket": ""}).status_code == 200
+
     def test_by_strategy_split_for_external_trigger_type(
         self,
         api_client,
