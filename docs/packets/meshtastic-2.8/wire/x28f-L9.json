@@ -1,0 +1,21 @@
+{
+  "channel": 0,
+  "decoded": {
+    "bitfield": 0,
+    "payload": "GAA=",
+    "portnum": "ROUTING_APP",
+    "requestId": 1686988781,
+    "routing": {
+      "errorReason": "NONE"
+    }
+  },
+  "from": 1129933592,
+  "fromId": null,
+  "id": 3127081963,
+  "rxRssi": -71,
+  "rxSnr": 5.75,
+  "rxTime": 1794148012,
+  "to": 4209798977,
+  "toId": "!faec6f41",
+  "transportMechanism": "TRANSPORT_LORA"
+}

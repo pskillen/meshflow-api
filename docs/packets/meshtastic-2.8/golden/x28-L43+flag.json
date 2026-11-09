@@ -1,0 +1,54 @@
+{
+  "effects": {
+    "baseline_traceroute_queued": false,
+    "device_metrics_rows": 0,
+    "dx_candidate_called": false,
+    "environment_metrics_rows": 0,
+    "inferred_max_hops": null,
+    "last_heard_advanced": false,
+    "nls": {},
+    "observation_api": {
+      "direct_from_sender": false,
+      "hop_count": null,
+      "replayed": true
+    },
+    "observed_node_created": false,
+    "position_rows": 0
+  },
+  "key": "x28-L43+flag",
+  "observation": {
+    "bitfield": null,
+    "channel": 0,
+    "hop_limit": 1,
+    "hop_start": 3,
+    "relay_node": null,
+    "replayed": true,
+    "rx_rssi": null,
+    "rx_snr": 5.5,
+    "rx_time": "2026-11-08T13:31:33Z",
+    "rx_time_estimated": false
+  },
+  "observed_node": null,
+  "packet": {
+    "fields": {
+      "battery_level": 94.0,
+      "from_int": 529363329,
+      "from_str": "!1f8d7181",
+      "meshtastic_air_util_tx": 1.7874444,
+      "meshtastic_channel_utilization": 23.433334,
+      "packet_id": 2577301768,
+      "port_num": "TELEMETRY_APP",
+      "reading_time": "2026-11-08T13:31:33Z",
+      "to_int": 4294967295,
+      "to_str": "^all",
+      "uptime_seconds": 6152952,
+      "voltage": 4.084
+    },
+    "model": "DeviceMetricsPacket"
+  },
+  "request": {
+    "feeder_num_header": 3769067321,
+    "url": "v4"
+  },
+  "status": 201
+}

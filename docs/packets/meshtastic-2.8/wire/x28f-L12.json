@@ -1,0 +1,29 @@
+{
+  "channel": 1,
+  "decoded": {
+    "bitfield": 0,
+    "payload": "CgkhNDM1OTZiMTgSEVBEWSBiYXNlIPCfpJbwn5SHGgRQRFliIgZIykNZaxgoKzgBQiDNDFh9MNf+YYB9nG4QOtOYOc9cRsCeyBBV6kEYP2uHfw==",
+    "portnum": "NODEINFO_APP",
+    "user": {
+      "hwModel": "HELTEC_V3",
+      "id": "!43596b18",
+      "longName": "PDY base \ud83e\udd16\ud83d\udd07",
+      "macaddr": "SMpDWWsY",
+      "publicKey": "zQxYfTDX/mGAfZxuEDrTmDnPXEbAnsgQVepBGD9rh38=",
+      "role": "CLIENT_MUTE",
+      "shortName": "PDYb"
+    }
+  },
+  "from": 1129933592,
+  "fromId": null,
+  "hopLimit": 5,
+  "hopStart": 6,
+  "id": 4198739948,
+  "relayNode": 180,
+  "rxRssi": -81,
+  "rxSnr": 6.25,
+  "rxTime": 1794148023,
+  "to": 4294967295,
+  "toId": "^all",
+  "transportMechanism": "TRANSPORT_LORA"
+}

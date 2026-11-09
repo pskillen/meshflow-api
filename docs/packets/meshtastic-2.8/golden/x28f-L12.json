@@ -1,0 +1,79 @@
+{
+  "effects": {
+    "baseline_traceroute_queued": true,
+    "device_metrics_rows": 0,
+    "dx_candidate_called": true,
+    "environment_metrics_rows": 0,
+    "inferred_max_hops": 6,
+    "last_heard_advanced": true,
+    "nls": {
+      "meshtastic_inferred_max_hops": 6,
+      "meshtastic_inferred_max_hops_source": "NODEINFO_APP"
+    },
+    "observation_api": {
+      "direct_from_sender": false,
+      "hop_count": 1,
+      "replayed": false
+    },
+    "observed_node_created": true,
+    "position_rows": 0
+  },
+  "key": "x28f-L12",
+  "observation": {
+    "bitfield": 0,
+    "channel": 1,
+    "hop_limit": 5,
+    "hop_start": 6,
+    "relay_node": 180,
+    "replayed": false,
+    "rx_rssi": -81.0,
+    "rx_snr": 6.25,
+    "rx_time": "2026-11-08T14:27:03Z",
+    "rx_time_estimated": false
+  },
+  "observed_node": {
+    "environment_exposure": 0,
+    "long_name": "PDY base \ud83e\udd16\ud83d\udd07",
+    "m2m_opt_out": false,
+    "mac_addr": "48:ca:43:59:6b:18",
+    "mc_pubkey": null,
+    "mc_pubkey_prefix": null,
+    "meshcore_adv_type": null,
+    "meshtastic_hw_model": "HELTEC_V3",
+    "meshtastic_is_licensed": null,
+    "meshtastic_is_unmessagable": null,
+    "meshtastic_key_node_id": 2033136204,
+    "meshtastic_node_id": 1129933592,
+    "meshtastic_public_key": "zQxYfTDX/mGAfZxuEDrTmDnPXEbAnsgQVepBGD9rh38=",
+    "meshtastic_public_key_hex": "cd0c587d30d7fe61807d9c6e103ad39839cf5c46c09ec81055ea41183f6b877f",
+    "meshtastic_role": 1,
+    "protocol": 1,
+    "short_name": "PDYb",
+    "weather_use": 0
+  },
+  "packet": {
+    "fields": {
+      "from_int": 1129933592,
+      "from_str": null,
+      "hw_model": "HELTEC_V3",
+      "is_licensed": null,
+      "is_unmessagable": null,
+      "long_name": "PDY base \ud83e\udd16\ud83d\udd07",
+      "mac_address": "48:ca:43:59:6b:18",
+      "node_id": "!43596b18",
+      "packet_id": 4198739948,
+      "port_num": "NODEINFO_APP",
+      "public_key": "zQxYfTDX/mGAfZxuEDrTmDnPXEbAnsgQVepBGD9rh38=",
+      "role": 1,
+      "short_name": "PDYb",
+      "to_int": 4294967295,
+      "to_str": "^all"
+    },
+    "model": "NodeInfoPacket"
+  },
+  "request": {
+    "feeder_num_header": 4209798977,
+    "url": "v4"
+  },
+  "status": 201
+}

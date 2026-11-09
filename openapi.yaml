@@ -668,7 +668,10 @@ components:
           description: The channel number on which the packet was received
         rxTime:
           type: integer
-          description: The time the packet was received, as a Unix timestamp
+          nullable: true
+          description: >
+            The time the packet was received, as a Unix timestamp. Optional; when absent, null or 0 the API uses
+            its own clock and flags the observation ``rx_time_estimated``.
         rxSnr:
           type: number
           nullable: true
@@ -681,6 +684,15 @@ components:
           type: number
           nullable: true
           description: The received signal strength of the packet
+        replayed:
+          type: boolean
+          default: false
+          description: >
+            Optional. True when the bot detected a Meshtastic 2.8 connect-time replay (a stored NodeDB record
+            replayed after config_complete_id, not a radio reception). Applies to the legacy, v3 and v4 ingest
+            paths. The API also detects the shape itself (no rxRssi, transportMechanism TRANSPORT_LORA,
+            priority BACKGROUND, not the feeder's own) unless MESHTASTIC_REPLAY_SHAPE_DETECTION is off. A replay
+            is stored and flagged but triggers no processing.
         hopStart:
           type: integer
           nullable: true
@@ -1279,6 +1291,28 @@ components:
         - $ref: '#/components/schemas/HostTelemetryPacket'
         - $ref: '#/components/schemas/TrafficManagementStatsTelemetryPacket'
         - $ref: '#/components/schemas/TraceroutePacket'
+        - $ref: '#/components/schemas/GenericIncomingPacket'
+
+    GenericIncomingPacket:
+      allOf:
+        - $ref: '#/components/schemas/BaseIncomingPacket'
+        - type: object
+          description: >
+            Any other port (STORE_FORWARD_APP, ROUTING_APP, a port number the sender only knew as an integer, a
+            TELEMETRY_APP packet with an unrecognised variant). Stored as a GenericPacket; never rejected for its
+            port. A missing decoded or decoded.portnum is still a 400.
+          properties:
+            decoded:
+              type: object
+              required: [portnum]
+              additionalProperties: true
+              properties:
+                portnum:
+                  oneOf:
+                    - type: string
+                    - type: integer
+                  description: >
+                    PortNum name, or an integer / numeric string. Unknown numbers are stored as PORT_<n>.
 
     Constellation:
       type: object
@@ -2940,6 +2974,9 @@ components:
           format: float
           description: The RSSI of the received packet
           nullable: true
+        replayed:
+          type: boolean
+          description: True for a Meshtastic 2.8 connect-time replay (not a radio reception). Then hop_count is null and direct_from_sender is false
         rx_snr:
           type: number
           format: float
@@ -2947,10 +2984,10 @@ components:
           nullable: true
         direct_from_sender:
           type: boolean
-          description: Whether the packet was heard directly from the sender
+          description: Whether the packet was heard directly from the sender. False when the hop count is unknown (hop_start 0 with no bitfield)
         hop_count:
           type: integer
-          description: The number of hops the packet took to reach the observer
+          description: The number of hops the packet took to reach the observer. Null when unknown (hop_start 0 with no bitfield)
           nullable: true
         observer_position:
           $ref: '#/components/schemas/MapPosition'

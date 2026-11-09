@@ -1,0 +1,82 @@
+{
+  "effects": {
+    "baseline_traceroute_queued": true,
+    "device_metrics_rows": 0,
+    "dx_candidate_called": true,
+    "environment_metrics_rows": 0,
+    "inferred_max_hops": 7,
+    "last_heard_advanced": true,
+    "nls": {
+      "meshtastic_inferred_max_hops": 7,
+      "meshtastic_inferred_max_hops_source": "STORE_FORWARD_APP"
+    },
+    "observation_api": {
+      "direct_from_sender": false,
+      "hop_count": 4,
+      "replayed": false
+    },
+    "observed_node_created": true,
+    "position_rows": 0
+  },
+  "key": "x28-L83",
+  "observation": {
+    "bitfield": 1,
+    "channel": 0,
+    "hop_limit": 3,
+    "hop_start": 7,
+    "relay_node": 240,
+    "replayed": false,
+    "rx_rssi": -80.0,
+    "rx_snr": 7.0,
+    "rx_time": "2026-11-08T13:34:23Z",
+    "rx_time_estimated": false
+  },
+  "observed_node": {
+    "environment_exposure": 0,
+    "long_name": "Unknown Node !a35ae558",
+    "m2m_opt_out": false,
+    "mac_addr": null,
+    "mc_pubkey": null,
+    "mc_pubkey_prefix": null,
+    "meshcore_adv_type": null,
+    "meshtastic_hw_model": null,
+    "meshtastic_is_licensed": null,
+    "meshtastic_is_unmessagable": null,
+    "meshtastic_key_node_id": null,
+    "meshtastic_node_id": 2740643160,
+    "meshtastic_public_key": null,
+    "meshtastic_public_key_hex": null,
+    "meshtastic_role": null,
+    "protocol": 1,
+    "short_name": "e558",
+    "weather_use": 0
+  },
+  "packet": {
+    "fields": {
+      "decoded": {
+        "bitfield": 1,
+        "payload": "CAIiAwiEBw==",
+        "storeforward": {
+          "heartbeat": {
+            "period": 900
+          },
+          "rr": "ROUTER_HEARTBEAT"
+        }
+      },
+      "decoded_truncated": false,
+      "from_int": 2740643160,
+      "from_str": null,
+      "packet_id": 3209050879,
+      "port_num": "STORE_FORWARD_APP",
+      "telemetry_variant": null,
+      "to_int": 4294967295,
+      "to_str": "^all"
+    },
+    "model": "GenericPacket"
+  },
+  "request": {
+    "feeder_num_header": 3769067321,
+    "url": "v4"
+  },
+  "status": 201
+}

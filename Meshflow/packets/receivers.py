@@ -3,16 +3,19 @@ import logging
 from django.dispatch import receiver
 
 from common.mesh_node_helpers import meshtastic_id_to_hex
-from nodes.models import NodeLatestStatus, ObservedNode
+from nodes.models import ObservedNode
 from nodes.services.observed_nodes import get_or_create_meshtastic_observed_node
 from traceroute.new_node_baseline import enqueue_new_node_baseline
 
+from .hops import update_inferred_max_hops
 from .models import (
     AirQualityMetricsPacket,
     DeviceMetricsPacket,
     EnvironmentMetricsPacket,
+    GenericPacket,
     HealthMetricsPacket,
     HostMetricsPacket,
+    LocalStatsPacket,
     MessagePacket,
     NodeInfoPacket,
     PacketObservation,
@@ -24,6 +27,7 @@ from .models import (
 from .services.air_quality import AirQualityMetricsPacketService
 from .services.device_metrics import DeviceMetricsPacketService
 from .services.environment_metrics import EnvironmentMetricsPacketService
+from .services.generic import GenericPacketService
 from .services.health_metrics import HealthMetricsPacketService
 from .services.host_metrics import HostMetricsPacketService
 from .services.node_info import NodeInfoPacketService
@@ -35,8 +39,10 @@ from .signals import (
     air_quality_metrics_packet_received,
     device_metrics_packet_received,
     environment_metrics_packet_received,
+    generic_packet_received,
     health_metrics_packet_received,
     host_metrics_packet_received,
+    local_stats_packet_received,
     message_packet_received,
     node_info_packet_received,
     packet_received,
@@ -49,7 +55,7 @@ from .signals import (
 logger = logging.getLogger(__name__)
 
 
-# Packet types that already update NodeLatestStatus (and set meshtastic_inferred_max_hops there)
+# Packet types whose services already call update_inferred_max_hops
 _PACKET_TYPES_WITH_NLS_UPDATE = (
     PositionPacket,
     DeviceMetricsPacket,
@@ -61,13 +67,31 @@ _PACKET_TYPES_WITH_NLS_UPDATE = (
 )
 
 
+# Port for packets whose row has no port_num (hand-built rows); otherwise packet.port_num is used.
+_PORT_BY_PACKET_TYPE = (
+    (MessagePacket, "TEXT_MESSAGE_APP"),
+    (NodeInfoPacket, "NODEINFO_APP"),
+    (TraceroutePacket, "TRACEROUTE_APP"),
+    (LocalStatsPacket, "TELEMETRY_APP"),
+    (TrafficManagementStatsPacket, "TELEMETRY_APP"),
+)
+
+
+def _port_name(packet) -> str | None:
+    if getattr(packet, "port_num", None):
+        return packet.port_num
+    for packet_type, port in _PORT_BY_PACKET_TYPE:
+        if isinstance(packet, packet_type):
+            return port
+    return None
+
+
 @receiver(packet_received)
 def on_packet_received_update_inferred_max_hops(sender, packet, observer, observation, **kwargs):
-    """Update NodeLatestStatus.meshtastic_inferred_max_hops for packet types that don't update NodeLatestStatus."""
+    """Update meshtastic_inferred_max_hops (packets.hops) for packet types whose services don't."""
     if isinstance(packet, _PACKET_TYPES_WITH_NLS_UPDATE):
         return
-    hop_start = observation.hop_start if observation else None
-    if hop_start is None:
+    if observation is None or observation.hop_start is None:
         return
     sender_node_id = getattr(packet, "from_int", None)
     if sender_node_id is None:
@@ -82,13 +106,7 @@ def on_packet_received_update_inferred_max_hops(sender, packet, observer, observ
     )
     if created:
         enqueue_new_node_baseline(observed_node, observer)
-    node_status, created = NodeLatestStatus.objects.get_or_create(
-        node=observed_node,
-        defaults={"meshtastic_inferred_max_hops": hop_start},
-    )
-    if not created and node_status.meshtastic_inferred_max_hops != hop_start:
-        node_status.meshtastic_inferred_max_hops = hop_start
-        node_status.save(update_fields=["meshtastic_inferred_max_hops"])
+    update_inferred_max_hops(observed_node, observation, _port_name(packet))
 
 
 @receiver(position_packet_received)
@@ -185,12 +203,31 @@ def on_power_metrics_packet_received(
     service.process_packet(packet, observer, observation, user=None)
 
 
+@receiver(local_stats_packet_received)
+def on_local_stats_packet_received(
+    sender, packet: LocalStatsPacket, observer: ObservedNode, observation: PacketObservation, **kwargs
+):
+    """Handle a local stats packet received signal. Stored by serializer; the no-op service advances last_heard."""
+    logger.info(f"Local stats packet received: {packet.id}")
+    GenericPacketService().process_packet(packet, observer, observation, user=None)
+
+
 @receiver(traffic_management_stats_packet_received)
 def on_traffic_management_stats_packet_received(
     sender, packet: TrafficManagementStatsPacket, observer: ObservedNode, observation: PacketObservation, **kwargs
 ):
-    """Handle a traffic management stats packet received signal. Packet is stored by serializer; no service."""
+    """Handle a traffic management stats packet received signal. Stored by serializer; advances last_heard."""
     logger.info(f"Traffic management stats packet received: {packet.id}")
+    GenericPacketService().process_packet(packet, observer, observation, user=None)
+
+
+@receiver(generic_packet_received)
+def on_generic_packet_received(
+    sender, packet: GenericPacket, observer: ObservedNode, observation: PacketObservation, **kwargs
+):
+    """Handle a generic (unknown port / unknown telemetry variant) packet. Stored by serializer."""
+    logger.info(f"Generic packet received: {packet.id} ({packet.port_num})")
+    GenericPacketService().process_packet(packet, observer, observation, user=None)
 
 
 @receiver(traceroute_packet_received)

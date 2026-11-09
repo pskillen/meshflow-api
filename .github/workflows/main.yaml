@@ -10,6 +10,24 @@ permissions:
   packages: write
 
 jobs:
+  contract-pin:
+    runs-on: ubuntu-latest
+    outputs:
+      bot_ref: ${{ steps.pin.outputs.bot_ref }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v7
+
+      - name: Read the pinned bot ref
+        id: pin
+        run: echo "bot_ref=$(tr -d '[:space:]' < .github/contract/bot-ref)" >> "$GITHUB_OUTPUT"
+
+  contract:
+    needs: contract-pin
+    uses: ./.github/workflows/contract.yaml
+    with:
+      bot_ref: ${{ needs.contract-pin.outputs.bot_ref }}
+
   extract-dev-tag:
     runs-on: ubuntu-latest
     steps:

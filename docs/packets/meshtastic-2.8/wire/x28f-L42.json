@@ -1,0 +1,27 @@
+{
+  "channel": 0,
+  "decoded": {
+    "bitfield": 0,
+    "payload": "DQ2K8GoaCg1hPqVBTQAABEI=",
+    "portnum": "TELEMETRY_APP",
+    "telemetry": {
+      "environmentMetrics": {
+        "lux": 33.0,
+        "temperature": 20.655458
+      },
+      "time": 1794148877
+    }
+  },
+  "from": 2395161539,
+  "fromId": null,
+  "hopLimit": 1,
+  "hopStart": 5,
+  "id": 1754736963,
+  "relayNode": 240,
+  "rxRssi": -80,
+  "rxSnr": 6.0,
+  "rxTime": 1794148880,
+  "to": 4294967295,
+  "toId": "^all",
+  "transportMechanism": "TRANSPORT_LORA"
+}

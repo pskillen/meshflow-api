@@ -123,19 +123,25 @@ def test_packet_volume_includes_by_type(create_managed_node):
 
     hour = timezone.make_aware(datetime(2025, 3, 15, 12, 0, 0))
 
-    MessagePacket.objects.create(
+    message = MessagePacket.objects.create(
         packet_id=1,
         from_int=111111111,
         first_reported_time=hour,
         message_text="hi",
     )
-    PositionPacket.objects.create(
+    position = PositionPacket.objects.create(
         packet_id=2,
         from_int=222222222,
         first_reported_time=hour + timezone.timedelta(minutes=30),
         latitude=55.0,
         longitude=-3.0,
     )
+    # A packet counts once a live (not replayed) observation reports it.
+    observer = create_managed_node(meshtastic_node_id=333333333)
+    for packet in (message, position):
+        PacketObservation.objects.create(
+            packet=packet, observer=observer, channel=observer.meshtastic_channel_0, rx_time=hour
+        )
 
     c, s = _collect_packet_volume(hour, run_id=None)
     assert c == 1

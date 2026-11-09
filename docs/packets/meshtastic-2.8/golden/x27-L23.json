@@ -1,0 +1,79 @@
+{
+  "effects": {
+    "baseline_traceroute_queued": true,
+    "device_metrics_rows": 0,
+    "dx_candidate_called": true,
+    "environment_metrics_rows": 0,
+    "inferred_max_hops": 3,
+    "last_heard_advanced": true,
+    "nls": {
+      "meshtastic_inferred_max_hops": 3,
+      "meshtastic_inferred_max_hops_source": "NODEINFO_APP"
+    },
+    "observation_api": {
+      "direct_from_sender": false,
+      "hop_count": null,
+      "replayed": false
+    },
+    "observed_node_created": true,
+    "position_rows": 0
+  },
+  "key": "x27-L23",
+  "observation": {
+    "bitfield": 2,
+    "channel": 0,
+    "hop_limit": null,
+    "hop_start": 3,
+    "relay_node": 180,
+    "replayed": false,
+    "rx_rssi": -79.0,
+    "rx_snr": 6.5,
+    "rx_time": "2026-11-08T13:00:32Z",
+    "rx_time_estimated": false
+  },
+  "observed_node": {
+    "environment_exposure": 0,
+    "long_name": "FnD2",
+    "m2m_opt_out": false,
+    "mac_addr": "30:ed:a0:cc:75:a0",
+    "mc_pubkey": null,
+    "mc_pubkey_prefix": null,
+    "meshcore_adv_type": null,
+    "meshtastic_hw_model": "HELTEC_V3",
+    "meshtastic_is_licensed": null,
+    "meshtastic_is_unmessagable": false,
+    "meshtastic_key_node_id": 244622862,
+    "meshtastic_node_id": 2697754016,
+    "meshtastic_public_key": "kMyulNh4b7MTWMjhi5nUifLGiIaZg0JEkh+w1amR7WM=",
+    "meshtastic_public_key_hex": "90ccae94d8786fb31358c8e18b99d489f2c6888699834244921fb0d5a991ed63",
+    "meshtastic_role": null,
+    "protocol": 1,
+    "short_name": "eTN2",
+    "weather_use": 0
+  },
+  "packet": {
+    "fields": {
+      "from_int": 2697754016,
+      "from_str": null,
+      "hw_model": "HELTEC_V3",
+      "is_licensed": null,
+      "is_unmessagable": false,
+      "long_name": "FnD2",
+      "mac_address": "30:ed:a0:cc:75:a0",
+      "node_id": "!a0cc75a0",
+      "packet_id": 134003927,
+      "port_num": "NODEINFO_APP",
+      "public_key": "kMyulNh4b7MTWMjhi5nUifLGiIaZg0JEkh+w1amR7WM=",
+      "role": null,
+      "short_name": "eTN2",
+      "to_int": 1451547656,
+      "to_str": "!5684dc08"
+    },
+    "model": "NodeInfoPacket"
+  },
+  "request": {
+    "feeder_num_header": 444845961,
+    "url": "v4"
+  },
+  "status": 201
+}

@@ -1,0 +1,70 @@
+{
+  "effects": {
+    "baseline_traceroute_queued": true,
+    "device_metrics_rows": 0,
+    "dx_candidate_called": true,
+    "environment_metrics_rows": 0,
+    "inferred_max_hops": null,
+    "last_heard_advanced": true,
+    "nls": {},
+    "observation_api": {
+      "direct_from_sender": false,
+      "hop_count": null,
+      "replayed": false
+    },
+    "observed_node_created": true,
+    "position_rows": 0
+  },
+  "key": "x28h4-L1",
+  "observation": {
+    "bitfield": null,
+    "channel": 0,
+    "hop_limit": 4,
+    "hop_start": null,
+    "relay_node": null,
+    "replayed": false,
+    "rx_rssi": null,
+    "rx_snr": null,
+    "rx_time": "2026-11-08T14:04:03Z",
+    "rx_time_estimated": false
+  },
+  "observed_node": {
+    "environment_exposure": 0,
+    "long_name": "Unknown Node !e0a76739",
+    "m2m_opt_out": false,
+    "mac_addr": null,
+    "mc_pubkey": null,
+    "mc_pubkey_prefix": null,
+    "meshcore_adv_type": null,
+    "meshtastic_hw_model": null,
+    "meshtastic_is_licensed": null,
+    "meshtastic_is_unmessagable": null,
+    "meshtastic_key_node_id": null,
+    "meshtastic_node_id": 3769067321,
+    "meshtastic_public_key": null,
+    "meshtastic_public_key_hex": null,
+    "meshtastic_role": null,
+    "protocol": 1,
+    "short_name": "6739",
+    "weather_use": 0
+  },
+  "packet": {
+    "fields": {
+      "decoded": null,
+      "decoded_truncated": false,
+      "from_int": 3769067321,
+      "from_str": "!e0a76739",
+      "packet_id": 729066805,
+      "port_num": "ROUTING_APP",
+      "telemetry_variant": null,
+      "to_int": 3769067321,
+      "to_str": "!e0a76739"
+    },
+    "model": "GenericPacket"
+  },
+  "request": {
+    "feeder_num_header": 3769067321,
+    "url": "v4"
+  },
+  "status": 201
+}

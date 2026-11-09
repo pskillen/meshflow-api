@@ -1,0 +1,26 @@
+{
+  "channel": 0,
+  "decoded": {
+    "bitfield": 1,
+    "payload": "CAIiAwiEBw==",
+    "portnum": "STORE_FORWARD_APP",
+    "storeforward": {
+      "heartbeat": {
+        "period": 900
+      },
+      "rr": "ROUTER_HEARTBEAT"
+    }
+  },
+  "from": 2740643160,
+  "fromId": null,
+  "hopLimit": 2,
+  "hopStart": 7,
+  "id": 155157316,
+  "relayNode": 240,
+  "rxRssi": -80,
+  "rxSnr": 6.5,
+  "rxTime": 1794148416,
+  "to": 4294967295,
+  "toId": "^all",
+  "transportMechanism": "TRANSPORT_LORA"
+}

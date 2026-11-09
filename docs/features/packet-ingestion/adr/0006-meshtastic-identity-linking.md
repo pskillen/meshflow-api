@@ -20,7 +20,7 @@ Consequence for Meshflow: after an upgrade the node appears as a **new** `Observ
 
 Planned:
 
-1. **Predict ahead of the upgrade.** Normalise every stored key (base64 or hex to 64-char hex; anything not 32 bytes yields null, never an error) and store `crc32` of it as `meshtastic_key_node_id` (indexed) on `ObservedNode`, with the same on `ManagedNode.meshtastic_public_key`. An idempotent backfill reads `ObservedNode.meshtastic_public_key`, falling back to the latest `NodeInfoPacket.public_key` for that `from_int`, and reports keys shared by several nodes. Worked example under test: `!da545c78` is predicted to become `!4396524c` (unverified).
+1. **Predict ahead of the upgrade.** Normalise every stored key (base64 or hex to 64-char hex; anything not 32 bytes yields null, never an error) and store `crc32` of it as `meshtastic_key_node_id` (indexed) on `ObservedNode`, with the same on `ManagedNode.meshtastic_public_key`. An idempotent backfill reads `ObservedNode.meshtastic_public_key`, falling back to the latest `NodeInfoPacket.public_key` for that `from_int`, and reports keys shared by several nodes. Worked example under test: `!da545c78` is predicted to become `!4396524c`. The zlib crc32 equals the firmware's number, confirmed on hardware 2026-11-08.
 2. **Best-effort linking of old and new identities, never merging.** Both `ObservedNode` rows are kept; a `MeshtasticIdentityLink(old, new, evidence, confidence, state)` row is the alias. `from_int` is never rewritten, so rollback is deleting link rows. Evidence:
    - **Strong, automatic:** the same public key K, `crc32(K)` equals the new number, and exactly one old Meshtastic node holds K. Two active nodes sharing a key are flagged, not linked.
    - **Medium, suggested and needing confirmation:** the OTA `macaddr` M satisfies `int(M[2:6]) == old number` (or the MAC equals the stored `mac_addr`). This covers full erases and licensed nodes.
@@ -34,7 +34,7 @@ Planned:
 
 ## Consequences
 
-- **Verification on hardware is pending.** Whether zlib `crc32(pubkey)` equals the firmware's `ErriezCRC32` result is inferred from source only. Nothing that acts on a prediction in production (auto re-key, auto links) is enabled until an upgrade of a spare node shows predicted and real numbers agree. Also unanswered: whether `my_info` is resent on a mid-session number change, whether Heltec 2.8.2 updates without an erase (keeping the key), and what a downgrade does to the number.
+- **Hardware gate met (2026-11-08).** zlib `crc32(pubkey)` equals the firmware's node number (update, re-key and a wild sender all agreed), and a downgrade in update mode kept the number. Still open: whether `my_info` is resent on a mid-session number change, and whether Heltec 2.8.2 updates keep the key.
 - Auto links are possible only for upgrades that keep the key. Full erases, licensed nodes and nodes whose key was never heard stay unlinked or suggested.
 - Prediction is only as good as the stored key. Nodes never heard sending NodeInfo have none.
 - Before link detection lands, an upgraded sender is a new "Unknown Node" and triggers a baseline traceroute and DX new-node checks; the old row will eventually look offline.

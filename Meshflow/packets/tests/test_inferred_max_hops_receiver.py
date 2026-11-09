@@ -87,3 +87,56 @@ def test_packet_received_skips_when_hop_start_is_none(create_managed_node, creat
 
     # Receiver returns early when hop_start is None, so NodeLatestStatus is never created
     assert not NodeLatestStatus.objects.filter(node__meshtastic_node_id=0x99999999).exists()
+
+
+def _observe(create_managed_node, create_message_packet, from_int, hop_start, hop_limit, port_num, bitfield=None):
+    observer = create_managed_node()
+    packet = create_message_packet(from_int=from_int, from_str=f"!{from_int:08x}", port_num=port_num)
+    channel = MessageChannel.objects.create(name="Test Channel", constellation=observer.constellation)
+    observation = PacketObservation.objects.create(
+        packet=packet,
+        observer=observer,
+        channel=channel,
+        hop_limit=hop_limit,
+        hop_start=hop_start,
+        bitfield=bitfield,
+        rx_time=packet.first_reported_time,
+    )
+    packet_received.send(sender=None, packet=packet, observer=observer, observation=observation)
+    return NodeLatestStatus.objects.filter(node__meshtastic_node_id=from_int).first()
+
+
+@pytest.mark.django_db
+def test_receiver_records_source_and_time(create_managed_node, create_message_packet):
+    status = _observe(create_managed_node, create_message_packet, 0x31313131, 3, 3, "TEXT_MESSAGE_APP")
+    assert status.meshtastic_inferred_max_hops == 3
+    assert status.meshtastic_inferred_max_hops_source == "TEXT_MESSAGE_APP"
+    assert status.meshtastic_inferred_max_hops_at is not None
+
+
+@pytest.mark.django_db
+def test_receiver_authoritative_text_can_lower(create_managed_node, create_message_packet):
+    _observe(create_managed_node, create_message_packet, 0x32323232, 4, 4, "TEXT_MESSAGE_APP")
+    status = _observe(create_managed_node, create_message_packet, 0x32323232, 2, 2, "TEXT_MESSAGE_APP")
+    assert status.meshtastic_inferred_max_hops == 2
+
+
+@pytest.mark.django_db
+def test_receiver_scaled_nodeinfo_does_not_lower_text_value(create_managed_node, create_message_packet):
+    _observe(create_managed_node, create_message_packet, 0x33333333, 3, 3, "TEXT_MESSAGE_APP")
+    status = _observe(create_managed_node, create_message_packet, 0x33333333, 1, 1, "NODEINFO_APP")
+    assert status.meshtastic_inferred_max_hops == 3
+    assert status.meshtastic_inferred_max_hops_source == "TEXT_MESSAGE_APP"
+
+
+@pytest.mark.django_db
+def test_receiver_ignores_hop_start_zero_without_bitfield(create_managed_node, create_message_packet):
+    _observe(create_managed_node, create_message_packet, 0x34343434, 3, 3, "TEXT_MESSAGE_APP")
+    status = _observe(create_managed_node, create_message_packet, 0x34343434, 0, 0, "TEXT_MESSAGE_APP")
+    assert status.meshtastic_inferred_max_hops == 3
+
+
+@pytest.mark.django_db
+def test_receiver_accepts_hop_start_zero_with_bitfield(create_managed_node, create_message_packet):
+    status = _observe(create_managed_node, create_message_packet, 0x35353535, 0, 0, "TEXT_MESSAGE_APP", bitfield=0)
+    assert status.meshtastic_inferred_max_hops == 0

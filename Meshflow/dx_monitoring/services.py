@@ -25,16 +25,17 @@ from dx_monitoring.models import (
     DxReasonCode,
 )
 from nodes.models import ManagedNode, NodeLatestStatus, ObservedNode
+from packets.hops import observation_is_direct
 from packets.models import MtRawPacket, PacketObservation, TraceroutePacket
 from traceroute.models import AutoTraceRoute
 
 
 def is_direct_packet_observation(observation: PacketObservation) -> bool:
-    """True when the packet reached the observer without remaining relay hops."""
-    if observation.hop_start is None or observation.hop_limit is None:
-        return False
-    hops_used = int(observation.hop_start) - int(observation.hop_limit)
-    return hops_used == 0
+    """True when the packet reached the observer without remaining relay hops.
+
+    False when the hop count is unknown (hop_start 0 without a bitfield).
+    """
+    return observation_is_direct(observation)
 
 
 def is_node_suppressed_for_dx(node_id: int) -> bool:

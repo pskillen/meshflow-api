@@ -295,6 +295,24 @@ class TraceroutePacket(MtRawPacket):
         verbose_name_plural = _("Traceroute packets")
 
 
+class GenericPacket(MtRawPacket):
+    """Any Meshtastic port without a typed table (STORE_FORWARD_APP, ROUTING_APP, new 2.8 ports, ...).
+
+    Also holds ``TELEMETRY_APP`` packets whose variant has no typed table. ``decoded`` is the decoded payload minus
+    ``portnum``; it is null for metadata-only ports (``MESHTASTIC_METADATA_ONLY_PORTNUMS``) and for payloads over
+    ``MESHTASTIC_GENERIC_DECODED_MAX_BYTES`` (then ``decoded_truncated`` is true). A port can later be promoted to a
+    typed table by backfilling from ``decoded``.
+    """
+
+    decoded = models.JSONField(null=True)
+    telemetry_variant = models.CharField(max_length=74, null=True, blank=True)
+    decoded_truncated = models.BooleanField(default=False)
+
+    class Meta:
+        verbose_name = _("Generic packet")
+        verbose_name_plural = _("Generic packets")
+
+
 class PacketObservation(models.Model):
     """Meshtastic ingest observation: which feeder saw a raw packet on mesh."""
 
@@ -304,8 +322,14 @@ class PacketObservation(models.Model):
     channel = models.ForeignKey(MessageChannel, on_delete=models.CASCADE, null=True)
     hop_limit = models.SmallIntegerField(null=True)
     hop_start = models.SmallIntegerField(null=True)
+    # decoded.bitfield. Null = absent (not the same as 0). Sent by 2.8+ firmware.
+    bitfield = models.PositiveIntegerField(null=True)
 
     rx_time = models.DateTimeField(null=False)
+    # True when the feeder sent no rxTime and the API used its own clock.
+    rx_time_estimated = models.BooleanField(default=False)
+    # True for a 2.8 connect-time replay (stored node record, not a radio reception). See packets/replay.py.
+    replayed = models.BooleanField(default=False)
     rx_rssi = models.FloatField(null=True)
     rx_snr = models.FloatField(null=True)
     upload_time = models.DateTimeField(null=False, default=timezone.now)

@@ -1,0 +1,509 @@
+[
+  {
+    "bot_ref": "45da30a1fb06964730f7c07fba5e5864a2340e72",
+    "feeder_num": 444845961,
+    "key": "x27-L1",
+    "kind": "self",
+    "labels": [
+      "feeder:2.7",
+      "kind:self",
+      "port:TELEMETRY_APP",
+      "variant:deviceMetrics",
+      "sender-id:mac"
+    ]
+  },
+  {
+    "bot_ref": "45da30a1fb06964730f7c07fba5e5864a2340e72",
+    "feeder_num": 444845961,
+    "key": "x27-L27",
+    "kind": "self",
+    "labels": [
+      "feeder:2.7",
+      "kind:self",
+      "port:TELEMETRY_APP",
+      "variant:localStats",
+      "sender-id:mac"
+    ]
+  },
+  {
+    "bot_ref": "45da30a1fb06964730f7c07fba5e5864a2340e72",
+    "feeder_num": 444845961,
+    "key": "x27-L5",
+    "kind": "live",
+    "labels": [
+      "feeder:2.7",
+      "kind:live",
+      "port:NODEINFO_APP",
+      "sender-id:mac",
+      "bitfield:0"
+    ]
+  },
+  {
+    "bot_ref": "45da30a1fb06964730f7c07fba5e5864a2340e72",
+    "feeder_num": 444845961,
+    "key": "x27-L7",
+    "kind": "live",
+    "labels": [
+      "feeder:2.7",
+      "kind:live",
+      "port:POSITION_APP",
+      "sender-id:mac",
+      "bitfield:0"
+    ]
+  },
+  {
+    "bot_ref": "45da30a1fb06964730f7c07fba5e5864a2340e72",
+    "feeder_num": 444845961,
+    "key": "x27-L9",
+    "kind": "live",
+    "labels": [
+      "feeder:2.7",
+      "kind:live",
+      "port:TELEMETRY_APP",
+      "variant:environmentMetrics",
+      "sender-id:unknown",
+      "from-id-null",
+      "bitfield:0"
+    ]
+  },
+  {
+    "bot_ref": "45da30a1fb06964730f7c07fba5e5864a2340e72",
+    "feeder_num": 444845961,
+    "key": "x27-L10",
+    "kind": "live",
+    "labels": [
+      "feeder:2.7",
+      "kind:live",
+      "port:TELEMETRY_APP",
+      "variant:deviceMetrics",
+      "sender-id:unknown",
+      "from-id-null",
+      "bitfield:0"
+    ]
+  },
+  {
+    "bot_ref": "45da30a1fb06964730f7c07fba5e5864a2340e72",
+    "feeder_num": 444845961,
+    "key": "x27-L12",
+    "kind": "live",
+    "labels": [
+      "feeder:2.7",
+      "kind:live",
+      "port:POSITION_APP",
+      "sender-id:unknown",
+      "from-id-null",
+      "hops-exhausted",
+      "bitfield:0"
+    ]
+  },
+  {
+    "bot_ref": "45da30a1fb06964730f7c07fba5e5864a2340e72",
+    "feeder_num": 444845961,
+    "key": "x27-L23",
+    "kind": "live",
+    "labels": [
+      "feeder:2.7",
+      "kind:live",
+      "port:NODEINFO_APP",
+      "sender-id:mac",
+      "from-id-null",
+      "hops-exhausted",
+      "bitfield:2"
+    ]
+  },
+  {
+    "bot_ref": "45da30a1fb06964730f7c07fba5e5864a2340e72",
+    "feeder_num": 444845961,
+    "key": "x27-L37",
+    "kind": "live",
+    "labels": [
+      "feeder:2.7",
+      "kind:live",
+      "port:ENCRYPTED",
+      "sender-id:unknown",
+      "from-id-null",
+      "hops-exhausted",
+      "channel:9"
+    ]
+  },
+  {
+    "bot_ref": "45da30a1fb06964730f7c07fba5e5864a2340e72",
+    "feeder_num": 3769067321,
+    "key": "x28-L1",
+    "kind": "live",
+    "labels": [
+      "feeder:2.8",
+      "kind:live",
+      "port:NODEINFO_APP",
+      "sender-id:mac",
+      "hops-exhausted",
+      "bitfield:0"
+    ]
+  },
+  {
+    "bot_ref": "45da30a1fb06964730f7c07fba5e5864a2340e72",
+    "feeder_num": 3769067321,
+    "key": "x28-L2",
+    "kind": "replay",
+    "labels": [
+      "feeder:2.8",
+      "kind:replay",
+      "port:POSITION_APP",
+      "sender-id:unknown",
+      "hops-exhausted",
+      "stable-replay-id"
+    ]
+  },
+  {
+    "bot_ref": "45da30a1fb06964730f7c07fba5e5864a2340e72",
+    "feeder_num": 3769067321,
+    "key": "x28-L4",
+    "kind": "replay",
+    "labels": [
+      "feeder:2.8",
+      "kind:replay",
+      "port:POSITION_APP",
+      "sender-id:unknown",
+      "fake-direct",
+      "stable-replay-id"
+    ]
+  },
+  {
+    "bot_ref": "45da30a1fb06964730f7c07fba5e5864a2340e72",
+    "feeder_num": 3769067321,
+    "key": "x28-L5",
+    "kind": "replay",
+    "labels": [
+      "feeder:2.8",
+      "kind:replay",
+      "port:POSITION_APP",
+      "sender-id:unknown",
+      "stable-replay-id"
+    ]
+  },
+  {
+    "bot_ref": "45da30a1fb06964730f7c07fba5e5864a2340e72",
+    "feeder_num": 3769067321,
+    "key": "x28-L41",
+    "kind": "replay",
+    "labels": [
+      "feeder:2.8",
+      "kind:replay",
+      "port:TELEMETRY_APP",
+      "variant:deviceMetrics",
+      "sender-id:unknown",
+      "hops-exhausted",
+      "stable-replay-id"
+    ]
+  },
+  {
+    "bot_ref": "45da30a1fb06964730f7c07fba5e5864a2340e72",
+    "feeder_num": 3769067321,
+    "key": "x28-L42",
+    "kind": "replay",
+    "labels": [
+      "feeder:2.8",
+      "kind:replay",
+      "port:TELEMETRY_APP",
+      "variant:deviceMetrics",
+      "sender-id:unknown",
+      "fake-direct",
+      "stable-replay-id"
+    ]
+  },
+  {
+    "bot_ref": "45da30a1fb06964730f7c07fba5e5864a2340e72",
+    "feeder_num": 3769067321,
+    "key": "x28-L43",
+    "kind": "replay",
+    "labels": [
+      "feeder:2.8",
+      "kind:replay",
+      "port:TELEMETRY_APP",
+      "variant:deviceMetrics",
+      "sender-id:unknown",
+      "stable-replay-id"
+    ]
+  },
+  {
+    "bot_ref": "45da30a1fb06964730f7c07fba5e5864a2340e72",
+    "feeder_num": 3769067321,
+    "key": "x28-L80",
+    "kind": "self",
+    "labels": [
+      "feeder:2.8",
+      "kind:self",
+      "port:TELEMETRY_APP",
+      "variant:deviceMetrics",
+      "sender-id:crc32"
+    ]
+  },
+  {
+    "bot_ref": "45da30a1fb06964730f7c07fba5e5864a2340e72",
+    "feeder_num": 3769067321,
+    "key": "x28-L104",
+    "kind": "self",
+    "labels": [
+      "feeder:2.8",
+      "kind:self",
+      "port:TELEMETRY_APP",
+      "variant:localStats",
+      "sender-id:crc32"
+    ]
+  },
+  {
+    "bot_ref": "45da30a1fb06964730f7c07fba5e5864a2340e72",
+    "feeder_num": 3769067321,
+    "key": "x28-L81",
+    "kind": "live",
+    "labels": [
+      "feeder:2.8",
+      "kind:live",
+      "port:POSITION_APP",
+      "sender-id:unknown",
+      "from-id-null",
+      "bitfield:1"
+    ]
+  },
+  {
+    "bot_ref": "45da30a1fb06964730f7c07fba5e5864a2340e72",
+    "feeder_num": 3769067321,
+    "key": "x28-L83",
+    "kind": "live",
+    "labels": [
+      "feeder:2.8",
+      "kind:live",
+      "port:STORE_FORWARD_APP",
+      "sender-id:unknown",
+      "from-id-null",
+      "bitfield:1"
+    ]
+  },
+  {
+    "bot_ref": "45da30a1fb06964730f7c07fba5e5864a2340e72",
+    "feeder_num": 3769067321,
+    "key": "x28-L85",
+    "kind": "live",
+    "labels": [
+      "feeder:2.8",
+      "kind:live",
+      "port:NODEINFO_APP",
+      "sender-id:crc32",
+      "from-id-null",
+      "hops-exhausted",
+      "bitfield:0"
+    ]
+  },
+  {
+    "bot_ref": "45da30a1fb06964730f7c07fba5e5864a2340e72",
+    "feeder_num": 3769067321,
+    "key": "x28-L86",
+    "kind": "live",
+    "labels": [
+      "feeder:2.8",
+      "kind:live",
+      "port:POSITION_APP",
+      "sender-id:unknown",
+      "bitfield:0"
+    ]
+  },
+  {
+    "bot_ref": "45da30a1fb06964730f7c07fba5e5864a2340e72",
+    "feeder_num": 3769067321,
+    "key": "x28-L95",
+    "kind": "live",
+    "labels": [
+      "feeder:2.8",
+      "kind:live",
+      "port:TELEMETRY_APP",
+      "variant:deviceMetrics",
+      "sender-id:unknown",
+      "bitfield:0"
+    ]
+  },
+  {
+    "bot_ref": "45da30a1fb06964730f7c07fba5e5864a2340e72",
+    "feeder_num": 3769067321,
+    "key": "x28h4-L1",
+    "kind": "self",
+    "labels": [
+      "feeder:2.8",
+      "kind:self",
+      "port:ROUTING_APP",
+      "sender-id:crc32"
+    ]
+  },
+  {
+    "bot_ref": "45da30a1fb06964730f7c07fba5e5864a2340e72",
+    "feeder_num": 3769067321,
+    "key": "x28h4-L2",
+    "kind": "live",
+    "labels": [
+      "feeder:2.8",
+      "kind:live",
+      "port:TELEMETRY_APP",
+      "variant:environmentMetrics",
+      "sender-id:unknown",
+      "bitfield:0"
+    ]
+  },
+  {
+    "bot_ref": "45da30a1fb06964730f7c07fba5e5864a2340e72",
+    "feeder_num": 3769067321,
+    "key": "x28h4-L4",
+    "kind": "replay",
+    "labels": [
+      "feeder:2.8",
+      "kind:replay",
+      "port:POSITION_APP",
+      "sender-id:unknown",
+      "fake-direct",
+      "stable-replay-id"
+    ]
+  },
+  {
+    "bot_ref": "45da30a1fb06964730f7c07fba5e5864a2340e72",
+    "feeder_num": 4209798977,
+    "key": "x28f-L1",
+    "kind": "self",
+    "labels": [
+      "feeder:2.8",
+      "kind:self",
+      "port:TELEMETRY_APP",
+      "variant:deviceMetrics",
+      "sender-id:crc32",
+      "no-rx-time"
+    ]
+  },
+  {
+    "bot_ref": "45da30a1fb06964730f7c07fba5e5864a2340e72",
+    "feeder_num": 4209798977,
+    "key": "x28f-L2",
+    "kind": "self",
+    "labels": [
+      "feeder:2.8",
+      "kind:self",
+      "port:TELEMETRY_APP",
+      "variant:localStats",
+      "sender-id:crc32",
+      "no-rx-time"
+    ]
+  },
+  {
+    "bot_ref": "45da30a1fb06964730f7c07fba5e5864a2340e72",
+    "feeder_num": 4209798977,
+    "key": "x28f-L35",
+    "kind": "self",
+    "labels": [
+      "feeder:2.8",
+      "kind:self",
+      "port:TELEMETRY_APP",
+      "variant:deviceMetrics",
+      "sender-id:crc32"
+    ]
+  },
+  {
+    "bot_ref": "45da30a1fb06964730f7c07fba5e5864a2340e72",
+    "feeder_num": 4209798977,
+    "key": "x28f-L4",
+    "kind": "live",
+    "labels": [
+      "feeder:2.8",
+      "kind:live",
+      "port:POSITION_APP",
+      "sender-id:unknown",
+      "no-rx-time",
+      "from-id-null",
+      "bitfield:0"
+    ]
+  },
+  {
+    "bot_ref": "45da30a1fb06964730f7c07fba5e5864a2340e72",
+    "feeder_num": 4209798977,
+    "key": "x28f-L7",
+    "kind": "live",
+    "labels": [
+      "feeder:2.8",
+      "kind:live",
+      "port:TRACEROUTE_APP",
+      "sender-id:mac",
+      "no-rx-time",
+      "from-id-null",
+      "bitfield:2"
+    ]
+  },
+  {
+    "bot_ref": "45da30a1fb06964730f7c07fba5e5864a2340e72",
+    "feeder_num": 4209798977,
+    "key": "x28f-L8",
+    "kind": "self",
+    "labels": [
+      "feeder:2.8",
+      "kind:self",
+      "port:ROUTING_APP",
+      "sender-id:crc32",
+      "no-rx-time"
+    ]
+  },
+  {
+    "bot_ref": "45da30a1fb06964730f7c07fba5e5864a2340e72",
+    "feeder_num": 4209798977,
+    "key": "x28f-L9",
+    "kind": "live",
+    "labels": [
+      "feeder:2.8",
+      "kind:live",
+      "port:ROUTING_APP",
+      "sender-id:mac",
+      "no-rx-time",
+      "from-id-null",
+      "bitfield:0"
+    ]
+  },
+  {
+    "bot_ref": "45da30a1fb06964730f7c07fba5e5864a2340e72",
+    "feeder_num": 4209798977,
+    "key": "x28f-L12",
+    "kind": "live",
+    "labels": [
+      "feeder:2.8",
+      "kind:live",
+      "port:NODEINFO_APP",
+      "sender-id:mac",
+      "no-rx-time",
+      "from-id-null",
+      "bitfield:0",
+      "channel:1"
+    ]
+  },
+  {
+    "bot_ref": "45da30a1fb06964730f7c07fba5e5864a2340e72",
+    "feeder_num": 4209798977,
+    "key": "x28f-L25",
+    "kind": "live",
+    "labels": [
+      "feeder:2.8",
+      "kind:live",
+      "port:STORE_FORWARD_APP",
+      "sender-id:unknown",
+      "no-rx-time",
+      "from-id-null",
+      "bitfield:1"
+    ]
+  },
+  {
+    "bot_ref": "45da30a1fb06964730f7c07fba5e5864a2340e72",
+    "feeder_num": 4209798977,
+    "key": "x28f-L42",
+    "kind": "live",
+    "labels": [
+      "feeder:2.8",
+      "kind:live",
+      "port:TELEMETRY_APP",
+      "variant:environmentMetrics",
+      "sender-id:unknown",
+      "from-id-null",
+      "bitfield:0"
+    ]
+  }
+]

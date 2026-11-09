@@ -624,6 +624,17 @@ class NodeLatestStatus(models.Model):
         blank=True,
         help_text=_("Meshtastic-only: inferred from packet hop_start when received; the node's max hops setting."),
     )
+    meshtastic_inferred_max_hops_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text=_("When meshtastic_inferred_max_hops was last written."),
+    )
+    meshtastic_inferred_max_hops_source = models.CharField(
+        max_length=50,
+        null=True,
+        blank=True,
+        help_text=_("Port name (e.g. TEXT_MESSAGE_APP) of the packet that set meshtastic_inferred_max_hops."),
+    )
 
     class Meta:
         verbose_name = _("Node latest status")

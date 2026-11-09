@@ -5,6 +5,9 @@ Neutral Django signals emitted by `packets` services after persistence. Feature 
 ## Ingest vs post-processing
 
 1. **Ingest** (`PacketIngestView`) saves `MtRawPacket` + `PacketObservation`, then sends `packet_received` and the type-specific `*_packet_received` signal.
+   A **replayed** observation (2.8 connect-time replay, `PacketObservation.replayed`) is stored but sends **no**
+   signal, neither `packet_received` nor the typed one, so nothing below runs for it. See
+   [meshtastic.md](meshtastic.md#replayed-packets-28).
 2. **`packets/receivers.py`** runs the matching `*PacketService` (`BasePacketService.process_packet`).
 3. **Post-processing signals** (this document) fire from inside services for cross-app side effects.
 

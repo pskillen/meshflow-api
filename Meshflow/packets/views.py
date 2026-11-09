@@ -15,6 +15,7 @@ from packets.models import (
     AirQualityMetricsPacket,
     DeviceMetricsPacket,
     EnvironmentMetricsPacket,
+    GenericPacket,
     HealthMetricsPacket,
     HostMetricsPacket,
     LocalStatsPacket,
@@ -26,11 +27,13 @@ from packets.models import (
     TrafficManagementStatsPacket,
 )
 
+from .replay import feeder_node_nums
 from .serializers import NodeSerializer, NodeSerializerV3, PacketIngestSerializer
 from .signals import (
     air_quality_metrics_packet_received,
     device_metrics_packet_received,
     environment_metrics_packet_received,
+    generic_packet_received,
     health_metrics_packet_received,
     host_metrics_packet_received,
     local_stats_packet_received,
@@ -99,6 +102,7 @@ class PacketIngestView(FeederApiUsageMixin, APIView):
                 "observer": observer,
                 "node_id": node_id,
                 "user": request.user,
+                "feeder_nums": feeder_node_nums(observer, request),
             },
         )
 
@@ -108,6 +112,19 @@ class PacketIngestView(FeederApiUsageMixin, APIView):
 
                 packet = serializer.instance
                 observation = serializer.observation
+
+                if observation.replayed:
+                    # 2.8 connect-time replay: stored and flagged, but it drives nothing (see packets/replay.py).
+                    logger.debug(
+                        "Replayed packet stored without signals: from=%s port=%s id=%s",
+                        packet.from_int,
+                        packet.port_num,
+                        packet.packet_id,
+                    )
+                    return Response(
+                        {"status": "success", "message": "Packet ingested successfully"},
+                        status=status.HTTP_201_CREATED,
+                    )
 
                 # Send the packet received signal
                 packet_received.send(sender=self, packet=packet, observer=observer, observation=observation)
@@ -159,6 +176,8 @@ class PacketIngestView(FeederApiUsageMixin, APIView):
                     traceroute_packet_received.send(
                         sender=self, packet=packet, observer=observer, observation=observation
                     )
+                elif isinstance(packet, GenericPacket):
+                    generic_packet_received.send(sender=self, packet=packet, observer=observer, observation=observation)
 
                 return Response(
                     {"status": "success", "message": "Packet ingested successfully"},

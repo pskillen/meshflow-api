@@ -1,0 +1,81 @@
+{
+  "effects": {
+    "baseline_traceroute_queued": true,
+    "device_metrics_rows": 1,
+    "dx_candidate_called": true,
+    "environment_metrics_rows": 0,
+    "inferred_max_hops": 7,
+    "last_heard_advanced": true,
+    "nls": {
+      "battery_level": 84.0,
+      "meshtastic_air_util_tx": 0.18527777,
+      "meshtastic_channel_utilization": 3.2333333,
+      "meshtastic_inferred_max_hops": 7,
+      "meshtastic_inferred_max_hops_source": "TELEMETRY_APP",
+      "uptime_seconds": 10960093,
+      "voltage": 4.017
+    },
+    "observation_api": {
+      "direct_from_sender": false,
+      "hop_count": 3,
+      "replayed": false
+    },
+    "observed_node_created": true,
+    "position_rows": 0
+  },
+  "key": "x28-L95",
+  "observation": {
+    "bitfield": 0,
+    "channel": 0,
+    "hop_limit": 4,
+    "hop_start": 7,
+    "relay_node": 180,
+    "replayed": false,
+    "rx_rssi": -80.0,
+    "rx_snr": 6.0,
+    "rx_time": "2026-11-08T13:41:22Z",
+    "rx_time_estimated": false
+  },
+  "observed_node": {
+    "environment_exposure": 0,
+    "long_name": "Unknown Node !2a83b265",
+    "m2m_opt_out": false,
+    "mac_addr": null,
+    "mc_pubkey": null,
+    "mc_pubkey_prefix": null,
+    "meshcore_adv_type": null,
+    "meshtastic_hw_model": null,
+    "meshtastic_is_licensed": null,
+    "meshtastic_is_unmessagable": null,
+    "meshtastic_key_node_id": null,
+    "meshtastic_node_id": 713273957,
+    "meshtastic_public_key": null,
+    "meshtastic_public_key_hex": null,
+    "meshtastic_role": null,
+    "protocol": 1,
+    "short_name": "b265",
+    "weather_use": 0
+  },
+  "packet": {
+    "fields": {
+      "battery_level": 84.0,
+      "from_int": 713273957,
+      "from_str": "!2a83b265",
+      "meshtastic_air_util_tx": 0.18527777,
+      "meshtastic_channel_utilization": 3.2333333,
+      "packet_id": 3113253660,
+      "port_num": "TELEMETRY_APP",
+      "reading_time": "2026-08-03T11:29:47Z",
+      "to_int": 4294967295,
+      "to_str": "^all",
+      "uptime_seconds": 10960093,
+      "voltage": 4.017
+    },
+    "model": "DeviceMetricsPacket"
+  },
+  "request": {
+    "feeder_num_header": 3769067321,
+    "url": "v4"
+  },
+  "status": 201
+}

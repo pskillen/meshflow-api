@@ -91,6 +91,7 @@ cluster.
 - Usable observer and destination positions when distance-based rules need them.
 - Packet hop metadata, especially whether the packet was observed with zero
   remaining intermediate hops between sender and managed observer.
+  An observation with `hop_start == 0` and no bitfield has an unknown hop count and is never treated as direct.
 
 The detector ignores packets that do not have a usable `from_int`, do not have a
 `PacketObservation`, do not have a `first_reported_time`, or are observations of
@@ -200,6 +201,8 @@ tested against real Meshtastic packet semantics, but the reference behaviour is:
 
 - direct observations are eligible for packet-ingest DX detection;
 - multi-hop observations are not eligible for packet-ingest DX detection;
+- a replayed observation (2.8 connect-time replay) is never direct and never starts a candidate: no signal is sent
+  for it and `observation_is_direct` returns false;
 - missing or ambiguous hop metadata is treated conservatively and does not open a
   packet-ingest DX event.
 

@@ -1,11 +1,10 @@
 # Meshtastic 2.8 feeder upgrade runbook
 
-> **DRAFT. Do not follow this to upgrade a production feeder yet.** It describes **planned** behaviour: most of the API and bot support it relies on is not built or deployed. Nothing here has been run on hardware.
+> **DRAFT. Do not follow this to upgrade a production feeder yet.** It describes **planned** behaviour: most of the API and bot support it relies on is not built or deployed. Only the identity checks (crc32 node number, re-key, downgrade and re-upgrade) have been run on hardware; the rest has not.
 >
 > **Pending before this is final:**
 >
-> - Results of the hardware session (identity snapshots, whether `crc32(public key)` equals the node number, mid-session key mint, 403 behaviour, signing and Traffic Management captures).
-> - Rollback findings (what a 2.8 to 2.7 downgrade does to the node number and config). Step 7 is a placeholder until then.
+> - Remaining results of the hardware session (mid-session key mint, 403 behaviour, signing and Traffic Management captures). Done: `crc32(public key)` equals the node number, and the rollback findings (step 7).
 > - Whether the Heltec 2.8.2 update keeps the key without an erase.
 > - Bot version numbers: every "bot version TBD" below is a placeholder.
 > - Whether the bot can tell a feeder's local telemetry from its broadcast telemetry (open question; see step 5).
@@ -18,7 +17,7 @@ Part of [packet ingestion](README.md). Design background: [ADR-0005 feeder-scope
 
 In Meshtastic 2.8 a node's number is `crc32(public key)`, so an upgraded feeder's number changes. A feeder that still posts under its old number on a legacy URL gets a 403 and stops ingesting without any visible error. 2.8 also changes what the feeder radio passes to the bot (Traffic Management drops some packets before the bot, broadcast telemetry and public positions are switched off on upgrade, signing fields appear). The steps below keep ingest running and the node's history attached.
 
-The firmware facts come from the 2.8.2 source and release notes; they have not been exercised on our hardware yet. 2.8.1 and 2.8.2 are both Alpha releases; the latest stable-track release is still 2.7.x. Decide separately whether a feeder should run an alpha.
+The firmware facts come from the 2.8.2 source and release notes; apart from the identity checks noted at the top, they have not been exercised on our hardware yet. 2.8.1 and 2.8.2 are both Alpha releases; the latest stable-track release is still 2.7.x. Decide separately whether a feeder should run an alpha.
 
 ## Hardware plan for the first runs
 
@@ -34,7 +33,7 @@ Do not upgrade a feeder until all of these hold. Bot version numbers are TBD.
 | Gate | Needed |
 | --- | --- |
 | API | Feeder-scoped v4 URLs ([ADR-0005](adr/0005-feeder-scoped-auth.md): `GET /api/v4/feeder/identity/`, `/api/v4/feeder/bot-version/`, `POST /api/v4/feeder/meshtastic/ingest/`, `POST /api/v4/feeder/meshtastic/nodes/`, and `ws/nodes/?feeder_scoped=1`; see [API.md](../../API.md#feeder-api-v4)), predicted node ids and key backfill, no-clobber identity fix, and feeder re-key deployed to the target environment; the backfill has been run (`python manage.py backfill_meshtastic_identity`, idempotent) |
-| Re-key switch | `MESHTASTIC_FEEDER_AUTO_REKEY` is on only if the crc32 match was confirmed on hardware; otherwise plan on a manual re-point |
+| Re-key switch | `MESHTASTIC_FEEDER_AUTO_REKEY` is on only when you accept the crc32 match, which is confirmed on hardware (2026-11-08); otherwise plan on a manual re-point |
 | Bot | Version TBD or later: reports identity (key, MAC, firmware, node number) and detects a number change; probes v4 URLs and falls back; uploads throttled self telemetry; library pinned below 2.8 |
 | Key | The feeder has **its own API key** (not shared with another feeder) |
 | Identity | The feeder's public key is already visible on its `ManagedNode` |
@@ -67,6 +66,8 @@ A feeder on a **legacy URL cannot survive the upgrade**. Confirm the bot is on a
 | Public-channel position precision | Restore if wanted | The upgrade sets it to 0 and the public clamp is about 730 m (15 bits) |
 | Telemetry | See step 5 | |
 
+The API ignores the connect-time replay of stored node records a 2.8 radio sends after `config_complete_id`: replayed packets are stored and flagged but change nothing (see [meshtastic.md](meshtastic.md#replayed-packets-28)). Bots with replay detection drop them before upload.
+
 Expect observation counts from a 2.8 feeder to differ from a 2.7 one even after these settings: pre-hop packets are withheld from the phone/bot, and broadcast hop limits are density-scaled.
 
 ## 5. Feeder telemetry
@@ -91,7 +92,13 @@ If ingest is not 200, check in this order: bot is on a v4 URL; key is the feeder
 
 ## 7. Rollback
 
-**TBD: pending the hardware rollback test.** Findings needed: after a 2.8 to 2.7 downgrade without an erase, does the node number revert to the MAC-based id, stay as the crc32 id, or does the config reset? What the API does on a reversion (the link logic must tolerate it) follows from that. Until it is recorded: restore the private key backup if the config was lost, and do not downgrade a production feeder.
+Findings from the hardware session (2026-11-08, one Xiao, 2.8.2 to 2.7.26 and back):
+
+- A 2.8.2 to 2.7.26 downgrade in update mode (no erase) **keeps the crc32 number** on a re-keyed node (`!faec6f41`; a plain update-then-downgrade was not run), the key, the owner, the region and the channels. It does not revert to the MAC-based number, so the API saw no reversion; the identity link logic is expected to need no special case.
+- A later 2.7 to 2.8 re-upgrade keeps the identity but **empties the NodeDB** (device state version 24 and 25 differ). Expect the feeder to hear its mesh again from scratch, and the 2.8 connect-time replay to be small until the NodeDB refills.
+- 2.8.2 ignores the 1200-baud DFU touch. Run `meshtastic --enter-dfu` first, then flash.
+
+Until the remaining DRAFT items are closed, do not downgrade a production feeder; if the config was lost, restore the private key backup.
 
 ## 8. Fleet order
 

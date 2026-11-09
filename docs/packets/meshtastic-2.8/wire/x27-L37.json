@@ -1,0 +1,15 @@
+{
+  "channel": 9,
+  "encrypted": "CFG1ENHiRRCTgtB+YMNK8atRRPfMAMX016rG5a8NCMIXX34UhU1KRKo=",
+  "from": 4178295047,
+  "fromId": null,
+  "hopStart": 7,
+  "id": 491660090,
+  "relayNode": 180,
+  "rxRssi": -80,
+  "rxSnr": 6.75,
+  "rxTime": 1794143268,
+  "to": 4294967295,
+  "toId": "^all",
+  "transportMechanism": "TRANSPORT_LORA"
+}

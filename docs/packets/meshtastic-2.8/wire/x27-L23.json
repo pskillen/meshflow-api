@@ -1,0 +1,29 @@
+{
+  "channel": 0,
+  "decoded": {
+    "bitfield": 2,
+    "payload": "CgkhYTBjYzc1YTASBEZuRDIaBGVUTjIiBjDtoMx1oCgrQiCQzK6U2HhvsxNYyOGLmdSJ8saIhpmDQkSSH7DVqZHtY0gA",
+    "portnum": "NODEINFO_APP",
+    "user": {
+      "hwModel": "HELTEC_V3",
+      "id": "!a0cc75a0",
+      "isUnmessagable": false,
+      "longName": "FnD2",
+      "macaddr": "MO2gzHWg",
+      "publicKey": "kMyulNh4b7MTWMjhi5nUifLGiIaZg0JEkh+w1amR7WM=",
+      "shortName": "eTN2"
+    },
+    "wantResponse": true
+  },
+  "from": 2697754016,
+  "fromId": null,
+  "hopStart": 3,
+  "id": 134003927,
+  "relayNode": 180,
+  "rxRssi": -79,
+  "rxSnr": 6.5,
+  "rxTime": 1794142832,
+  "to": 1451547656,
+  "toId": "!5684dc08",
+  "transportMechanism": "TRANSPORT_LORA"
+}

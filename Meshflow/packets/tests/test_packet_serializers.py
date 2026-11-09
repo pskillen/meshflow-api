@@ -10,6 +10,7 @@ from constellations.models import Constellation, MessageChannel
 from nodes.models import ManagedNode, NodeLatestStatus, ObservedNode, Position
 from packets.models import (
     DeviceMetricsPacket,
+    GenericPacket,
     LocalStatsPacket,
     LocationSource,
     MessagePacket,
@@ -702,21 +703,29 @@ class PacketIngestSerializerTest(BasePacketSerializerTestCase):
         self.assertEqual(packet.snr_towards, [4.5, -3.0, 1.0])  # Extra value stored, receiver uses i < len
         self.assertEqual(packet.snr_back, [2.0, 0.0, -1.0])
 
-    def test_invalid_packet_type(self):
-        """Test handling of invalid packet type."""
+    def test_unknown_packet_type_is_generic(self):
+        """An unknown port is stored as a GenericPacket, not rejected."""
         data = {
             "id": 123,
             "from": self.from_node.meshtastic_node_id,
             "fromId": self.from_node.node_id_str,
-            "decoded": {
-                "portnum": "INVALID_TYPE",
-            },
+            "decoded": {"portnum": "INVALID_TYPE"},
             "rxTime": 1672531200,
         }
 
         serializer = PacketIngestSerializer(data=data, context=self.context)
+        assert_serializer_valid(serializer)
+        packet = serializer.save()
+        self.assertIsInstance(packet, GenericPacket)
+        self.assertEqual(packet.port_num, "INVALID_TYPE")
+
+    def test_missing_portnum_is_invalid(self):
+        """A packet with no decoded.portnum is still a 400."""
+        data = {"id": 123, "from": self.from_node.meshtastic_node_id, "decoded": {}, "rxTime": 1672531200}
+
+        serializer = PacketIngestSerializer(data=data, context=self.context)
         self.assertFalse(serializer.is_valid())
-        self.assertIn("Unknown packet type", str(serializer.errors))
+        self.assertIn("decoded.portnum", serializer.errors)
 
 
 class NodeSerializerTest(BasePacketSerializerTestCase):
@@ -1341,3 +1350,45 @@ class PacketDeduplicationTest(BasePacketSerializerTestCase):
 
         self.assertEqual(packet1.id, packet2.id)
         self.assertEqual(packet1.observations.count(), 1)
+
+
+class NodeSerializerHwModelTest(BasePacketSerializerTestCase):
+    """Hardware model normalisation on node upsert."""
+
+    def test_update_normalises_numeric_hw_model(self):
+        serializer = NodeSerializer(
+            instance=self.from_node,
+            data={"id": self.from_node.meshtastic_node_id, "meshtastic_hw_model": "152"},
+            partial=True,
+        )
+        assert_serializer_valid(serializer)
+        serializer.save()
+        self.from_node.refresh_from_db()
+        self.assertEqual(self.from_node.meshtastic_hw_model, "HELTEC_MESH_POCKET_V2")
+
+    def test_create_normalises_legacy_alias_and_renamed_name(self):
+        serializer = NodeSerializer(
+            data={"id": 777001, "long_name": "New", "short_name": "NEW", "macaddr": None, "hw_model": "SENSELORA_S3"}
+        )
+        assert_serializer_valid(serializer)
+        node = serializer.save()
+        self.assertEqual(node.meshtastic_hw_model, "MAKERFABS_RESERVED")
+
+    def test_unknown_hw_model_number_is_valid_and_stored_as_hw_n(self):
+        serializer = NodeSerializer(
+            instance=self.from_node,
+            data={"id": self.from_node.meshtastic_node_id, "meshtastic_hw_model": "999"},
+            partial=True,
+        )
+        assert_serializer_valid(serializer)
+        serializer.save()
+        self.from_node.refresh_from_db()
+        self.assertEqual(self.from_node.meshtastic_hw_model, "HW_999")
+
+    def test_non_ascii_digit_hw_model_does_not_raise(self):
+        serializer = NodeSerializer(
+            instance=self.from_node,
+            data={"id": self.from_node.meshtastic_node_id, "meshtastic_hw_model": "²"},
+            partial=True,
+        )
+        assert_serializer_valid(serializer)

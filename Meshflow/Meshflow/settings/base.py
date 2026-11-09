@@ -326,6 +326,22 @@ AUTH_USER_MODEL = "users.User"
 
 # Packet deduplication: time window (minutes) within which same sender+packet_id is treated as duplicate
 PACKET_DEDUP_WINDOW_MINUTES = int(os.environ.get("PACKET_DEDUP_WINDOW_MINUTES", "10"))
+# Meshtastic 2.8 connect-time replay: flag packets by shape (no rxRssi, TRANSPORT_LORA, BACKGROUND, not the
+# feeder's own). Off = only the body "replayed" flag counts. See docs/features/packet-ingestion/meshtastic.md.
+MESHTASTIC_REPLAY_SHAPE_DETECTION = os.environ.get("MESHTASTIC_REPLAY_SHAPE_DETECTION", "true").strip().lower() in (
+    "1",
+    "true",
+    "yes",
+    "on",
+)
+# Meshtastic ports stored without their decoded payload (comma-separated PortNum names).
+MESHTASTIC_METADATA_ONLY_PORTNUMS = [
+    name.strip()
+    for name in os.environ.get("MESHTASTIC_METADATA_ONLY_PORTNUMS", "ROUTING_APP").split(",")
+    if name.strip()
+]
+# GenericPacket.decoded is dropped (decoded_truncated=True) when its JSON is larger than this many bytes.
+MESHTASTIC_GENERIC_DECODED_MAX_BYTES = int(os.environ.get("MESHTASTIC_GENERIC_DECODED_MAX_BYTES", "4096"))
 MESHCORE_PACKET_DEDUP_WINDOW_MINUTES = int(os.environ.get("MESHCORE_PACKET_DEDUP_WINDOW_MINUTES", "10"))
 MESHCORE_DECODED_TWIN_WINDOW_SECONDS = int(os.environ.get("MESHCORE_DECODED_TWIN_WINDOW_SECONDS", "120"))
 

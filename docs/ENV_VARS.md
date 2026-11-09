@@ -86,6 +86,9 @@ Discord **login** uses the OAuth pair above. **DM notifications** (test message 
 |-------------------------------|---------|-------------------------------------------------------------------|-------------------------|
 | `PACKET_DEDUP_WINDOW_MINUTES` | `10`    | Time window (minutes) within which same sender+packet_id is treated as duplicate. | Integer (string)        |
 | `MESHCORE_PACKET_DEDUP_WINDOW_MINUTES` | `10` | MeshCore dedup window (minutes) for `(pkt_hash, rx_time)` per ADR-0004. | Integer (string) |
+| `MESHTASTIC_REPLAY_SHAPE_DETECTION` | `true` | Flag 2.8 connect-time replays by shape (no `rxRssi`, `TRANSPORT_LORA`, `BACKGROUND`, not the feeder's own). Off = only the body `replayed` flag counts. | `true` / `false` |
+| `MESHTASTIC_METADATA_ONLY_PORTNUMS` | `ROUTING_APP` | Meshtastic ports stored as `GenericPacket` with no payload (`decoded` null). | Comma-separated `PortNum` names |
+| `MESHTASTIC_GENERIC_DECODED_MAX_BYTES` | `4096` | A `GenericPacket` payload whose JSON is larger than this is dropped and flagged `decoded_truncated`. | Integer (string) |
 | `MESHCORE_DECODED_TWIN_WINDOW_SECONDS` | `120` | Max `rx_time` skew for rx_log PATH/TEXT_MSG ↔ `channel_text` path twin merge (ADR-0004). | Integer (string) |
 
 ---
@@ -124,7 +127,7 @@ Discord **login** uses the OAuth pair above. **DM notifications** (test message 
 
 See **[docs/features/dx-monitoring/notifications.md](features/dx-monitoring/notifications.md)** for categories and self-service API.
 
-Packet-ingest rules (`new_distant_node`, `returned_dx_node`, `distant_observation`) only run when the `PacketObservation` is **direct**: both `hop_start` and `hop_limit` must be present and `hop_start - hop_limit == 0`. Missing hop metadata or multi-hop observations are ignored for those reasons (multi-hop mesh reachability is normal).
+Packet-ingest rules (`new_distant_node`, `returned_dx_node`, `distant_observation`) only run when the `PacketObservation` is **direct**: both `hop_start` and `hop_limit` must be present and `hop_start - hop_limit == 0`. An observation with `hop_start == 0` and no bitfield is unknown, not direct. Missing hop metadata or multi-hop observations are ignored for those reasons (multi-hop mesh reachability is normal).
 
 See **[docs/features/dx-monitoring/detection.md](features/dx-monitoring/detection.md)** for behaviour.
 
@@ -212,6 +215,9 @@ Tunables for [automatic target selection reliability](../features/traceroute/alg
 ## 7. Packet Ingestion
 
 - **PACKET_DEDUP_WINDOW_MINUTES**: Time window (minutes) within which the same sender+packet_id is treated as a duplicate. See `docs/features/packet-ingestion/DEDUPLICATION.md`.
+- **MESHTASTIC_REPLAY_SHAPE_DETECTION**: Default `true`. Observations with the 2.8 replay shape are stored flagged (`PacketObservation.replayed`) and trigger no processing. `false` keeps only the body `replayed` flag. See `docs/features/packet-ingestion/meshtastic.md`.
+- **MESHTASTIC_METADATA_ONLY_PORTNUMS**: Comma-separated `PortNum` names (default `ROUTING_APP`) whose packets are stored as `GenericPacket` without their decoded payload.
+- **MESHTASTIC_GENERIC_DECODED_MAX_BYTES**: Size cap (default `4096`) for a `GenericPacket` payload; larger payloads are dropped and `decoded_truncated` is set.
 
 ## 8. Mesh monitoring
 

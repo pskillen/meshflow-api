@@ -1,0 +1,22 @@
+{
+  "channel": 0,
+  "decoded": {
+    "payload": "GAAiCITJowdwCkPc",
+    "portnum": "ROUTING_APP",
+    "requestId": 1686988781,
+    "routing": {
+      "ackProof": "hMmjB3AKQ9w=",
+      "errorReason": "NONE"
+    }
+  },
+  "from": 4209798977,
+  "fromId": "!faec6f41",
+  "id": 178496494,
+  "priority": "ACK",
+  "relayNode": 240,
+  "rxRssi": -80,
+  "rxSnr": 5.75,
+  "rxTime": 1794148012,
+  "to": 4209798977,
+  "toId": "!faec6f41"
+}

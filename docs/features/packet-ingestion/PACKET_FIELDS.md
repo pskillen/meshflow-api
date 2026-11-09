@@ -12,13 +12,41 @@ All packet types share these common fields:
 | to         | integer   | Recipient's node ID      | 4294967295 for broadcast            |
 | channel    | integer   | Channel number           | 0-based                             |
 | id         | integer   | Packet identifier        | Unique per sender, not globally     |
-| rxTime     | integer   | Reception timestamp      | Unix timestamp                      |
+| rxTime     | integer   | Reception timestamp      | Unix timestamp; optional (see below) |
 | rxSnr      | float     | Signal-to-noise ratio    | -                                   |
 | hopLimit   | integer   | Maximum number of hops   | -                                   |
 | hopStart   | integer   | Initial hop count        | -                                   |
 | fromId     | string    | Sender's node ID         | String format (e.g. "!433d4494")    |
 | toId       | string    | Recipient's node ID      | String format, "^all" for broadcast |
 | raw        | string    | Raw packet data          | Text format of the complete packet  |
+| rxRssi     | float     | Received signal strength | Absent on a 2.8 replay; feeds replay detection |
+| priority   | string    | Packet priority          | `BACKGROUND` on a 2.8 replay; feeds replay detection |
+| transportMechanism | string | How the packet arrived | `TRANSPORT_LORA` on a 2.8 replay; `TRANSPORT_MQTT` is never a replay. Feeds replay detection, not stored |
+| replayed   | boolean   | Bot-side replay flag     | Optional (body only, default false). Stored as `PacketObservation.replayed` |
+
+### Replayed packets
+
+`PacketObservation.replayed` is true for a 2.8 connect-time replay: the body says `replayed: true`, or the packet has
+the replay shape (no `rxRssi`, `TRANSPORT_LORA`, `BACKGROUND`, not the feeder's own). It is exposed as `replayed` in
+the observation API. See [meshtastic.md](meshtastic.md#replayed-packets-28).
+
+### Hops, `decoded.bitfield` and unknown hop counts
+
+`decoded.bitfield` (2.8+ firmware, any port) is stored on `PacketObservation.bitfield`. Absent stays null, which is
+different from `0`.
+
+2.8 HopScaling lowers `hopStart` on broadcast POSITION, TELEMETRY, NODEINFO and NEIGHBORINFO packets depending on
+mesh density, and a 2.8 relay can send `hopStart == 0` on a packet that travelled. So **`hopStart == 0` with no
+bitfield means the hop count is unknown**, not direct:
+
+- `hop_count` in the observation API is null and `direct_from_sender` is false;
+- DX detection does not treat the observation as direct;
+- `hopStart == 0` with a bitfield (even `0`) is a real zero: `hopLimit == 0` then means direct.
+
+`NodeLatestStatus.meshtastic_inferred_max_hops` (with `_at` and `_source`, the port name) ignores unknown-hop,
+inconsistent (`hopStart < hopLimit`) and MQTT observations. TEXT_MESSAGE, TRACEROUTE, ROUTING, ADMIN and generic
+ports are authoritative and can lower it. POSITION, TELEMETRY, NODEINFO and NEIGHBORINFO may only raise it, and only
+when no authoritative value is younger than 7 days.
 
 ## Packet Type Specific Fields
 
@@ -33,7 +61,7 @@ Node information packets contain device details:
 | decoded.user.longName  | string    | Full node name         | UTF-8 encoded         |
 | decoded.user.shortName | string    | Short node name        | Max 4 characters      |
 | decoded.user.macaddr   | string    | MAC address            | Base64 encoded        |
-| decoded.user.hwModel   | string    | Hardware model         | e.g. "HELTEC_V3"      |
+| decoded.user.hwModel   | string    | Hardware model         | Normalised to the enum name: a number (lib 2.7.11 sends 2.8 models as `150`) maps to its name, an unknown number becomes `HW_<n>`, and renamed 2.7 names (`SENSELORA_S3`) map to their 2.8 name. e.g. "HELTEC_V3" |
 | decoded.user.role      | string    | Node role              | e.g. "CLIENT_MUTE"    |
 | decoded.user.publicKey | string    | Public key             | Base64 encoded        |
 | decoded.user.isLicensed | boolean  | Ham radio operator flag | -                    |
@@ -241,3 +269,15 @@ Traceroute packets contain routing path information:
 
 In the response packet, `from` is the target node (responder), `to` is the source node (initiator).
 SNR arrays require firmware 2.5+; older nodes report -128 for unknown hops.
+
+### Other ports
+
+Any `decoded.portnum` without a section above (for example `STORE_FORWARD_APP`, `ROUTING_APP`, or a port the sender could only give as an integer) is accepted and stored as a `GenericPacket`.
+
+| Field Name              | Data Type        | Description                | Notes                                                                 |
+|-------------------------|------------------|----------------------------|-----------------------------------------------------------------------|
+| decoded.portnum         | string or integer | Port                       | Ints and numeric strings become the enum name; unknown numbers become `PORT_<n>` |
+| decoded.*               | object           | Port payload               | Stored as JSON minus `portnum`; null for `ROUTING_APP`, null when over 4 KB |
+| decoded.telemetry.*     | object           | Unknown telemetry variant  | `TELEMETRY_APP` only; the first dict-valued key other than `time` is stored as `telemetry_variant` |
+
+`rxTime` may be omitted (protobuf3 drops zero). The API then uses its own clock and flags the observation `rx_time_estimated`.

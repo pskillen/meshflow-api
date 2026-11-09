@@ -1,0 +1,27 @@
+{
+  "channel": 0,
+  "decoded": {
+    "bitfield": 2,
+    "payload": "EgEY",
+    "portnum": "TRACEROUTE_APP",
+    "traceroute": {
+      "snrTowards": [
+        24
+      ]
+    },
+    "wantResponse": true
+  },
+  "from": 1129933592,
+  "fromId": null,
+  "hopLimit": 7,
+  "hopStart": 7,
+  "id": 2502214665,
+  "relayNode": 24,
+  "rxRssi": -70,
+  "rxSnr": 6.0,
+  "rxTime": 1794148009,
+  "to": 4209798977,
+  "toId": "!faec6f41",
+  "transportMechanism": "TRANSPORT_LORA",
+  "wantAck": true
+}
