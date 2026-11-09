@@ -44,7 +44,7 @@ source of truth for defaults.
 | `SCHEDULE_TRACEROUTE_SOURCE_RECENCY_SECONDS` | `600` (s) | Managed feeder snapshot (`ManagedNodeStatus`) + TR source eligibility window |
 | `FAILED_TR_TIMEOUT_SECONDS` | `180` (s) | Mark stuck `AutoTraceRoute` as `failed` |
 | `STALE_TR_TIMEOUT_SECONDS` | `180` (s) | Match inbound TR response packet to an `AutoTraceRoute` |
-| `ONLINE_NODE_WINDOW_HOURS` | `2` (h) | Length of the `online_nodes` / `mc_online_nodes` snapshot window `[recorded_at - N h, recorded_at]` |
+| `ONLINE_NODE_WINDOW_HOURS` | `2` (h) | Length of the `online_nodes` / `mc_online_nodes` snapshot window, centred on `recorded_at` (`[recorded_at - N/2 h, recorded_at + N/2 h]`) |
 | `MESH_MONITORING_VERIFICATION_SECONDS` | `180` (s) | Offline-verification window after a watch triggers |
 | `MESH_MONITORING_VERIFICATION_NOTIFY_COOLDOWN_SECONDS` | `3600` (s) | Min gap between verification-start Discord DMs |
 | `MESH_MONITORING_NOTIFY_VERIFICATION_START` | unset = on | Toggle verification-start DMs |
@@ -261,7 +261,7 @@ Implemented in [`Meshflow/stats/tasks.py`](../Meshflow/stats/tasks.py).
 
 | Item | Default | Env | Purpose |
 | --- | --- | --- | --- |
-| `ONLINE_NODE_WINDOW_HOURS` | **2 h** | yes | Length of the `online_nodes` / `mc_online_nodes` window `[recorded_at - N h, recorded_at]`, counted from packets (`first_reported_time` global, `rx_time` per constellation), not `last_heard` |
+| `ONLINE_NODE_WINDOW_HOURS` | **2 h** | yes | Length of the `online_nodes` / `mc_online_nodes` window, centred on `recorded_at` (`[recorded_at - N/2 h, recorded_at + N/2 h]`, so the point at H includes the hour just finished), counted from packets (`first_reported_time` global, `rx_time` per constellation), not `last_heard` |
 | Snapshot lag | **1 h** | no | Snapshots target `current_hour - 1h` so only completed hours are recorded |
 | `_collect_packet_volume` bucket | **1 h** | no | Packet volume snapshot uses `[recorded_at, recorded_at+1h)` on `first_reported_time` |
 | `node_firmware` window | **168 h** (7 d, `ADOPTION_WINDOW_HOURS`) | no | Daily snapshot of Meshtastic nodes by `last_heard`, no upper bound; `recorded_at` is midnight UTC |

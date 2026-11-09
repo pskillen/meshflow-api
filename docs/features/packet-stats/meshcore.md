@@ -15,7 +15,7 @@ Prefix **`mc_`** on `stat_type` (no schema migration; extends OpenAPI enum):
 | `stat_type` | Scope (MT parity) | Data source (intended) |
 | --- | --- | --- |
 | `mc_packet_volume` | Global only | `MeshCoreRawPacket.first_reported_time` in hour bucket; `by_type` from `MeshCorePayloadType` (`advert`, `channel_text`, `contact_text`, `raw`) |
-| `mc_online_nodes` | Global + per-constellation | Distinct senders heard in `[recorded_at - ONLINE_NODE_WINDOW_HOURS, recorded_at]` (2 h): global from `MeshCoreRawPacket.first_reported_time`, constellation from `MeshCorePacketObservation.rx_time` by feeder constellation. A sender is its 12-hex pubkey prefix (`from_pubkey[:12]`, else `from_pubkey_prefix`), because `from_pubkey` is null on prefix-only packets that still advance `last_heard`. Same cut-over and `--rewrite-online` backfill as MT, see [meshtastic.md](meshtastic.md#online_nodes) |
+| `mc_online_nodes` | Global + per-constellation | Distinct senders heard in the `ONLINE_NODE_WINDOW_HOURS` window centred on `recorded_at` (2 h: `[H - 1h, H + 1h]`): global from `MeshCoreRawPacket.first_reported_time`, constellation from `MeshCorePacketObservation.rx_time` by feeder constellation. A sender is its 12-hex pubkey prefix (`from_pubkey[:12]`, else `from_pubkey_prefix`), because `from_pubkey` is null on prefix-only packets that still advance `last_heard`. Same cut-over and `--rewrite-online` backfill as MT, see [meshtastic.md](meshtastic.md#online_nodes) |
 | `mc_new_nodes` | Global + per-constellation | `ObservedNode` `protocol=MESHCORE` + `created_at` (delta / backfill same rules as MT) |
 
 **Celery:** extend existing `collect_stats_snapshots` / `backfill_stats_snapshots` (single `run_id` per hour).
