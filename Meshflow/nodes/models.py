@@ -239,8 +239,9 @@ class ManagedNode(models.Model):
         null=True,
         blank=True,
         help_text=_(
-            "Node number the bot last reported (X-Meshtastic-Feeder-Node-Num). Informational only: "
-            "never used for authorisation, and never copied into meshtastic_node_id."
+            "Node number the bot last reported (X-Meshtastic-Feeder-Node-Num). Never used for authorisation. "
+            "On v4 URLs a change drives the feeder re-key (nodes.services.feeder_identity), which updates "
+            "meshtastic_node_id only when the reported public key proves it."
         ),
     )
     identity_reported_at = models.DateTimeField(
@@ -322,6 +323,48 @@ class ManagedNode(models.Model):
             raise ValueError(f"Invalid channel index: {channel_idx}")
 
         return getattr(self, f"meshtastic_channel_{channel_idx}")
+
+
+class ManagedNodeIdentityEvent(models.Model):
+    """Audit row: a feeder reported a new Meshtastic node number, or a new public key (see feeder_identity)."""
+
+    class Outcome(models.TextChoices):
+        AUTO_UPDATED = "auto_updated", _("Auto-updated")
+        FLAGGED = "flagged", _("Flagged")
+        MANUAL = "manual", _("Manual")
+        KEY_CHANGED = "key_changed", _("Key changed")
+
+    class Reason(models.TextChoices):
+        KEY_NOT_REPORTED = "key_not_reported", _("Key not reported")
+        CRC_MISMATCH = "crc_mismatch", _("crc32 of key does not match the number")
+        KEY_MISMATCH = "key_mismatch", _("Key differs from the stored key")
+        SHARED_KEY = "shared_key", _("Key held by another node")
+        NUMBER_COLLISION = "number_collision", _("Number held by another feeder")
+        AUTO_REKEY_DISABLED = "auto_rekey_disabled", _("Auto re-key disabled")
+
+    managed_node = models.ForeignKey(ManagedNode, on_delete=models.CASCADE, related_name="identity_events")
+    old_meshtastic_node_id = models.BigIntegerField()
+    new_meshtastic_node_id = models.BigIntegerField()
+    reported_public_key = models.CharField(max_length=64, null=True, blank=True, help_text=_("64-char hex."))
+    outcome = models.CharField(max_length=16, choices=Outcome.choices, db_index=True)
+    reason = models.CharField(max_length=24, choices=Reason.choices, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    resolved_at = models.DateTimeField(
+        null=True, blank=True, help_text=_("A flagged event overtaken by a later change.")
+    )
+    acknowledged_at = models.DateTimeField(null=True, blank=True)
+    acknowledged_by = models.ForeignKey(
+        "users.User", on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
+
+    class Meta:
+        indexes = [models.Index(fields=["managed_node", "-created_at"], name="mn_identity_event_node_created")]
+
+    def __str__(self):
+        return (
+            f"{self.managed_node_id}: {meshtastic_id_to_hex(self.old_meshtastic_node_id)} -> "
+            f"{meshtastic_id_to_hex(self.new_meshtastic_node_id)} ({self.outcome})"
+        )
 
 
 class ManagedNodeMcChannelLink(models.Model):

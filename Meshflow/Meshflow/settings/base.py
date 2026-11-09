@@ -334,6 +334,14 @@ MESHTASTIC_REPLAY_SHAPE_DETECTION = os.environ.get("MESHTASTIC_REPLAY_SHAPE_DETE
     "yes",
     "on",
 )
+# Meshtastic 2.8: re-point a feeder's ManagedNode when it reports a new node number backed by a matching public key
+# (v4 feeder URLs only). Off = a provable change is recorded as a flagged event and nothing is changed.
+MESHTASTIC_FEEDER_AUTO_REKEY = os.environ.get("MESHTASTIC_FEEDER_AUTO_REKEY", "false").strip().lower() in (
+    "1",
+    "true",
+    "yes",
+    "on",
+)
 # Meshtastic ports stored without their decoded payload (comma-separated PortNum names).
 MESHTASTIC_METADATA_ONLY_PORTNUMS = [
     name.strip()

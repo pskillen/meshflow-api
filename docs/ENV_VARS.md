@@ -86,6 +86,7 @@ Discord **login** uses the OAuth pair above. **DM notifications** (test message 
 |-------------------------------|---------|-------------------------------------------------------------------|-------------------------|
 | `PACKET_DEDUP_WINDOW_MINUTES` | `10`    | Time window (minutes) within which same sender+packet_id is treated as duplicate. | Integer (string)        |
 | `MESHCORE_PACKET_DEDUP_WINDOW_MINUTES` | `10` | MeshCore dedup window (minutes) for `(pkt_hash, rx_time)` per ADR-0004. | Integer (string) |
+| `MESHTASTIC_FEEDER_AUTO_REKEY` | `false` | Re-point a feeder's `ManagedNode.meshtastic_node_id` when it reports a new number on a v4 feeder URL and its public key proves the change. Off = the change is recorded as a flagged `ManagedNodeIdentityEvent` and nothing is changed. | `true` / `false` |
 | `MESHTASTIC_REPLAY_SHAPE_DETECTION` | `true` | Flag 2.8 connect-time replays by shape (no `rxRssi`, `TRANSPORT_LORA`, `BACKGROUND`, not the feeder's own). Off = only the body `replayed` flag counts. | `true` / `false` |
 | `MESHTASTIC_METADATA_ONLY_PORTNUMS` | `ROUTING_APP` | Meshtastic ports stored as `GenericPacket` with no payload (`decoded` null). | Comma-separated `PortNum` names |
 | `MESHTASTIC_GENERIC_DECODED_MAX_BYTES` | `4096` | A `GenericPacket` payload whose JSON is larger than this is dropped and flagged `decoded_truncated`. | Integer (string) |
@@ -216,6 +217,7 @@ Tunables for [automatic target selection reliability](../features/traceroute/alg
 
 - **PACKET_DEDUP_WINDOW_MINUTES**: Time window (minutes) within which the same sender+packet_id is treated as a duplicate. See `docs/features/packet-ingestion/DEDUPLICATION.md`.
 - **MESHTASTIC_REPLAY_SHAPE_DETECTION**: Default `true`. Observations with the 2.8 replay shape are stored flagged (`PacketObservation.replayed`) and trigger no processing. `false` keeps only the body `replayed` flag. See `docs/features/packet-ingestion/meshtastic.md`.
+- **MESHTASTIC_FEEDER_AUTO_REKEY**: Default `false`. On a v4 feeder URL, a feeder that reports a new node number together with a public key whose `crc32` is that number (and that no other node holds) has its `ManagedNode` re-pointed atomically, with an audit row. Off, the same change is flagged (`reason=auto_rekey_disabled`) and left alone; turning it on applies it within 10 minutes. Enable only once the owner notification and manual re-point are deployed. See `docs/features/packet-ingestion/meshtastic.md`.
 - **MESHTASTIC_METADATA_ONLY_PORTNUMS**: Comma-separated `PortNum` names (default `ROUTING_APP`) whose packets are stored as `GenericPacket` without their decoded payload.
 - **MESHTASTIC_GENERIC_DECODED_MAX_BYTES**: Size cap (default `4096`) for a `GenericPacket` payload; larger payloads are dropped and `decoded_truncated` is set.
 
