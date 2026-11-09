@@ -6,7 +6,7 @@ Reverse-engineered from [`Meshflow/stats/`](../../../Meshflow/stats/) as of 2026
 
 | Mechanism | Purpose | Storage |
 | --- | --- | --- |
-| **Hourly snapshots** | Dashboard long-range charts, ops trending | `StatsSnapshot` rows |
+| **Hourly snapshots** (plus one daily, `node_firmware`) | Dashboard long-range charts, ops trending | `StatsSnapshot` rows |
 | **Live API** | Ad-hoc charts, node detail pages, custom intervals | Computed per request from ORM |
 
 **Replayed observations are excluded.** Stats over observations (`node_received_stats`, `node_neighbour_stats`,
@@ -57,6 +57,7 @@ Each run assigns a shared **`run_id`** (`uuid4`) on every snapshot created in th
 | `online_nodes` | Global + per-`Constellation` | `{"count": int, "window_hours": int}` |
 | `packet_volume` | **Global only** | `{"count": int, "by_type": {…}}` |
 | `new_nodes` | Global + per-`Constellation` | `{"count": int}` |
+| `node_firmware` | **Global only, daily** | `{"count": int, "window_hours": int, "by_type": {…}, "by_basis": {…}}` |
 
 `constellation_id` is `null` on the model for global scope.
 
@@ -106,6 +107,17 @@ Two modes:
 
 **Per-constellation:** count `ObservedNode` rows whose `meshtastic_node_id` appears in `PacketObservation` from feeders in that constellation (with the same time filter as global — delta or hour window). Uses `meshtastic_node_id__in=observed_node_ids` from packet observations.
 
+### `node_firmware`
+
+Daily count of active Meshtastic nodes per firmware generation (see [inferred firmware](../packet-ingestion/inferred-firmware.md)).
+
+- **`recorded_at`** is midnight UTC of the day the task runs (not the previous hour). `collect_stats_snapshots` writes it on the first hourly run of the day that finds it missing, normally `00:05`, so a late or failed run does not lose the day. A whole day with no successful run is not retried; re-run the backfill to fill the gap.
+- **Window:** `ObservedNode` with `protocol=MESHTASTIC` and `last_heard >= recorded_at - 168h` (`ADOPTION_WINDOW_HOURS`). There is **no upper bound** on `last_heard`: it only moves forward, so a bound would drop a node heard just after midnight.
+- **`by_type`:** open keys, one per stored `inferred_firmware` value; nodes with none are `unknown`. A new generation appears with no API change.
+- **`by_basis`:** `key_identity`, `predicted_id`, `reported` (stored `feeder_report`) and `none` (null) are always present, at 0 if empty; any other stored basis passes through.
+- A node that upgrades (new row) counts twice for up to 7 days.
+- **Backfill:** `python manage.py backfill_node_firmware_snapshots [--days N] [--dry-run]` (default 90 days, idempotent). It does one `MtRawPacket` scan for `(day, from_int)` pairs and unions the 7 preceding days per target midnight, using today's classification. Backfilled days, including the current day's midnight, are derived from packets, not from `last_heard`, so a midnight written by the backfill before that day's `00:05` run can differ slightly from what the live run would have written; the live run then skips it. Packets whose only observations are 2.8 connect-time replays are not counted. It prints the scan size and time. `--dry-run` writes nothing but costs the same full scan, so run either form off-peak. Run it after `backfill_inferred_firmware`.
+
 ---
 
 ## Environment
@@ -130,7 +142,7 @@ Base path: `/api/stats/` ([`stats/urls.py`](../../../Meshflow/stats/urls.py)).
 
 Response: paginated `StatsSnapshot` (`recorded_at`, `stat_type`, `constellation_id`, `value`).
 
-OpenAPI enum for `stat_type` today: `online_nodes`, `new_nodes`, `packet_volume`.
+OpenAPI enum for `stat_type` today: `online_nodes`, `new_nodes`, `packet_volume`, `mc_online_nodes`, `mc_new_nodes`, `mc_packet_volume`, `node_firmware`.
 
 ### Live aggregation (Meshtastic `node_id` = decimal nodenum)
 

@@ -63,3 +63,7 @@ Active in the last 168h: N, with a usable key N (P%)
 ```
 
 It reads the stored `meshtastic_key_node_id`. In an environment that never ran it, run `backfill_meshtastic_identity` first.
+
+## Adoption statistic
+
+The daily `node_firmware` snapshot counts active nodes per generation and basis; see [packet statistics](../packet-stats/meshtastic.md#node_firmware). Run `backfill_node_firmware_snapshots` after this backfill.
