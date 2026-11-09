@@ -183,7 +183,9 @@ def test_get_or_create_loses_a_create_race_and_returns_the_winner():
     )
     lookups = iter([None, winner])  # the first lookup misses; the re-read after the IntegrityError finds the winner
 
-    with mock.patch("nodes.services.observed_nodes.get_meshtastic_observed_node", side_effect=lambda _id: next(lookups)):
+    with mock.patch(
+        "nodes.services.observed_nodes.get_meshtastic_observed_node", side_effect=lambda _id: next(lookups)
+    ):
         node, created = get_or_create_meshtastic_observed_node(NODE, defaults={"long_name": "Loser", "short_name": "L"})
 
     assert not created
