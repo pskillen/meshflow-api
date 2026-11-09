@@ -53,6 +53,21 @@ Managed-node mutation and removal permissions are:
 
 A Meshtastic 2.8 feeder's node number is the `crc32` of its public key, so it changes on a firmware upgrade or re-key. On v4 feeder URLs the API re-points the feeder's `ManagedNode.meshtastic_node_id` (same row, same history) when the feeder reports the new number with a public key that proves it, and records a `ManagedNodeIdentityEvent` either way (applied, or flagged with a reason). Anything unprovable (no key, a key that does not match, a key shared with other nodes, a number already taken) is flagged and left alone, and ingest is never affected. It is behind `MESHTASTIC_FEEDER_AUTO_REKEY`; the decision table is in [Meshtastic packet ingestion](../packet-ingestion/meshtastic.md#feeder-number-change-auto-re-key).
 
+### What the owner sees
+
+- **Automatic change** (`auto_updated`): a Discord DM, if the owner has a verified Discord target (see [Discord notifications](../discord/notifications.md)): "Your feeder <name> changed node number: !old is now !new. It keeps its history and API key. Nothing to do." Without a verified target the DM is skipped and an audit row says so.
+- **Flagged change** (`flagged`): a DM naming the reason ("Your feeder <name> reported node number !new but is stored as !old, and it could not be updated automatically (<reason>). Ingest continues. Open My Nodes to review it."). When the reason is `auto_rekey_disabled`, the text says automatic updates are off on this server. A repeat of the same flagged change writes no new event, so there is one DM per event.
+- `manual` and `key_changed` events are never sent as a DM; `key_changed` is an audit row only.
+- A failed DM never affects the re-key.
+
+`GET /api/nodes/managed-node-identity-events/` lists the events for the caller's own feeders (staff see all), newest first. `?unacknowledged=true` hides acknowledged events and `key_changed`; `?managed_node=<internal_id>` filters to one feeder. `needs_action` is true for a flagged event that has not been resolved. `POST /api/nodes/managed-node-identity-events/{id}/acknowledge/` records who saw it and when; calling it again changes nothing.
+
+### Re-pointing a feeder by hand
+
+For a flagged feeder, the owner (or staff) calls `POST /api/nodes/managed-nodes/{internal_id}/repoint-meshtastic-id/`. The body `{"meshtastic_node_id": <int>}` is optional; the default is the number the feeder last reported. It works whether or not `MESHTASTIC_FEEDER_AUTO_REKEY` is on, because a person is deciding. The feeder keeps its row, history and API key; the number is updated, the public key is taken from the open flagged event when that event reported the same number, a `manual` event is written (acknowledged by the caller) and open flagged events are resolved. Passing the old number reverses a re-key.
+
+Refusals: 400 `{"code": "not_meshtastic" | "no_reported_number" | "invalid_node_id" | "already_current"}`, 409 `{"code": "number_collision"}` when another active feeder has that number, 403 for anyone but the owner or staff.
+
 ## Deleted Managed Nodes
 
 When a managed node is removed, the row should be soft-deleted rather than hard-deleted so historical references remain intact. A soft-deleted managed node should not appear in normal managed-node lists, maps, traceroute source selection, statistics, or monitoring views.

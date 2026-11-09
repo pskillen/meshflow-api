@@ -247,7 +247,9 @@ A 2.8 firmware upgrade or re-key changes a feeder's node number. v4 feeder URLs 
 | 6 | `MESHTASTIC_FEEDER_AUTO_REKEY` is off | flagged `auto_rekey_disabled` |
 | 7 | Otherwise | applied: number, key and key-node-id updated atomically (`select_for_update`; a unique-constraint race becomes `number_collision`), `auto_updated` event, `ensure_observed_node_for_managed_node`, then the `nodes.signals.feeder_identity_changed` signal |
 
-When the number is unchanged: open flagged events are resolved, a blank stored key is filled silently, and a different key is stored with a `key_changed` event (not gated by the flag). A downgrade to 2.7 keeps the number and key, so it reports no change. Metric: `meshflow_feeder_identity_changes_total{protocol, outcome}`.
+When the number is unchanged: open flagged events are resolved, a blank stored key is filled silently, and a different key is stored with a `key_changed` event (not gated by the flag). A downgrade to 2.7 keeps the number and key, so it reports no change. Metric: `meshflow_feeder_identity_changes_total{protocol, outcome}` (`manual` counts owner re-points).
+
+The owner is told by Discord DM on `auto_updated` and on each new `flagged` row (`nodes/services/feeder_identity_notify.py`; never raises), and can re-point a flagged feeder with `repoint_feeder` (the `repoint-meshtastic-id/` endpoint), which ignores the flag. See [Managed nodes](../node-lifecycle/managed-nodes.md#node-number-changes-28).
 
 ### Identity data is not clobbered by 2.8 feeder NodeDB entries
 
