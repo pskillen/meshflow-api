@@ -27,14 +27,14 @@ def utc_day_start(dt: datetime) -> datetime:
 def _as_int(value: Any) -> int:
     try:
         return int(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return 0
 
 
 def _has_count(value: dict) -> bool:
     try:
         int(value.get("count"))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return False
     return True
 
@@ -49,7 +49,8 @@ def rollup_daily(stat_type: str, rows) -> list[dict]:
     Aggregate ``(recorded_at, constellation_id, value)`` tuples per UTC day and constellation.
 
     Returns serializer-shaped dicts, newest day first. Gauges are averaged (rounded half up),
-    flows summed (``by_type`` per key). ``value.samples`` is the number of hourly rows used (gauge rows without a numeric ``count`` are skipped).
+    flows summed (``by_type`` per key). ``value.samples`` is the number of hourly rows used
+    (gauge rows without a numeric ``count`` are skipped).
     """
     is_gauge = stat_type in GAUGE_STAT_TYPES
     groups: dict[tuple[datetime, Optional[int]], dict] = defaultdict(lambda: {"count": 0, "samples": 0, "by_type": {}})
