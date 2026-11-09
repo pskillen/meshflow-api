@@ -2815,6 +2815,153 @@ components:
           type: number
           nullable: true
 
+    DeviceMetricBucket:
+      type: object
+      description: >
+        Bucketed device metrics row (``bucket`` set). Aggregates of the raw DeviceMetrics fields; ``id`` and ``logged_time`` are omitted. ``battery_level`` ignores 101 (powered) unless every sample is 101; ``uptime_seconds`` is the bucket maximum.
+      required: [node, reported_time, samples]
+      properties:
+        node:
+          type: integer
+          description: The ID of the node these metrics belong to
+        reported_time:
+          type: string
+          format: date-time
+          description: Start of the UTC bucket
+        samples:
+          type: integer
+          description: Number of raw rows rolled into the bucket
+        battery_level:
+          type: number
+          nullable: true
+        voltage:
+          type: number
+          nullable: true
+        meshtastic_channel_utilization:
+          type: number
+          nullable: true
+        meshtastic_air_util_tx:
+          type: number
+          nullable: true
+        uptime_seconds:
+          type: integer
+          nullable: true
+
+    EnvironmentMetricBucket:
+      type: object
+      description: >
+        Bucketed environment metrics row (``bucket`` set). Means of non-null values; ``wind_direction``, ``rainfall_1h`` and ``rainfall_24h`` are the latest non-null reading. ``id`` and ``logged_time`` are omitted.
+      required: [node, reported_time, samples]
+      properties:
+        node:
+          type: integer
+          description: The ID of the node these metrics belong to
+        reported_time:
+          type: string
+          format: date-time
+          description: Start of the UTC bucket
+        samples:
+          type: integer
+          description: Number of raw rows rolled into the bucket
+        temperature:
+          type: number
+          nullable: true
+        relative_humidity:
+          type: number
+          nullable: true
+        barometric_pressure:
+          type: number
+          nullable: true
+        gas_resistance:
+          type: number
+          nullable: true
+        iaq:
+          type: integer
+          nullable: true
+        lux:
+          type: number
+          nullable: true
+        wind_direction:
+          type: integer
+          nullable: true
+        wind_speed:
+          type: number
+          nullable: true
+        radiation:
+          type: number
+          nullable: true
+        rainfall_1h:
+          type: number
+          nullable: true
+        rainfall_24h:
+          type: number
+          nullable: true
+
+    PowerMetricBucket:
+      type: object
+      description: >
+        Bucketed power metrics row (``bucket`` set). Means of non-null values; ``id`` and ``logged_time`` are omitted.
+      required: [node, reported_time, samples]
+      properties:
+        node:
+          type: integer
+          description: The ID of the node these metrics belong to
+        reported_time:
+          type: string
+          format: date-time
+          description: Start of the UTC bucket
+        samples:
+          type: integer
+          description: Number of raw rows rolled into the bucket
+        ch1_voltage:
+          type: number
+          nullable: true
+        ch1_current:
+          type: number
+          nullable: true
+        ch2_voltage:
+          type: number
+          nullable: true
+        ch2_current:
+          type: number
+          nullable: true
+        ch3_voltage:
+          type: number
+          nullable: true
+        ch3_current:
+          type: number
+          nullable: true
+        ch4_voltage:
+          type: number
+          nullable: true
+        ch4_current:
+          type: number
+          nullable: true
+        ch5_voltage:
+          type: number
+          nullable: true
+        ch5_current:
+          type: number
+          nullable: true
+        ch6_voltage:
+          type: number
+          nullable: true
+        ch6_current:
+          type: number
+          nullable: true
+        ch7_voltage:
+          type: number
+          nullable: true
+        ch7_current:
+          type: number
+          nullable: true
+        ch8_voltage:
+          type: number
+          nullable: true
+        ch8_current:
+          type: number
+          nullable: true
+
     LatestAirQualityMetrics:
       type: object
       description: Latest air quality metrics from NodeLatestStatus
@@ -6193,7 +6340,9 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/DeviceMetrics'
+                  oneOf:
+                    - $ref: '#/components/schemas/DeviceMetrics'
+                    - $ref: '#/components/schemas/DeviceMetricBucket'
         '400':
           description: Invalid request parameters
           content:
@@ -6238,7 +6387,9 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/EnvironmentMetrics'
+                  oneOf:
+                    - $ref: '#/components/schemas/EnvironmentMetrics'
+                    - $ref: '#/components/schemas/EnvironmentMetricBucket'
         '400':
           description: Invalid request parameters
           content:
@@ -6282,7 +6433,9 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/PowerMetrics'
+                  oneOf:
+                    - $ref: '#/components/schemas/PowerMetrics'
+                    - $ref: '#/components/schemas/PowerMetricBucket'
         '400':
           description: Invalid request parameters
           content:
