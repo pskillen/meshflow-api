@@ -111,10 +111,11 @@ position.
 
 On-air position packets carry `precision_bits`, and the position service stores them
 beside the position. A node upsert (the feeder's NodeDB sync) uses the precision bits
-from its position block (`meshtastic_precision_bits`) when the payload has one. Otherwise it cannot know, so it
-clears the stored bits whenever it changes the latitude or longitude (a stale value
-would describe a position that is no longer there) and leaves them alone when the
-position is unchanged.
+from its position block (`meshtastic_precision_bits`) when the payload has one.
+Otherwise it leaves the stored bits alone, even when it changes the latitude or
+longitude: precision is a property of the sender's setting, not of one position, so
+the bits last seen on air still describe the node. A coarse node whose NodeDB position
+differs slightly from its on-air one therefore stays coarse and raises no false event.
 
 Known limitation: a node known only through a feeder's NodeDB has unknown precision,
 which counts as exact. In 2.8 that stored position is already clamped by the sender,

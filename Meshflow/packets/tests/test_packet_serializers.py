@@ -1197,14 +1197,49 @@ class NodeSerializerTest(BasePacketSerializerTestCase):
         self.assertEqual(status.meshtastic_precision_bits, 13)
         self.assertEqual(Position.objects.get(node=self.from_node).meshtastic_precision_bits, 13)
 
-    def test_node_upsert_without_bits_clears_stale_bits_when_position_changes(self):
+    def test_node_upsert_without_bits_keeps_stored_bits_when_position_changes(self):
         NodeLatestStatus.objects.update_or_create(
             node=self.from_node,
             defaults={"latitude": 51.5, "longitude": -0.12, "meshtastic_precision_bits": 9},
         )
         status = self._upsert_position(55.9, -3.2)
         self.assertEqual((status.latitude, status.longitude), (55.9, -3.2))
-        self.assertIsNone(status.meshtastic_precision_bits)
+        self.assertEqual(status.meshtastic_precision_bits, 9)
+
+    def test_node_upsert_without_bits_keeps_stored_bits_when_only_longitude_changes(self):
+        NodeLatestStatus.objects.update_or_create(
+            node=self.from_node,
+            defaults={"latitude": 55.9, "longitude": -3.2, "meshtastic_precision_bits": 9},
+        )
+        status = self._upsert_position(55.9, -3.1)
+        self.assertEqual(status.longitude, -3.1)
+        self.assertEqual(status.meshtastic_precision_bits, 9)
+
+    def test_node_upsert_payload_bits_replace_stored_bits(self):
+        NodeLatestStatus.objects.update_or_create(
+            node=self.from_node,
+            defaults={"latitude": 55.9, "longitude": -3.2, "meshtastic_precision_bits": 9},
+        )
+        status = self._upsert_position(55.9, -3.2, meshtastic_precision_bits=15)
+        self.assertEqual(status.meshtastic_precision_bits, 15)
+
+    def test_node_upsert_rejects_precision_bits_above_32(self):
+        from django.utils import timezone
+
+        serializer = NodeSerializer(
+            instance=self.from_node,
+            data={
+                "id": self.from_node.meshtastic_node_id,
+                "position": {
+                    "reported_time": timezone.now().isoformat(),
+                    "latitude": 55.9,
+                    "longitude": -3.2,
+                    "meshtastic_precision_bits": 33,
+                },
+            },
+            partial=True,
+        )
+        self.assertFalse(serializer.is_valid())
 
     def test_node_upsert_without_bits_keeps_bits_when_position_is_unchanged(self):
         NodeLatestStatus.objects.update_or_create(

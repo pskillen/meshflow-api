@@ -286,3 +286,103 @@ def test_traceroute_managed_source_counts_as_exact_not_its_observed_status_bits(
     )
     event = DxEvent.objects.get(reason_code=DxReasonCode.TRACEROUTE_DISTANT_HOP, destination=relay)
     assert "uncertainty_km" not in DxEventObservation.objects.get(event=event).metadata
+
+
+@pytest.mark.django_db
+@override_settings(
+    DX_MONITORING_DETECTION_ENABLED=True,
+    DX_MONITORING_CLUSTER_DISTANCE_KM=150.0,
+    DX_MONITORING_DIRECT_DISTANCE_KM=80.0,
+)
+def test_nodedb_upsert_without_bits_keeps_coarse_precision_and_raises_no_false_event(
+    create_managed_node,
+    create_observed_node,
+    create_user,
+    create_message_packet,
+    create_packet_observation,
+):
+    """A 9-bit node about 100 km away (46.7 km of uncertainty), then a NodeDB upsert 1 km away with no bits: the
+    stored 9 bits stay, so a direct packet from it is not reported as a distant observation."""
+    from django.utils import timezone
+
+    from packets.serializers import NodeSerializer
+
+    observer = create_managed_node(
+        meshtastic_node_id=0xE2000045,
+        default_location_latitude=55.95,
+        default_location_longitude=-3.19,
+    )
+    node = create_observed_node(meshtastic_node_id=0xBEEF0245)
+    _set_node_coords_bits(node, 55.05, -3.19, 9)
+    serializer = NodeSerializer(
+        instance=node,
+        data={
+            "id": node.meshtastic_node_id,
+            "position": {
+                "reported_time": timezone.now().isoformat(),
+                "latitude": 55.04,  # about 1 km from the stored position
+                "longitude": -3.19,
+                "altitude": 5.0,
+                "meshtastic_location_source": "UNSET",
+            },
+        },
+        partial=True,
+    )
+    assert serializer.is_valid(), serializer.errors
+    serializer.save()
+    assert NodeLatestStatus.objects.get(node=node).meshtastic_precision_bits == 9
+
+    from dx_monitoring.services import maybe_detect_dx_candidate
+
+    packet = create_message_packet(
+        packet_id=940045,
+        from_int=node.meshtastic_node_id,
+        from_str=meshtastic_id_to_hex(node.meshtastic_node_id),
+    )
+    packet.first_reported_time = timezone.now()
+    packet.save(update_fields=["first_reported_time"])
+    observation = create_packet_observation(packet=packet, observer=observer)
+    maybe_detect_dx_candidate(
+        packet=packet,
+        observer=observer,
+        observation=observation,
+        from_node=node,
+        previous_last_heard=None,
+    )
+    assert not DxEvent.objects.filter(reason_code=DxReasonCode.DISTANT_OBSERVATION).exists()
+
+
+@pytest.mark.django_db
+@override_settings(**TR_SETTINGS)
+def test_traceroute_hop_uncertainty_is_the_sum_of_both_ends_not_the_larger(
+    create_managed_node,
+    create_observed_node,
+    create_user,
+    create_traceroute_packet,
+    create_packet_observation_for_tr,
+):
+    """Relay and target both at 10 bits (23.3 km each) and 190 km apart against a 150 km threshold. The two errors
+    can oppose, so the sum (46.7 km) leaves 143 km: suppressed. Using only the larger (23.3 km) would raise."""
+    source = create_managed_node(
+        meshtastic_node_id=0xE2000046,
+        default_location_latitude=55.95,
+        default_location_longitude=-3.19,
+    )
+    target = create_observed_node(meshtastic_node_id=0xBEEF0246)
+    relay = create_observed_node(meshtastic_node_id=0xCAFE0246)
+    _set_node_coords_bits(relay, 54.51, -3.19, 10)  # 160 km from the source: 136.7 km after its own error
+    _set_node_coords_bits(target, 56.22, -3.19, 10)  # 190 km from the relay
+    _complete_traceroute(
+        source,
+        dict(
+            from_int=target.meshtastic_node_id,
+            route=[relay.meshtastic_node_id],
+            route_back=[],
+            snr_towards=[-4.0],
+            snr_back=[],
+        ),
+        create_traceroute_packet,
+        create_packet_observation_for_tr,
+        create_user,
+    )
+    assert not DxEvent.objects.filter(reason_code=DxReasonCode.TRACEROUTE_DISTANT_HOP).exists()

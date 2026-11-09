@@ -1648,18 +1648,11 @@ class BaseNodeSerializer(serializers.ModelSerializer):
                 "meshtastic_location_source": position_data.get("meshtastic_location_source"),
                 "position_reported_time": reported_time,
             }
-            # Precision describes one position. Use the payload's bits; without them, a changed position makes the
-            # stored bits stale, so they become unknown (None). An unchanged position keeps what is known.
+            # Precision is a property of the sender's setting, not of one position: use the payload's bits when it
+            # carries them, otherwise leave the stored bits alone (even if the position changed).
             precision_bits = position_data.get("meshtastic_precision_bits")
             if precision_bits is not None:
                 defaults["meshtastic_precision_bits"] = precision_bits
-            else:
-                previous = NodeLatestStatus.objects.filter(node=node).first()
-                if previous is not None and (
-                    previous.latitude != position_data.get("latitude")
-                    or previous.longitude != position_data.get("longitude")
-                ):
-                    defaults["meshtastic_precision_bits"] = None
             NodeLatestStatus.objects.update_or_create(node=node, defaults=defaults)
 
         # Create device metrics if provided
