@@ -564,7 +564,7 @@ def stats_snapshots_list(request):
 
     Query params: stat_type, constellation_id, recorded_at_after, recorded_at_before, bucket
 
-    ``bucket=1d`` (requires ``stat_type``) returns one row per UTC day and constellation,
+    ``bucket=1d`` (requires ``stat_type`` and ``recorded_at_after``) returns one row per UTC day and constellation,
     computed at request time from the hourly rows: gauges (``online_nodes``) are averaged,
     flows (``packet_volume``, ``new_nodes``) are summed, daily types pass through unchanged.
     """
@@ -583,6 +583,11 @@ def stats_snapshots_list(request):
         if bucket_stat_type not in (DAILY_STAT_TYPES | GAUGE_STAT_TYPES | FLOW_STAT_TYPES):
             return Response(
                 {"detail": f"stat_type '{bucket_stat_type}' cannot be bucketed."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not request.query_params.get("recorded_at_after"):
+            return Response(
+                {"detail": "recorded_at_after is required with bucket."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
