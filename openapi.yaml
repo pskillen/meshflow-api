@@ -2980,11 +2980,12 @@ components:
       properties:
         id:
           type: integer
-          description: Primary key
+          nullable: true
+          description: Primary key (null on rows rolled up with bucket=1d)
         recorded_at:
           type: string
           format: date-time
-          description: When the snapshot was taken
+          description: When the snapshot was taken (UTC day start on bucket=1d rows)
         stat_type:
           type: string
           enum: [online_nodes, new_nodes, packet_volume, mc_online_nodes, mc_new_nodes, mc_packet_volume, node_firmware]
@@ -7311,6 +7312,21 @@ paths:
             type: string
             format: date-time
             description: Filter snapshots recorded at or before this time
+        - name: bucket
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: ['1d']
+            description: >-
+              Roll hourly snapshots up to one row per UTC day (and per constellation when
+              constellation_id is omitted), computed at request time and newest day first.
+              Requires stat_type. Gauges (online_nodes, mc_online_nodes) are the rounded mean of the
+              hourly samples; flows (packet_volume, new_nodes, mc_*) are summed, with by_type summed
+              per key. Rolled rows have id null and value.samples (hourly rows contributing, 24 for a
+              full day). node_firmware and tr_success_daily are already daily and are returned
+              unchanged. Any other bucket, a missing stat_type or a stat_type that cannot be
+              bucketed returns 400. Pagination is unchanged (max page_size 1000).
       responses:
         '200':
           description: Paginated list of stats snapshots
@@ -7333,6 +7349,8 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/StatsSnapshot'
+        '400':
+          description: Unsupported bucket, or bucket without a bucketable stat_type
 
   /traceroutes/:
     get:
