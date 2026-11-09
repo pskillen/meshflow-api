@@ -3,6 +3,7 @@
 import logging
 from datetime import timedelta
 
+from django.core.exceptions import ObjectDoesNotExist
 from django.utils import timezone
 
 from celery import shared_task
@@ -14,6 +15,7 @@ from traceroute.models import AutoTraceRoute
 
 from .constants import (
     DEFAULT_OFFLINE_AFTER_SECONDS,
+    TWO_EIGHT_DEFAULT_OFFLINE_AFTER_SECONDS,
     notify_verification_start_enabled,
     verification_notify_cooldown_seconds,
     verification_window_seconds,
@@ -31,9 +33,26 @@ logger = logging.getLogger(__name__)
 
 
 def _effective_last_heard_offline_after_seconds(obs: ObservedNode) -> int:
+    """
+    Silence threshold for one node, first match wins:
+
+    1. a NodeMonitoringConfig value that differs from the default (the owner chose it);
+    2. the threshold learned from the node's own cadence (never below the default);
+    3. 12 h for a 2.8 node (inferred firmware, or its node id is its key-derived id);
+    4. the 6 h default.
+    """
     cfg = NodeMonitoringConfig.objects.filter(pk=obs.pk).first()
-    if cfg is not None:
+    if cfg is not None and int(cfg.last_heard_offline_after_seconds) != DEFAULT_OFFLINE_AFTER_SECONDS:
         return int(cfg.last_heard_offline_after_seconds)
+    try:
+        learned = obs.mesh_presence.learned_offline_after_seconds
+    except ObjectDoesNotExist:
+        learned = None
+    if learned:
+        return int(learned)
+    key_id = obs.meshtastic_key_node_id
+    if obs.inferred_firmware == "2.8" or (key_id is not None and key_id == obs.meshtastic_node_id):
+        return TWO_EIGHT_DEFAULT_OFFLINE_AFTER_SECONDS
     return int(DEFAULT_OFFLINE_AFTER_SECONDS)
 
 
@@ -119,7 +138,7 @@ def process_node_watch_presence() -> dict:
     if not watched_ids:
         return {"watched": 0}
 
-    observed_qs = ObservedNode.objects.filter(pk__in=watched_ids).select_related("latest_status")
+    observed_qs = ObservedNode.objects.filter(pk__in=watched_ids).select_related("latest_status", "mesh_presence")
     processed = 0
     for obs in observed_qs.iterator(chunk_size=100):
         processed += 1
