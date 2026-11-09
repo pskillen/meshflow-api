@@ -23,6 +23,19 @@ Linking or refreshing Discord login syncs these fields (see `users.signals`). `P
 
 Other features (e.g. [mesh monitoring](../mesh-monitoring/README.md) offline alerts) should use the same rules before calling `send_dm`.
 
+## Notification kinds
+
+Every DM attempt (sent, skipped or failed) is recorded in `DiscordNotificationAudit` with a `feature` and a `kind` (`push_notifications.constants`). The exception is a flagged feeder identity DM suppressed by its per-feeder cooldown, which writes no audit row, so a flapping feeder can't fill the table.
+
+| Feature | Kind | When |
+|---------|------|------|
+| `node_watch` | `node_offline`, `verification_started`, `node_battery_low` | [Mesh monitoring](../mesh-monitoring/README.md) watches |
+| `dx_monitoring` | `dx_*` | DX monitoring (opt-in) |
+| `feeder_identity` | `feeder_identity_changed` | A feeder's node number was re-pointed automatically. Sent to the feeder's owner: "Your feeder <name> changed node number: !old is now !new. It keeps its history and API key. Nothing to do." |
+| `feeder_identity` | `feeder_identity_flagged` | A feeder reported a new node number that could not be applied automatically. Sent to the owner with the reason and "Open My Nodes to review it." |
+
+See [Managed nodes](../node-lifecycle/managed-nodes.md#node-number-changes-28) for the feeder events. Manual re-points and `key_changed` events (first public key recorded) send no DM. Flagged DMs are limited to one per feeder every 24 hours.
+
 ## Bot setup
 
 1. Create a **Discord Application** (can be the same project as OAuth or a dedicated “Meshflow notifier” bot).

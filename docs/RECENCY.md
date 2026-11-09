@@ -23,7 +23,9 @@ When you change any threshold in code, **update this file in the same PR**.
   in admin (for Celery beat schedules).
 - `ObservedNode.last_heard` is updated from `MtRawPacket.first_reported_time`
   in `packets/services/base.py` at ingest. It is the canonical "mesh heard"
-  time.
+  time. It only moves **forward**: a packet with an older time leaves it (and
+  sends no `node_last_heard_advanced` signal), and a time in the future is
+  capped at now.
 - `PacketObservation.upload_time` (feeder upload) is the canonical
   "feeder heard" time for managed nodes. Traceroute **source eligibility** and
   constellation **coverage geometry** read the denormalized snapshot
@@ -136,9 +138,14 @@ with the `environment_reported_after` query parameter.
 ### `ObservedNode.last_heard` source
 
 Set from `MtRawPacket.first_reported_time` in
-[`Meshflow/packets/services/base.py`](../Meshflow/packets/services/base.py).
-Mesh monitoring, traceroute target selection, and all UI "online" tiers
-depend on this.
+[`Meshflow/packets/services/base.py`](../Meshflow/packets/services/base.py),
+as `min(first_reported_time, now)`, and written only when it is later than the
+stored value (or the stored value is null). The check is a conditional `UPDATE`
+in the database, so a stale instance or a concurrent worker cannot move it
+back. A stored value already in the future (an old bad feeder clock) is
+replaced by the next packet. A late upload or a feeder with a bad clock cannot
+move it back or into the future. Mesh monitoring, traceroute target selection,
+and all UI "online" tiers depend on this.
 
 ---
 
@@ -218,11 +225,25 @@ Node presence lifecycle:
 | --- | --- | --- | --- |
 | `NodeMonitoringConfig.last_heard_offline_after_seconds` | **21600 s (6 h)** (model default) | per-row | Silence threshold on `ObservedNode.last_heard` before verification starts |
 | `DEFAULT_OFFLINE_AFTER_SECONDS` | **21600 s** | no | Fallback used when no `NodePresence` row exists (serializer + tasks) |
+| `TWO_EIGHT_DEFAULT_OFFLINE_AFTER_SECONDS` | **43200 s (12 h)** | no | Default for a 2.8 node (`inferred_firmware == "2.8"`, or node id equals its key-derived id); 2.8 nodes may send only NodeInfo, about every 3 h |
+| `NodePresence.learned_offline_after_seconds` | null until learned | no | `3 x p90` of the gaps between the node's own packets over 7 d (replay-only packets excluded, newest 5000), clamped to **6 h - 48 h**, null with fewer than 5 gaps. Never below the applicable default (6 h, or 12 h for a 2.8 node), so it only ever lengthens it |
 | `MESH_MONITORING_VERIFICATION_SECONDS` | **180 s** | yes | Window after `verification_started_at` to confirm the node is offline |
 | `MESH_MONITORING_VERIFICATION_NOTIFY_COOLDOWN_SECONDS` | **3600 s** | yes | Minimum gap between verification-start Discord DMs per watch |
 | `MESH_MONITORING_NOTIFY_VERIFICATION_START` | on (unset) | yes | Feature flag for verification-start DMs |
 | `MONITORING_TR_STAGGER_SECONDS` | **30 s** | no | Celery `countdown` between monitoring-triggered traceroutes |
 | `process_node_watch_presence` beat | **every 60 s** | DB | Presence loop cadence |
+| `update_learned_offline_thresholds` beat | **daily 03:30 UTC** | DB | Recomputes the learned threshold for watched Meshtastic nodes |
+
+**Effective silence threshold**, first match wins:
+
+1. a `NodeMonitoringConfig` value that differs from 21600 (the owner chose it; a row at 21600 is just the default and does not count);
+2. `NodePresence.learned_offline_after_seconds`, when set, but never below the default for that node (12 h for 2.8, else 6 h);
+3. 12 h for a 2.8 node;
+4. 6 h.
+
+Alerts for sparse nodes can therefore wait up to 48 h. NodeDB uploads already
+move `last_heard` forward, so the radio's own NodeDB time counts as a
+heartbeat.
 
 **Historical note:** migration `0001` seeded `offline_after = 7200` (2 h)
 on `NodeWatch`; migration `0006` moved the field to `NodePresence` with the
@@ -308,6 +329,7 @@ deploy; the table below lists the **seeded defaults**:
 | `collect_traceroute_success_daily` | Daily `01:05` UTC | `traceroute/migrations/0006_add_collect_traceroute_success_daily_task.py` |
 | `collect_stats_snapshots` | Hourly `:05` UTC | `stats/migrations/0002_add_collect_stats_snapshots_periodic_task.py` |
 | `process_node_watch_presence` | Every 60 s | `mesh_monitoring/migrations/0002_add_process_node_watch_presence_periodic_task.py` |
+| `update_learned_offline_thresholds` | Daily `03:30` UTC | `mesh_monitoring/migrations/0009_learned_offline_threshold.py` |
 
 ---
 
