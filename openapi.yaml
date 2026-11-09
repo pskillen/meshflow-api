@@ -7425,7 +7425,8 @@ paths:
         Returns traceroute stats for the given timeframe: sources (by trigger_type),
         success/failure counts, top routers (intermediate nodes), per-source managed node
         totals (with success rate among finished runs only), per-target observed node totals,
-        success over time (daily series for the same ``triggered_at_after`` window, default 14 days),
+        success over time (daily series for the same ``triggered_at_after`` window, default 14 days; or
+        an hourly series with ``bucket=1h``),
         ``by_strategy`` (all trigger types; null mapped to legacy), and
         ``by_strategy_excluding_external`` (same shape but omits trigger_type external for hypothesis-only
         success breakdowns). All authenticated users.
@@ -7464,8 +7465,6 @@ paths:
             by_strategy_excluding_external) are limited to
             traceroutes from that source. Invalid or unknown ids are ignored (no filter).
       responses:
-        '400':
-          description: Invalid ``bucket``, or ``bucket=1h`` with a window longer than 7 days
         '200':
           description: Traceroute statistics
           content:
@@ -7659,6 +7658,8 @@ paths:
                           type: integer
                         sent:
                           type: integer
+        '400':
+          description: Invalid ``bucket``, or ``bucket=1h`` with a window longer than 7 days
 
   /traceroutes/heatmap-edges/:
     get:
