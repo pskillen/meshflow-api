@@ -40,6 +40,8 @@ jobs:
         uses: actions/setup-python@v7
         with:
           python-version: "3.14"
+          cache: pip
+          cache-dependency-path: Meshflow/requirements*.txt
 
       - name: Install dependencies
         run: |
@@ -107,6 +109,8 @@ jobs:
         uses: actions/setup-python@v7
         with:
           python-version: "3.14"
+          cache: pip
+          cache-dependency-path: tests/requirements-integration.txt
 
       - name: Run integration tests
         run: |
