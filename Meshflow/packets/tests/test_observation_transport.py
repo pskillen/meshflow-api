@@ -1,4 +1,4 @@
-"""How a packet reached the feeder (viaMqtt, transportMechanism) and the hop_limit absent-means-0 rule (G44)."""
+"""How a packet reached the feeder (viaMqtt, transportMechanism) and the hop_limit absent-means-0 rule."""
 
 from datetime import datetime
 from types import SimpleNamespace
@@ -21,7 +21,7 @@ from packets.hops import (
     update_inferred_max_hops,
 )
 from packets.models import MessagePacket, PacketObservation
-from packets.serializers import MessagePacketSerializer
+from packets.serializers import MessagePacketSerializer, PrefetchedPacketObservationSerializer
 from packets.tests.test_packet_serializers import BasePacketSerializerTestCase
 
 
@@ -37,6 +37,11 @@ from packets.tests.test_packet_serializers import BasePacketSerializerTestCase
         (None, None),
         ("", None),
         ("  ", None),
+        ("TRANSPORT_" + "X" * 30, None),  # 40 characters: more than the column holds
+        ("TRANSPORT_" + "X" * 22, "TRANSPORT_" + "X" * 22),  # exactly 32
+        (10**40, None),
+        ("9" * 5000, None),
+        ("TRANSPORT_\x00MQTT", None),
     ],
 )
 def test_normalise_transport(value, expected):
@@ -77,6 +82,18 @@ class ObservationTransportSerializerTest(BasePacketSerializerTestCase):
 
     def test_transport_null_is_null(self):
         self.assertIsNone(self._observe(7, transportMechanism=None).transport_mechanism)
+
+    def test_observation_api_carries_via_mqtt_and_transport(self):
+        cases = [
+            (20, {"viaMqtt": True, "transportMechanism": "TRANSPORT_MQTT"}, True, "TRANSPORT_MQTT"),
+            (21, {"transportMechanism": "TRANSPORT_LORA"}, False, "TRANSPORT_LORA"),
+            (22, {}, False, None),  # legacy or own packet: no transport
+        ]
+        for packet_id, extra, via_mqtt, transport in cases:
+            with self.subTest(packet_id=packet_id):
+                data = PrefetchedPacketObservationSerializer(self._observe(packet_id, **extra)).data
+                self.assertIs(data["via_mqtt"], via_mqtt)
+                self.assertEqual(data["transport_mechanism"], transport)
 
     def test_hop_limit_absent_with_hop_start_is_zero(self):
         observation = self._observe(8, hopStart=3)
