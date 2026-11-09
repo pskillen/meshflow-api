@@ -522,7 +522,8 @@ def _hourly(stat_type, start, hours, value_fn, constellation=None):
 
 
 def _bucket_get(**params):
-    query = {"bucket": "1d", "page_size": 1000, **params}
+    query = {"bucket": "1d", "page_size": 1000, "recorded_at_after": "2025-01-01T00:00:00Z", **params}
+    query = {k: v for k, v in query.items() if v is not None}
     return APIClient().get(reverse("stats:stats-snapshots"), query)
 
 
@@ -605,7 +606,7 @@ def test_snapshots_bucket_passes_daily_types_through():
 @pytest.mark.django_db
 def test_snapshots_bucket_validation():
     assert _bucket_get(stat_type="online_nodes", bucket="1h").status_code == status.HTTP_400_BAD_REQUEST
-    assert _bucket_get().status_code == status.HTTP_400_BAD_REQUEST
+    assert _bucket_get().status_code == status.HTTP_400_BAD_REQUEST  # no stat_type
     assert _bucket_get(stat_type="nonsense").status_code == status.HTTP_400_BAD_REQUEST
 
 
@@ -617,3 +618,42 @@ def test_snapshots_without_bucket_unchanged():
     first = response.data["results"][0]
     assert first["value"] == {"count": 29, "window_hours": 2}
     assert first["id"] is not None
+
+
+@pytest.mark.django_db
+def test_snapshots_bucket_requires_recorded_at_after():
+    _hourly("online_nodes", datetime(2026, 5, 1, tzinfo=dt_timezone.utc), 24, lambda h: {"count": 1})
+    response = _bucket_get(stat_type="online_nodes", recorded_at_after=None)
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "recorded_at_after" in response.data["detail"]
+    # Without bucket the parameter stays optional
+    assert APIClient().get(reverse("stats:stats-snapshots"), {"stat_type": "online_nodes"}).status_code == 200
+
+
+@pytest.mark.django_db
+def test_snapshots_bucket_gauge_skips_rows_without_numeric_count():
+    start = datetime(2026, 5, 1, tzinfo=dt_timezone.utc)
+    _hourly("online_nodes", start, 3, lambda h: {"count": 10})
+    StatsSnapshot.objects.create(recorded_at=start + timedelta(hours=3), stat_type="online_nodes", value={})
+    StatsSnapshot.objects.create(
+        recorded_at=start + timedelta(hours=4), stat_type="online_nodes", value={"count": "n/a"}
+    )
+
+    results = _bucket_get(stat_type="online_nodes", constellation_id="-1").data["results"]
+    assert results[0]["value"] == {"count": 10, "samples": 3}
+
+
+@pytest.mark.django_db
+def test_snapshots_bucket_second_page_and_mc_type(django_assert_num_queries):
+    start = datetime(2026, 1, 1, tzinfo=dt_timezone.utc)
+    _hourly("mc_online_nodes", start, 5 * 24, lambda h: {"count": 4})
+
+    with django_assert_num_queries(1):
+        page1 = _bucket_get(stat_type="mc_online_nodes", constellation_id="-1", page_size=2).data
+    assert page1["count"] == 5 and len(page1["results"]) == 2
+    assert page1["next"] is not None
+    page2 = _bucket_get(stat_type="mc_online_nodes", constellation_id="-1", page_size=2, page=2).data
+    assert [r["recorded_at"][:10] for r in page2["results"]] == ["2026-01-03", "2026-01-02"]
+    assert page2["results"][0]["value"] == {"count": 4, "samples": 24}
+    page3 = _bucket_get(stat_type="mc_online_nodes", constellation_id="-1", page_size=2, page=3).data
+    assert page3["next"] is None and len(page3["results"]) == 1
