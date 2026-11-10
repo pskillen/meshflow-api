@@ -85,7 +85,7 @@ In pre-prod the open flagged event was resolved and the `auto_updated` event wri
 
 **A blank-key feeder that reaches v4 already upgraded stays flagged**, because there is no stored key to prove the change. Rescue it with `python manage.py backfill_meshtastic_identity` (fills blank keys only, then wait out the first-key hour) or have staff re-point it. The backfill's source is NodeDB data the client can write, so treat that key as a claim, not a proof.
 
-**Rollback does not re-key.** A downgrade keeps the crc32 number, so the radio still reports the number the `ManagedNode` already has and nothing changes (step 8).
+**Rollback does not re-key, and never returns the radio to its old MAC-based number.** A downgrade keeps the crc32 number. If the re-key was already applied, the radio still reports the number the `ManagedNode` has and nothing changes. If it was not applied (flag off, or an open flagged event), the feeder stays flagged with `identity_mismatch: true` and still needs the re-point (step 8).
 
 **Direct messages after a re-key.** A 2.8 peer cannot DM the new number until it learns the new key. The first DM fails with a NAK `PKI_SEND_FAIL_PUBLIC_KEY`; two direct NodeInfo exchanges and a reboot did not help, and it resolved by itself in about an hour (periodic NodeInfo). Allow for this in test traffic and when asking anyone to message the feeder.
 
@@ -127,18 +127,29 @@ If the API is held by its fail-closed start guard (for example a migration is pe
 
 ## 8. Rollback
 
+**Steps.**
+
+1. Note the number the radio reports before you start. The feeder keeps its `ManagedNode` row either way.
+2. Flash the last 2.7.x release with the web flasher's **update** option, **full erase off** (never full-erase a feeder). On an nRF52 run `meshtastic --enter-dfu` first, then flash the app only.
+3. If the config was lost, restore the private key from the offline backup (step 2) **before the bot reconnects**.
+4. Check the radio reports the **same number as before the downgrade** (the crc32 number, not the old MAC-based one) and the same key.
+5. Check the `ManagedNode`:
+   - re-key already applied: nothing to do; the radio reports the number the `ManagedNode` holds and no new event is written;
+   - re-key **never applied** (flag off, or an open flagged event): the feeder stays flagged with `identity_mismatch: true`. Rollback does not restore the old number, so this does not clear by itself. Either turn `MESHTASTIC_FEEDER_AUTO_REKEY` on and wait up to 10 minutes, or re-point by hand (step 4).
+
+**ESP32 rollback is untested.** The likely feeder hardware is an ESP32 (Heltec). Only an nRF52 downgrade was exercised, so treat the steps above as the intended procedure for an ESP32 and verify step 4 before trusting it.
+
 Findings from the hardware session (2026-11-08, one Xiao, 2.8.2 to 2.7.26 and back):
 
-- A 2.8.2 to 2.7.26 downgrade (app-only DFU, no erase) **kept the crc32 number and the key** on a re-keyed node (`!faec6f41`, the number predicted before the key was written), plus the owner, region and channels. The 2.7 radio keeps the stored number; it does not revert to the MAC-based number, so there is no second identity change. **The `ManagedNode` needs no change on rollback**: the radio still reports the crc32 number, so no re-key happens.
+- A 2.8.2 to 2.7.26 downgrade (app-only DFU, no erase) **kept the crc32 number and the key** on a re-keyed node, plus the owner, region and channels. The 2.7 radio keeps the stored number; it does not revert to the MAC-based number, so there is no second identity change.
 - A later 2.7 to 2.8 re-upgrade keeps the identity but **empties the NodeDB** (device state versions 24 and 25 differ), as does the ESP32 update in step 3. Expect the feeder to hear its mesh again from scratch and the 2.8 connect-time replay to be small until the NodeDB refills.
-- 2.8.2 ignores the 1200-baud DFU touch on nRF52 (the USB CDC does not honour it). Run `meshtastic --enter-dfu` first, then flash.
-- If the config was lost, restore the private key backup before the bot reconnects.
+- 2.8.2 ignores the 1200-baud DFU touch on nRF52 (the USB CDC does not honour it); that is why step 2 uses `--enter-dfu`.
 
 ## 9. Known limitations
 
 - **Until state is carried across identity links (not built):** watches, DX metadata, claims on the old row and history stay on the old number. Watchers of the old node may get an offline alert once the learned threshold (6 to 48 hours) passes. Identity links are made at re-key time when deployed, or later by `python manage.py detect_meshtastic_identity_links` from key evidence; nothing yet carries state across a link.
 - **NodeDB reset:** an ESP32 update resets the NodeDB (200 to 4 nodes observed), and an nRF52 re-upgrade empties it.
-- **Not tested:** Traffic Management dedup behaviour, broadcast telemetry on or off, and a 2.7 feeder hearing a 2.8 sender. A signed NodeInfo was captured once from a BALANCED sender; the COMPATIBLE default sends unsigned.
+- **Not tested:** an ESP32 downgrade, Traffic Management dedup behaviour, broadcast telemetry on or off, and a 2.7 feeder hearing a 2.8 sender. A signed NodeInfo was captured once from a BALANCED sender; the COMPATIBLE default sends unsigned.
 - **DMs to a re-keyed node** fail for about an hour (step 4).
 
 ## 10. Fleet order
