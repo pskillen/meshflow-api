@@ -7425,7 +7425,8 @@ paths:
         Returns traceroute stats for the given timeframe: sources (by trigger_type),
         success/failure counts, top routers (intermediate nodes), per-source managed node
         totals (with success rate among finished runs only), per-target observed node totals,
-        success over time (daily series for the same ``triggered_at_after`` window, default 14 days),
+        success over time (daily series for the same ``triggered_at_after`` window, default 14 days; or
+        an hourly series with ``bucket=1h``),
         ``by_strategy`` (all trigger types; null mapped to legacy), and
         ``by_strategy_excluding_external`` (same shape but omits trigger_type external for hypothesis-only
         success breakdowns). All authenticated users.
@@ -7440,6 +7441,18 @@ paths:
             type: string
             format: date-time
             description: Filter stats by triggered_at >= value (ISO 8601)
+        - name: bucket
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: ['1d', '1h']
+            default: '1d'
+          description: >
+            Bucket size of ``success_over_time``. ``1d`` (default) is the daily series. ``1h`` returns one
+            zero-filled row per UTC hour from the hour containing ``triggered_at_after`` (last 24 hours when
+            omitted) through the current hour, and requires a window of at most 7 days (otherwise 400; use
+            ``1d``). Other values return 400. Other aggregates are unaffected.
         - name: source_node
           in: query
           required: false
@@ -7597,12 +7610,18 @@ paths:
                       through today (inclusive). When ``triggered_at_after`` is omitted, the series covers the
                       last 14 calendar days. Counts respect the same filters as the rest of the payload
                       (including ``source_node``). Only completed and failed runs are counted.
+                      With ``bucket=1h`` there is one row per UTC hour instead (see ``bucket_start``).
                     items:
                       type: object
                       properties:
                         date:
                           type: string
                           format: date
+                          description: Calendar date (UTC date of the hour when ``bucket=1h``).
+                        bucket_start:
+                          type: string
+                          format: date-time
+                          description: Start of the hour (UTC). Present only when ``bucket=1h``.
                         completed:
                           type: integer
                         failed:
@@ -7639,6 +7658,8 @@ paths:
                           type: integer
                         sent:
                           type: integer
+        '400':
+          description: Invalid ``bucket``, or ``bucket=1h`` with a window longer than 7 days
 
   /traceroutes/heatmap-edges/:
     get:
