@@ -18,6 +18,8 @@ Prefix **`mc_`** on `stat_type` (no schema migration; extends OpenAPI enum):
 | `mc_online_nodes` | Global + per-constellation | Distinct senders heard in the `ONLINE_NODE_WINDOW_HOURS` window centred on `recorded_at` (2 h: `[H - 1h, H + 1h]`): global from `MeshCoreRawPacket.first_reported_time`, constellation from `MeshCorePacketObservation.rx_time` by feeder constellation. A sender is its 12-hex pubkey prefix (`from_pubkey[:12]`, else `from_pubkey_prefix`), because `from_pubkey` is null on prefix-only packets that still advance `last_heard`. Same cut-over and `--rewrite-online` backfill as MT, see [meshtastic.md](meshtastic.md#online_nodes) |
 | `mc_new_nodes` | Global + per-constellation | `ObservedNode` `protocol=MESHCORE` + `created_at` (delta / backfill same rules as MT) |
 
+**Daily rollup:** `GET /api/stats/snapshots/?bucket=1d` works for `mc_*` types the same way as for MT (gauges averaged, flows summed; needs `stat_type` and `recorded_at_after`). See [meshtastic.md](meshtastic.md#stored-snapshots) for the contract. If the bounds are not UTC midnight, the first and last days are partial (`value.samples` < 24).
+
 **Celery:** extend existing `collect_stats_snapshots` / `backfill_stats_snapshots` (single `run_id` per hour).
 
 **Out of scope for #329:** live `GET /api/stats/global/` MeshCore aggregates; meshflow-ui protocol toggle; blending MT+MC in one chart without explicit `stat_type`.
