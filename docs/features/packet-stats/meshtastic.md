@@ -1,6 +1,6 @@
 # Meshtastic packet statistics
 
-Reverse-engineered from [`Meshflow/stats/`](../../../Meshflow/stats/) as of 2026-05. This is the reference for MeshCore parity ([#329](https://github.com/pskillen/meshflow-api/issues/329)).
+Reverse-engineered from [`Meshflow/stats/`](../../../Meshflow/stats/) as of 2026-05.
 
 ## Overview
 
@@ -202,13 +202,12 @@ Path param `node_id` is **Meshtastic numeric nodenum**; handlers filter `Observe
 
 | Component | API | `stat_type` / endpoint |
 | --- | --- | --- |
-| `MeshStatsSection` | Snapshots | `online_nodes`, `new_nodes`, `packet_volume` |
-| `PacketStatsChartFromSnapshots` | `GET /api/stats/snapshots/?stat_type=packet_volume` | Global rows only (`constellation_id === null`) |
-| `OnlineNodesChart` | Snapshots | `online_nodes` or `new_nodes` |
-| `PacketStatsChart` / `PacketTypeChart` | Live | `GET /api/stats/global/` or per-node |
+| `MeshStatsSection` | Snapshots | `online_nodes`, `new_nodes`, `packet_volume` and the `mc_*` twins; `bucket=1d` for 30d/90d, hourly otherwise, rolled up client-side in UTC |
+| `FirmwareAdoptionCard` | Snapshots | `node_firmware` |
+| `RightNowBand` | `GET /api/nodes/observed-nodes/recent_counts/` | Rolling-window node counts |
+| `NodePacketTypeCard` | Live | `GET /api/stats/nodes/{id}/packets/` and `/received/` with `interval_type` hour or day |
+| `NeighbourSourceBars` | Live | `GET /api/stats/nodes/{id}/neighbours/` |
 | Hooks | `useStatsSnapshots`, `usePacketStats` | [`usePacketStats.ts`](https://github.com/pskillen/meshflow-ui/blob/main/src/hooks/api/usePacketStats.ts) |
-
-Client aggregates hourly snapshot points into 6 h / daily buckets ([`stats-aggregation.ts`](https://github.com/pskillen/meshflow-ui/blob/main/src/lib/stats-aggregation.ts)): `packet_volume` **sums** counts; `online_nodes` **averages** within a bucket.
 
 ---
 
@@ -237,9 +236,8 @@ print(StatsSnapshot.objects.order_by('-recorded_at')[:5].values('recorded_at','s
 
 ## Known gaps (Meshtastic doc scope)
 
-- ~~Global `online_nodes` / `new_nodes` included MeshCore rows~~ — fixed ([#365](https://github.com/pskillen/meshflow-api/issues/365)). `new_nodes` filters `protocol=MESHTASTIC` on `ObservedNode`; `online_nodes` is now counted from Meshtastic raw packets (see above), not from `ObservedNode`, so it never sees MeshCore rows.
 - Live stats views do not accept MeshCore identity (pubkey / `internal_id`).
 - `packet_volume` has no constellation-scoped snapshots.
 - Traceroute success daily stats use a different `stat_type` (`tr_success_daily`) — not covered here.
 
-See [meshcore.md](meshcore.md) for planned MC snapshot types.
+See [meshcore.md](meshcore.md) for the MeshCore types.

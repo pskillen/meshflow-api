@@ -36,4 +36,3 @@ Dashboard [`MeshStatsSection`](https://github.com/pskillen/meshflow-ui/blob/main
 ## References
 
 - Tracking: [#329](https://github.com/pskillen/meshflow-api/issues/329), epic [#266](https://github.com/pskillen/meshflow-api/issues/266)
-- Progress: [packet-stats-progress.md](packet-stats-progress.md)
