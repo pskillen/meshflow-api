@@ -55,7 +55,7 @@ def parse_stats_params(request) -> Tuple[Optional[datetime], Optional[datetime],
     end_date = request.query_params.get("end_date")
     try:
         interval = int(request.query_params.get("interval", 1))
-    except TypeError, ValueError:
+    except ValueError:
         interval = None
     if interval != 1:
         raise ValueError("interval must be 1; use interval_type (hour, day, week, month) to choose the bucket size")
