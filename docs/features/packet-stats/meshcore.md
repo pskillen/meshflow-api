@@ -24,7 +24,7 @@ There are no MeshCore live stats endpoints; `/api/stats/global/` and the per-nod
 
 ## Managed-node live status
 
-Packet counts for the last 2 h and 24 h are on `GET /api/nodes/managed-nodes/?include=status` (annotations on MeshCore feeders). This is separate from the hourly `StatsSnapshot`; see [meshcore phase-2-progress](../meshcore/phase-2-progress.md).
+Packet counts for the last 2 h and 24 h are on `GET /api/nodes/managed-nodes/?include=status` (annotations on MeshCore feeders). This is separate from the hourly `StatsSnapshot`.
 
 ## UI consumers
 
