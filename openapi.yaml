@@ -7369,7 +7369,8 @@ paths:
           required: false
           schema:
             type: integer
-            description: The interval of the stats
+            enum: [1]
+            description: Only 1 is accepted; other values are a 400. Use interval_type for the bucket size.
             default: 1
         - name: interval_type
           in: query
@@ -7415,7 +7416,8 @@ paths:
           required: false
           schema:
             type: integer
-            description: The interval of the stats
+            enum: [1]
+            description: Only 1 is accepted; other values are a 400. Use interval_type for the bucket size.
             default: 1
         - name: interval_type
           in: query
@@ -7486,7 +7488,8 @@ paths:
           required: false
           schema:
             type: integer
-            description: The interval of the stats
+            enum: [1]
+            description: Only 1 is accepted; other values are a 400. Use interval_type for the bucket size.
             default: 1
         - name: interval_type
           in: query
