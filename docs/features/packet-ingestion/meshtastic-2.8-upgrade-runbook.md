@@ -31,14 +31,14 @@ Do not upgrade a feeder until all of these hold. Each is checkable.
   - the first API request after boot is `GET /api/v4/feeder/identity/`;
   - NodeDB uploads go to `POST /api/v4/feeder/meshtastic/nodes/` and return 200;
   - there is no 403 and no identity-rejection line.
-- [ ] **Own key:** the feeder has **its own API key**, not shared with another feeder.
-- [ ] **Stored public key:** the feeder's public key is visible on its `ManagedNode`, and was first recorded **more than an hour ago**. A key first recorded from a report is not trusted for the automatic re-key until it is an hour old (flagged `key_mismatch` until then).
-- [ ] **Re-key flag decision:** decide whether `MESHTASTIC_FEEDER_AUTO_REKEY` is on for this environment (step 4). On is the tested path. Off means a person re-points each feeder.
-- [ ] **Backup** of the radio config, private key included, stored offline (step 2).
-- [ ] **Region** is set on the radio.
-- [ ] **Board** is not an nRF52832.
-- [ ] **Watchers warned:** people watching the feeder or its old number know a number change is coming (see Known limitations).
-- [ ] **Soak:** the pre-prod feeder has run 2.8.2 for 7 days without ingest loss.
+- [ ] **Own key:** the feeder has **its own API key**, not shared with another feeder. Check: `python manage.py report_shared_api_keys` shows 0 shared keys.
+- [ ] **Stored public key:** the feeder's public key is visible on its `ManagedNode`, and was first recorded **more than an hour ago**. A key first recorded from a report is not trusted for the automatic re-key until it is an hour old (flagged `key_mismatch` until then). Check in admin: `ManagedNode.meshtastic_public_key` is set, and the feeder has no `key_changed` `ManagedNodeIdentityEvent` in the last hour (that event dates a first key; a backfilled key also writes one).
+- [ ] **Re-key flag decision:** decide whether `MESHTASTIC_FEEDER_AUTO_REKEY` is on for this environment (step 4). On is the tested path. Off means a person re-points each feeder. Check the current value with `echo 'from django.conf import settings as s; print(s.MESHTASTIC_FEEDER_AUTO_REKEY)' | python manage.py shell`.
+- [ ] **Backup** of the radio config, private key included, stored offline (step 2). Check: the backup file exists offline and its public key matches the `ManagedNode`'s.
+- [ ] **Region** is set on the radio. Check: `meshtastic --get lora.region` is not `UNSET`.
+- [ ] **Board** is not an nRF52832. Check: the hardware model in the bot's identity report or `meshtastic --info`.
+- [ ] **Watchers warned:** people watching the feeder or its old number know a number change is coming (see Known limitations). Check: the watchers of the old number are listed in admin (node watches) and have been told.
+- [ ] **Soak:** the pre-prod feeder has run 2.8.2 for 7 days without an ERROR loop in the bot or API logs. Check: the container uptime or the bot's start time in its log, and a log search for `ERROR` over the week.
 
 ## 2. Pre-upgrade checklist
 
