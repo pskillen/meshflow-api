@@ -1760,6 +1760,10 @@ class BaseNodeSerializer(serializers.ModelSerializer):
         validated_data = protect_stale_names(instance, validated_data, has_nodeinfo)
         # last_heard itself must never move backwards, into the future, or be cleared.
         validated_data = clamp_last_heard(instance, validated_data)
+        key_changed = (
+            "meshtastic_public_key" in validated_data
+            and validated_data["meshtastic_public_key"] != instance.meshtastic_public_key
+        )
         if "meshtastic_public_key" in validated_data:
             validated_data.update(identity_fields(validated_data["meshtastic_public_key"]))
 
@@ -1770,6 +1774,7 @@ class BaseNodeSerializer(serializers.ModelSerializer):
         instance.save()
         if "meshtastic_public_key" in validated_data:
             refresh_row_numbered_by_key(instance)
+        if key_changed:
             detect_after_key_write(instance)
 
         # Create related objects

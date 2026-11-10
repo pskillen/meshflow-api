@@ -160,3 +160,59 @@ def test_nodedb_upload_costs_one_identity_query_per_node_on_the_no_work_path():
     holder_queries = [q for q in queries.captured_queries if '"meshtastic_public_key_hex" = ' in q["sql"]]
     assert len(holder_queries) == count
     assert not Link.objects.exists()
+
+
+def _identity_queries(queries):
+    """The reads detection makes: link rows, holders of a key, MAC candidates (the node's own UPDATE is not one)."""
+    markers = ("nodes_observednodeidentitylink", '"meshtastic_public_key_hex" = ', '"mac_addr" = ')
+    return [
+        q for q in queries.captured_queries if q["sql"].startswith("SELECT") and any(m in q["sql"] for m in markers)
+    ]
+
+
+@pytest.mark.django_db
+def test_repeated_identical_nodeinfo_costs_no_identity_queries(
+    create_node_info_packet, create_managed_node, create_packet_observation, create_user
+):
+    _row(NEW)
+    packet = dict(
+        from_int=NEW,
+        from_str="!8959691b",
+        node_id="!8959691b",
+        public_key=KEY_B64,
+        mac_address=MAC,
+        long_name="PDYt",
+    )
+    args = (create_node_info_packet, create_managed_node, create_packet_observation, create_user)
+    with CaptureQueriesContext(connection) as first:
+        _process(*args, **packet)  # the first one is a real change: detection reads
+    assert _identity_queries(first)
+    with CaptureQueriesContext(connection) as queries:
+        for _ in range(3):
+            _process(*args, **packet)
+    assert _identity_queries(queries) == []
+
+
+@pytest.mark.django_db
+def test_nodeinfo_with_a_changed_mac_or_key_runs_detection_again(
+    create_node_info_packet, create_managed_node, create_packet_observation, create_user
+):
+    _row(OLD)
+    _row(NEW)
+    args = (create_node_info_packet, create_managed_node, create_packet_observation, create_user)
+    base = dict(from_int=NEW, from_str="!8959691b", node_id="!8959691b", public_key=None)
+    _process(*args, **base, mac_address="02:00:00:00:00:01")
+    assert not Link.objects.exists()
+    _process(*args, **base, mac_address=MAC)  # a different MAC: a real change
+    assert Link.objects.get().state == State.SUGGESTED
+
+
+@pytest.mark.django_db
+def test_repeated_identical_nodedb_upload_costs_no_identity_queries():
+    with CaptureQueriesContext(connection) as first:
+        node = _upsert(id=NEW, meshtastic_public_key=KEY_B64)
+    assert _identity_queries(first)
+    with CaptureQueriesContext(connection) as queries:
+        for _ in range(3):
+            _upsert(node, id=NEW, meshtastic_public_key=KEY_B64)
+    assert _identity_queries(queries) == []
