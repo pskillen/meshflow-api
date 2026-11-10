@@ -14,6 +14,10 @@ BUCKET_CHOICES = ("1h", "6h", "1d")
 #: Battery level reported by powered (non-battery) devices.
 POWERED_BATTERY_LEVEL = 101
 
+#: Fields where ingestion stores a missing reading as 0, so 0 is excluded from the mean.
+#: Channel utilisation, air time and uptime are not listed: a real 0 is possible there.
+ZERO_MEANS_MISSING_FIELDS = frozenset({"voltage", "battery_level"})
+
 #: Fields where the bucket value is the most recent reading, not a mean.
 LAST_READING_FIELDS = frozenset({"wind_direction", "rainfall_1h", "rainfall_24h"})
 
@@ -55,6 +59,10 @@ def _aggregate_field(field: str, values: Sequence):
         return values[-1]
     if field in MAX_FIELDS:
         return max(values)
+    if field in ZERO_MEANS_MISSING_FIELDS:
+        values = [v for v in values if v != 0]
+        if not values:
+            return None
     if field == "battery_level":
         real = [v for v in values if v != POWERED_BATTERY_LEVEL]
         return _mean(real) if real else POWERED_BATTERY_LEVEL

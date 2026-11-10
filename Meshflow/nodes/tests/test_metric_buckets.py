@@ -49,6 +49,35 @@ def test_battery_101_handling():
     assert bucket_rows(powered, ["battery_level"], "1d")[0]["battery_level"] == 101
 
 
+def test_zero_voltage_is_missing_not_averaged():
+    rows = [_row(_t(1), voltage=0), _row(_t(2), voltage=4.0)]
+    (out,) = bucket_rows(rows, ["voltage"], "6h")
+    assert out["voltage"] == 4.0
+    assert out["samples"] == 2
+    zeros = [_row(_t(1), voltage=0), _row(_t(2), voltage=0)]
+    assert bucket_rows(zeros, ["voltage"], "6h")[0]["voltage"] is None
+
+
+def test_zero_battery_level_is_missing_not_averaged():
+    rows = [_row(_t(1), battery_level=0), _row(_t(2), battery_level=80)]
+    assert bucket_rows(rows, ["battery_level"], "1d")[0]["battery_level"] == 80
+    zeros = [_row(_t(1), battery_level=0), _row(_t(2), battery_level=0)]
+    assert bucket_rows(zeros, ["battery_level"], "1d")[0]["battery_level"] is None
+    # 0 and 101 together: 0 is dropped, the powered marker remains.
+    both = [_row(_t(1), battery_level=0), _row(_t(2), battery_level=101)]
+    assert bucket_rows(both, ["battery_level"], "1d")[0]["battery_level"] == 101
+
+
+def test_zero_kept_for_other_fields():
+    rows = [
+        _row(_t(1), meshtastic_channel_utilization=0, uptime_seconds=0),
+        _row(_t(2), meshtastic_channel_utilization=10, uptime_seconds=0),
+    ]
+    (out,) = bucket_rows(rows, ["meshtastic_channel_utilization", "uptime_seconds"], "1d")
+    assert out["meshtastic_channel_utilization"] == 5
+    assert out["uptime_seconds"] == 0
+
+
 def test_uptime_max_and_last_reading_fields():
     rows = [
         _row(_t(3), uptime_seconds=50, wind_direction=270, rainfall_1h=None),
