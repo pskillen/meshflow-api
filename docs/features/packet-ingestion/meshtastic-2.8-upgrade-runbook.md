@@ -21,9 +21,12 @@ The identity behaviour below was observed on hardware on 2026-11-08 and 2026-11-
 
 Do not upgrade a feeder until all of these hold. Each is checkable.
 
-- [ ] **API:** the target environment runs api **2.5.0 or later** for the re-key itself, and the release that carries the signing state, identity links and re-point audit (api **2.7.0**, not yet published at the time of writing; if it is still unpublished, take the release that includes them from the changelog). Migrations applied; `python manage.py backfill_meshtastic_identity` has been run (idempotent).
-- [ ] **UI:** ui **2.4.0** or later, so My Nodes shows the "Feeder number changed" and "Feeder review" notices.
-- [ ] **Bot:** bot **2.3.1** or later (not yet published at the time of writing; latest is 2.3.0), the release that holds the v4 URLs (bot#158), the connect-replay drop (bot#160) and the v4 probe before any upload (bot#166). **A feeder on bot 2.2.0 uses legacy URLs and cannot survive an upgrade.** Check the bot log after a restart:
+- [ ] **API:** the target environment runs an api release that includes signing state, identity links and the re-point audit (it also carries `accept_reported_key` and the backfill's first-key event; api 2.5.0, the re-key itself, is not enough). Migrations applied. Check each:
+  - `python manage.py backfill_meshtastic_identity` has been run (idempotent; a second run changes nothing);
+  - null-island cleanup is applied: `python manage.py cleanup_null_island_positions` (dry-run, no `--apply`) reports zero rows;
+  - the learned offline thresholds have been computed. The task is the Celery beat task `update_learned_offline_thresholds` (daily 03:30 UTC, see [RECENCY.md](../../RECENCY.md)), not a management command. Run it once with `echo 'from mesh_monitoring.tasks import update_learned_offline_thresholds as t; print(t())' | python manage.py shell`, then confirm in admin that `NodePresence.learned_offline_computed_at` is set for a watched node. This matters for the false-offline warning in Known limitations.
+- [ ] **UI:** a ui release that shows the My Nodes notices "Feeder number changed", "Feeder needs review" and "Feeder review resolved" (ui 2.4.0 or later). Check: the built bundle contains the string "Feeder needs review".
+- [ ] **Bot:** a bot release that includes the v4 feeder URLs, the connect-replay drop, the v4 probe before the first upload and the signing shim (the shim reports the signing state the API stores as `xeddsa_signed`; without it signing state is unknown). **A feeder on bot 2.2.0 uses legacy URLs and cannot survive an upgrade.** Check the bot log after a restart:
   - `using v4 (feeder-scoped) feeder URLs` is logged before any upload;
   - the first API request after boot is `GET /api/v4/feeder/identity/`;
   - NodeDB uploads go to `POST /api/v4/feeder/meshtastic/nodes/` and return 200;
@@ -95,7 +98,7 @@ In pre-prod the open flagged event was resolved and the `auto_updated` event wri
 | Public-channel position precision | Restore if wanted | The upgrade sets it to 0 and the public clamp is about 730 m (15 bits) |
 | Telemetry | See step 6 | |
 
-The API ignores the connect-time replay of stored node records a 2.8 radio sends after `config_complete_id`: replayed packets are stored and flagged but change nothing (see [meshtastic.md](meshtastic.md#replayed-packets-28)). Bots with replay detection (bot#160) drop them before upload.
+The API ignores the connect-time replay of stored node records a 2.8 radio sends after `config_complete_id`: replayed packets are stored and flagged but change nothing (see [meshtastic.md](meshtastic.md#replayed-packets-28)). Bots with replay detection drop them before upload.
 
 Expect observation counts from a 2.8 feeder to differ from a 2.7 one even after these settings: pre-hop packets are withheld from the phone/bot, and broadcast hop limits are density-scaled.
 
@@ -133,7 +136,7 @@ Findings from the hardware session (2026-11-08, one Xiao, 2.8.2 to 2.7.26 and ba
 
 ## 9. Known limitations
 
-- **Until ID-3:** watches, DX metadata, claims on the old row and history stay on the old number. Watchers of the old node may get an offline alert once the learned threshold (6 to 48 hours) passes. Identity links are made at re-key time when deployed, or later by `python manage.py detect_meshtastic_identity_links` from key evidence; nothing yet carries state across a link.
+- **Until state is carried across identity links (not built):** watches, DX metadata, claims on the old row and history stay on the old number. Watchers of the old node may get an offline alert once the learned threshold (6 to 48 hours) passes. Identity links are made at re-key time when deployed, or later by `python manage.py detect_meshtastic_identity_links` from key evidence; nothing yet carries state across a link.
 - **NodeDB reset:** an ESP32 update resets the NodeDB (200 to 4 nodes observed), and an nRF52 re-upgrade empties it.
 - **Not tested:** Traffic Management dedup behaviour, broadcast telemetry on or off, and a 2.7 feeder hearing a 2.8 sender. A signed NodeInfo was captured once from a BALANCED sender; the COMPATIBLE default sends unsigned.
 - **DMs to a re-keyed node** fail for about an hour (step 4).
