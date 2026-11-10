@@ -6933,14 +6933,23 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/OwnedManagedNode'
+        '400':
+          description: >-
+            Validation error. Staff changing `meshtastic_node_id` to an invalid node number get
+            `{code: invalid_node_id, detail}`.
         '403':
           description: Not the node owner and not staff
+        '409':
+          description: >-
+            Staff changed `meshtastic_node_id` to a number another active feeder holds
+            (`{code: number_collision, detail}`). Nothing else in the request is saved.
 
     patch:
       summary: Partially update managed node
       description: >-
         Owner or staff only. Typical body fields include meshtastic_channel_0–meshtastic_channel_7 (nullable MessageChannel IDs),
         name, allow_auto_traceroute, default location via position, etc. Non-owners receive 403.
+        `meshtastic_node_id` is staff only (ignored for owners); staff changes go through the audited re-point.
       tags: [Nodes]
       security:
         - BearerAuth: []
@@ -6968,9 +6977,15 @@ paths:
               schema:
                 $ref: '#/components/schemas/OwnedManagedNode'
         '400':
-          description: Validation error (e.g. channel not in node constellation)
+          description: >-
+            Validation error (e.g. channel not in node constellation), or `{code: invalid_node_id, detail}` when
+            staff send an invalid `meshtastic_node_id`
         '403':
           description: Not the node owner and not staff
+        '409':
+          description: >-
+            Staff changed `meshtastic_node_id` to a number another active feeder holds
+            (`{code: number_collision, detail}`). Nothing else in the request is saved.
 
     delete:
       summary: Soft-delete managed node (un-manage)
