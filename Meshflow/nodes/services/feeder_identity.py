@@ -443,7 +443,13 @@ def _after_commit(node, event, old_num, new_num, *, claim) -> None:
         sender=ManagedNode, managed_node=node, event=event, old_node_id=old_num, new_node_id=new_num
     ):
         if isinstance(result, Exception):
-            logger.error("Feeder %s: identity signal receiver %r failed: %r", node.internal_id, receiver, result)
+            logger.error(
+                "Feeder %s: identity signal receiver %r failed: %r",
+                node.internal_id,
+                receiver,
+                result,
+                exc_info=result,
+            )
 
 
 def accept_reported_key(node, *, actor, now=None) -> ManagedNodeIdentityEvent:
