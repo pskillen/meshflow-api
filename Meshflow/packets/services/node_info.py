@@ -1,5 +1,6 @@
 from common.meshtastic_enums import normalise_hw_model
 from common.meshtastic_identity import identity_fields, protect_identity
+from nodes.services.identity_links import detect_after_nodeinfo
 from nodes.services.node_firmware import refresh_inferred_firmware, refresh_row_numbered_by_key
 from packets.models import NodeInfoPacket
 from packets.services.base import BasePacketService
@@ -41,5 +42,8 @@ class NodeInfoPacketService(BasePacketService):
         sender.meshtastic_is_unmessagable = self.packet.is_unmessagable
         refresh_inferred_firmware(sender)
         sender.save()
-        if "meshtastic_public_key" in updates:
+        key_written = "meshtastic_public_key" in updates
+        if key_written:
             refresh_row_numbered_by_key(sender)
+        # Identity links: key evidence, then MAC evidence (on-air only: NodeDB uploads zero other nodes' MACs).
+        detect_after_nodeinfo(sender, self.packet.mac_address, key_written=key_written)
