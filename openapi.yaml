@@ -2441,7 +2441,7 @@ components:
           example: '!4396524c'
         outcome:
           type: string
-          enum: [auto_updated, flagged, manual, key_changed]
+          enum: [auto_updated, flagged, manual, key_changed, key_accepted]
         reason:
           type: string
           nullable: true
@@ -7009,6 +7009,11 @@ paths:
         same number, its public key becomes the stored key. Open flagged events are resolved and a `manual` identity
         event is written (already acknowledged by the caller). A reversal holds: while the radio still reports the number
         the feeder was moved away from, automatic re-key flags it instead of applying it, until a later manual re-point.
+
+        With `accept_reported_key: true` (staff only) the number is kept and the public key the feeder reported for it
+        is accepted: the key comes from the newest open `key_mismatch` flagged event for the current number, the stored
+        key is replaced, open flagged events are resolved, and a `key_accepted` identity event is written (already
+        acknowledged). No signal is sent. Send no number, or the current one.
       tags: [Nodes]
       security:
         - BearerAuth: []
@@ -7029,9 +7034,14 @@ paths:
                 meshtastic_node_id:
                   type: integer
                   description: Node number to set. Defaults to the feeder's reported_meshtastic_node_id.
+                accept_reported_key:
+                  type: boolean
+                  default: false
+                  description: >-
+                    Staff only. Accept the reported public key for the unchanged number instead of re-pointing.
       responses:
         '200':
-          description: The `manual` identity event
+          description: The `manual` identity event (`key_accepted` for `accept_reported_key`)
           content:
             application/json:
               schema:
@@ -7046,14 +7056,15 @@ paths:
                 properties:
                   code:
                     type: string
-                    enum: [not_meshtastic, no_reported_number, invalid_node_id, already_current]
+                    enum: [not_meshtastic, no_reported_number, invalid_node_id, already_current, no_key_to_accept]
                   detail:
                     type: string
         '403':
           description: >-
             Refused. With `code: repoint_not_proven`, the caller is the owner but the number is not one the owner may
             set: it is not the number the feeder last reported, or crc32 of a trusted stored key does not give it. With
-            no `code`, the caller is neither the owner nor staff.
+            no `code`, the caller is neither the owner nor staff. With `code: staff_only`, an owner sent
+            `accept_reported_key`.
           content:
             application/json:
               schema:
@@ -7061,7 +7072,7 @@ paths:
                 properties:
                   code:
                     type: string
-                    enum: [repoint_not_proven]
+                    enum: [repoint_not_proven, staff_only]
                   detail:
                     type: string
         '404':
