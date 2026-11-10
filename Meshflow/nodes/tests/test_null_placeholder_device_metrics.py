@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from io import StringIO
 
-from django.core.management import call_command
+from django.core.management import CommandError, call_command
 
 import pytest
 
@@ -140,3 +140,91 @@ def test_idempotent_and_batched(create_observed_node):
     second = _run("--batch-size", "2")
     assert "voltage (0): 0" in second
     assert "uptime_seconds (0): 0" in second
+
+
+def _mixed_rows(node):
+    return [
+        _dm(
+            node,
+            battery_level=0,
+            voltage=0,
+            meshtastic_channel_utilization=0,
+            meshtastic_air_util_tx=0,
+            uptime_seconds=0,
+        ),
+        _dm(node, voltage=0),
+        _dm(node, battery_level=0, voltage=3.1),
+        _dm(node, battery_level=0, voltage=None, uptime_seconds=0),
+        _dm(node, battery_level=80, voltage=3.9, meshtastic_channel_utilization=0, uptime_seconds=0),
+        _dm(node, meshtastic_channel_utilization=0, meshtastic_air_util_tx=0),
+        _dm(node),
+    ]
+
+
+def _snapshot(model):
+    return list(model.objects.order_by("pk").values_list("pk", *FIELDS))
+
+
+@pytest.mark.django_db
+def test_dry_run_counts_equal_real_counts_and_second_run_is_noop(create_observed_node):
+    node = create_observed_node()
+    _mixed_rows(node)
+    for i in range(3):
+        NodeLatestStatus.objects.update_or_create(
+            node=create_observed_node(),
+            defaults={"battery_level": 0, "voltage": i, "uptime_seconds": 0, "meshtastic_channel_utilization": 0},
+        )
+    before = _snapshot(DeviceMetrics)
+    dry = _run("--dry-run", "--batch-size", "2")
+    assert _snapshot(DeviceMetrics) == before
+    real = _run("--batch-size", "2")
+    assert dry.replace("[dry-run] ", "") == real
+    assert "voltage (0): 0" not in real
+    after = _snapshot(DeviceMetrics) + _snapshot(NodeLatestStatus)
+    again = _run("--batch-size", "2")
+    assert after == _snapshot(DeviceMetrics) + _snapshot(NodeLatestStatus)
+    assert all(line.endswith(": 0") or line.endswith(":") for line in again.splitlines())
+
+
+@pytest.mark.django_db
+def test_batching_with_id_gaps(create_observed_node):
+    node = create_observed_node()
+    pks = []
+    for _ in range(4):
+        pks.append(_dm(node, voltage=0))
+        for _ in range(3):
+            DeviceMetrics.objects.create(node=node, voltage=1.0).delete()
+    out = _run("--batch-size", "2")
+    assert "voltage (0): 4" in out
+    assert all(_vals(DeviceMetrics, pk)["voltage"] is None for pk in pks)
+
+
+@pytest.mark.django_db
+def test_before_on_node_latest_status(create_observed_node):
+    cutoff = datetime(2026, 6, 1, tzinfo=timezone.utc)
+    old_node, new_node, null_node = create_observed_node(), create_observed_node(), create_observed_node()
+    for n, when in ((old_node, cutoff - timedelta(days=1)), (new_node, cutoff + timedelta(days=1)), (null_node, None)):
+        NodeLatestStatus.objects.update_or_create(node=n, defaults={"voltage": 0, "metrics_reported_time": when})
+    _run("--before", cutoff.isoformat())
+    assert NodeLatestStatus.objects.get(node=old_node).voltage is None
+    assert NodeLatestStatus.objects.get(node=new_node).voltage == 0
+    assert NodeLatestStatus.objects.get(node=null_node).voltage == 0
+
+
+@pytest.mark.django_db
+def test_node_latest_status_keeps_real_readings(create_observed_node):
+    a, b = create_observed_node(), create_observed_node()
+    NodeLatestStatus.objects.update_or_create(node=a, defaults={"battery_level": 0, "voltage": 3.1})
+    NodeLatestStatus.objects.update_or_create(
+        node=b, defaults={"battery_level": 80, "voltage": 3.9, "meshtastic_channel_utilization": 0}
+    )
+    _run()
+    assert NodeLatestStatus.objects.get(node=a).battery_level == 0
+    assert NodeLatestStatus.objects.get(node=b).meshtastic_channel_utilization == 0
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("args", [["--batch-size", "0"], ["--before", "garbage"], ["--before", "2026-13-45T00:00:00Z"]])
+def test_bad_arguments_raise_command_error(args):
+    with pytest.raises(CommandError):
+        _run(*args)
