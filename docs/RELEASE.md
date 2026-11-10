@@ -87,9 +87,9 @@ docker pull ghcr.io/pskillen/meshflow-api:latest-docs
 
 PR builds do **not** push images to the registry. The workflow builds locally and runs smoke + integration tests in a single job.
 
-In the `build-and-smoke` job the API image is built once with buildx (`load: true`, `push: false`) as `meshflow-api:ci`, reading the layer cache that main builds write (GHA cache scope `meshflow-api`; PRs never write it). `docker-compose.test.yaml` tags its API services `${MESHFLOW_API_IMAGE:-meshflow-api:ci}`, so CI runs `up -d --no-build` and reuses that image; a local `docker compose build` still works. The job runs in parallel with `verify` and the bot contract check.
+In the `build-and-smoke` job the API image is built once with buildx (`load: true`, `push: false`) as `meshflow-api:ci`, reading the layer cache that main builds write (GHA cache scope `meshflow-api`; PRs never write it). `docker-compose.test.yaml` tags its API services `${MESHFLOW_API_IMAGE:-meshflow-api:ci}`, so CI runs `up -d --no-build` and reuses that image; a local `docker compose build` still works. The job runs in parallel with `verify`, `verify-postgres` and the bot contract check.
 
-The PR workflow runs on every pull request whatever its base, so stacked PRs run the same checks (`verify`, `build-and-smoke`, `contract`) and read the caches `main` writes.
+The PR workflow runs on every pull request whatever its base, so stacked PRs run the same checks (`verify`, `verify-postgres`, `build-and-smoke`, `contract`) and read the caches `main` writes.
 
 The `VERSION` build arg is declared late in the `Dockerfile` so a new version only invalidates the last layers, not apt/pip.
 
