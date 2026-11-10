@@ -27,6 +27,7 @@ from common.meshtastic_identity import (
 from common.protocol import Protocol
 from constellations.models import MessageChannel
 from nodes.models import DeviceMetrics, ManagedNode, NodeLatestStatus, ObservedNode, Position
+from nodes.services.identity_links import detect_after_key_write
 from nodes.services.node_firmware import FIRMWARE_FIELDS, refresh_inferred_firmware, refresh_row_numbered_by_key
 from nodes.services.observed_nodes import get_meshtastic_observed_node
 
@@ -1736,6 +1737,7 @@ class BaseNodeSerializer(serializers.ModelSerializer):
             node.save(update_fields=FIRMWARE_FIELDS)
         if "meshtastic_public_key" in validated_data:
             refresh_row_numbered_by_key(node)
+            detect_after_key_write(node)
 
         # Create related objects
         self._create_related_objects(node, position_data, device_metrics_data)
@@ -1758,6 +1760,10 @@ class BaseNodeSerializer(serializers.ModelSerializer):
         validated_data = protect_stale_names(instance, validated_data, has_nodeinfo)
         # last_heard itself must never move backwards, into the future, or be cleared.
         validated_data = clamp_last_heard(instance, validated_data)
+        key_changed = (
+            "meshtastic_public_key" in validated_data
+            and validated_data["meshtastic_public_key"] != instance.meshtastic_public_key
+        )
         if "meshtastic_public_key" in validated_data:
             validated_data.update(identity_fields(validated_data["meshtastic_public_key"]))
 
@@ -1768,6 +1774,8 @@ class BaseNodeSerializer(serializers.ModelSerializer):
         instance.save()
         if "meshtastic_public_key" in validated_data:
             refresh_row_numbered_by_key(instance)
+        if key_changed:
+            detect_after_key_write(instance)
 
         # Create related objects
         self._create_related_objects(instance, position_data, device_metrics_data)
