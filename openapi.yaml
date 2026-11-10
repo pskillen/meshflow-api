@@ -79,7 +79,7 @@ components:
       schema:
         type: string
         pattern: '^[0-9a-f]{12}$'
-      description: First 12 hex chars of the feeder device pubkey (mc: prefix in bot logs)
+      description: 'First 12 hex chars of the feeder device pubkey (mc: prefix in bot logs)'
     MeshCoreFeederPubkeyHeader:
       name: X-MeshCore-Feeder-Pubkey
       in: header
@@ -429,7 +429,7 @@ components:
         node_id_str:
           type: string
           nullable: true
-          description: mc: pubkey form
+          description: 'mc: pubkey form'
         status:
           type: string
           enum: [unknown, resolved, ambiguous, stale]
@@ -3503,7 +3503,7 @@ components:
           type: string
           nullable: true
           readOnly: true
-          description: Name parsed from MC channel text ``{name}: {body}``; null for MT or contact/DM rows.
+          description: 'Name parsed from MC channel text ``{name}: {body}``; null for MT or contact/DM rows.'
         mc_sender_candidates:
           type: array
           readOnly: true
