@@ -50,6 +50,7 @@ from nodes.api_key_linking import (
     api_key_can_link,
 )
 from nodes.constants import INFRASTRUCTURE_ROLES
+from nodes.metric_buckets import bucket_rows, parse_bucket
 from nodes.models import (
     DeviceMetrics,
     EnvironmentExposure,
@@ -516,25 +517,24 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
         serializer = PositionSerializer(positions, many=True)
         return Response(serializer.data)
 
-    @action(detail=True, methods=["get"])
-    def device_metrics(self, request, internal_id=None):
-        """
-        Get device metrics for a specific node with optional date filtering.
+    def _metric_history(self, request, model, serializer_class):
+        """Shared body of the device/environment/power metric history actions.
 
         Query parameters:
-        - start_date: Filter metrics after this date (format: YYYY-MM-DD)
-        - end_date: Filter metrics before this date (format: YYYY-MM-DD)
+        - start_date / end_date: ``reported_time`` bounds (``end_date`` is widened to 23:59:59)
+        - bucket: optional ``1h``, ``6h`` or ``1d``; one aggregated row per populated UTC bucket
         """
         node = self.get_object()
-
-        # Get query parameters
         start_date = request.query_params.get("start_date")
         end_date = request.query_params.get("end_date")
 
-        # Filter device metrics by node
-        metrics = DeviceMetrics.objects.filter(node=node).order_by("-reported_time")
+        try:
+            bucket = parse_bucket(request.query_params.get("bucket"))
+        except ValueError as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Apply date filters if provided
+        metrics = model.objects.filter(node=node).order_by("-reported_time")
+
         if start_date:
             try:
                 start_datetime = datetime.fromisoformat(start_date)
@@ -557,86 +557,44 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-        serializer = DeviceMetricsSerializer(metrics, many=True)
+        if bucket:
+            fields = [
+                f.name
+                for f in model._meta.get_fields()
+                if f.concrete and not f.is_relation and f.name not in ("id", "logged_time", "reported_time")
+            ]
+            rows = metrics.values("id", "node_id", "reported_time", *fields).iterator(chunk_size=2000)
+            return Response(bucket_rows(rows, fields, bucket))
+
+        serializer = serializer_class(metrics, many=True)
         return Response(serializer.data)
+
+    @action(detail=True, methods=["get"])
+    def device_metrics(self, request, internal_id=None):
+        """
+        Get device metrics for a specific node with optional date filtering and bucketing.
+
+        Query parameters: start_date, end_date (YYYY-MM-DD), bucket (1h, 6h, 1d).
+        """
+        return self._metric_history(request, DeviceMetrics, DeviceMetricsSerializer)
 
     @action(detail=True, methods=["get"], url_path="environment_metrics")
     def environment_metrics(self, request, internal_id=None):
         """
-        Get environment metrics for a specific node with optional date filtering.
+        Get environment metrics for a specific node with optional date filtering and bucketing.
 
-        Query parameters:
-        - start_date: Filter metrics after this date (format: YYYY-MM-DD)
-        - end_date: Filter metrics before this date (format: YYYY-MM-DD)
+        Query parameters: start_date, end_date (YYYY-MM-DD), bucket (1h, 6h, 1d).
         """
-        node = self.get_object()
-        start_date = request.query_params.get("start_date")
-        end_date = request.query_params.get("end_date")
-
-        metrics = EnvironmentMetrics.objects.filter(node=node).order_by("-reported_time")
-
-        if start_date:
-            try:
-                start_datetime = datetime.fromisoformat(start_date)
-                metrics = metrics.filter(reported_time__gte=start_datetime)
-            except ValueError:
-                return Response(
-                    {"error": "Invalid start_date format. Use YYYY-MM-DD or full ISO 8601 format."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-        if end_date:
-            try:
-                end_datetime = datetime.fromisoformat(end_date)
-                end_datetime = end_datetime.replace(hour=23, minute=59, second=59)
-                metrics = metrics.filter(reported_time__lte=end_datetime)
-            except ValueError:
-                return Response(
-                    {"error": "Invalid end_date format. Use YYYY-MM-DD or full ISO 8601 format."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-        serializer = EnvironmentMetricsSerializer(metrics, many=True)
-        return Response(serializer.data)
+        return self._metric_history(request, EnvironmentMetrics, EnvironmentMetricsSerializer)
 
     @action(detail=True, methods=["get"], url_path="power_metrics")
     def power_metrics(self, request, internal_id=None):
         """
-        Get power metrics for a specific node with optional date filtering.
+        Get power metrics for a specific node with optional date filtering and bucketing.
 
-        Query parameters:
-        - start_date: Filter metrics after this date (format: YYYY-MM-DD)
-        - end_date: Filter metrics before this date (format: YYYY-MM-DD)
+        Query parameters: start_date, end_date (YYYY-MM-DD), bucket (1h, 6h, 1d).
         """
-        node = self.get_object()
-        start_date = request.query_params.get("start_date")
-        end_date = request.query_params.get("end_date")
-
-        metrics = PowerMetrics.objects.filter(node=node).order_by("-reported_time")
-
-        if start_date:
-            try:
-                start_datetime = datetime.fromisoformat(start_date)
-                metrics = metrics.filter(reported_time__gte=start_datetime)
-            except ValueError:
-                return Response(
-                    {"error": "Invalid start_date format. Use YYYY-MM-DD or full ISO 8601 format."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-        if end_date:
-            try:
-                end_datetime = datetime.fromisoformat(end_date)
-                end_datetime = end_datetime.replace(hour=23, minute=59, second=59)
-                metrics = metrics.filter(reported_time__lte=end_datetime)
-            except ValueError:
-                return Response(
-                    {"error": "Invalid end_date format. Use YYYY-MM-DD or full ISO 8601 format."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-        serializer = PowerMetricsSerializer(metrics, many=True)
-        return Response(serializer.data)
+        return self._metric_history(request, PowerMetrics, PowerMetricsSerializer)
 
     @action(detail=True, methods=["get"], url_path="traceroute-links")
     def traceroute_links(self, request, internal_id=None):
