@@ -1,0 +1,80 @@
+{
+  "effects": {
+    "baseline_traceroute_queued": true,
+    "device_metrics_rows": 0,
+    "dx_candidate_called": true,
+    "environment_metrics_rows": 0,
+    "inferred_max_hops": null,
+    "last_heard_advanced": true,
+    "nls": {},
+    "observation_api": {
+      "direct_from_sender": false,
+      "hop_count": null,
+      "replayed": false
+    },
+    "observed_node_created": true,
+    "position_rows": 0
+  },
+  "key": "p27-L7",
+  "observation": {
+    "bitfield": 0,
+    "channel": 0,
+    "hop_limit": 2,
+    "hop_start": 7,
+    "relay_node": 180,
+    "replayed": false,
+    "rx_rssi": null,
+    "rx_snr": null,
+    "rx_time": "2026-11-09T16:34:56Z",
+    "rx_time_estimated": false,
+    "transport_mechanism": "TRANSPORT_MULTICAST_UDP",
+    "via_mqtt": false
+  },
+  "observed_node": {
+    "environment_exposure": 0,
+    "inferred_firmware": "2.7",
+    "inferred_firmware_basis": "key_identity",
+    "long_name": "Nyan 0 \ud83c\udf08\ud83d\udc31",
+    "m2m_opt_out": false,
+    "mac_addr": "48:ca:43:3b:10:bc",
+    "mc_pubkey": null,
+    "mc_pubkey_prefix": null,
+    "meshcore_adv_type": null,
+    "meshtastic_hw_model": "HELTEC_V3",
+    "meshtastic_is_licensed": null,
+    "meshtastic_is_unmessagable": null,
+    "meshtastic_key_node_id": 2589916392,
+    "meshtastic_node_id": 1127944380,
+    "meshtastic_public_key": "CYiDxj5lmtlU711QwUALOih6ZnnvSxXHb++jO6YXi24=",
+    "meshtastic_public_key_hex": "098883c63e659ad954ef5d50c1400b3a287a6679ef4b15c76fefa33ba6178b6e",
+    "meshtastic_role": 2,
+    "protocol": 1,
+    "short_name": "NYA0",
+    "weather_use": 0
+  },
+  "packet": {
+    "fields": {
+      "from_int": 1127944380,
+      "from_str": "!433b10bc",
+      "hw_model": "HELTEC_V3",
+      "is_licensed": null,
+      "is_unmessagable": null,
+      "long_name": "Nyan 0 \ud83c\udf08\ud83d\udc31",
+      "mac_address": "48:ca:43:3b:10:bc",
+      "node_id": "!433b10bc",
+      "packet_id": 3792398312,
+      "port_num": "NODEINFO_APP",
+      "public_key": "CYiDxj5lmtlU711QwUALOih6ZnnvSxXHb++jO6YXi24=",
+      "role": 2,
+      "short_name": "NYA0",
+      "to_int": 4294967295,
+      "to_str": "^all"
+    },
+    "model": "NodeInfoPacket"
+  },
+  "request": {
+    "feeder_num_header": 1127973616,
+    "url": "v4"
+  },
+  "status": 201
+}

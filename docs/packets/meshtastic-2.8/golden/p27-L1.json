@@ -1,0 +1,83 @@
+{
+  "effects": {
+    "baseline_traceroute_queued": true,
+    "device_metrics_rows": 1,
+    "dx_candidate_called": true,
+    "environment_metrics_rows": 0,
+    "inferred_max_hops": null,
+    "last_heard_advanced": true,
+    "nls": {
+      "battery_level": 72.0,
+      "meshtastic_air_util_tx": 0.033305556,
+      "meshtastic_channel_utilization": 1.9983332,
+      "uptime_seconds": 126,
+      "voltage": 3.911
+    },
+    "observation_api": {
+      "direct_from_sender": false,
+      "hop_count": null,
+      "replayed": false
+    },
+    "observed_node_created": true,
+    "position_rows": 0
+  },
+  "key": "p27-L1",
+  "observation": {
+    "bitfield": null,
+    "channel": 0,
+    "hop_limit": 7,
+    "hop_start": null,
+    "relay_node": null,
+    "replayed": false,
+    "rx_rssi": null,
+    "rx_snr": null,
+    "rx_time": "2026-11-09T16:31:54Z",
+    "rx_time_estimated": false,
+    "transport_mechanism": null,
+    "via_mqtt": false
+  },
+  "observed_node": {
+    "environment_exposure": 0,
+    "inferred_firmware": null,
+    "inferred_firmware_basis": null,
+    "long_name": "Unknown Node !433b82f0",
+    "m2m_opt_out": false,
+    "mac_addr": null,
+    "mc_pubkey": null,
+    "mc_pubkey_prefix": null,
+    "meshcore_adv_type": null,
+    "meshtastic_hw_model": null,
+    "meshtastic_is_licensed": null,
+    "meshtastic_is_unmessagable": null,
+    "meshtastic_key_node_id": null,
+    "meshtastic_node_id": 1127973616,
+    "meshtastic_public_key": null,
+    "meshtastic_public_key_hex": null,
+    "meshtastic_role": null,
+    "protocol": 1,
+    "short_name": "82f0",
+    "weather_use": 0
+  },
+  "packet": {
+    "fields": {
+      "battery_level": 72.0,
+      "from_int": 1127973616,
+      "from_str": "!433b82f0",
+      "meshtastic_air_util_tx": 0.033305556,
+      "meshtastic_channel_utilization": 1.9983332,
+      "packet_id": 1047418108,
+      "port_num": "TELEMETRY_APP",
+      "reading_time": "2026-11-09T16:31:54Z",
+      "to_int": 4294967295,
+      "to_str": "^all",
+      "uptime_seconds": 126,
+      "voltage": 3.911
+    },
+    "model": "DeviceMetricsPacket"
+  },
+  "request": {
+    "feeder_num_header": 1127973616,
+    "url": "v4"
+  },
+  "status": 201
+}

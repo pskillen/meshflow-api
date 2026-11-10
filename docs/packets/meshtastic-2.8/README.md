@@ -1,7 +1,7 @@
 # Meshtastic 2.7/2.8 capture goldens
 
-The API side of the labelled capture subset the bot keeps under `docs/meshtastic_packets/2.8` (`subset.json`, 36
-entries, by `key`). One physical radio (NIAV-1) was captured across an upgrade and a re-key, as three feeders:
+The API side of the labelled capture subset the bot keeps under `docs/meshtastic_packets/2.8` (`subset.json`, 55
+entries, by `key`). One physical radio (NIAV-1) was captured across an upgrade and a re-key, as three feeders (the `p27`, `p28`, `p28d`, `p28s` and `p28t` keys are the later PDYt, Heltec Wireless Paper, captures):
 
 | Capture | Feeder number | Firmware |
 | --- | --- | --- |

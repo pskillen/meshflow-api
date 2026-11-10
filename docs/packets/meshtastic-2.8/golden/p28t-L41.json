@@ -1,0 +1,80 @@
+{
+  "effects": {
+    "baseline_traceroute_queued": true,
+    "device_metrics_rows": 0,
+    "dx_candidate_called": true,
+    "environment_metrics_rows": 0,
+    "inferred_max_hops": 3,
+    "last_heard_advanced": true,
+    "nls": {
+      "meshtastic_inferred_max_hops": 3,
+      "meshtastic_inferred_max_hops_source": "TRACEROUTE_APP"
+    },
+    "observation_api": {
+      "direct_from_sender": true,
+      "hop_count": 0,
+      "replayed": false
+    },
+    "observed_node_created": true,
+    "position_rows": 0
+  },
+  "key": "p28t-L41",
+  "observation": {
+    "bitfield": 2,
+    "channel": 0,
+    "hop_limit": 3,
+    "hop_start": 3,
+    "relay_node": 65,
+    "replayed": false,
+    "rx_rssi": -41.0,
+    "rx_snr": 5.75,
+    "rx_time": "2026-11-09T17:47:53Z",
+    "rx_time_estimated": false,
+    "transport_mechanism": "TRANSPORT_LORA",
+    "via_mqtt": false
+  },
+  "observed_node": {
+    "environment_exposure": 0,
+    "inferred_firmware": null,
+    "inferred_firmware_basis": null,
+    "long_name": "Unknown Node !faec6f41",
+    "m2m_opt_out": false,
+    "mac_addr": null,
+    "mc_pubkey": null,
+    "mc_pubkey_prefix": null,
+    "meshcore_adv_type": null,
+    "meshtastic_hw_model": null,
+    "meshtastic_is_licensed": null,
+    "meshtastic_is_unmessagable": null,
+    "meshtastic_key_node_id": null,
+    "meshtastic_node_id": 4209798977,
+    "meshtastic_public_key": null,
+    "meshtastic_public_key_hex": null,
+    "meshtastic_role": null,
+    "protocol": 1,
+    "short_name": "6f41",
+    "weather_use": 0
+  },
+  "packet": {
+    "fields": {
+      "from_int": 4209798977,
+      "from_str": "!faec6f41",
+      "packet_id": 896060148,
+      "port_num": "TRACEROUTE_APP",
+      "route": [],
+      "route_back": [],
+      "snr_back": [],
+      "snr_towards": [
+        5.75
+      ],
+      "to_int": 2304338203,
+      "to_str": "!8959691b"
+    },
+    "model": "TraceroutePacket"
+  },
+  "request": {
+    "feeder_num_header": 2304338203,
+    "url": "v4"
+  },
+  "status": 201
+}
