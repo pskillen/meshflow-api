@@ -2,7 +2,8 @@
 
 Copies the pattern in ``mesh_monitoring.services.notify_watchers_node_offline``: skip with an audit row when the
 owner has no verified Discord target, and never raise, so a failed DM can't affect the re-key.
-``manual`` and ``key_changed`` events are never sent: the owner did the first, the second is audit only.
+``manual``, ``key_changed`` and ``key_accepted`` events are never sent: the owner or staff did the first and last,
+the second is audit only.
 
 The DM goes through Celery after commit (``queue_owner_notification``), never on the feeder's request. Flagged DMs are
 limited per feeder by ``FLAGGED_DM_COOLDOWN``; the events themselves are always written.

@@ -41,6 +41,24 @@ last hop). On a replay, or with no `hopStart`, it stays null (unknown).
 the replay shape (no `rxRssi`, `TRANSPORT_LORA`, `BACKGROUND`, not the feeder's own). It is exposed as `replayed` in
 the observation API. See [meshtastic.md](meshtastic.md#replayed-packets-28).
 
+### Signing state (2.8+)
+
+Meshtastic 2.8 can sign packets (XEdDSA), but its default policy does not: **unsigned is the normal state** and is
+never a warning. The bot forwards three optional keys, and the API stores them read-only:
+
+| Body key | Stored on | Meaning |
+| --- | --- | --- |
+| `xeddsaSigned` | `PacketObservation.xeddsa_signed` | `true` signed; `false` not signed, from a feeder known to run 2.8 or later; **absent: unknown** (a 2.7 feeder, an older bot, firmware unreadable) |
+| `ackProofStatus` | `PacketObservation.ack_proof_status` | Enum name (`ACK_PROOF_VALID`, `ACK_PROOF_INVALID`, `ACK_PROOF_NO_KEY`), only when non-zero; absent stays null |
+| `decoded.xeddsaSignature` | `MtRawPacket.xeddsa_signature_present` | True once any observer's body carried a signature; null otherwise. A later observer without one does not clear it. The signature bytes are not stored |
+
+Absent is never coerced to `false`: the observation API shows `xeddsa_signed` as null for unknown. A signed,
+non-replayed packet moves the sender's `ObservedNode.meshtastic_last_signed_at` forward only (one conditional UPDATE,
+like `last_heard`); unsigned, unknown, older and replayed packets leave it alone. The observed-node API derives two
+read-only properties: `meshtastic_v28_identity` (the node number equals the crc32 of the stored key; null with no
+key) and `meshtastic_known_signer` (a signed packet has been seen). Nothing verifies a signature: the flag is what the
+bot reports.
+
 ### Hops, `decoded.bitfield` and unknown hop counts
 
 `decoded.bitfield` (2.8+ firmware, any port) is stored on `PacketObservation.bitfield`, a nullable 32-bit column

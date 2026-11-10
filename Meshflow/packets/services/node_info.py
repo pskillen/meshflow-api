@@ -1,5 +1,6 @@
 from common.meshtastic_enums import normalise_hw_model
 from common.meshtastic_identity import identity_fields, protect_identity
+from nodes.services.identity_links import detect_after_nodeinfo
 from nodes.services.node_firmware import refresh_inferred_firmware, refresh_row_numbered_by_key
 from packets.models import NodeInfoPacket
 from packets.services.base import BasePacketService
@@ -29,6 +30,10 @@ class NodeInfoPacketService(BasePacketService):
             },
         )
 
+        # What is stored now, to tell a real change from a repeat of the same NodeInfo (repeats cost no identity work).
+        stored_key = sender.meshtastic_public_key
+        stored_mac = sender.mac_addr
+
         # update the ObservedNode
         for field, value in updates.items():
             setattr(sender, field, value)
@@ -41,5 +46,12 @@ class NodeInfoPacketService(BasePacketService):
         sender.meshtastic_is_unmessagable = self.packet.is_unmessagable
         refresh_inferred_firmware(sender)
         sender.save()
-        if "meshtastic_public_key" in updates:
+        key_written = "meshtastic_public_key" in updates
+        if key_written:
             refresh_row_numbered_by_key(sender)
+        # Identity links: key evidence, then MAC evidence (on-air only: NodeDB uploads zero other nodes' MACs).
+        # Only a key or MAC that differs from what was stored can change the answer.
+        key_changed = key_written and updates["meshtastic_public_key"] != stored_key
+        mac_changed = "mac_addr" in updates and updates["mac_addr"] != stored_mac
+        if key_changed or mac_changed:
+            detect_after_nodeinfo(sender, self.packet.mac_address if mac_changed else None, key_written=key_changed)

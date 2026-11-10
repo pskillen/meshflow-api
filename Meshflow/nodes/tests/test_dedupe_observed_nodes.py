@@ -11,7 +11,7 @@ import pytest
 
 from common.protocol import Protocol
 from mesh_monitoring.models import NodeWatch
-from nodes.models import NodeLatestStatus, NodeOwnerClaim, ObservedNode, Position
+from nodes.models import NodeLatestStatus, NodeOwnerClaim, ObservedNode, ObservedNodeIdentityLink, Position
 from nodes.services.observed_node_merge import HANDLED_RELATIONS, current_relations, merge_duplicate_meshtastic_nodes
 
 pytest_plugins = ["packets.tests.conftest"]
@@ -271,3 +271,100 @@ def test_meshcore_rows_and_unique_numbers_are_untouched():
 
     assert report.sets_found == 0
     assert ObservedNode.objects.count() == 3
+
+
+# --- identity links (ID-2) --------------------------------------------------------------------------------------
+
+Link = ObservedNodeIdentityLink
+State = Link.State
+
+
+def _link(old, new, state=State.AUTO, evidence=Link.Evidence.PUBLIC_KEY):
+    return Link.objects.create(old_node=old, new_node=new, state=state, evidence=evidence, confidence="strong")
+
+
+def _pair():
+    """A keeper/loser pair sharing one node number (keeper is the older row)."""
+    keeper = _make(age_days=10, heard_days=5)
+    loser = _make(age_days=5, heard_days=1)
+    return keeper, loser
+
+
+@pytest.mark.django_db
+def test_merge_repoints_links_on_both_sides_to_the_keeper():
+    keeper, loser = _pair()
+    before = _make(OTHER_NODE, age_days=3, heard_days=1)
+    after = _make(0x3C4D5E6F, age_days=3, heard_days=1)
+    _link(before, loser)  # loser as the new side
+    _link(loser, after, evidence=Link.Evidence.MAC, state=State.SUGGESTED)  # loser as the old side
+
+    report = merge_duplicate_meshtastic_nodes()
+
+    assert report.moved["nodes.ObservedNodeIdentityLink.new_node"] == 1
+    assert report.moved["nodes.ObservedNodeIdentityLink.old_node"] == 1
+    assert Link.objects.get(old_node=before).new_node_id == keeper.pk
+    assert Link.objects.get(new_node=after).old_node_id == keeper.pk
+
+
+@pytest.mark.django_db
+def test_merge_drops_a_losers_link_that_duplicates_the_keepers_pair():
+    keeper, loser = _pair()
+    other = _make(OTHER_NODE, age_days=3, heard_days=1)
+    kept = _link(keeper, other)
+    _link(loser, other, state=State.SUGGESTED, evidence=Link.Evidence.MAC)
+
+    report = merge_duplicate_meshtastic_nodes()
+
+    assert report.dropped["nodes.ObservedNodeIdentityLink.old_node"] == 1
+    assert list(Link.objects.values_list("pk", flat=True)) == [kept.pk]
+
+
+@pytest.mark.django_db
+def test_merge_drops_a_losers_live_link_when_the_keeper_already_has_a_live_successor():
+    keeper, loser = _pair()
+    one = _make(OTHER_NODE, age_days=3, heard_days=1)
+    two = _make(0x3C4D5E6F, age_days=3, heard_days=1)
+    kept = _link(keeper, one)
+    _link(loser, two)  # a second live successor of the merged node would break the one-live-successor rule
+
+    merge_duplicate_meshtastic_nodes()
+
+    assert list(Link.objects.values_list("pk", flat=True)) == [kept.pk]
+
+
+@pytest.mark.django_db
+def test_merge_drops_a_link_between_the_keeper_and_the_loser():
+    keeper, loser = _pair()
+    _link(keeper, loser)  # would become a link from the node to itself
+
+    merge_duplicate_meshtastic_nodes()
+
+    assert not Link.objects.exists()
+    assert _rows().count() == 1
+
+
+@pytest.mark.django_db
+def test_merge_keeps_a_confirmed_link_over_a_weaker_clashing_one():
+    keeper, loser = _pair()
+    other = _make(OTHER_NODE, age_days=3, heard_days=1)
+    _link(keeper, other, state=State.SUGGESTED, evidence=Link.Evidence.MAC)
+    confirmed = _link(loser, other, state=State.CONFIRMED)
+
+    merge_duplicate_meshtastic_nodes()
+
+    survivor = Link.objects.get()
+    assert survivor.pk == confirmed.pk and survivor.state == State.CONFIRMED
+    assert survivor.old_node_id == keeper.pk
+
+
+@pytest.mark.django_db
+def test_merge_dry_run_leaves_links_alone():
+    keeper, loser = _pair()
+    other = _make(OTHER_NODE, age_days=3, heard_days=1)
+    link = _link(other, loser)
+
+    merge_duplicate_meshtastic_nodes(dry_run=True)
+
+    link.refresh_from_db()
+    assert link.new_node_id == loser.pk
+    assert _rows().count() == 2

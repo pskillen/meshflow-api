@@ -1660,6 +1660,19 @@ components:
           description: >
             The current user's claim for this node, if any. Only present for authenticated requests.
             Null when the user has no claim. Use accepted_at to distinguish pending vs accepted claims.
+        meshtastic_v28_identity:
+          type: boolean
+          nullable: true
+          readOnly: true
+          description: >
+            Meshtastic only. True when the node number is the crc32 of the stored public key (a 2.8 identity), false
+            when it is not, null when there is no usable key. Derived, not stored
+        meshtastic_known_signer:
+          type: boolean
+          readOnly: true
+          description: >
+            True once a signed (non-replayed) packet from this node has been seen. False means none seen yet, which
+            is normal: unsigned is the default state on 2.8
 
     RfProfile:
       type: object
@@ -2441,7 +2454,7 @@ components:
           example: '!4396524c'
         outcome:
           type: string
-          enum: [auto_updated, flagged, manual, key_changed]
+          enum: [auto_updated, flagged, manual, key_changed, key_accepted]
         reason:
           type: string
           nullable: true
@@ -3269,6 +3282,19 @@ components:
           description: >
             How the packet reached the feeder (e.g. TRANSPORT_LORA, TRANSPORT_MQTT). Null for rows from before this
             field and for the feeder's own packets. A non-RF transport gives hop_count null and direct_from_sender false
+        xeddsa_signed:
+          type: boolean
+          nullable: true
+          description: >
+            Whether the packet was XEdDSA-signed (Meshtastic 2.8+). True: signed. False: not signed, reported by a
+            feeder known to run 2.8 or later; this is the normal state, since the default policy does not sign. Null:
+            unknown (a 2.7 feeder, an older bot, or unreadable firmware). Null is never the same as false
+        ack_proof_status:
+          type: string
+          nullable: true
+          description: >
+            Ack-proof status name when the packet carried a non-zero one (ACK_PROOF_VALID, ACK_PROOF_INVALID,
+            ACK_PROOF_NO_KEY). Null when absent
         rx_snr:
           type: number
           format: float
@@ -6933,14 +6959,23 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/OwnedManagedNode'
+        '400':
+          description: >-
+            Validation error. Staff changing `meshtastic_node_id` to an invalid node number get
+            `{code: invalid_node_id, detail}`.
         '403':
           description: Not the node owner and not staff
+        '409':
+          description: >-
+            Staff changed `meshtastic_node_id` to a number another active feeder holds
+            (`{code: number_collision, detail}`). Nothing else in the request is saved.
 
     patch:
       summary: Partially update managed node
       description: >-
         Owner or staff only. Typical body fields include meshtastic_channel_0–meshtastic_channel_7 (nullable MessageChannel IDs),
         name, allow_auto_traceroute, default location via position, etc. Non-owners receive 403.
+        `meshtastic_node_id` is staff only (ignored for owners); staff changes go through the audited re-point.
       tags: [Nodes]
       security:
         - BearerAuth: []
@@ -6968,9 +7003,15 @@ paths:
               schema:
                 $ref: '#/components/schemas/OwnedManagedNode'
         '400':
-          description: Validation error (e.g. channel not in node constellation)
+          description: >-
+            Validation error (e.g. channel not in node constellation), or `{code: invalid_node_id, detail}` when
+            staff send an invalid `meshtastic_node_id`
         '403':
           description: Not the node owner and not staff
+        '409':
+          description: >-
+            Staff changed `meshtastic_node_id` to a number another active feeder holds
+            (`{code: number_collision, detail}`). Nothing else in the request is saved.
 
     delete:
       summary: Soft-delete managed node (un-manage)
@@ -7009,6 +7050,11 @@ paths:
         same number, its public key becomes the stored key. Open flagged events are resolved and a `manual` identity
         event is written (already acknowledged by the caller). A reversal holds: while the radio still reports the number
         the feeder was moved away from, automatic re-key flags it instead of applying it, until a later manual re-point.
+
+        With `accept_reported_key: true` (staff only) the number is kept and the public key the feeder reported for it
+        is accepted: the key comes from the newest open `key_mismatch` flagged event for the current number, the stored
+        key is replaced, open flagged events are resolved, and a `key_accepted` identity event is written (already
+        acknowledged). No signal is sent. Send no number, or the current one.
       tags: [Nodes]
       security:
         - BearerAuth: []
@@ -7029,9 +7075,14 @@ paths:
                 meshtastic_node_id:
                   type: integer
                   description: Node number to set. Defaults to the feeder's reported_meshtastic_node_id.
+                accept_reported_key:
+                  type: boolean
+                  default: false
+                  description: >-
+                    Staff only. Accept the reported public key for the unchanged number instead of re-pointing.
       responses:
         '200':
-          description: The `manual` identity event
+          description: The `manual` identity event (`key_accepted` for `accept_reported_key`)
           content:
             application/json:
               schema:
@@ -7046,14 +7097,15 @@ paths:
                 properties:
                   code:
                     type: string
-                    enum: [not_meshtastic, no_reported_number, invalid_node_id, already_current]
+                    enum: [not_meshtastic, no_reported_number, invalid_node_id, already_current, no_key_to_accept]
                   detail:
                     type: string
         '403':
           description: >-
             Refused. With `code: repoint_not_proven`, the caller is the owner but the number is not one the owner may
             set: it is not the number the feeder last reported, or crc32 of a trusted stored key does not give it. With
-            no `code`, the caller is neither the owner nor staff.
+            no `code`, the caller is neither the owner nor staff. With `code: staff_only`, an owner sent
+            `accept_reported_key`.
           content:
             application/json:
               schema:
@@ -7061,7 +7113,7 @@ paths:
                 properties:
                   code:
                     type: string
-                    enum: [repoint_not_proven]
+                    enum: [repoint_not_proven, staff_only]
                   detail:
                     type: string
         '404':

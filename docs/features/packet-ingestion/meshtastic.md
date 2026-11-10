@@ -157,6 +157,14 @@ Dual-protocol `TextMessage.protocol` and CHECK constraints: `text_messages.model
 
 ---
 
+## Signing state (2.8)
+
+Each observation records whether its packet was XEdDSA-signed as a tri-state (`xeddsa_signed`: true, false, or null
+for unknown), plus the ack-proof status when non-zero. A body with no `xeddsaSigned` key is stored as unknown, never
+as unsigned; the bot sends `false` only for a feeder it knows runs 2.8 or later. Unsigned is the normal state, not a
+warning. A signature on the body marks the raw packet, and a signed non-replayed packet advances the sender's
+`meshtastic_last_signed_at`. Field details: [PACKET_FIELDS.md](PACKET_FIELDS.md#signing-state-28).
+
 ## Replayed packets (2.8)
 
 After `config_complete_id`, a 2.8 radio replays its stored per-node records to every client that asks for full
@@ -245,7 +253,7 @@ In Meshtastic 2.8 a node's number is `crc32` of its 32-byte public key, and an u
 
 - Helpers: `common/meshtastic_identity.py` (`normalise_pubkey`, `key_node_id`, `identity_fields`). Bad keys give null, never an error.
 - Written by `NodeInfoPacketService` and the node upsert serializer (`BaseNodeSerializer`) whenever a key arrives. Other writers (`ManagedNode` rows) are filled only by the backfill for now.
-- `python manage.py backfill_meshtastic_identity [--dry-run] [--batch-size N]` fills existing rows: it reads `ObservedNode.meshtastic_public_key`, falls back to the latest `NodeInfoPacket.public_key` for that `from_int`, copies the key onto a `ManagedNode` with the same number and no key (a stored feeder key is never replaced: the observed row is client-writable), and reports keys shared by several nodes. It is idempotent and never clears a stored value. **Run it in each environment straight after deploying.**
+- `python manage.py backfill_meshtastic_identity [--dry-run] [--batch-size N]` fills existing rows: it reads `ObservedNode.meshtastic_public_key`, falls back to the latest `NodeInfoPacket.public_key` for that `from_int`, copies the key onto a `ManagedNode` with the same number and no key (a stored feeder key is never replaced: the observed row is client-writable; a key it fills in leaves a `key_changed` event, so it is dated like a key recorded from a report and waits out the first-key hour), and reports keys shared by several nodes. It is idempotent and never clears a stored value. **Run it in each environment straight after deploying.**
 - Django admin: the observed and managed node lists show the predicted id, can be filtered by whether one exists, and search matches `!<predicted id>` or the start of the hex key.
 - **Confirmed on hardware (2026-11-08):** `zlib.crc32` equals the firmware's value (see the runbook). The worked example is the NodeInfo in `docs/packets/nodeinfo_packet.json`: `!da545c78` predicts `!4396524c`. The prediction drives the inferred firmware generation: see [inferred-firmware.md](inferred-firmware.md).
 
@@ -267,9 +275,27 @@ A 2.8 firmware upgrade or re-key changes a feeder's node number. v4 feeder URLs 
 
 crc32 is forgeable, so a match shows only that the report is consistent; see the threat model in [ADR-0005](adr/0005-feeder-scoped-auth.md).
 
-When the number is unchanged: a key that differs from the stored key (or, with none stored, from the feeder's own `ObservedNode` row) is flagged `key_mismatch` and not stored, and stays open until the feeder reports the expected key. Otherwise open flagged events are resolved, and a first key is stored with a `key_changed` audit event. A downgrade to 2.7 keeps the number and key, so it reports no change. Metric: `meshflow_feeder_identity_changes_total{protocol, outcome}` (`manual` counts owner re-points).
+When the number is unchanged: a key that differs from the stored key (or, with none stored, from the feeder's own `ObservedNode` row) is flagged `key_mismatch` and not stored, and stays open until the feeder reports the expected key or staff accept the reported one (`accept_reported_key` on the re-point endpoint, `key_accepted` event). Otherwise open flagged events are resolved, and a first key is stored with a `key_changed` audit event. A downgrade to 2.7 keeps the number and key, so it reports no change. Metric: `meshflow_feeder_identity_changes_total{protocol, outcome}` (`manual` counts owner re-points).
 
 The owner is told by Discord DM on `auto_updated` and on a new `flagged` row, at most one flagged DM per feeder every 24 hours (`nodes/services/feeder_identity_notify.py`; a Celery task queued after commit, never on the request), and can re-point a flagged feeder with `repoint_feeder` (the `repoint-meshtastic-id/` endpoint), which ignores the flag. See [Managed nodes](../node-lifecycle/managed-nodes.md#node-number-changes-28).
+
+### Identity links
+
+When the same radio is seen under two numbers (an upgrade, a re-key or a full erase), the API records one `ObservedNodeIdentityLink` from the old `ObservedNode` row to the new one ([ADR-0006](adr/0006-meshtastic-identity-linking.md)). Rows are never merged and no packet's `from_int` is rewritten, so rolling back is deleting link rows. Nothing consumes links yet except a signal, `nodes.signals.identity_link_live`, sent after commit when a link becomes `auto` or `confirmed`.
+
+| Evidence | When | State |
+| --- | --- | --- |
+| `public_key` | A node's number is `crc32` of its key and exactly one other Meshtastic row holds the key (either arrival order) | `auto`, strong |
+| `feeder_rekey` | The feeder re-key service moved a managed feeder's number and both rows exist | `auto` (automatic re-key) or `confirmed` (manual re-point), strong; merged into an existing key link |
+| `mac` | On-air NodeInfo only: exactly one other row is numbered by the MAC's last four bytes or holds the same MAC, and its key differs | `suggested`, medium; never promoted by MAC alone |
+
+- **A key held by several nodes is never linked.** One `flagged` row per key (no old or new node) names every holder in `detail`. If a key that already has an `auto` key link gains a further holder, that link drops to `suggested` (it keeps its row and gets `detail["key_now_shared"]`), so a cloned key is never left linked. A `confirmed` (staff) link, and a `feeder_rekey` link, are left alone. Expect roughly one flagged row per shared key reported by `backfill_meshtastic_identity`.
+- Detection runs after each of the three key-write sites (on-air NodeInfo, node upsert create and update) and from a `feeder_identity_changed` receiver. It is idempotent and never raises to its caller: a failure is logged and ingest, or a manual re-point, carries on. NodeInfo and NodeDB upserts run it only when the key or the MAC differs from what is stored (or the node is new), so a repeated identical packet costs no identity queries; when a changed key has no other holder the cost is one indexed query, and a changed MAC adds the link check and the candidate lookup. A feeder re-point whose new row does not exist yet records nothing and is not retried; the key evidence from a later NodeInfo still links the pair (as `auto`). NodeDB uploads never count as MAC evidence (2.8 zeroes other nodes' MACs).
+- Rules: a state only moves up (suggested, auto, confirmed); a `rejected` row is never recreated or promoted; the reverse of an existing pair is never created; the database allows at most one live (`auto` or `confirmed`) successor per old row and one live predecessor per new row (a refused second link is logged, ingest continues). A 2.8-native node with no other holder, and a downgrade (same row, same key), get nothing.
+- Django admin (`Observed node identity links`): list, filter by state, evidence and confidence, search by number (`!8959691b`, hex or decimal) or key; staff confirm or reject by changing the state. Confirming (or otherwise moving a link into `auto`/`confirmed`) sends `identity_link_live`, like the automatic paths. When duplicate rows merge, a `confirmed` link wins over a weaker clashing one.
+- `python manage.py detect_meshtastic_identity_links [--dry-run] [--batch-size N]` links what is already stored, from keys only: it reports keyed rows scanned, links created and promoted, flagged rows and the number of unlinkable (shared) keys. `--dry-run` runs the same work in a transaction and rolls it back, so its numbers equal a real run's; a second real run changes nothing. **Run it dry first, then for real, in each environment after deploying.**
+- Worked example: PDYt (Heltec Wireless Paper), 2.7 number `!433b82f0` (the last four bytes of its MAC), 2.8 number `!8959691b` (`crc32` of its key). Key evidence links the pair `auto`; with only the MAC known the same pair is `suggested`.
+- Indexes: `ObservedNode.meshtastic_public_key_hex` and `ObservedNode.mac_addr` are indexed so the candidate lookups stay cheap.
 
 ### Identity data is not clobbered by 2.8 feeder NodeDB entries
 

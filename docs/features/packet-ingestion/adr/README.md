@@ -17,7 +17,7 @@ Planned records (add the matching Markdown file in this directory when the ADR i
 | `0003-mc-broadcast-semantics.md` | Broadcast vs directed semantics (MT vs MC on the wire) |
 | `0004-mc-dedup-key.md` | Deduplication key for MC (`pkt_hash`, windows, decoded twins) |
 | [`0005-feeder-scoped-auth.md`](0005-feeder-scoped-auth.md) | MT: one API key per feeder, v4 feeder URLs, legacy tracking (planned) |
-| [`0006-meshtastic-identity-linking.md`](0006-meshtastic-identity-linking.md) | MT 2.8: node number = crc32(public key), predicted ids, old/new identity linking (planned; hardware verification pending) |
+| [`0006-meshtastic-identity-linking.md`](0006-meshtastic-identity-linking.md) | MT 2.8: node number = crc32(public key), predicted ids, old/new identity linking (accepted; hardware verified) |
 
 ## ADR format (use in each `NNNN-title.md`)
 
