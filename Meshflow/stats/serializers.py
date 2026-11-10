@@ -17,8 +17,8 @@ class NodeStatsSerializer(serializers.Serializer):
         end_date = serializers.DateTimeField()
         packet_types = PacketTypeCountSerializer(many=True)
 
-    start_date = serializers.DateTimeField()
-    end_date = serializers.DateTimeField()
+    start_date = serializers.DateTimeField(allow_null=True)
+    end_date = serializers.DateTimeField(allow_null=True)
     intervals = IntervalSerializer(many=True)
 
 
@@ -69,7 +69,7 @@ class GlobalStatsSerializer(serializers.Serializer):
         end_date = serializers.DateTimeField()
         packets = serializers.IntegerField()
 
-    start_date = serializers.DateTimeField()
-    end_date = serializers.DateTimeField()
+    start_date = serializers.DateTimeField(allow_null=True)
+    end_date = serializers.DateTimeField(allow_null=True)
     intervals = IntervalSerializer(many=True)
     summary = serializers.DictField()

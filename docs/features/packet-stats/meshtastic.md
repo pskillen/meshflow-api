@@ -191,7 +191,7 @@ OpenAPI enum for `stat_type` today: `online_nodes`, `new_nodes`, `packet_volume`
 | --- | --- | --- |
 | `interval` | `1` | Must be 1 (other values are a 400); choose the bucket size with `interval_type` |
 | `interval_type` | `hour` | `hour`, `day`, `week`, `month` |
-| `start_date` / `end_date` | optional | ISO 8601 or `YYYY-MM-DD`; values without an offset are read as UTC |
+| `start_date` / `end_date` | optional | ISO 8601 or `YYYY-MM-DD`; values without an offset are read as UTC. With no dates the range is unbounded and the response `start_date` / `end_date` are null |
 | Month interval | — | Approximated as **30 days** in `get_interval_delta` |
 
 Path param `node_id` is **Meshtastic numeric nodenum**; handlers filter `ObservedNode` / `ManagedNode` with `protocol=MESHTASTIC`.

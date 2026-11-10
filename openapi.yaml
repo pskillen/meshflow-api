@@ -3048,11 +3048,13 @@ components:
         start_date:
           type: string
           format: date
-          description: The start date of the stats
+          nullable: true
+          description: The start date of the stats (null when no dates are given)
         end_date:
           type: string
           format: date
-          description: The end date of the stats
+          nullable: true
+          description: The end date of the stats (null when no dates are given)
         intervals:
           type: array
           description: The intervals of the stats
@@ -3091,11 +3093,13 @@ components:
         start_date:
           type: string
           format: date
-          description: The start date of the stats
+          nullable: true
+          description: The start date of the stats (null when no dates are given)
         end_date:
           type: string
           format: date
-          description: The end date of the stats
+          nullable: true
+          description: The end date of the stats (null when no dates are given)
         intervals:
           type: array
           description: The intervals of the stats
