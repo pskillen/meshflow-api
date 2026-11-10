@@ -27,6 +27,7 @@
   },
   "key": "x28-L86",
   "observation": {
+    "ack_proof_status": null,
     "bitfield": 0,
     "channel": 0,
     "hop_limit": 5,
@@ -38,7 +39,8 @@
     "rx_time": "2026-11-08T13:34:55Z",
     "rx_time_estimated": false,
     "transport_mechanism": "TRANSPORT_LORA",
-    "via_mqtt": false
+    "via_mqtt": false,
+    "xeddsa_signed": null
   },
   "observed_node": {
     "environment_exposure": 0,
@@ -78,7 +80,8 @@
       "port_num": "POSITION_APP",
       "position_time": "2026-11-09T17:32:02Z",
       "to_int": 4294967295,
-      "to_str": "^all"
+      "to_str": "^all",
+      "xeddsa_signature_present": null
     },
     "model": "PositionPacket"
   },

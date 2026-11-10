@@ -17,6 +17,7 @@
   },
   "key": "x28-L41+flag",
   "observation": {
+    "ack_proof_status": null,
     "bitfield": null,
     "channel": 0,
     "hop_limit": null,
@@ -28,7 +29,8 @@
     "rx_time": "2025-08-13T09:40:58Z",
     "rx_time_estimated": false,
     "transport_mechanism": "TRANSPORT_LORA",
-    "via_mqtt": false
+    "via_mqtt": false,
+    "xeddsa_signed": null
   },
   "observed_node": null,
   "packet": {
@@ -44,7 +46,8 @@
       "to_int": 4294967295,
       "to_str": "^all",
       "uptime_seconds": 56890,
-      "voltage": 3.699
+      "voltage": 3.699,
+      "xeddsa_signature_present": null
     },
     "model": "DeviceMetricsPacket"
   },

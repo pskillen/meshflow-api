@@ -17,6 +17,7 @@
   },
   "key": "x28h4-L4",
   "observation": {
+    "ack_proof_status": null,
     "bitfield": null,
     "channel": 0,
     "hop_limit": 4,
@@ -28,7 +29,8 @@
     "rx_time": "2025-08-13T09:39:02Z",
     "rx_time_estimated": false,
     "transport_mechanism": "TRANSPORT_LORA",
-    "via_mqtt": false
+    "via_mqtt": false,
+    "xeddsa_signed": null
   },
   "observed_node": null,
   "packet": {
@@ -47,7 +49,8 @@
       "port_num": "POSITION_APP",
       "position_time": "2025-06-26T02:23:49Z",
       "to_int": 4294967295,
-      "to_str": "^all"
+      "to_str": "^all",
+      "xeddsa_signature_present": null
     },
     "model": "PositionPacket"
   },
