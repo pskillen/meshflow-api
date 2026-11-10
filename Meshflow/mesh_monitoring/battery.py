@@ -9,7 +9,7 @@ from mesh_monitoring.models import NodeMonitoringConfig, NodePresence
 def evaluate_device_metrics_for_battery_alert(
     *,
     observed_node,
-    battery_level: float,
+    battery_level: float,  # callers must skip None (the signal receiver does)
     reported_time,
     device_metrics=None,
     **_kwargs,

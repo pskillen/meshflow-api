@@ -28,6 +28,7 @@ generic_packet_received = Signal()
 
 # Emitted after a DeviceMetrics row is persisted for an observed node (mesh monitoring, analytics, etc.).
 # kwargs: observed_node, device_metrics, battery_level, reported_time
+# battery_level is None when the packet had no battery reading; receivers must skip it.
 device_metrics_recorded = Signal()
 
 # Emitted after a traceroute response is linked to an AutoTraceRoute and completion is persisted.
