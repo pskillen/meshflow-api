@@ -43,8 +43,8 @@ the observation API. See [meshtastic.md](meshtastic.md#replayed-packets-28).
 
 ### Hops, `decoded.bitfield` and unknown hop counts
 
-`decoded.bitfield` (2.8+ firmware, any port) is stored on `PacketObservation.bitfield`. Absent stays null, which is
-different from `0`.
+`decoded.bitfield` (2.8+ firmware, any port) is stored on `PacketObservation.bitfield`, a nullable non-negative bigint column
+(`PositiveBigIntegerField`) so any firmware uint32 fits. Absent stays null, which is different from `0`.
 
 2.8 HopScaling lowers `hopStart` on broadcast POSITION, TELEMETRY, NODEINFO and NEIGHBORINFO packets depending on
 mesh density, and a 2.8 relay can send `hopStart == 0` on a packet that travelled. So **`hopStart == 0` with no

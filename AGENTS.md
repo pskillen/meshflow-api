@@ -61,6 +61,7 @@ python manage.py runserver
 When making changes, **add or update unit and integration tests** as needed. New behaviour should be covered by tests; changes to existing behaviour should update the corresponding tests.
 
 - **Unit tests**: `Meshflow/` – Django TestCase/pytest, run with `python -m pytest Meshflow/ -v`
+- **Unit tests on PostgreSQL**: `TEST_DB_ENGINE=postgres python -m pytest Meshflow/ --create-db` against a Postgres container; CI runs the suite on SQLite and on Postgres (`verify-postgres`), so test data must fit real column sizes (see tests/TESTING.md)
 - **Integration tests**: `tests/integration/` – HTTP client tests against live API, run with `pytest tests/integration/ -v` (requires API running and `seed_integration_tests`)
 - **Bot contract test**: marker `contract`, `Meshflow/packets/tests/contract/`; skipped unless `MESHFLOW_BOT_PATH` names a meshflow-bot checkout. CI pins the bot in `.github/contract/bot-ref` (see tests/TESTING.md).
 

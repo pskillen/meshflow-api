@@ -19,6 +19,26 @@ With coverage:
 python -m pytest -v --cov
 ```
 
+### Unit tests on PostgreSQL
+
+The default run uses in-memory SQLite. Prod runs PostgreSQL, and SQLite hides length, range and ordering defects, so
+CI runs the same suite on both (the `verify` and `verify-postgres` jobs). To reproduce the PostgreSQL run locally,
+start a database (the `db` service in `docker-compose.test.yaml`, or any container) and set `TEST_DB_ENGINE=postgres`:
+
+```bash
+docker run -d --name meshflow-test-pg -e POSTGRES_USER=meshflow -e POSTGRES_PASSWORD=meshflow \
+  -e POSTGRES_DB=meshflow -p 5432:5432 postgres:18-alpine
+cd Meshflow
+TEST_DB_ENGINE=postgres python -m pytest -v --create-db
+```
+
+The connection comes from `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_HOST` (default `localhost`)
+and `POSTGRES_PORT` (default `5432`), defaulting to the container above. Django creates and drops its own
+`test_<POSTGRES_DB>` database. Use `--create-db` after a schema change, since `pytest.ini` sets `--reuse-db`.
+Test data must fit the real column sizes (for example `short_name` is `varchar(5)`).
+
+CI also checks that `openapi.yaml` and `openapi-m2m.yaml` parse as YAML.
+
 ## Bot contract test
 
 `Meshflow/packets/tests/contract/test_bot_contract.py` (marker `contract`) checks that what the meshflow-bot sends is
