@@ -157,8 +157,6 @@ def test_nodedb_upload_costs_one_identity_query_per_node_on_the_no_work_path():
     with CaptureQueriesContext(connection) as queries:
         for i, key in enumerate(keys):
             _upsert(id=0x70000000 + i, meshtastic_public_key=key)
-    holder_queries = [
-        q for q in queries.captured_queries if '"meshtastic_public_key_hex" = ' in q["sql"]
-    ]
+    holder_queries = [q for q in queries.captured_queries if '"meshtastic_public_key_hex" = ' in q["sql"]]
     assert len(holder_queries) == count
     assert not Link.objects.exists()
