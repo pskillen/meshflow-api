@@ -81,11 +81,11 @@ All decided in https://github.com/pskillen/meshflow-ui/issues/407.
 - Uptime is the maximum; wind direction and rainfall take the latest reading.
 - Bucketed output is unpaginated.
 - 0 voltage and 0 battery are excluded from means because rows stored before null ingestion use 0 for a missing reading.
+- Dates without an offset are read as UTC.
 
 ## Known gaps
 
 - Node upserts from the bot still send 0 for a missing reading until the bot is changed: https://github.com/pskillen/meshflow-bot/issues/170
-- Dates without an offset parse as naive datetimes and raise a RuntimeWarning: https://github.com/pskillen/meshflow-api/issues/525
 - Queries filter `reported_time` but the index is `(node, -logged_time)`. The owner judged this fine on production.
 
 ## Related

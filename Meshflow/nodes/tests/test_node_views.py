@@ -677,6 +677,23 @@ def test_device_metrics_unbucketed_returns_null_fields(create_observed_node, met
 
 
 @pytest.mark.django_db
+def test_device_metrics_offsetless_dates_read_as_utc_without_warning(create_observed_node, metrics_client):
+    import warnings
+
+    node = create_observed_node()
+    _device(node, _utc(1, 12))
+    _device(node, _utc(2, 23, 0))
+    _device(node, _utc(4, 1))
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", RuntimeWarning)
+        response = metrics_client.get(
+            _metric_url("device_metrics", node), {"start_date": "2026-03-01", "end_date": "2026-03-02"}
+        )
+    assert response.status_code == 200
+    assert len(response.data) == 2
+
+
+@pytest.mark.django_db
 def test_metrics_bad_bucket_is_400(create_observed_node, metrics_client):
     node = create_observed_node()
     for name in ("device_metrics", "environment_metrics", "power_metrics"):

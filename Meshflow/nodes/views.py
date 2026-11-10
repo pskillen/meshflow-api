@@ -3,6 +3,7 @@ import re
 import uuid
 from collections.abc import Mapping
 from datetime import datetime, timedelta
+from datetime import timezone as dt_timezone
 from pathlib import Path
 
 from django.conf import settings
@@ -506,6 +507,8 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
                 end_datetime = timezone.datetime.strptime(end_date, "%Y-%m-%d")
                 # Set time to end of day
                 end_datetime = end_datetime.replace(hour=23, minute=59, second=59)
+                if timezone.is_naive(end_datetime):
+                    end_datetime = timezone.make_aware(end_datetime, dt_timezone.utc)
                 end_datetime = timezone.make_aware(end_datetime)
                 positions = positions.filter(reported_time__lte=end_datetime)
             except ValueError:
@@ -538,6 +541,8 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
         if start_date:
             try:
                 start_datetime = datetime.fromisoformat(start_date)
+                if timezone.is_naive(start_datetime):
+                    start_datetime = timezone.make_aware(start_datetime, dt_timezone.utc)
                 metrics = metrics.filter(reported_time__gte=start_datetime)
             except ValueError:
                 return Response(
@@ -550,6 +555,8 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
                 end_datetime = datetime.fromisoformat(end_date)
                 # Set time to end of day
                 end_datetime = end_datetime.replace(hour=23, minute=59, second=59)
+                if timezone.is_naive(end_datetime):
+                    end_datetime = timezone.make_aware(end_datetime, dt_timezone.utc)
                 metrics = metrics.filter(reported_time__lte=end_datetime)
             except ValueError:
                 return Response(
