@@ -16,6 +16,18 @@ class DeviceMetricsPacketService(BasePacketService):
 
         reported_time = self.packet.reading_time or self.packet.first_reported_time
 
+        readings = (
+            self.packet.battery_level,
+            self.packet.voltage,
+            self.packet.meshtastic_channel_utilization,
+            self.packet.meshtastic_air_util_tx,
+            self.packet.uptime_seconds,
+        )
+        if all(r is None for r in readings):
+            # Nothing was reported: store no row and leave NodeLatestStatus alone (same rule as node upserts).
+            self._update_inferred_max_hops("TELEMETRY_APP")
+            return
+
         # Create a new DeviceMetrics record
         battery_level = float(self.packet.battery_level) if self.packet.battery_level is not None else None
         dm = DeviceMetrics.objects.create(
