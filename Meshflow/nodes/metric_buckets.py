@@ -14,7 +14,7 @@ BUCKET_CHOICES = ("1h", "6h", "1d")
 #: Battery level reported by powered (non-battery) devices.
 POWERED_BATTERY_LEVEL = 101
 
-#: Fields where ingestion stores a missing reading as 0, so 0 is excluded from the mean.
+#: Rows stored before null ingestion use 0 for a missing reading, so 0 is excluded from the mean.
 #: Channel utilisation, air time and uptime are not listed: a real 0 is possible there.
 ZERO_MEANS_MISSING_FIELDS = frozenset({"voltage", "battery_level"})
 

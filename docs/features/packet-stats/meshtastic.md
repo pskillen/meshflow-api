@@ -20,7 +20,7 @@ arrived over MQTT, UDP or the API (`via_mqtt`, or a `transport_mechanism` of `TR
 `TRANSPORT_UNICAST_UDP` or `TRANSPORT_API`), because they say nothing about who the feeder hears over the air. A null
 transport counts as radio.
 
-Snapshots favour **completed hours** and fixed JSON shapes. Live endpoints support `interval` + `interval_type` (hour/day/week/month) over user-supplied `start_date` / `end_date`.
+Snapshots favour **completed hours** and fixed JSON shapes. Live endpoints support `interval_type` (hour/day/week/month; `interval` must be 1) over user-supplied `start_date` / `end_date`.
 
 ---
 
@@ -189,9 +189,9 @@ OpenAPI enum for `stat_type` today: `online_nodes`, `new_nodes`, `packet_volume`
 
 | Param | Default | Notes |
 | --- | --- | --- |
-| `interval` | `1` | Multiplier for truncation |
+| `interval` | `1` | Must be 1 (other values are a 400); choose the bucket size with `interval_type` |
 | `interval_type` | `hour` | `hour`, `day`, `week`, `month` |
-| `start_date` / `end_date` | optional | ISO 8601 or `YYYY-MM-DD` |
+| `start_date` / `end_date` | optional | ISO 8601 or `YYYY-MM-DD`; values without an offset are read as UTC. With no dates the range is unbounded and the response `start_date` / `end_date` are null |
 | Month interval | — | Approximated as **30 days** in `get_interval_delta` |
 
 Path param `node_id` is **Meshtastic numeric nodenum**; handlers filter `ObservedNode` / `ManagedNode` with `protocol=MESHTASTIC`.

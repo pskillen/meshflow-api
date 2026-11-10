@@ -10,6 +10,9 @@ logger = logging.getLogger(__name__)
 
 @receiver(device_metrics_recorded)
 def on_device_metrics_recorded(sender, observed_node, battery_level, reported_time, device_metrics=None, **kwargs):
+    if battery_level is None:
+        # A missing reading neither extends nor resets a low-battery streak.
+        return
     try:
         evaluate_device_metrics_for_battery_alert(
             observed_node=observed_node,

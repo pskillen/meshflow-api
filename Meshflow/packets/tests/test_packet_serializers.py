@@ -7,7 +7,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
 
 from constellations.models import Constellation, MessageChannel
-from nodes.models import ManagedNode, NodeLatestStatus, ObservedNode, Position
+from nodes.models import DeviceMetrics, ManagedNode, NodeLatestStatus, ObservedNode, Position
 from packets.models import (
     DeviceMetricsPacket,
     GenericPacket,
@@ -499,6 +499,27 @@ class DeviceMetricsPacketSerializerTest(BasePacketSerializerTestCase):
         self.assertEqual(packet.battery_level, 95.5)
         self.assertEqual(packet.voltage, 3.7)
 
+    def test_device_metrics_packet_absent_fields_stored_as_null(self):
+        """A deviceMetrics block lacking voltage and uptimeSeconds stores null for them."""
+        data = {
+            "id": 124,
+            "from": self.from_node.meshtastic_node_id,
+            "fromId": self.from_node.node_id_str,
+            "decoded": {
+                "portnum": "TELEMETRY_APP",
+                "telemetry": {"deviceMetrics": {"batteryLevel": 95.5, "channelUtilization": 0.0}, "time": 1672531200},
+            },
+            "rxTime": 1672531200,
+        }
+        serializer = DeviceMetricsPacketSerializer(data=data, context=self.context)
+        assert_serializer_valid(serializer)
+        packet = serializer.save()
+        packet.refresh_from_db()
+        self.assertEqual(packet.battery_level, 95.5)
+        self.assertIsNone(packet.voltage)
+        self.assertIsNone(packet.uptime_seconds)
+        self.assertEqual(packet.meshtastic_channel_utilization, 0.0)
+
 
 class LocalStatsPacketSerializerTest(BasePacketSerializerTestCase):
     """Tests for LocalStatsPacketSerializer."""
@@ -830,6 +851,46 @@ class NodeSerializerTest(BasePacketSerializerTestCase):
         self.assertEqual(latest_status.meshtastic_air_util_tx, 0.3)
         self.assertEqual(latest_status.uptime_seconds, 10000)
         self.assertIsNotNone(latest_status.metrics_reported_time)
+
+    def test_node_upsert_partial_device_metrics_stores_null_for_missing(self):
+        from django.utils import timezone
+
+        data = {
+            "id": self.from_node.meshtastic_node_id,
+            "device_metrics": {
+                "reported_time": timezone.now().isoformat(),
+                "battery_level": 85.0,
+                "meshtastic_channel_utilization": 0.0,
+            },
+        }
+        serializer = NodeSerializer(instance=self.from_node, data=data, partial=True)
+        assert_serializer_valid(serializer)
+        serializer.save()
+
+        row = DeviceMetrics.objects.filter(node=self.from_node).latest("id")
+        self.assertEqual(row.battery_level, 85.0)
+        self.assertEqual(row.meshtastic_channel_utilization, 0.0)
+        self.assertIsNone(row.voltage)
+        self.assertIsNone(row.meshtastic_air_util_tx)
+        self.assertIsNone(row.uptime_seconds)
+        latest_status = NodeLatestStatus.objects.get(node=self.from_node)
+        self.assertEqual(latest_status.battery_level, 85.0)
+        self.assertIsNone(latest_status.voltage)
+
+    def test_node_upsert_all_absent_device_metrics_creates_no_row(self):
+        from django.utils import timezone
+
+        NodeLatestStatus.objects.update_or_create(node=self.from_node, defaults={"battery_level": 77.0})
+        data = {
+            "id": self.from_node.meshtastic_node_id,
+            "device_metrics": {"reported_time": timezone.now().isoformat()},
+        }
+        serializer = NodeSerializer(instance=self.from_node, data=data, partial=True)
+        assert_serializer_valid(serializer)
+        serializer.save()
+
+        self.assertFalse(DeviceMetrics.objects.filter(node=self.from_node).exists())
+        self.assertEqual(NodeLatestStatus.objects.get(node=self.from_node).battery_level, 77.0)
 
     def test_node_upsert_v2_compat_legacy_position_and_metrics_fields(self):
         """Legacy bot wire (location_source, channel_utilization) validates on v2 serializer."""
@@ -1283,6 +1344,23 @@ class NodeSerializerTest(BasePacketSerializerTestCase):
         serializer = NodeSerializerV3(instance=self.from_node, data=data, partial=True)
         self.assertFalse(serializer.is_valid())
         self.assertIn("position", serializer.errors)
+
+    def test_node_upsert_v3_rejects_legacy_only_device_metrics_field(self):
+        from django.utils import timezone
+
+        from packets.serializers import NodeSerializerV3
+
+        data = {
+            "id": self.from_node.meshtastic_node_id,
+            "device_metrics": {
+                "reported_time": timezone.now().isoformat(),
+                "channel_utilization": 1,
+            },
+        }
+
+        serializer = NodeSerializerV3(instance=self.from_node, data=data, partial=True)
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("device_metrics", serializer.errors)
 
     def test_node_upsert_v3_accepts_meshtastic_fields(self):
         from django.utils import timezone

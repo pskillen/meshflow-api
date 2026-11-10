@@ -850,11 +850,13 @@ class Position(BaseNodeItem):
 class DeviceMetrics(BaseNodeItem):
     """Device telemetry sample (Meshtastic path today; shared table)."""
 
-    battery_level = models.FloatField(help_text="Battery level as a percentage")
-    voltage = models.FloatField(help_text="Battery voltage in volts")
-    meshtastic_channel_utilization = models.FloatField(help_text="Channel utilization as a percentage")
-    meshtastic_air_util_tx = models.FloatField(help_text="Air utilization for transmission")
-    uptime_seconds = models.BigIntegerField(help_text="Device uptime in seconds")
+    battery_level = models.FloatField(null=True, blank=True, help_text="Battery level as a percentage")
+    voltage = models.FloatField(null=True, blank=True, help_text="Battery voltage in volts")
+    meshtastic_channel_utilization = models.FloatField(
+        null=True, blank=True, help_text="Channel utilization as a percentage"
+    )
+    meshtastic_air_util_tx = models.FloatField(null=True, blank=True, help_text="Air utilization for transmission")
+    uptime_seconds = models.BigIntegerField(null=True, blank=True, help_text="Device uptime in seconds")
 
     class Meta:
         """Model metadata."""

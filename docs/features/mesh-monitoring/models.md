@@ -75,7 +75,7 @@ These fields describe the **active** silence → TR episode. They are cleared wh
 
 | Field | Type | Meaning |
 |-------|------|---------|
-| **`battery_below_threshold_report_count`** | int | Consecutive below-threshold **`DeviceMetrics`** readings in the current streak. |
+| **`battery_below_threshold_report_count`** | int | Consecutive below-threshold **`DeviceMetrics`** readings in the current streak. A reading with no battery value (null) is skipped: it neither extends nor resets the streak. |
 | **`battery_alerting_since`** | datetime, null | First below-threshold reading time in the current streak. |
 | **`battery_alert_confirmed_at`** | datetime, null | When the episode reached **N** consecutive low readings; used for UI and one-shot Discord notify. |
 | **`last_battery_alert_notify_at`** | datetime, null | When the low-battery Discord DM was last recorded for this episode. |

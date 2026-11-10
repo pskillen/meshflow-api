@@ -79,7 +79,7 @@ components:
       schema:
         type: string
         pattern: '^[0-9a-f]{12}$'
-      description: First 12 hex chars of the feeder device pubkey (mc: prefix in bot logs)
+      description: 'First 12 hex chars of the feeder device pubkey (mc: prefix in bot logs)'
     MeshCoreFeederPubkeyHeader:
       name: X-MeshCore-Feeder-Pubkey
       in: header
@@ -429,7 +429,7 @@ components:
         node_id_str:
           type: string
           nullable: true
-          description: mc: pubkey form
+          description: 'mc: pubkey form'
         status:
           type: string
           enum: [unknown, resolved, ambiguous, stale]
@@ -2593,19 +2593,24 @@ components:
           description: The time the metrics were reported by the node
         battery_level:
           type: number
-          description: The battery level as a percentage
+          nullable: true
+          description: The battery level as a percentage; null when the device did not report it
         voltage:
           type: number
-          description: The battery voltage in volts
+          nullable: true
+          description: The battery voltage in volts; null when the device did not report it
         meshtastic_channel_utilization:
           type: number
-          description: The channel utilization as a percentage
+          nullable: true
+          description: The channel utilization as a percentage; null when the device did not report it
         meshtastic_air_util_tx:
           type: number
-          description: The air utilization for transmission
+          nullable: true
+          description: The air utilization for transmission; null when the device did not report it
         uptime_seconds:
           type: integer
-          description: The device uptime in seconds
+          nullable: true
+          description: The device uptime in seconds; null when the device did not report it
 
     LatestEnvironmentMetrics:
       type: object
@@ -2827,7 +2832,7 @@ components:
     DeviceMetricBucket:
       type: object
       description: >
-        Bucketed device metrics row (``bucket`` set). Aggregates of the raw DeviceMetrics fields; ``id`` and ``logged_time`` are omitted. ``voltage`` and ``battery_level`` ignore 0 (ingestion stores a missing reading as 0) and are null when every sample is 0; ``battery_level`` also ignores 101 (powered) unless every remaining sample is 101; ``uptime_seconds`` is the bucket maximum.
+        Bucketed device metrics row (``bucket`` set). Aggregates of the raw DeviceMetrics fields; ``id`` and ``logged_time`` are omitted. ``voltage`` and ``battery_level`` ignore 0 (rows stored before null ingestion use 0 for a missing reading) and are null when every sample is 0; ``battery_level`` also ignores 101 (powered) unless every remaining sample is 101; ``uptime_seconds`` is the bucket maximum.
       required: [node, reported_time, samples]
       properties:
         node:
@@ -3043,11 +3048,13 @@ components:
         start_date:
           type: string
           format: date
-          description: The start date of the stats
+          nullable: true
+          description: The start date of the stats (null when no dates are given)
         end_date:
           type: string
           format: date
-          description: The end date of the stats
+          nullable: true
+          description: The end date of the stats (null when no dates are given)
         intervals:
           type: array
           description: The intervals of the stats
@@ -3086,11 +3093,13 @@ components:
         start_date:
           type: string
           format: date
-          description: The start date of the stats
+          nullable: true
+          description: The start date of the stats (null when no dates are given)
         end_date:
           type: string
           format: date
-          description: The end date of the stats
+          nullable: true
+          description: The end date of the stats (null when no dates are given)
         intervals:
           type: array
           description: The intervals of the stats
@@ -3498,7 +3507,7 @@ components:
           type: string
           nullable: true
           readOnly: true
-          description: Name parsed from MC channel text ``{name}: {body}``; null for MT or contact/DM rows.
+          description: 'Name parsed from MC channel text ``{name}: {body}``; null for MT or contact/DM rows.'
         mc_sender_candidates:
           type: array
           readOnly: true
@@ -5104,6 +5113,7 @@ paths:
         match the authenticated ManagedNode. Nested ``position`` / ``device_metrics`` accept legacy
         unprefixed fields (``location_source``, ``channel_utilization``, ``air_util_tx``) as aliases for
         ``meshtastic_*`` fields. New installs should use ``POST /v3/packets/{meshtastic_node_id}/nodes/``.
+        Metric fields in ``device_metrics`` may be omitted or null; a block with none stores nothing.
       tags: [Meshtastic packets]
       security:
         - NodeApiKeyAuth: []
@@ -5226,6 +5236,7 @@ paths:
       description: >
         Strict feeder node upsert for ``STORAGE_API_VERSION=3``. Requires ``meshtastic_*`` nested
         fields only (no legacy ``location_source`` / ``channel_utilization`` / ``air_util_tx``).
+        Metric fields in ``device_metrics`` may be omitted or null; a block with none stores nothing.
       tags: [Meshtastic packets]
       security:
         - NodeApiKeyAuth: []
@@ -6056,12 +6067,24 @@ paths:
                           format: date-time
                         battery_level:
                           type: number
+                          nullable: true
+                          description: null when the device did not report it
                         meshtastic_channel_utilization:
                           type: number
+                          nullable: true
+                          description: null when the device did not report it
+                        meshtastic_air_util_tx:
+                          type: number
+                          nullable: true
+                          description: null when the device did not report it
                         voltage:
                           type: number
+                          nullable: true
+                          description: null when the device did not report it
                         uptime_seconds:
                           type: integer
+                          nullable: true
+                          description: null when the device did not report it
         '400':
           description: Invalid request (e.g. missing node_ids)
     post:
@@ -6334,7 +6357,7 @@ paths:
         with ``reported_time`` = bucket start (UTC-aligned; ``6h`` buckets start 00/06/12/18), ``samples`` = rows in
         the bucket, ``node``, and each metric field. ``id`` and ``logged_time`` are omitted. Aggregation: mean of
         non-null values; a field with no values in the bucket is null. ``voltage`` and ``battery_level`` also ignore
-        0 (ingestion stores a missing reading as 0), so a bucket where every value is 0 is null. ``battery_level``
+        0 (rows stored before null ingestion use 0 for a missing reading), so a bucket where every value is 0 is null. ``battery_level``
         averages real readings only (101 means powered and is ignored), returning 101 if every remaining sample is
         101; ``uptime_seconds`` is the maximum. ``meshtastic_channel_utilization``, ``meshtastic_air_util_tx`` and
         ``uptime_seconds`` keep 0 as a real value.
@@ -7350,7 +7373,8 @@ paths:
           required: false
           schema:
             type: integer
-            description: The interval of the stats
+            enum: [1]
+            description: Only 1 is accepted; other values are a 400. Use interval_type for the bucket size.
             default: 1
         - name: interval_type
           in: query
@@ -7396,7 +7420,8 @@ paths:
           required: false
           schema:
             type: integer
-            description: The interval of the stats
+            enum: [1]
+            description: Only 1 is accepted; other values are a 400. Use interval_type for the bucket size.
             default: 1
         - name: interval_type
           in: query
@@ -7467,7 +7492,8 @@ paths:
           required: false
           schema:
             type: integer
-            description: The interval of the stats
+            enum: [1]
+            description: Only 1 is accepted; other values are a 400. Use interval_type for the bucket size.
             default: 1
         - name: interval_type
           in: query

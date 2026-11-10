@@ -20,6 +20,8 @@ Neutral Django signals emitted by `packets` services after persistence. Feature 
 | `packet_from_node_processed` | `BasePacketService` (after `_process_packet`, **before** `last_heard` update) | `packet`, `observer`, `observation`, `from_node`, `previous_last_heard`, `from_node_created` | `dx_monitoring` (candidate detection) |
 | `node_last_heard_advanced` | `BasePacketService._update_node_last_heard` | `observed_node`, `last_heard` | `mesh_monitoring` (clear presence flags) |
 
+`device_metrics_recorded` carries `battery_level=None` when the packet had no battery reading; receivers must skip it (the `mesh_monitoring` receiver does).
+
 Definitions and docstrings: `Meshflow/packets/signals.py`.
 
 ## Multi-app handler order

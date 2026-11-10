@@ -1484,14 +1484,10 @@ def _normalize_device_metrics_block(metrics_data, *, allow_legacy_fields):
     channel_utilization = metrics_data.get("meshtastic_channel_utilization")
     if channel_utilization is None and allow_legacy_fields:
         channel_utilization = metrics_data.get("channel_utilization")
-    if channel_utilization is None:
-        channel_utilization = 0.0
 
     air_util_tx = metrics_data.get("meshtastic_air_util_tx")
     if air_util_tx is None and allow_legacy_fields:
         air_util_tx = metrics_data.get("air_util_tx")
-    if air_util_tx is None:
-        air_util_tx = 0.0
 
     return {
         "reported_time": metrics_data.get("reported_time"),
@@ -1529,11 +1525,11 @@ class PositionSerializer(serializers.Serializer):
 class DeviceMetricsSerializer(serializers.Serializer):
     logged_time = serializers.DateTimeField(read_only=True, default=django_timezone.now)
     reported_time = serializers.DateTimeField(required=True)
-    battery_level = serializers.FloatField()
-    voltage = serializers.FloatField()
-    meshtastic_channel_utilization = serializers.FloatField()
-    meshtastic_air_util_tx = serializers.FloatField()
-    uptime_seconds = serializers.IntegerField()
+    battery_level = serializers.FloatField(required=False, allow_null=True)
+    voltage = serializers.FloatField(required=False, allow_null=True)
+    meshtastic_channel_utilization = serializers.FloatField(required=False, allow_null=True)
+    meshtastic_air_util_tx = serializers.FloatField(required=False, allow_null=True)
+    uptime_seconds = serializers.IntegerField(required=False, allow_null=True)
 
 
 class BaseNodeSerializer(serializers.ModelSerializer):
@@ -1657,8 +1653,15 @@ class BaseNodeSerializer(serializers.ModelSerializer):
                 defaults["meshtastic_precision_bits"] = precision_bits
             NodeLatestStatus.objects.update_or_create(node=node, defaults=defaults)
 
-        # Create device metrics if provided
-        if device_metrics_data:
+        # Create device metrics if provided and at least one value was reported; an all-absent block stores nothing
+        metric_fields = (
+            "battery_level",
+            "voltage",
+            "meshtastic_channel_utilization",
+            "meshtastic_air_util_tx",
+            "uptime_seconds",
+        )
+        if device_metrics_data and any(device_metrics_data.get(f) is not None for f in metric_fields):
             reported_time = device_metrics_data.get("reported_time")
             DeviceMetrics.objects.create(
                 node=node,

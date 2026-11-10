@@ -657,3 +657,111 @@ def test_snapshots_bucket_second_page_and_mc_type(django_assert_num_queries):
     assert page2["results"][0]["value"] == {"count": 4, "samples": 24}
     page3 = _bucket_get(stat_type="mc_online_nodes", constellation_id="-1", page_size=2, page=3).data
     assert page3["next"] is None and len(page3["results"]) == 1
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("value", ["2", "24", "0", "abc"])
+def test_stats_interval_other_than_one_is_400(create_managed_node, create_observed_node, create_user, value):
+    """interval other than 1 is rejected: buckets are always one interval_type wide."""
+    user = create_user()
+    create_managed_node(owner=user, meshtastic_node_id=111111111)
+    create_observed_node(meshtastic_node_id=111111111)
+    client = APIClient()
+    client.force_authenticate(user=user)
+    urls = [
+        reverse("stats:global-packet-stats"),
+        reverse("stats:node-packet-stats", kwargs={"node_id": 111111111}),
+        reverse("stats:node-received-stats", kwargs={"node_id": 111111111}),
+    ]
+    for url in urls:
+        response = client.get(url, {"interval": value})
+        assert response.status_code == status.HTTP_400_BAD_REQUEST, url
+        assert "interval must be 1" in str(response.data)
+
+
+def _seed_stats_packets(managed):
+    """One text message from the managed node and one from another node, both observed by the managed node."""
+    rx_time = datetime(2026, 11, 1, 12, 0, 0, tzinfo=dt_timezone.utc)
+    for packet_id, from_int in [(901, 111111111), (902, 222222222)]:
+        msg = MessagePacket.objects.create(
+            packet_id=packet_id,
+            from_int=from_int,
+            from_str=f"!{from_int:08x}",
+            to_int=4294967295,
+            to_str="^all",
+            port_num="TEXT_MESSAGE_APP",
+            message_text="hi",
+            first_reported_time=rx_time,
+        )
+        PacketObservation.objects.create(
+            packet=msg, observer=managed, channel=managed.meshtastic_channel_0, rx_time=rx_time, relay_node=None
+        )
+
+
+def _stats_urls():
+    return [
+        reverse("stats:global-packet-stats"),
+        reverse("stats:node-packet-stats", kwargs={"node_id": 111111111}),
+        reverse("stats:node-received-stats", kwargs={"node_id": 111111111}),
+    ]
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("params", [{}, {"interval": "1"}])
+@pytest.mark.parametrize("interval_type,unit", [("hour", timedelta(hours=1)), ("day", timedelta(days=1))])
+def test_stats_interval_one_or_omitted_is_200(
+    create_managed_node, create_observed_node, create_user, params, interval_type, unit
+):
+    """interval=1 and omitted behave the same: 200, one bucket exactly one interval_type wide."""
+    user = create_user()
+    managed = create_managed_node(owner=user, meshtastic_node_id=111111111)
+    create_observed_node(meshtastic_node_id=111111111)
+    _seed_stats_packets(managed)
+    client = APIClient()
+    client.force_authenticate(user=user)
+    for url in _stats_urls():
+        response = client.get(
+            url,
+            {"start_date": "2026-11-01", "end_date": "2026-11-02", "interval_type": interval_type, **params},
+        )
+        assert response.status_code == status.HTTP_200_OK, url
+        assert len(response.data["intervals"]) == 1, url
+        bucket = response.data["intervals"][0]
+        assert bucket["end_date"] - bucket["start_date"] == unit, url
+
+
+@pytest.mark.django_db
+def test_stats_without_dates_is_200_with_null_dates(create_managed_node, create_observed_node, create_user):
+    """No dates: the range is unbounded and the response dates are null (was a 500)."""
+    user = create_user()
+    managed = create_managed_node(owner=user, meshtastic_node_id=111111111)
+    create_observed_node(meshtastic_node_id=111111111)
+    _seed_stats_packets(managed)
+    client = APIClient()
+    client.force_authenticate(user=user)
+    for url in _stats_urls():
+        response = client.get(url)
+        assert response.status_code == status.HTTP_200_OK, url
+        assert response.data["start_date"] is None, url
+        assert response.data["end_date"] is None, url
+        assert len(response.data["intervals"]) == 1, url
+
+
+@pytest.mark.django_db
+def test_stats_offsetless_dates_read_as_utc_without_warning(create_managed_node, create_observed_node, create_user):
+    import warnings
+
+    user = create_user()
+    create_managed_node(owner=user, meshtastic_node_id=111111111)
+    create_observed_node(meshtastic_node_id=111111111)
+    client = APIClient()
+    client.force_authenticate(user=user)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", RuntimeWarning)
+        packets = client.get(
+            reverse("stats:node-packet-stats", kwargs={"node_id": 111111111}),
+            {"start_date": "2026-11-01T00:00:00", "end_date": "2026-11-02T00:00:00"},
+        )
+        snapshots = client.get(reverse("stats:stats-snapshots"), {"recorded_at_after": "2026-11-01T00:00:00"})
+    assert packets.status_code == status.HTTP_200_OK
+    assert snapshots.status_code == status.HTTP_200_OK

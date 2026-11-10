@@ -58,6 +58,25 @@ def test_battery_recovery_clears_streak(create_user, create_observed_node):
 
 
 @pytest.mark.django_db
+def test_missing_battery_reading_leaves_streak_unchanged(create_user, create_observed_node):
+    from mesh_monitoring.receivers import on_device_metrics_recorded
+
+    user = create_user()
+    obs = create_observed_node(claimed_by=user)
+    NodeMonitoringConfig.objects.create(
+        observed_node=obs,
+        battery_alert_enabled=True,
+        battery_alert_threshold_percent=50,
+        battery_alert_report_count=3,
+    )
+    NodePresence.objects.create(observed_node=obs, is_offline=False, battery_below_threshold_report_count=2)
+    on_device_metrics_recorded(sender=None, observed_node=obs, battery_level=None, reported_time=timezone.now())
+    p = NodePresence.objects.get(pk=obs.pk)
+    assert p.battery_below_threshold_report_count == 2
+    assert p.battery_alert_confirmed_at is None
+
+
+@pytest.mark.django_db
 def test_monitoring_alerts_summary_mesh_infra(api_client, create_user, create_observed_node):
     user = create_user()
     obs = create_observed_node(meshtastic_role=INFRASTRUCTURE_ROLES[0], claimed_by=None)

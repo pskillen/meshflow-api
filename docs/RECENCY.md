@@ -267,7 +267,7 @@ Implemented in [`Meshflow/stats/tasks.py`](../Meshflow/stats/tasks.py).
 | `node_firmware` window | **168 h** (7 d, `ADOPTION_WINDOW_HOURS`) | no | Daily snapshot of Meshtastic nodes by `last_heard`, no upper bound; `recorded_at` is midnight UTC |
 | `backfill_node_firmware_snapshots` span | **90 days** default arg | no | Historical backfill |
 | `backfill_stats_snapshots` span | **30 days** default arg | no | Historical backfill |
-| Stats API interval defaults | `interval=1`, `interval_type=hour` | query | Node/global stats endpoints |
+| Stats API interval defaults | `interval=1` (must be 1; other values are a 400), `interval_type=hour` | query | Node/global stats endpoints |
 | Stats API "month" unit | **30 days** | no | `get_interval_delta` month handling |
 
 ### Celery beat schedule
