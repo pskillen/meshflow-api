@@ -1,0 +1,83 @@
+{
+  "effects": {
+    "baseline_traceroute_queued": true,
+    "device_metrics_rows": 0,
+    "dx_candidate_called": true,
+    "environment_metrics_rows": 0,
+    "inferred_max_hops": 7,
+    "last_heard_advanced": true,
+    "nls": {
+      "meshtastic_inferred_max_hops": 7,
+      "meshtastic_inferred_max_hops_source": "NODEINFO_APP"
+    },
+    "observation_api": {
+      "direct_from_sender": false,
+      "hop_count": 1,
+      "replayed": false
+    },
+    "observed_node_created": true,
+    "position_rows": 0
+  },
+  "key": "p28-L8",
+  "observation": {
+    "bitfield": 0,
+    "channel": 0,
+    "hop_limit": 6,
+    "hop_start": 7,
+    "relay_node": 180,
+    "replayed": false,
+    "rx_rssi": -33.0,
+    "rx_snr": 5.75,
+    "rx_time": "2026-11-09T18:22:06Z",
+    "rx_time_estimated": false,
+    "transport_mechanism": "TRANSPORT_LORA",
+    "via_mqtt": false
+  },
+  "observed_node": {
+    "environment_exposure": 0,
+    "inferred_firmware": "2.7",
+    "inferred_firmware_basis": "key_identity",
+    "long_name": "Cant Hills Router",
+    "m2m_opt_out": false,
+    "mac_addr": "d5:98:46:22:01:65",
+    "mc_pubkey": null,
+    "mc_pubkey_prefix": null,
+    "meshcore_adv_type": null,
+    "meshtastic_hw_model": "NRF52_UNKNOWN",
+    "meshtastic_is_licensed": null,
+    "meshtastic_is_unmessagable": true,
+    "meshtastic_key_node_id": 3640084214,
+    "meshtastic_node_id": 1176633701,
+    "meshtastic_public_key": "MGJwnw5IQWz+e14JjncKC9rO71Nvg4kDrC4bu+91qVA=",
+    "meshtastic_public_key_hex": "3062709f0e48416cfe7b5e098e770a0bdaceef536f838903ac2e1bbbef75a950",
+    "meshtastic_role": 2,
+    "protocol": 1,
+    "short_name": "CANX",
+    "weather_use": 0
+  },
+  "packet": {
+    "fields": {
+      "from_int": 1176633701,
+      "from_str": "!46220165",
+      "hw_model": "NRF52_UNKNOWN",
+      "is_licensed": null,
+      "is_unmessagable": true,
+      "long_name": "Cant Hills Router",
+      "mac_address": "d5:98:46:22:01:65",
+      "node_id": "!46220165",
+      "packet_id": 2130609728,
+      "port_num": "NODEINFO_APP",
+      "public_key": "MGJwnw5IQWz+e14JjncKC9rO71Nvg4kDrC4bu+91qVA=",
+      "role": 2,
+      "short_name": "CANX",
+      "to_int": 4294967295,
+      "to_str": "^all"
+    },
+    "model": "NodeInfoPacket"
+  },
+  "request": {
+    "feeder_num_header": 2304338203,
+    "url": "v4"
+  },
+  "status": 201
+}

@@ -1,0 +1,88 @@
+{
+  "effects": {
+    "baseline_traceroute_queued": true,
+    "device_metrics_rows": 0,
+    "dx_candidate_called": true,
+    "environment_metrics_rows": 0,
+    "inferred_max_hops": null,
+    "last_heard_advanced": true,
+    "nls": {
+      "altitude": 116.0,
+      "ground_speed": 0.0,
+      "ground_track": 0.0,
+      "latitude": 56.1,
+      "longitude": -3.2,
+      "meshtastic_location_source": 1,
+      "meshtastic_precision_bits": 13
+    },
+    "observation_api": {
+      "direct_from_sender": false,
+      "hop_count": null,
+      "replayed": false
+    },
+    "observed_node_created": true,
+    "position_rows": 1
+  },
+  "key": "p27-L4",
+  "observation": {
+    "bitfield": 0,
+    "channel": 0,
+    "hop_limit": 3,
+    "hop_start": 7,
+    "relay_node": 180,
+    "replayed": false,
+    "rx_rssi": null,
+    "rx_snr": null,
+    "rx_time": "2026-11-09T16:34:21Z",
+    "rx_time_estimated": false,
+    "transport_mechanism": "TRANSPORT_MULTICAST_UDP",
+    "via_mqtt": false
+  },
+  "observed_node": {
+    "environment_exposure": 0,
+    "inferred_firmware": null,
+    "inferred_firmware_basis": null,
+    "long_name": "Unknown Node !f101391a",
+    "m2m_opt_out": false,
+    "mac_addr": null,
+    "mc_pubkey": null,
+    "mc_pubkey_prefix": null,
+    "meshcore_adv_type": null,
+    "meshtastic_hw_model": null,
+    "meshtastic_is_licensed": null,
+    "meshtastic_is_unmessagable": null,
+    "meshtastic_key_node_id": null,
+    "meshtastic_node_id": 4043389210,
+    "meshtastic_public_key": null,
+    "meshtastic_public_key_hex": null,
+    "meshtastic_role": null,
+    "protocol": 1,
+    "short_name": "391a",
+    "weather_use": 0
+  },
+  "packet": {
+    "fields": {
+      "altitude": 116.0,
+      "from_int": 4043389210,
+      "from_str": "!f101391a",
+      "ground_speed": 0.0,
+      "ground_track": 0.0,
+      "heading": null,
+      "latitude": 56.1,
+      "longitude": -3.2,
+      "meshtastic_location_source": 1,
+      "meshtastic_precision_bits": 13,
+      "packet_id": 1969391984,
+      "port_num": "POSITION_APP",
+      "position_time": "2026-11-09T16:34:16Z",
+      "to_int": 4294967295,
+      "to_str": "^all"
+    },
+    "model": "PositionPacket"
+  },
+  "request": {
+    "feeder_num_header": 1127973616,
+    "url": "v4"
+  },
+  "status": 201
+}

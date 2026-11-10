@@ -1,0 +1,24 @@
+{
+  "channel": 0,
+  "decoded": {
+    "bitfield": 0,
+    "payload": "ZngxIEQ=",
+    "portnum": "TEXT_MESSAGE_APP",
+    "text": "fx1 D"
+  },
+  "from": 4209798977,
+  "fromId": "!faec6f41",
+  "hopLimit": 3,
+  "hopStart": 3,
+  "id": 4029189928,
+  "pkiEncrypted": true,
+  "publicKey": "tHG7yKuK6bw2JfyKLtd5e7+uWGbPfsr0B1F4Av0zOWY=",
+  "relayNode": 65,
+  "rxRssi": -39,
+  "rxSnr": 5.5,
+  "rxTime": 1794257098,
+  "to": 2304338203,
+  "toId": "!8959691b",
+  "transportMechanism": "TRANSPORT_LORA",
+  "wantAck": true
+}

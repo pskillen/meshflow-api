@@ -1,0 +1,30 @@
+{
+  "channel": 0,
+  "decoded": {
+    "bitfield": 0,
+    "payload": "CgkhZmFlYzZmNDESFVBhZGR5IE5JQVYtMSDwn6eq8J+arBoETklBViIG+n4ag8+JKFhCILRxu8irium8NiX8ii7XeXu/rlhmz37K9AdReAL9Mzlm",
+    "portnum": "NODEINFO_APP",
+    "user": {
+      "hwModel": "XIAO_NRF52_KIT",
+      "id": "!faec6f41",
+      "longName": "Paddy NIAV-1 \ud83e\uddea\ud83d\udeac",
+      "macaddr": "+n4ag8+J",
+      "publicKey": "tHG7yKuK6bw2JfyKLtd5e7+uWGbPfsr0B1F4Av0zOWY=",
+      "shortName": "NIAV"
+    },
+    "xeddsaSignature": "6O2jR/JZB9f0jFswDTZWazoyTa0b890c60YiWNboocHLdmjciFPz9h/OydjhuV2eMXPVAyHG+ueHIsJ38fV5AQ=="
+  },
+  "from": 4209798977,
+  "fromId": "!faec6f41",
+  "hopLimit": 3,
+  "hopStart": 3,
+  "id": 3902895518,
+  "relayNode": 65,
+  "rxRssi": -41,
+  "rxSnr": 6.0,
+  "rxTime": 1794247760,
+  "to": 4294967295,
+  "toId": "^all",
+  "transportMechanism": "TRANSPORT_LORA",
+  "xeddsaSigned": true
+}

@@ -27,8 +27,8 @@ def test_golden(name, feeder, side_effects):
 
 def test_golden_count():
     ids = goldens.case_ids()
-    assert len(goldens.load_manifest()) == 36
-    assert len([i for i in ids if i.endswith("+flag")]) == 7
+    assert len(goldens.load_manifest()) == 55
+    assert len([i for i in ids if i.endswith("+flag")]) == 10
 
 
 def test_v3_url_gives_the_same_golden_as_v4(feeder, side_effects):

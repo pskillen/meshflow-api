@@ -1,0 +1,31 @@
+{
+  "channel": 0,
+  "decoded": {
+    "bitfield": 0,
+    "payload": "DUAucCEVALgX/hh0JQj28WooAXgAgAEAuAEN",
+    "portnum": "POSITION_APP",
+    "position": {
+      "altitude": 116,
+      "groundSpeed": 0,
+      "groundTrack": 0,
+      "latitude": 56.1,
+      "latitudeI": 561000000,
+      "locationSource": "LOC_MANUAL",
+      "longitude": -3.2,
+      "longitudeI": -32000000,
+      "precisionBits": 13,
+      "time": 1794242056
+    }
+  },
+  "from": 4043389210,
+  "fromId": "!f101391a",
+  "hopLimit": 3,
+  "hopStart": 7,
+  "id": 1969391984,
+  "priority": "DEFAULT",
+  "relayNode": 180,
+  "rxTime": 1794242061,
+  "to": 4294967295,
+  "toId": "^all",
+  "transportMechanism": "TRANSPORT_MULTICAST_UDP"
+}

@@ -1,0 +1,14 @@
+{
+  "effects": {
+    "rows": 0
+  },
+  "key": "p27-L19",
+  "observation": null,
+  "observed_node": null,
+  "packet": null,
+  "request": {
+    "feeder_num_header": 1127973616,
+    "url": "v4"
+  },
+  "status": 304
+}

@@ -1,0 +1,27 @@
+{
+  "channel": 0,
+  "decoded": {
+    "bitfield": 2,
+    "payload": "CgkhZmFlYzZmNDESFVBhZGR5IE5JQVYtMSDwn6eq8J+arBoETklBVkIgtHG7yKuK6bw2JfyKLtd5e7+uWGbPfsr0B1F4Av0zOWY=",
+    "portnum": "NODEINFO_APP",
+    "user": {
+      "id": "!faec6f41",
+      "longName": "Paddy NIAV-1 \ud83e\uddea\ud83d\udeac",
+      "publicKey": "tHG7yKuK6bw2JfyKLtd5e7+uWGbPfsr0B1F4Av0zOWY=",
+      "shortName": "NIAV"
+    },
+    "wantResponse": true
+  },
+  "from": 4209798977,
+  "fromId": "!faec6f41",
+  "hopLimit": 3,
+  "hopStart": 3,
+  "id": 2718356225,
+  "relayNode": 65,
+  "rxRssi": -41,
+  "rxSnr": 5.75,
+  "rxTime": 1794247612,
+  "to": 2304338203,
+  "toId": "!8959691b",
+  "transportMechanism": "TRANSPORT_LORA"
+}

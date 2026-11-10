@@ -93,7 +93,7 @@ def test_nodeinfo_capture_is_classified_from_its_label(name, generation, feeder,
 
 def test_manifest_has_both_kinds_of_nodeinfo():
     assert {generation for _, generation in NODEINFO_CASES} == {"2.7", "2.8"}
-    assert len(NODEINFO_CASES) == 5
+    assert len(NODEINFO_CASES) == 9
 
 
 @pytest.mark.parametrize("num, expected", [(NEW_NUM, "2.8"), (OLD_NUM, "2.7")])

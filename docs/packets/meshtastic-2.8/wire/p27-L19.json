@@ -1,0 +1,15 @@
+{
+  "channel": 68,
+  "encrypted": "AiNzUeXmjFZeBpf6OO2nB/910lxaLoO+0eCAlSQcCjED",
+  "from": 1129933592,
+  "fromId": null,
+  "hopLimit": 6,
+  "hopStart": 6,
+  "id": 1247379275,
+  "priority": "BACKGROUND",
+  "relayNode": 24,
+  "rxTime": 1794242391,
+  "to": 4294967295,
+  "toId": "^all",
+  "transportMechanism": "TRANSPORT_MULTICAST_UDP"
+}

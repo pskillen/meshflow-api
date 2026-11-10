@@ -1,0 +1,30 @@
+{
+  "channel": 0,
+  "decoded": {
+    "bitfield": 0,
+    "payload": "CgkhNDYyMjAxNjUSEUNhbnQgSGlsbHMgUm91dGVyGgRDQU5YIgbVmEYiAWUoJDgCQiAwYnCfDkhBbP57XgmOdwoL2s7vU2+DiQOsLhu773WpUEgB",
+    "portnum": "NODEINFO_APP",
+    "user": {
+      "hwModel": "NRF52_UNKNOWN",
+      "id": "!46220165",
+      "isUnmessagable": true,
+      "longName": "Cant Hills Router",
+      "macaddr": "1ZhGIgFl",
+      "publicKey": "MGJwnw5IQWz+e14JjncKC9rO71Nvg4kDrC4bu+91qVA=",
+      "role": "ROUTER",
+      "shortName": "CANX"
+    }
+  },
+  "from": 1176633701,
+  "fromId": "!46220165",
+  "hopLimit": 6,
+  "hopStart": 7,
+  "id": 2130609728,
+  "relayNode": 180,
+  "rxRssi": -33,
+  "rxSnr": 5.75,
+  "rxTime": 1794248526,
+  "to": 4294967295,
+  "toId": "^all",
+  "transportMechanism": "TRANSPORT_LORA"
+}

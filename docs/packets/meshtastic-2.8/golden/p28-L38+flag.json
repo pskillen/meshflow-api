@@ -1,0 +1,59 @@
+{
+  "effects": {
+    "baseline_traceroute_queued": false,
+    "device_metrics_rows": 0,
+    "dx_candidate_called": false,
+    "environment_metrics_rows": 0,
+    "inferred_max_hops": null,
+    "last_heard_advanced": false,
+    "nls": {},
+    "observation_api": {
+      "direct_from_sender": false,
+      "hop_count": null,
+      "replayed": true
+    },
+    "observed_node_created": false,
+    "position_rows": 0
+  },
+  "key": "p28-L38+flag",
+  "observation": {
+    "bitfield": null,
+    "channel": 0,
+    "hop_limit": 6,
+    "hop_start": 7,
+    "relay_node": null,
+    "replayed": true,
+    "rx_rssi": null,
+    "rx_snr": 6.25,
+    "rx_time": "2026-11-09T18:23:04Z",
+    "rx_time_estimated": false,
+    "transport_mechanism": "TRANSPORT_LORA",
+    "via_mqtt": false
+  },
+  "observed_node": null,
+  "packet": {
+    "fields": {
+      "altitude": 301.0,
+      "from_int": 1176633701,
+      "from_str": "!46220165",
+      "ground_speed": null,
+      "ground_track": null,
+      "heading": null,
+      "latitude": 55.9,
+      "longitude": -3.9,
+      "meshtastic_location_source": 1,
+      "meshtastic_precision_bits": 13,
+      "packet_id": 682166352,
+      "port_num": "POSITION_APP",
+      "position_time": null,
+      "to_int": 4294967295,
+      "to_str": "^all"
+    },
+    "model": "PositionPacket"
+  },
+  "request": {
+    "feeder_num_header": 2304338203,
+    "url": "v4"
+  },
+  "status": 201
+}
