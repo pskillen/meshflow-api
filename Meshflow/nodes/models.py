@@ -333,6 +333,7 @@ class ManagedNodeIdentityEvent(models.Model):
         FLAGGED = "flagged", _("Flagged")
         MANUAL = "manual", _("Manual")
         KEY_CHANGED = "key_changed", _("Key changed")
+        KEY_ACCEPTED = "key_accepted", _("Key accepted by staff")
 
     class Reason(models.TextChoices):
         KEY_NOT_REPORTED = "key_not_reported", _("Key not reported")
