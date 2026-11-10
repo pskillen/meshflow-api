@@ -499,7 +499,6 @@ class DeviceMetricsPacketSerializerTest(BasePacketSerializerTestCase):
         self.assertEqual(packet.battery_level, 95.5)
         self.assertEqual(packet.voltage, 3.7)
 
-
     def test_device_metrics_packet_absent_fields_stored_as_null(self):
         """A deviceMetrics block lacking voltage and uptimeSeconds stores null for them."""
         data = {
