@@ -64,7 +64,7 @@ Everyone else gets validation errors on create (and **`NodeWatch.clean()`** reje
 |----------|------|----------------|
 | **`/api/monitoring/watches/`** (CRUD) | Authenticated | Create: **`user_can_watch`**. List/detail/update/delete: only the **owning** user’s watches. |
 | **`/api/monitoring/nodes/{id}/config/`** | Authenticated | PATCH: **`user_can_edit_node_monitoring_config`**. |
-| **`/api/monitoring/alerts/summary/`** | Authenticated | Query **`scope=mesh_infra`**. Returns operational infrastructure alert counts (not filtered by the current user’s Discord opt-ins). |
+| **`/api/monitoring/alerts/summary/`** | Authenticated | Query **`scope=mesh_infra`**, optional **`protocol=meshtastic|meshcore`** (default Meshtastic; response has `protocol` and `supported`). Returns operational infrastructure alert counts (not filtered by the current user’s Discord opt-ins). |
 
 ---
 

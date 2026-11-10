@@ -5,6 +5,7 @@ from django.shortcuts import get_object_or_404
 from rest_framework import permissions, status, views, viewsets
 from rest_framework.response import Response
 
+from common.protocol import Protocol, protocol_from_query_param
 from mesh_monitoring.models import NodeMonitoringConfig, NodePresence, NodeWatch
 from mesh_monitoring.permission_helpers import user_can_edit_node_monitoring_config
 from mesh_monitoring.serializers import NodeMonitoringConfigSerializer, NodeWatchSerializer
@@ -55,7 +56,7 @@ class NodeMonitoringConfigView(views.APIView):
 
 class MonitoringAlertsSummaryView(views.APIView):
     """
-    GET /api/monitoring/alerts/summary/?scope=mesh_infra
+    GET /api/monitoring/alerts/summary/?scope=mesh_infra[&protocol=meshtastic|meshcore]
 
     Operational counts for mesh infrastructure alerting (not filtered by the current user's Discord opt-ins).
     """
@@ -69,7 +70,8 @@ class MonitoringAlertsSummaryView(views.APIView):
                 {"detail": "Unsupported scope. Use ?scope=mesh_infra."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        return Response({"mesh_infra": mesh_infra_monitoring_alert_counts()})
+        protocol = protocol_from_query_param(request.query_params.get("protocol")) or Protocol.MESHTASTIC
+        return Response({"mesh_infra": mesh_infra_monitoring_alert_counts(protocol)})
 
 
 class NodeWatchViewSet(viewsets.ModelViewSet):

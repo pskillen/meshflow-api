@@ -13,7 +13,7 @@ This document describes the **intended design** (models, Celery, APIs, and integ
 | Django app **`mesh_monitoring`** (`NodeWatch`, `NodePresence`, `NodeMonitoringConfig`), Celery **`process_node_watch_presence`**, `AutoTraceRoute.trigger_type=4` (Node Watch), hooks in **`packets`** + **`traceroute.target_selection`** | **Shipped** (phase 03b) |
 | Watch **REST** CRUD | **`GET/POST /api/monitoring/watches/`**, **`GET/PATCH/PUT/DELETE …/watches/{id}/`** — authenticated; see **`openapi.yaml`** (`Mesh Monitoring` tag) |
 | Node-level monitoring config (silence + battery) | **`GET/PATCH /api/monitoring/nodes/{internal_id}/config/`** — staff or claim owner may PATCH |
-| Alert summary (e.g. Mesh Infra nav) | **`GET /api/monitoring/alerts/summary/?scope=mesh_infra`** — authenticated |
+| Alert summary (e.g. Mesh Infra nav) | **`GET /api/monitoring/alerts/summary/?scope=mesh_infra`** — authenticated; optional **`&protocol=meshtastic|meshcore`** (default Meshtastic). Response echoes `protocol` and `supported` (`false` for MeshCore: presence/battery monitoring does not run for MC nodes yet) |
 | **UI** (My Nodes watch toggles) | **meshtastic-bot-ui** My Nodes page + `meshtastic-api` client (phase 04) |
 
 Env: **`MESH_MONITORING_VERIFICATION_SECONDS`** (default `180`) for the verification window after silence.
