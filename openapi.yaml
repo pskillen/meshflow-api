@@ -5109,6 +5109,7 @@ paths:
         match the authenticated ManagedNode. Nested ``position`` / ``device_metrics`` accept legacy
         unprefixed fields (``location_source``, ``channel_utilization``, ``air_util_tx``) as aliases for
         ``meshtastic_*`` fields. New installs should use ``POST /v3/packets/{meshtastic_node_id}/nodes/``.
+        Metric fields in ``device_metrics`` may be omitted or null; a block with none stores nothing.
       tags: [Meshtastic packets]
       security:
         - NodeApiKeyAuth: []
@@ -5231,6 +5232,7 @@ paths:
       description: >
         Strict feeder node upsert for ``STORAGE_API_VERSION=3``. Requires ``meshtastic_*`` nested
         fields only (no legacy ``location_source`` / ``channel_utilization`` / ``air_util_tx``).
+        Metric fields in ``device_metrics`` may be omitted or null; a block with none stores nothing.
       tags: [Meshtastic packets]
       security:
         - NodeApiKeyAuth: []
@@ -6064,6 +6066,10 @@ paths:
                           nullable: true
                           description: null when the device did not report it
                         meshtastic_channel_utilization:
+                          type: number
+                          nullable: true
+                          description: null when the device did not report it
+                        meshtastic_air_util_tx:
                           type: number
                           nullable: true
                           description: null when the device did not report it
