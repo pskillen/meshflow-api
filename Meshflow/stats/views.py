@@ -5,11 +5,12 @@ alternate identity once MeshCore packets contribute to aggregates.
 """
 
 from datetime import datetime, timedelta, timezone
-from typing import Dict, Optional, Tuple
+from typing import Optional, Tuple
 
 from django.core.cache import cache
 from django.db.models import BigIntegerField, Case, Count, Exists, F, OuterRef, Q, When
 from django.db.models.functions import Mod, Trunc
+from django.utils import timezone as django_timezone
 
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
@@ -29,6 +30,13 @@ from .serializers import GlobalStatsSerializer, NeighbourStatsSerializer, NodeSt
 from .snapshot_rollup import DAILY_STAT_TYPES, FLOW_STAT_TYPES, GAUGE_STAT_TYPES, SUPPORTED_BUCKETS, rollup_daily
 
 
+def _ensure_utc(dt: datetime) -> datetime:
+    """Treat an offset-less datetime as UTC (avoids Django's naive-datetime warning)."""
+    if django_timezone.is_naive(dt):
+        return django_timezone.make_aware(dt, timezone.utc)
+    return dt
+
+
 def parse_stats_params(request) -> Tuple[Optional[datetime], Optional[datetime], int, str]:
     """
     Parse common statistics parameters from the request.
@@ -45,7 +53,12 @@ def parse_stats_params(request) -> Tuple[Optional[datetime], Optional[datetime],
     # Get query parameters with defaults
     start_date = request.query_params.get("start_date")
     end_date = request.query_params.get("end_date")
-    interval = int(request.query_params.get("interval", 1))
+    try:
+        interval = int(request.query_params.get("interval", 1))
+    except TypeError, ValueError:
+        interval = None
+    if interval != 1:
+        raise ValueError("interval must be 1; use interval_type (hour, day, week, month) to choose the bucket size")
     interval_type = request.query_params.get("interval_type", "hour")
 
     # Validate interval type
@@ -80,31 +93,12 @@ def parse_stats_params(request) -> Tuple[Optional[datetime], Optional[datetime],
             except ValueError:
                 raise ValueError("Invalid end_date format. Must be ISO 8601 (YYYY-MM-DDTHH:MM:SS±HH:MM) or YYYY-MM-DD")
 
+    if parsed_start is not None:
+        parsed_start = _ensure_utc(parsed_start)
+    if parsed_end is not None:
+        parsed_end = _ensure_utc(parsed_end)
+
     return parsed_start, parsed_end, interval, interval_type
-
-
-def get_interval_trunc_kwargs(interval_type: str, interval: int) -> Dict:
-    """
-    Get the truncation kwargs for the specified interval type and size.
-
-    Args:
-        interval_type: The type of interval (hour, day, week, month)
-        interval: The size of the interval
-
-    Returns:
-        Dictionary of kwargs for Trunc function
-    """
-    # For hour intervals, we need to handle the special case of truncating to multiple hours
-    if interval_type == "hour":
-        return {"hour": interval}
-    elif interval_type == "day":
-        return {"day": interval}
-    elif interval_type == "week":
-        return {"week": interval}
-    elif interval_type == "month":
-        return {"month": interval}
-    else:
-        raise ValueError(f"Unsupported interval type: {interval_type}")
 
 
 def get_interval_delta(interval_type: str, interval: int) -> timedelta:
@@ -176,11 +170,7 @@ def node_packet_stats(request, node_id: int):
 
     # Get interval stats
     stats = (
-        packets.annotate(
-            interval_start=Trunc(
-                "first_reported_time", interval_type, **get_interval_trunc_kwargs(interval_type, interval)
-            )
-        )
+        packets.annotate(interval_start=Trunc("first_reported_time", interval_type))
         .values("interval_start")
         .annotate(
             text_messages=Count("id", filter=Q(messagepacket__isnull=False)),
@@ -198,7 +188,7 @@ def node_packet_stats(request, node_id: int):
     for stat in stats:
         interval_data = {
             "start_date": stat["interval_start"],
-            "end_date": stat["interval_start"] + get_interval_delta(interval_type, interval),
+            "end_date": stat["interval_start"] + get_interval_delta(interval_type, 1),
             "packet_types": [
                 {"packet_type": "text_message", "count": stat["text_messages"]},
                 {"packet_type": "position", "count": stat["position_updates"]},
@@ -260,9 +250,7 @@ def node_received_stats(request, node_id: int):
 
     # Get interval stats
     stats = (
-        observations.annotate(
-            interval_start=Trunc("rx_time", interval_type, **get_interval_trunc_kwargs(interval_type, interval))
-        )
+        observations.annotate(interval_start=Trunc("rx_time", interval_type))
         .values("interval_start")
         .annotate(
             text_messages=Count("id", filter=Q(packet__messagepacket__isnull=False)),
@@ -280,7 +268,7 @@ def node_received_stats(request, node_id: int):
     for stat in stats:
         interval_data = {
             "start_date": stat["interval_start"],
-            "end_date": stat["interval_start"] + get_interval_delta(interval_type, interval),
+            "end_date": stat["interval_start"] + get_interval_delta(interval_type, 1),
             "packet_types": [
                 {"packet_type": "text_message", "count": stat["text_messages"]},
                 {"packet_type": "position", "count": stat["position_updates"]},
@@ -493,11 +481,7 @@ def global_packet_stats(request):
 
     # Get interval stats
     stats = (
-        packets.annotate(
-            interval_start=Trunc(
-                "first_reported_time", interval_type, **get_interval_trunc_kwargs(interval_type, interval)
-            )
-        )
+        packets.annotate(interval_start=Trunc("first_reported_time", interval_type))
         .values("interval_start")
         .annotate(packets=Count("id"))
         .order_by("interval_start")
@@ -508,7 +492,7 @@ def global_packet_stats(request):
     for stat in stats:
         interval_data = {
             "start_date": stat["interval_start"],
-            "end_date": stat["interval_start"] + get_interval_delta(interval_type, interval),
+            "end_date": stat["interval_start"] + get_interval_delta(interval_type, 1),
             "packets": stat["packets"],
         }
         intervals.append(interval_data)
@@ -546,7 +530,7 @@ def _parse_datetime_param(value):
 
     dt = parse_datetime(value.replace("Z", "+00:00"))
     if dt:
-        return dt
+        return _ensure_utc(dt)
     try:
         from datetime import datetime
 
