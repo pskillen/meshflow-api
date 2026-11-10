@@ -104,7 +104,8 @@ def test_process_node_info_packet_different_node(
     service = NodeInfoPacketService()
 
     # Create a packet where the node_id is different from the from_int
-    packet = create_node_info_packet(node_id="!diffrent")
+    # Any id other than the sender's works. Keep it 9 chars: the node_id column is varchar(9) ("!" + 8 hex)
+    packet = create_node_info_packet(node_id="!0ther123")
     observer = create_managed_node()
     observation = create_packet_observation(packet=packet, observer=observer)
     user = create_user()
