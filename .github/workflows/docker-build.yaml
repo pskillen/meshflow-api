@@ -44,8 +44,8 @@ jobs:
             ghcr.io/${{ github.repository }}:${{ inputs.ENVIRONMENT == 'dev' && 'latest-dev' || inputs.VERSION_LABEL }}
           build-args: |
             VERSION=${{ inputs.VERSION_LABEL }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=meshflow-api
+          cache-to: type=gha,scope=meshflow-api,mode=max
 
       - name: Build and Push Docs Image
         uses: docker/build-push-action@v7
@@ -56,8 +56,8 @@ jobs:
           push: true
           tags: |
             ghcr.io/${{ github.repository }}:${{ inputs.ENVIRONMENT == 'dev' && 'latest-dev' || inputs.VERSION_LABEL }}-docs
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=meshflow-api-docs
+          cache-to: type=gha,scope=meshflow-api-docs,mode=max
 
   tagging:
     runs-on: ubuntu-latest
@@ -113,24 +113,3 @@ jobs:
           docker buildx imagetools create \
             -t ghcr.io/${{ github.repository }}:${MAJOR}.${MINOR}-docs \
             ghcr.io/${{ github.repository }}:${VERSION}-docs
-
-  cleanup:
-    runs-on: ubuntu-latest
-    needs:
-      - build-and-push
-      - tagging
-    if: always() && !cancelled() && needs.build-and-push.result == 'success'
-    # Two overlapping runs would list and delete the same untagged versions; the second gets a 404 and the action
-    # reports "fail delete N". Serialise cleanups (queue, never cancel one mid-delete) so that cannot happen.
-    concurrency:
-      group: ghcr-cleanup-meshflow-api
-      cancel-in-progress: false
-    steps:
-      - name: Delete untagged images
-        uses: Chizkiyahu/delete-untagged-ghcr-action@v6.1.1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          repository_owner: ${{ github.repository_owner }}
-          package_name: meshflow-api
-          owner_type: user
-          untagged_only: true

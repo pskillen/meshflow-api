@@ -1,0 +1,16 @@
+# Keep the build context small. The Dockerfiles only need Meshflow/, docker-entrypoint.sh and openapi*.yaml.
+.git
+/venv
+/.venv
+/tmp
+.claude
+.cursor*
+/reports
+**/__pycache__
+**/*.pyc
+.pytest_cache
+htmlcov
+.coverage
+node_modules
+.env*
+**/.env*
