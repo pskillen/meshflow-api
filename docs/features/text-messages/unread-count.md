@@ -1,6 +1,6 @@
 # Text messages — unread count (WebSocket → UI)
 
-**Purpose:** How new text messages reach the browser for realtime UI and unread badges. Unread state is **client-only** in meshflow-ui.
+**Purpose:** How new text messages reach the browser for realtime UI and unread badges. Realtime frames are client-side in meshflow-ui; persistent unread state is server-side, see [unread-state.md](unread-state.md).
 
 **UI counterpart:** [meshflow-ui `docs/features/messages/unread-count.md`](https://github.com/pskillen/meshflow-ui/blob/main/docs/features/messages/unread-count.md)
 
@@ -14,7 +14,7 @@
 | --- | --- |
 | Persist `TextMessage` with correct `protocol` | `text_messages` + ingest |
 | Broadcast new rows to UI clients | `ws` via Channels group `text_messages` |
-| Unread / read receipts | **Not implemented** — SPA only |
+| Unread / read cursors | Shipped — see [unread-state.md](unread-state.md) |
 
 ---
 

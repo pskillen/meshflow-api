@@ -12,12 +12,13 @@ This folder documents cross-cutting text-message behaviour. MeshCore-specific in
 | `TextMessage.protocol` on DB row | Shipped | `Protocol.MESHTASTIC` / `Protocol.MESHCORE` |
 | WebSocket `/ws/messages/` | Shipped | JWT; Redis group `text_messages` |
 | WS payload `protocol` | Shipped | `TextMessageWSSerializer` (see [unread-count.md](unread-count.md)) |
-| Server-side unread / read receipts | Not implemented | Unread is entirely client-side in meshflow-ui |
+| Server-side unread counts + channel read cursors | Shipped | [unread-state.md](unread-state.md); `GET /api/messages/unread-counts/`, `POST /api/messages/channels/{id}/mark-read/` |
 
 ## Documentation map
 
 | Doc | Purpose |
 | --- | --- |
+| [unread-state.md](unread-state.md) | Server-side read cursors, unread counts and mark-read endpoints ([#517](https://github.com/pskillen/meshflow-api/issues/517)) |
 | [unread-count.md](unread-count.md) | Realtime push, WS serializer fields, UI nav badges ([#279](https://github.com/pskillen/meshflow-ui/issues/279)) |
 | [../meshcore/text-message-channels.md](../meshcore/text-message-channels.md) | MC ingest, channels, sender inference |
 | [../packet-ingestion/meshtastic.md](../packet-ingestion/meshtastic.md) | MT `TEXT_MESSAGE_APP` → `TextMessage` |
@@ -26,7 +27,7 @@ This folder documents cross-cutting text-message behaviour. MeshCore-specific in
 
 - **`TextMessage`** — business row with `protocol`, optional `sender`, `channel` FK, provenance via `original_packet` (MT) or `original_mc_packet` (MC).
 - **`text_message_received`** — Django signal (`packets.signals`) fired after a row is created; `ws.receivers` pushes to connected UI clients.
-- **Unread** — not stored in Postgres; the SPA keeps an in-memory list keyed by protocol (see UI doc).
+- **Unread** — stored per user and channel as `MessageChannelReadState.last_read_at`; counts come from `GET /api/messages/unread-counts/` ([unread-state.md](unread-state.md)). The SPA still adds live WS frames on top.
 
 ## Flow (high level)
 
@@ -64,7 +65,7 @@ sequenceDiagram
 | --- | --- |
 | meshflow-ui `WebSocketProvider` | Nav unread badges, toasts when off messages page |
 | meshflow-ui `useMessagesWithWebSocket` | Prepend to active channel list on messages page |
-| (none server-side) | No unread persistence |
+| `GET /api/messages/unread-counts/`, `POST .../mark-read/` | Persistent unread badges ([meshflow-ui#422](https://github.com/pskillen/meshflow-ui/issues/422)) |
 
 ## Related issues
 

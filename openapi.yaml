@@ -3407,6 +3407,18 @@ components:
             True when every hop in resolved_path is resolved and has a position (from
             MeshCorePathSegmentResolution / staff annotation).
 
+    UnreadCounts:
+      type: object
+      properties:
+        total:
+          type: integer
+          description: Sum of the (capped) per-channel counts
+        channels:
+          type: object
+          description: Channel id to unread count (1-99); only channels with unread messages
+          additionalProperties:
+            type: integer
+
     TextMessage:
       type: object
       description: >
@@ -8859,6 +8871,71 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+
+  /messages/unread-counts/:
+    get:
+      summary: Unread channel message counts per protocol
+      description: |
+        Counts channel messages with `sent_at` after the caller's per-channel read cursor, split by protocol.
+        Per channel only the last 7 days count and each channel count is capped at 99. Channels with no
+        cursor yet get one created at "now" (reported as 0 unread). Direct messages are not counted.
+      tags: [Text Messages]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Unread counts
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [meshtastic, meshcore]
+                properties:
+                  meshtastic:
+                    $ref: '#/components/schemas/UnreadCounts'
+                  meshcore:
+                    $ref: '#/components/schemas/UnreadCounts'
+
+  /messages/channels/{id}/mark-read/:
+    post:
+      summary: Mark a channel read
+      description: Advances the caller's read cursor for the channel. The cursor never moves backwards.
+      tags: [Text Messages]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                up_to:
+                  type: string
+                  description: ISO-8601 timestamp or message UUID in this channel. Defaults to now; future values are clamped to now.
+      responses:
+        '200':
+          description: Cursor after the request
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  channel_id:
+                    type: integer
+                  last_read_at:
+                    type: string
+                    format: date-time
+        '400':
+          description: Invalid up_to
+        '404':
+          description: Channel not found or not visible
 
   /messages/text/:
     get:
