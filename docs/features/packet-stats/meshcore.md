@@ -18,6 +18,8 @@ Prefix **`mc_`** on `stat_type` (no schema migration; extends OpenAPI enum):
 | `mc_online_nodes` | Global + per-constellation | Global: `ObservedNode` `protocol=MESHCORE`, `last_heard`; constellation: distinct `from_pubkey` on `MeshCorePacketObservation` by feeder constellation |
 | `mc_new_nodes` | Global + per-constellation | `ObservedNode` `protocol=MESHCORE` + `created_at` (delta / backfill same rules as MT) |
 
+**Daily rollup:** `GET /api/stats/snapshots/?bucket=1d` works for `mc_*` types the same way as for MT (gauges averaged, flows summed; needs `stat_type` and `recorded_at_after`). See [meshtastic.md](meshtastic.md#stored-snapshots) for the contract. If the bounds are not UTC midnight, the first and last days are partial (`value.samples` < 24).
+
 **Celery:** extend existing `collect_stats_snapshots` / `backfill_stats_snapshots` (single `run_id` per hour).
 
 **Out of scope for #329:** live `GET /api/stats/global/` MeshCore aggregates; meshflow-ui protocol toggle; blending MT+MC in one chart without explicit `stat_type`.
