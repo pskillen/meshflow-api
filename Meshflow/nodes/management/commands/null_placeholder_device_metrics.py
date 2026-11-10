@@ -49,6 +49,7 @@ RULES = [
     ("uptime_seconds (0)", Q(uptime_seconds=0), ["uptime_seconds"]),
 ]
 
+
 def _field_conditions():
     """For each field some rule nulls, the OR of the filters of the rules that null it."""
     conditions = {}
