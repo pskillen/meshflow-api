@@ -12,13 +12,17 @@ Before null ingestion a missing reading was stored as 0. This command nulls the 
 
 ``--dry-run`` writes nothing and prints what a real run would change. Idempotent: a second run changes no
 rows. ``--before`` limits it to rows reported before a cut-over time (pass the null-ingestion deploy time):
-``DeviceMetrics.logged_time`` and ``NodeLatestStatus.metrics_reported_time``. Each batch is an id-range
-``.update()`` in its own transaction.
+``DeviceMetrics.logged_time`` and ``NodeLatestStatus.metrics_reported_time``. Each batch is one id-range
+``.update()`` in its own transaction (every field set with a ``CASE``, so a row is rewritten once); the
+counts come from one conditional ``aggregate`` per batch, taken before the update, in dry-run and real runs alike.
 """
+
+from functools import reduce
+from operator import or_
 
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
-from django.db.models import Max, Min, Q
+from django.db.models import Case, Count, F, Max, Min, Q, Value, When
 from django.utils.dateparse import parse_datetime
 from django.utils.timezone import is_naive, make_aware
 
@@ -45,6 +49,19 @@ RULES = [
     ("uptime_seconds (0)", Q(uptime_seconds=0), ["uptime_seconds"]),
 ]
 
+def _field_conditions():
+    """For each field some rule nulls, the OR of the filters of the rules that null it."""
+    conditions = {}
+    for _, condition, fields in RULES:
+        for field in fields:
+            conditions[field] = conditions[field] | condition if field in conditions else condition
+    return conditions
+
+
+FIELD_CONDITIONS = _field_conditions()
+# Only rows some rule matches are rewritten; the CASE leaves their other fields as they were.
+ANY_RULE = reduce(or_, (condition for _, condition, _ in RULES))
+
 # (model, field used by --before)
 TARGETS = [(DeviceMetrics, "logged_time"), (NodeLatestStatus, "metrics_reported_time")]
 
@@ -55,7 +72,11 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument("--dry-run", action="store_true", help="Report what would change; write nothing")
         parser.add_argument("--batch-size", type=int, default=5000, help="Id range per transaction (default 5000)")
-        parser.add_argument("--before", help="ISO datetime: only rows reported before this (pass the deploy time)")
+        parser.add_argument(
+            "--before",
+            help="ISO datetime: only rows reported before this (pass the null-ingestion deploy time; an old cutoff "
+            "matching few rows scans most of the table to find its id range)",
+        )
 
     def handle(self, *args, **options):
         batch_size = options["batch_size"]
@@ -64,7 +85,10 @@ class Command(BaseCommand):
         dry_run = options["dry_run"]
         before = None
         if options["before"]:
-            before = parse_datetime(options["before"])
+            try:
+                before = parse_datetime(options["before"])
+            except ValueError:
+                before = None
             if before is None:
                 raise CommandError("--before must be an ISO datetime, e.g. 2026-11-10T12:00:00Z")
             if is_naive(before):
@@ -81,12 +105,22 @@ class Command(BaseCommand):
                 for start in range(bounds["lo"], bounds["hi"] + 1, batch_size):
                     window = base.filter(id__gte=start, id__lt=start + batch_size)
                     with transaction.atomic():
-                        for label, condition, fields in RULES:
-                            rows = window.filter(condition)
-                            if dry_run:
-                                counts[label] += rows.count()
-                            else:
-                                counts[label] += rows.update(**{f: None for f in fields})
+                        found = window.aggregate(
+                            **{f"r{i}": Count("id", filter=cond) for i, (_, cond, _) in enumerate(RULES)}
+                        )
+                        for i, (label, _, _) in enumerate(RULES):
+                            counts[label] += found[f"r{i}"]
+                        if not dry_run:
+                            window.filter(ANY_RULE).update(
+                                **{
+                                    field: Case(
+                                        When(cond, then=Value(None)),
+                                        default=F(field),
+                                        output_field=model._meta.get_field(field),
+                                    )
+                                    for field, cond in FIELD_CONDITIONS.items()
+                                }
+                            )
             self.stdout.write(f"{prefix}{model.__name__}:")
             for label, n in counts.items():
                 self.stdout.write(f"  {label}: {n}")
