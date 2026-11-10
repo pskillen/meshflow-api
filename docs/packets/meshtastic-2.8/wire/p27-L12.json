@@ -1,0 +1,29 @@
+{
+  "channel": 0,
+  "decoded": {
+    "bitfield": 1,
+    "payload": "DaH3MWoSFgg+FQisdEAdAAAAACXSbgU+KPSBpwc=",
+    "portnum": "TELEMETRY_APP",
+    "telemetry": {
+      "deviceMetrics": {
+        "airUtilTx": 0.13030556,
+        "batteryLevel": 62,
+        "channelUtilization": 0.0,
+        "uptimeSeconds": 15319284,
+        "voltage": 3.823
+      },
+      "time": 1781659553
+    }
+  },
+  "from": 728397814,
+  "fromId": "!2b6a77f6",
+  "hopLimit": 4,
+  "hopStart": 6,
+  "id": 2475083698,
+  "priority": "DEFAULT",
+  "relayNode": 180,
+  "rxTime": 1794242203,
+  "to": 4294967295,
+  "toId": "^all",
+  "transportMechanism": "TRANSPORT_MULTICAST_UDP"
+}

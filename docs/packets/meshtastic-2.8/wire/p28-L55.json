@@ -1,0 +1,21 @@
+{
+  "channel": 0,
+  "decoded": {
+    "payload": "uAEg",
+    "portnum": "POSITION_APP",
+    "position": {
+      "precisionBits": 32
+    }
+  },
+  "from": 4209798977,
+  "fromId": "!faec6f41",
+  "hopLimit": 7,
+  "hopStart": 7,
+  "id": 1689056727,
+  "priority": "BACKGROUND",
+  "rxSnr": 6.5,
+  "rxTime": 1794248483,
+  "to": 4294967295,
+  "toId": "^all",
+  "transportMechanism": "TRANSPORT_LORA"
+}

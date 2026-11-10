@@ -1,0 +1,28 @@
+{
+  "channel": 0,
+  "decoded": {
+    "payload": "DcCpUSEVQOis/RitAigBuAEN",
+    "portnum": "POSITION_APP",
+    "position": {
+      "altitude": 301,
+      "latitude": 55.9,
+      "latitudeI": 559000000,
+      "locationSource": "LOC_MANUAL",
+      "longitude": -3.9,
+      "longitudeI": -39000000,
+      "precisionBits": 13
+    }
+  },
+  "from": 1176633701,
+  "fromId": "!46220165",
+  "hopLimit": 6,
+  "hopStart": 7,
+  "id": 682166352,
+  "priority": "BACKGROUND",
+  "replayed": true,
+  "rxSnr": 6.25,
+  "rxTime": 1794248584,
+  "to": 4294967295,
+  "toId": "^all",
+  "transportMechanism": "TRANSPORT_LORA"
+}

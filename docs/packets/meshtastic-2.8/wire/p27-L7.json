@@ -1,0 +1,28 @@
+{
+  "channel": 0,
+  "decoded": {
+    "bitfield": 0,
+    "payload": "CgkhNDMzYjEwYmMSD055YW4gMCDwn4yI8J+QsRoETllBMCIGSMpDOxC8KCs4AkIgCYiDxj5lmtlU711QwUALOih6ZnnvSxXHb++jO6YXi24=",
+    "portnum": "NODEINFO_APP",
+    "user": {
+      "hwModel": "HELTEC_V3",
+      "id": "!433b10bc",
+      "longName": "Nyan 0 \ud83c\udf08\ud83d\udc31",
+      "macaddr": "SMpDOxC8",
+      "publicKey": "CYiDxj5lmtlU711QwUALOih6ZnnvSxXHb++jO6YXi24=",
+      "role": "ROUTER",
+      "shortName": "NYA0"
+    }
+  },
+  "from": 1127944380,
+  "fromId": "!433b10bc",
+  "hopLimit": 2,
+  "hopStart": 7,
+  "id": 3792398312,
+  "priority": "DEFAULT",
+  "relayNode": 180,
+  "rxTime": 1794242096,
+  "to": 4294967295,
+  "toId": "^all",
+  "transportMechanism": "TRANSPORT_MULTICAST_UDP"
+}
