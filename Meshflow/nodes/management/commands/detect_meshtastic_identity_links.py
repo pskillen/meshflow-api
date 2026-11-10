@@ -1,7 +1,7 @@
 """Link Meshtastic rows that are the same radio under two numbers, from the keys already in the database.
 
-Idempotent: a second run changes nothing. The whole run is one transaction. ``--dry-run`` does the same work inside a transaction and rolls
-it back, so it reports exactly the numbers a real run would. Only key evidence is used here (MAC evidence needs a
+Idempotent: a second run changes nothing. The whole run is one transaction. ``--dry-run`` does the same work and
+rolls it back, so it reports exactly the numbers a real run would. Only key evidence is used here (MAC evidence needs a
 live on-air NodeInfo). Keys held by several nodes are never linked: each gets one flagged row naming every holder.
 Run it after the deploy that adds the link table, pre-prod first. See
 docs/features/packet-ingestion/adr/0006-meshtastic-identity-linking.md.
@@ -30,7 +30,12 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument("--dry-run", action="store_true", help="Report what would change; write nothing.")
-        parser.add_argument("--batch-size", type=int, default=500, help="Keys handled per slice of the loop (default 500). The whole run is still one transaction.")
+        parser.add_argument(
+            "--batch-size",
+            type=int,
+            default=500,
+            help="Keys per slice of the loop (default 500); the whole run is one transaction.",
+        )
 
     def handle(self, *args, **options):
         dry_run = options["dry_run"]
