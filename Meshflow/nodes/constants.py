@@ -9,3 +9,6 @@ INFRASTRUCTURE_ROLES = [
     RoleSource.REPEATER,
     RoleSource.ROUTER_LATE,
 ]
+
+# MeshCore infrastructure advert types: 2 = repeater, 3 = room server (ObservedNode.meshcore_adv_type)
+MC_INFRA = (2, 3)

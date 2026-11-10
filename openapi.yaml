@@ -1917,6 +1917,15 @@ components:
     MeshInfraMonitoringAlertSummary:
       type: object
       properties:
+        protocol:
+          type: string
+          enum: [meshtastic, meshcore]
+          description: Resolved protocol the counts are for.
+        supported:
+          type: boolean
+          description: >
+            False when mesh_presence monitoring (offline / battery / verifying) does not run for this
+            protocol (currently MeshCore); counts are then always 0 and the UI should hide the badge.
         alerting_nodes_count:
           type: integer
         offline_count:
@@ -8342,6 +8351,16 @@ paths:
             type: string
             enum: [mesh_infra]
           description: Use mesh_infra for infrastructure alerting counts.
+        - name: protocol
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [meshtastic, meshcore, mt, mc]
+            default: meshtastic
+          description: >
+            Which protocol's infrastructure to count. Omitted or unrecognized means Meshtastic.
+            MeshCore infra is meshcore_adv_type 2 (repeater) or 3 (room server).
       responses:
         '200':
           description: Alert summary for the requested scope

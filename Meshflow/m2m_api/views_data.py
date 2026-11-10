@@ -16,7 +16,7 @@ from rest_framework.views import APIView
 
 from common.protocol import Protocol
 from constellations.models import Constellation
-from nodes.constants import INFRASTRUCTURE_ROLES
+from nodes.constants import INFRASTRUCTURE_ROLES, MC_INFRA
 from nodes.models import ManagedNode, ManagedNodeStatus, ObservedNode, RoleSource
 from stats.models import StatsSnapshot
 
@@ -25,7 +25,6 @@ from .throttling import M2M_THROTTLE_CLASSES
 from .usage import record_m2m_request
 
 MC_TYPE_NAMES = {0: "none", 1: "chat", 2: "repeater", 3: "room", 4: "sensor"}
-MC_INFRA = (2, 3)
 HEARD_WINDOWS = {"24h": timedelta(hours=24), "7d": timedelta(days=7), "30d": timedelta(days=30)}
 DEPRECATED_ROLES = {RoleSource.ROUTER_CLIENT, RoleSource.REPEATER}
 

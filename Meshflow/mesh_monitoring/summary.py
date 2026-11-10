@@ -2,17 +2,27 @@
 
 from django.db.models import Q
 
-from nodes.constants import INFRASTRUCTURE_ROLES
+from common.protocol import Protocol
+from nodes.constants import INFRASTRUCTURE_ROLES, MC_INFRA
 from nodes.models import ObservedNode
 
 
-def mesh_infra_monitoring_alert_counts():
+def mesh_infra_monitoring_alert_counts(protocol=Protocol.MESHTASTIC):
     """
-    Count infrastructure observed nodes in an alerting monitoring state.
+    Count infrastructure observed nodes of ``protocol`` in an alerting monitoring state.
+
+    Meshtastic infra = ``meshtastic_role`` in ``INFRASTRUCTURE_ROLES``; MeshCore infra =
+    ``meshcore_adv_type`` in ``MC_INFRA``. ``supported`` is False for MeshCore because mesh_presence
+    monitoring (offline / battery / verifying) does not run for MeshCore nodes yet, so zero counts mean
+    "not monitored", not "all healthy".
 
     ``alerting_nodes_count`` is the distinct union of offline, active battery alert, and verifying nodes.
     """
-    qs = ObservedNode.objects.filter(meshtastic_role__in=INFRASTRUCTURE_ROLES)
+    if protocol == Protocol.MESHCORE:
+        qs = ObservedNode.objects.filter(protocol=Protocol.MESHCORE, meshcore_adv_type__in=MC_INFRA)
+    else:
+        protocol = Protocol.MESHTASTIC
+        qs = ObservedNode.objects.filter(protocol=Protocol.MESHTASTIC, meshtastic_role__in=INFRASTRUCTURE_ROLES)
 
     offline_q = Q(mesh_presence__is_offline=True) | Q(mesh_presence__offline_confirmed_at__isnull=False)
     battery_q = Q(monitoring_config__battery_alert_enabled=True) & Q(
@@ -30,6 +40,8 @@ def mesh_infra_monitoring_alert_counts():
     alerting_nodes_count = qs.filter(offline_q | battery_q | verifying_q).distinct().count()
 
     return {
+        "protocol": "meshcore" if protocol == Protocol.MESHCORE else "meshtastic",
+        "supported": protocol == Protocol.MESHTASTIC,
         "alerting_nodes_count": alerting_nodes_count,
         "offline_count": offline_count,
         "battery_count": battery_count,
