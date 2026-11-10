@@ -199,7 +199,7 @@ is a time-based fairness mechanism even though there is no explicit cutoff.
 
 | Item | Default | Purpose |
 | --- | --- | --- |
-| `GET /traceroutes/stats/` `success_over_time` | **Same window as** ``triggered_at_after`` (default 14d if omitted) | Daily completed/failed counts from filtered `AutoTraceRoute` in `traceroute_analytics/views.py` |
+| `GET /traceroutes/stats/` `success_over_time` | **Same window as** ``triggered_at_after`` (default 14d if omitted) | Daily completed/failed counts from filtered `AutoTraceRoute` in `traceroute_analytics/views.py`; `bucket=1h` gives hourly rows (default 24h, max 7d window, else 400) |
 | `backfill_traceroute_success_daily` | **30 days** default arg | Backfill span for `tr_success_daily` stats |
 | `compute_reach` (`triggered_at_after`/`_before`) | caller-supplied | Reach / coverage aggregation; no implicit default window |
 

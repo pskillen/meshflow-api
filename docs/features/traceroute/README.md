@@ -17,7 +17,7 @@ Meshtastic sections below remain the reference for the **active** traceroute sys
 - **Triggering**: Manual (**User**), scheduled mesh exploration (**Monitoring**), **External** (cross-environment / orphaned responses), **Node Watch** (mesh monitoring verification), **DX Watch** (reserved integer for future DX Monitoring exploration), and **New node baseline** (first-seen `ObservedNode`; meshflow-api#236). See [Mesh monitoring](../mesh-monitoring/README.md) for node-watch flows.
 - **Command delivery**: WebSocket (`NodeConsumer`) sends traceroute commands to connected bots (meshtastic-bot).
 - **Completion**: Packet receiver matches incoming `TraceroutePacket` to `AutoTraceRoute` (same source/target within configurable window). If no match exists (e.g. cross-env: prod triggered, pre-prod received), creates an `AutoTraceRoute` with `trigger_type=2` (External). Updates status and enqueues Neo4j sync (`traceroute_analytics`).
-- **Heatmap / coverage / stats**: Implemented in `traceroute_analytics` (Neo4j + ORM); same `/api/traceroutes/` paths as before.
+- **Heatmap / coverage / stats**: Implemented in `traceroute_analytics` (Neo4j + ORM); same `/api/traceroutes/` paths as before. `GET /api/traceroutes/stats/` `success_over_time` is daily by default; `bucket=1h` returns UTC hourly rows with `bucket_start` (default window 24h, max 7 days, otherwise 400).
 
 ## Trigger type (canonical)
 
