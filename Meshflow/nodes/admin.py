@@ -466,7 +466,11 @@ class ManagedNodeAdminForm(forms.ModelForm):
                 self.fields["mc_pubkey"].help_text = _(
                     "64-char lowercase hex from bot connect logs (SELF_INFO). Required before save."
                 )
-        elif not self.instance._state.adding and self.instance.protocol == Protocol.MESHTASTIC:
+        elif (
+            not self.instance._state.adding
+            and self.instance.protocol == Protocol.MESHTASTIC
+            and "meshtastic_node_id" in self.fields
+        ):
             self.fields["meshtastic_node_id"].initial = meshtastic_id_to_hex(self.instance.meshtastic_node_id)
 
         if "mc_flood_advert_interval_hours" in self.fields:
@@ -699,8 +703,11 @@ class ManagedNodeAdmin(admin.ModelAdmin):
     def get_readonly_fields(self, request, obj=None):
         if obj and obj.protocol == Protocol.MESHCORE:
             return ("display_id", "mc_channels_mirror", "mc_channels_synced_at") + MANAGED_NODE_FEEDER_API_FIELDS
+        # An existing feeder's number changes only through the audited re-point (API or action), never a raw save.
+        number_readonly = ("meshtastic_node_id",) if obj else ()
         return (
-            ("mc_channels_synced_at", "meshtastic_public_key", "predicted_node_id_str")
+            number_readonly
+            + ("mc_channels_synced_at", "meshtastic_public_key", "predicted_node_id_str")
             + MANAGED_NODE_FEEDER_API_FIELDS
             + MANAGED_NODE_REPORTED_IDENTITY_FIELDS
         )

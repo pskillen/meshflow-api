@@ -116,7 +116,9 @@ def _is_trusted_key(node, key_hex: str, now) -> bool:
 
 def _key_came_from_report(node, key_hex: str) -> bool:
     """True when a feeder report recorded ``key_hex``, so it proves nothing about who holds the radio."""
-    return node.identity_events.filter(outcome=Outcome.KEY_CHANGED, reported_public_key=key_hex).exists()
+    return node.identity_events.filter(
+        outcome__in=(Outcome.KEY_CHANGED, Outcome.KEY_ACCEPTED), reported_public_key=key_hex
+    ).exists()
 
 
 def _observed_at(num: int) -> Optional[ObservedNode]:
@@ -216,16 +218,7 @@ def _apply(node, *, old_num, new_num, key_hex, now):
         meshtastic_id_to_hex(old_num),
         meshtastic_id_to_hex(new_num),
     )
-    # The number has changed and committed: nothing below may stop the signal or the caller's later steps.
-    try:
-        ensure_observed_node_for_managed_node(node, claim=not _key_came_from_report(node, key_hex))
-    except Exception:
-        logger.exception("Feeder %s: could not ensure ObservedNode after re-key", node.internal_id)
-    for receiver, result in feeder_identity_changed.send_robust(
-        sender=ManagedNode, managed_node=node, event=event, old_node_id=old_num, new_node_id=new_num
-    ):
-        if isinstance(result, Exception):
-            logger.error("Feeder %s: identity signal receiver %r failed: %r", node.internal_id, receiver, result)
+    _after_commit(node, event, old_num, new_num, claim=not _key_came_from_report(node, key_hex))
     return event
 
 
@@ -309,10 +302,22 @@ class FeederRepointError(Exception):
     CODE_NOT_PROVEN = "repoint_not_proven"
     CODE_TARGET_KEY_MISMATCH = "repoint_target_key_mismatch"
     CODE_TARGET_CLAIMED = "repoint_target_claimed"
+    CODE_STAFF_ONLY = "staff_only"
+    CODE_NO_KEY_TO_ACCEPT = "no_key_to_accept"
 
     def __init__(self, code: str, message: str = ""):
         super().__init__(message or code)
         self.code = code
+
+
+# HTTP status for each refusal; any code not listed is a 400.
+REPOINT_HTTP_STATUS = {
+    FeederRepointError.CODE_NUMBER_COLLISION: 409,
+    FeederRepointError.CODE_NOT_PROVEN: 403,
+    FeederRepointError.CODE_TARGET_KEY_MISMATCH: 409,
+    FeederRepointError.CODE_TARGET_CLAIMED: 409,
+    FeederRepointError.CODE_STAFF_ONLY: 403,
+}
 
 
 def _valid_node_number(num) -> bool:
@@ -424,8 +429,85 @@ def repoint_feeder(node, new_number=None, *, actor, now=None) -> ManagedNodeIden
         meshtastic_id_to_hex(old_num),
         meshtastic_id_to_hex(new_number),
     )
-    ensure_observed_node_for_managed_node(node, claim=False)
-    feeder_identity_changed.send(
-        sender=ManagedNode, managed_node=node, event=event, old_node_id=old_num, new_node_id=new_number
+    _after_commit(node, event, old_num, new_number, claim=False)
+    return event
+
+
+def _after_commit(node, event, old_num, new_num, *, claim) -> None:
+    """The number has changed and committed: nothing here may turn that into a failure for the caller."""
+    try:
+        ensure_observed_node_for_managed_node(node, claim=claim)
+    except Exception:
+        logger.exception("Feeder %s: could not ensure ObservedNode after re-point", node.internal_id)
+    for receiver, result in feeder_identity_changed.send_robust(
+        sender=ManagedNode, managed_node=node, event=event, old_node_id=old_num, new_node_id=new_num
+    ):
+        if isinstance(result, Exception):
+            logger.error(
+                "Feeder %s: identity signal receiver %r failed: %r",
+                node.internal_id,
+                receiver,
+                result,
+                exc_info=result,
+            )
+
+
+def accept_reported_key(node, *, actor, now=None) -> ManagedNodeIdentityEvent:
+    """Staff accept the key a feeder reports for its unchanged number (the 2.7 key-regeneration case).
+
+    A report never replaces a stored key, so a re-keyed radio that keeps its number stays ``key_mismatch`` for ever.
+    The key comes from the newest open ``key_mismatch`` row for the current number (never from the request), so
+    staff accept what the feeder actually reported. Owners can't: their re-point proof rests on the stored key. Writes
+    a ``key_accepted`` event and resolves the open flagged rows, all acknowledged by ``actor``; the number is
+    unchanged, so there is no signal. Raises ``FeederRepointError``.
+    """
+    if node.protocol != Protocol.MESHTASTIC:
+        raise FeederRepointError(FeederRepointError.CODE_NOT_MESHTASTIC, "Only Meshtastic feeders have a node number.")
+    if not actor.is_staff:
+        raise FeederRepointError(FeederRepointError.CODE_STAFF_ONLY, "Only staff can accept a new public key.")
+    now = now or timezone.now()
+    with transaction.atomic():
+        locked = _lock(node)
+        number = locked.meshtastic_node_id
+        open_flagged = list(_open_flagged(locked).order_by("-created_at", "-id"))
+        matching = next(
+            (
+                row
+                for row in open_flagged
+                if row.reason == Reason.KEY_MISMATCH
+                and row.new_meshtastic_node_id == number
+                and normalise_pubkey(row.reported_public_key) is not None
+            ),
+            None,
+        )
+        if matching is None:
+            raise FeederRepointError(
+                FeederRepointError.CODE_NO_KEY_TO_ACCEPT,
+                "This feeder has no reported public key waiting to be accepted.",
+            )
+        key_hex = normalise_pubkey(matching.reported_public_key)
+        locked.meshtastic_public_key = key_hex
+        locked.meshtastic_key_node_id = key_node_id(key_hex)
+        locked.save(update_fields=["meshtastic_public_key", "meshtastic_key_node_id"])
+        seen = {"acknowledged_at": now, "acknowledged_by": actor}
+        ManagedNodeIdentityEvent.objects.filter(pk__in=[row.pk for row in open_flagged]).update(resolved_at=now, **seen)
+        event = ManagedNodeIdentityEvent.objects.create(
+            managed_node=locked,
+            old_meshtastic_node_id=number,
+            new_meshtastic_node_id=number,
+            reported_public_key=key_hex,
+            outcome=Outcome.KEY_ACCEPTED,
+            resolved_at=now,
+            **seen,
+        )
+    node.meshtastic_public_key = locked.meshtastic_public_key
+    node.meshtastic_key_node_id = locked.meshtastic_key_node_id
+    _count(Outcome.KEY_ACCEPTED)
+    logger.info(
+        "Feeder %s (%s): user %s accepted the reported public key for %s",
+        node.internal_id,
+        node.name,
+        getattr(actor, "pk", None),
+        meshtastic_id_to_hex(number),
     )
     return event

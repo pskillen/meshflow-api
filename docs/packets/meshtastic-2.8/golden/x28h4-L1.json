@@ -17,6 +17,7 @@
   },
   "key": "x28h4-L1",
   "observation": {
+    "ack_proof_status": null,
     "bitfield": null,
     "channel": 0,
     "hop_limit": 4,
@@ -28,7 +29,8 @@
     "rx_time": "2026-11-08T14:04:03Z",
     "rx_time_estimated": false,
     "transport_mechanism": null,
-    "via_mqtt": false
+    "via_mqtt": false,
+    "xeddsa_signed": null
   },
   "observed_node": {
     "environment_exposure": 0,
@@ -62,7 +64,8 @@
       "port_num": "ROUTING_APP",
       "telemetry_variant": null,
       "to_int": 3769067321,
-      "to_str": "!e0a76739"
+      "to_str": "!e0a76739",
+      "xeddsa_signature_present": null
     },
     "model": "GenericPacket"
   },

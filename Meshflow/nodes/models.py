@@ -333,6 +333,7 @@ class ManagedNodeIdentityEvent(models.Model):
         FLAGGED = "flagged", _("Flagged")
         MANUAL = "manual", _("Manual")
         KEY_CHANGED = "key_changed", _("Key changed")
+        KEY_ACCEPTED = "key_accepted", _("Key accepted by staff")
 
     class Reason(models.TextChoices):
         KEY_NOT_REPORTED = "key_not_reported", _("Key not reported")
@@ -563,6 +564,12 @@ class ObservedNode(models.Model):
     )
 
     last_heard = models.DateTimeField(null=True, blank=True, db_index=True)
+    # When a signed (non-replayed) packet from this node was last ingested. Forward-only; null = never seen signing.
+    meshtastic_last_signed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text=_("When a signed packet from this node was last seen. Null: never seen signing."),
+    )
     created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
 
     m2m_opt_out = models.BooleanField(
@@ -611,6 +618,19 @@ class ObservedNode(models.Model):
     def node_id_str(self) -> str:
         """Protocol-aware display id (not a DB column; ADR-0001)."""
         return observed_node_id_str(self)
+
+    @property
+    def meshtastic_v28_identity(self) -> bool | None:
+        """True when the node number is the crc32 of the stored key (a 2.8 identity), False when it is not, None
+        when there is no usable key or number to compare. Derived, not stored."""
+        if self.meshtastic_key_node_id is None or self.meshtastic_node_id is None:
+            return None
+        return self.meshtastic_key_node_id == self.meshtastic_node_id
+
+    @property
+    def meshtastic_known_signer(self) -> bool:
+        """True once a signed packet from this node has been seen."""
+        return self.meshtastic_last_signed_at is not None
 
     def __str__(self):
         """Return a string representation of the node, including user's short name if available."""

@@ -49,6 +49,7 @@ class BasePacketService(abc.ABC):
             from_node_created=self._dx_from_node_created,
         )
         self._update_node_last_heard()
+        self._update_node_last_signed()
 
     @abc.abstractmethod
     def _process_packet(self) -> None:
@@ -105,3 +106,21 @@ class BasePacketService(abc.ABC):
             except ObservedNode.DoesNotExist:
                 # If the node doesn't exist, we don't need to update it
                 pass
+
+    def _update_node_last_signed(self) -> None:
+        """
+        Move the sender's last-signed time forward only, when this observation is a signed, non-replayed one.
+
+        Unsigned (False) and unknown (None) observations leave it alone, as does a replay. Like last_heard, the
+        UPDATE is conditional so a stale in-memory node or a concurrent worker cannot move it back.
+        """
+        if self.observation.xeddsa_signed is not True or self.observation.replayed:
+            return
+        if not self.packet.from_int or not self.packet.first_reported_time:
+            return
+        candidate = min(self.packet.first_reported_time, timezone.now())
+        rows = ObservedNode.objects.filter(pk=self.from_node.pk).filter(
+            Q(meshtastic_last_signed_at__isnull=True) | Q(meshtastic_last_signed_at__lt=candidate)
+        )
+        if rows.update(meshtastic_last_signed_at=candidate):
+            self.from_node.meshtastic_last_signed_at = candidate

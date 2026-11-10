@@ -99,7 +99,7 @@ from nodes.serializers import (
 )
 from nodes.services.device_metrics import get_device_metrics_bulk
 from nodes.services.environment_metrics import get_environment_metrics_bulk
-from nodes.services.feeder_identity import FeederRepointError, repoint_feeder
+from nodes.services.feeder_identity import REPOINT_HTTP_STATUS, FeederRepointError, accept_reported_key, repoint_feeder
 from nodes.services.nearby_infrastructure import (
     NearbyParamError,
     get_nearby_infrastructure_cached,
@@ -1378,6 +1378,9 @@ class ManagedNodeViewSet(viewsets.ModelViewSet):
 
         Body ``{"meshtastic_node_id": <int>}`` is optional; the default is the number the feeder last reported.
         Owners can only accept the number the feeder reports, proved by its stored key; any other number is staff only.
+
+        Body ``{"accept_reported_key": true}`` (staff only) keeps the number and accepts the public key the feeder
+        reported for it, resolving the open ``key_mismatch`` row (a radio re-keyed without a number change).
         """
         node = self.get_object()
         self._managed_node_mutate_allowed(node)
@@ -1386,15 +1389,24 @@ class ManagedNodeViewSet(viewsets.ModelViewSet):
         new_number = request.data.get("meshtastic_node_id")
         if new_number is not None and (isinstance(new_number, bool) or not isinstance(new_number, int)):
             return Response({"code": FeederRepointError.CODE_INVALID_NODE_ID}, status=status.HTTP_400_BAD_REQUEST)
+        accept_key = request.data.get("accept_reported_key", False)
+        if not isinstance(accept_key, bool):
+            return Response(
+                {"code": "invalid_accept_reported_key", "detail": "accept_reported_key must be true or false."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         try:
-            event = repoint_feeder(node, new_number, actor=request.user)
+            if accept_key:
+                if new_number is not None and new_number != node.meshtastic_node_id:
+                    raise FeederRepointError(
+                        FeederRepointError.CODE_INVALID_NODE_ID,
+                        "accept_reported_key keeps the current number; send one or the other.",
+                    )
+                event = accept_reported_key(node, actor=request.user)
+            else:
+                event = repoint_feeder(node, new_number, actor=request.user)
         except FeederRepointError as exc:
-            http_status = {
-                FeederRepointError.CODE_NUMBER_COLLISION: status.HTTP_409_CONFLICT,
-                FeederRepointError.CODE_NOT_PROVEN: status.HTTP_403_FORBIDDEN,
-                FeederRepointError.CODE_TARGET_KEY_MISMATCH: status.HTTP_409_CONFLICT,
-                FeederRepointError.CODE_TARGET_CLAIMED: status.HTTP_409_CONFLICT,
-            }.get(exc.code, status.HTTP_400_BAD_REQUEST)
+            http_status = REPOINT_HTTP_STATUS.get(exc.code, status.HTTP_400_BAD_REQUEST)
             return Response({"code": exc.code, "detail": str(exc)}, status=http_status)
         return Response(ManagedNodeIdentityEventSerializer(event).data)
 

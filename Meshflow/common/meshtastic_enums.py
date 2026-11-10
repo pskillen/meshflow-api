@@ -294,3 +294,20 @@ def normalise_hw_model(value):
             return HARDWARE_MODEL_NAMES.get(number, f"HW_{number}")
         return HARDWARE_MODEL_RENAMES.get(text, value)
     return value
+
+
+ACK_PROOF_MAX_LENGTH = 32  # ``PacketObservation.ack_proof_status`` column width
+
+
+def normalise_ack_proof(value) -> "str | None":
+    """Return the ack-proof status name as sent (``ACK_PROOF_VALID``, ``_INVALID``, ``_NO_KEY``), else None.
+
+    The bot sends the enum name and only for a non-zero status, so absent stays None. Anything that is not a short
+    printable string is None.
+    """
+    if not isinstance(value, str):
+        return None
+    text = value.strip()
+    if not text or len(text) > ACK_PROOF_MAX_LENGTH or not text.isprintable():
+        return None
+    return text

@@ -16,7 +16,7 @@ from common.mesh_node_helpers import (
     observed_node_id_str,
     parse_b64_mac_address,
 )
-from common.meshtastic_enums import normalise_hw_model, normalise_portnum, normalise_transport
+from common.meshtastic_enums import normalise_ack_proof, normalise_hw_model, normalise_portnum, normalise_transport
 from common.meshtastic_identity import (
     clamp_last_heard,
     has_name_fields,
@@ -42,6 +42,7 @@ from .models import (
     LocalStatsPacket,
     LocationSource,
     MessagePacket,
+    MtRawPacket,
     NodeInfoPacket,
     PacketObservation,
     PositionPacket,
@@ -174,6 +175,15 @@ class BasePacketSerializer(serializers.Serializer):
 
         validated_data["transport_mechanism"] = normalise_transport(data.get("transportMechanism"))
 
+        # XEdDSA signing state. Absent stays None (unknown): it is never coerced to False.
+        signed = data.get("xeddsaSigned") if hasattr(data, "get") else None
+        validated_data["xeddsa_signed"] = signed if isinstance(signed, bool) else None
+        ack_proof = data.get("ackProofStatus") if hasattr(data, "get") else None
+        validated_data["ack_proof_status"] = normalise_ack_proof(ack_proof)
+        decoded_in = data.get("decoded") if hasattr(data, "get") else None
+        signature = decoded_in.get("xeddsaSignature") if isinstance(decoded_in, dict) else None
+        validated_data["xeddsa_signature_present"] = isinstance(signature, str) and bool(signature.strip())
+
         # Convert rxTime to a datetime object with validation. A feeder with no rxTime (protobuf3 drops 0)
         # gets the API clock, flagged on the observation.
         if validated_data.get("rx_time"):
@@ -221,6 +231,8 @@ class BasePacketSerializer(serializers.Serializer):
             self.observation = existing_observation
             return existing_observation
 
+        self._mark_signature_present(packet, validated_data)
+
         # --- Channel FK resolution logic ---
         channel_value = validated_data.get("channel", 0)  # The bot often omits nullish fields
         channel_instance = None
@@ -261,9 +273,22 @@ class BasePacketSerializer(serializers.Serializer):
             rx_rssi=validated_data.get("rx_rssi"),
             rx_snr=validated_data.get("rx_snr"),
             relay_node=validated_data.get("relay_node"),
+            xeddsa_signed=validated_data.get("xeddsa_signed"),
+            ack_proof_status=validated_data.get("ack_proof_status"),
         )
 
         return self.observation
+
+    @staticmethod
+    def _mark_signature_present(packet, validated_data) -> None:
+        """Record that a signature was seen on the packet. Only ever sets it: a later observer without one does not
+        clear it. One conditional UPDATE, so a stale in-memory packet cannot undo it."""
+        if not validated_data.get("xeddsa_signature_present") or packet.xeddsa_signature_present:
+            return
+        MtRawPacket.objects.filter(pk=packet.pk).exclude(xeddsa_signature_present=True).update(
+            xeddsa_signature_present=True
+        )
+        packet.xeddsa_signature_present = True
 
 
 class MessagePacketSerializer(BasePacketSerializer):
@@ -1837,6 +1862,8 @@ class PrefetchedPacketObservationSerializer(serializers.ModelSerializer):
             "replayed",
             "via_mqtt",
             "transport_mechanism",
+            "xeddsa_signed",
+            "ack_proof_status",
             "rx_snr",
             "direct_from_sender",
             "hop_count",

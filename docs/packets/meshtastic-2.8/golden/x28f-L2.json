@@ -17,6 +17,7 @@
   },
   "key": "x28f-L2",
   "observation": {
+    "ack_proof_status": null,
     "bitfield": null,
     "channel": 0,
     "hop_limit": 3,
@@ -28,7 +29,8 @@
     "rx_time": "2026-11-08T14:24:12Z",
     "rx_time_estimated": false,
     "transport_mechanism": null,
-    "via_mqtt": false
+    "via_mqtt": false,
+    "xeddsa_signed": null
   },
   "observed_node": {
     "environment_exposure": 0,
@@ -75,7 +77,8 @@
       "reading_time": "1970-01-01T00:01:21Z",
       "to_int": 4294967295,
       "to_str": "^all",
-      "uptime_seconds": 81
+      "uptime_seconds": 81,
+      "xeddsa_signature_present": null
     },
     "model": "LocalStatsPacket"
   },

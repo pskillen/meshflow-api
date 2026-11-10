@@ -97,6 +97,53 @@ def test_backfill_sets_managed_node_key_from_observed_node(create_observed_node,
 
 
 @pytest.mark.django_db
+def test_backfilled_managed_key_is_dated_so_it_cannot_back_a_number_change_at_once(
+    create_observed_node, create_managed_node, settings
+):
+    """The key comes from the client-writable observed row: it gets the same settle hour as a key from a report."""
+    from nodes.models import ManagedNodeIdentityEvent
+    from nodes.services.feeder_identity import FIRST_KEY_SETTLE, apply_reported_identity
+
+    settings.MESHTASTIC_FEEDER_AUTO_REKEY = True
+    create_observed_node(meshtastic_node_id=2010, meshtastic_public_key=KEY_B64)
+    managed = create_managed_node(meshtastic_node_id=2010)
+
+    _run()
+
+    event = managed.identity_events.get()
+    assert event.outcome == ManagedNodeIdentityEvent.Outcome.KEY_CHANGED
+    assert event.reported_public_key == KEY_HEX
+    managed.refresh_from_db()
+    now = timezone.now()
+    flagged = apply_reported_identity(managed, reported_node_num=0x4396524C, reported_pubkey=KEY_B64, now=now)
+    assert flagged.reason == ManagedNodeIdentityEvent.Reason.KEY_MISMATCH
+    later = now + FIRST_KEY_SETTLE + timedelta(minutes=1)
+    applied = apply_reported_identity(managed, reported_node_num=0x4396524C, reported_pubkey=KEY_B64, now=later)
+    assert applied.outcome == ManagedNodeIdentityEvent.Outcome.AUTO_UPDATED
+
+
+@pytest.mark.django_db
+def test_backfill_writes_no_event_when_the_managed_key_was_already_held(create_observed_node, create_managed_node):
+    create_observed_node(meshtastic_node_id=2011, meshtastic_public_key=KEY_B64)
+    managed = create_managed_node(meshtastic_node_id=2011)
+    ManagedNode.objects.filter(pk=managed.pk).update(meshtastic_public_key=KEY_HEX)
+
+    _run()
+
+    assert not managed.identity_events.exists()
+
+
+@pytest.mark.django_db
+def test_dry_run_writes_no_identity_events(create_observed_node, create_managed_node):
+    create_observed_node(meshtastic_node_id=2012, meshtastic_public_key=KEY_B64)
+    managed = create_managed_node(meshtastic_node_id=2012)
+
+    _run("--dry-run")
+
+    assert not managed.identity_events.exists()
+
+
+@pytest.mark.django_db
 def test_backfill_does_not_clear_an_existing_managed_key(create_observed_node, create_managed_node):
     create_observed_node(meshtastic_node_id=2003, meshtastic_public_key=None)
     managed = create_managed_node(meshtastic_node_id=2003)

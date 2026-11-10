@@ -3,6 +3,7 @@ import secrets
 from django.urls import reverse
 
 from rest_framework import serializers
+from rest_framework.exceptions import APIException
 from rest_framework.fields import empty
 
 from common.access import AccessLevel, get_access_level, user_can_manage_api_keys
@@ -38,6 +39,7 @@ from .permission_helpers import (
     user_can_edit_observed_node_rf_profile,
 )
 from .positioning import managed_node_default_position_data
+from .services.feeder_identity import REPOINT_HTTP_STATUS, FeederRepointError, repoint_feeder
 
 
 class ObservedNodeEnvironmentSettingsSerializer(serializers.Serializer):
@@ -379,6 +381,14 @@ class APIKeyCreateSerializer(serializers.ModelSerializer):
         return api_key
 
 
+class FeederRepointAPIError(APIException):
+    """A staff update that changes ``meshtastic_node_id`` was refused by ``repoint_feeder``: 409 on a collision."""
+
+    def __init__(self, error: FeederRepointError):
+        super().__init__(detail={"code": error.code, "detail": str(error)})
+        self.status_code = REPOINT_HTTP_STATUS.get(error.code, 400)
+
+
 class ManagedNodeSerializer(serializers.ModelSerializer):
     """Serializer for managed nodes, enriched with observed node and latest position info."""
 
@@ -604,7 +614,7 @@ class ManagedNodeSerializer(serializers.ModelSerializer):
             .select_related("latest_status")
             .first()
         )
-        return observed.latest_status if observed else None
+        return getattr(observed, "latest_status", None)  # a freshly ensured ObservedNode has none yet
 
     def get_latest_environment_metrics(self, obj):
         status = self._get_managed_node_latest_status(obj)
@@ -850,6 +860,21 @@ class OwnedManagedNodeSerializer(ManagedNodeSerializer):
         if request is not None and not request.user.is_staff:
             validated_data.pop("owner", None)
             validated_data.pop("constellation", None)
+        new_number = validated_data.pop("meshtastic_node_id", None)
+        if (
+            request is not None
+            and request.user.is_staff
+            and instance.protocol == Protocol.MESHTASTIC
+            and new_number is not None
+            and new_number != instance.meshtastic_node_id
+        ):
+            # Staff change the number through the audited path too: event, resolved flags, signal, 409 on a clash.
+            try:
+                repoint_feeder(instance, new_number, actor=request.user)
+            except FeederRepointError as exc:
+                raise FeederRepointAPIError(exc) from exc
+        elif instance.protocol != Protocol.MESHTASTIC and new_number is not None:
+            validated_data["meshtastic_node_id"] = new_number
         return super().update(instance, validated_data)
 
     # For read, override to_representation
@@ -1237,6 +1262,8 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
     battery_alert_confirmed_at = serializers.SerializerMethodField()
     owner = OwnerSerializer(source="claimed_by", read_only=True)
     claim = serializers.SerializerMethodField()
+    meshtastic_v28_identity = serializers.BooleanField(read_only=True, allow_null=True)
+    meshtastic_known_signer = serializers.BooleanField(read_only=True)
 
     def get_fields(self):
         fields = super().get_fields()
@@ -1289,6 +1316,8 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
             "battery_alert_confirmed_at",
             "owner",
             "claim",
+            "meshtastic_v28_identity",
+            "meshtastic_known_signer",
         ]
         read_only_fields = [
             "internal_id",

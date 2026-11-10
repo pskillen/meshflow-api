@@ -30,6 +30,9 @@ class MtRawPacket(models.Model):
     to_str = models.CharField(max_length=9, null=True)
     port_num = models.CharField(max_length=50, null=True)
     first_reported_time = models.DateTimeField(null=False, default=timezone.now)
+    # True once any observer's body carried decoded.xeddsaSignature. Null = no signature seen (not "unsigned":
+    # an observer that does not forward the signature says nothing). Never cleared by a later observer.
+    xeddsa_signature_present = models.BooleanField(null=True)
 
     class Meta:
         db_table = "packets_mt_raw_packet"
@@ -339,6 +342,11 @@ class PacketObservation(models.Model):
     # transportMechanism on a new row is also null: it means TRANSPORT_INTERNAL, the feeder's own packet.
     via_mqtt = models.BooleanField(null=True)
     transport_mechanism = models.CharField(max_length=32, null=True)
+    # XEdDSA signing (2.8+). Tri-state: True signed, False unsigned (the feeder is known to run 2.8+, where
+    # unsigned is the normal state), null unknown (body had no xeddsaSigned: 2.7 feeder, older bot, unreadable).
+    xeddsa_signed = models.BooleanField(null=True)
+    # Ack-proof status name (ACK_PROOF_VALID, ACK_PROOF_INVALID, ACK_PROOF_NO_KEY). Null = absent.
+    ack_proof_status = models.CharField(max_length=32, null=True)
 
     class Meta:
         verbose_name = _("Packet observation")
