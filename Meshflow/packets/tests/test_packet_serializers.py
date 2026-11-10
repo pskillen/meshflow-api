@@ -1345,6 +1345,23 @@ class NodeSerializerTest(BasePacketSerializerTestCase):
         self.assertFalse(serializer.is_valid())
         self.assertIn("position", serializer.errors)
 
+    def test_node_upsert_v3_rejects_legacy_only_device_metrics_field(self):
+        from django.utils import timezone
+
+        from packets.serializers import NodeSerializerV3
+
+        data = {
+            "id": self.from_node.meshtastic_node_id,
+            "device_metrics": {
+                "reported_time": timezone.now().isoformat(),
+                "channel_utilization": 1,
+            },
+        }
+
+        serializer = NodeSerializerV3(instance=self.from_node, data=data, partial=True)
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("device_metrics", serializer.errors)
+
     def test_node_upsert_v3_accepts_meshtastic_fields(self):
         from django.utils import timezone
 
