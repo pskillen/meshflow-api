@@ -1,3 +1,5 @@
+import os
+
 from .base import *  # noqa
 
 # Tests use locmem cache so pytest does not require Redis for django.core.cache
@@ -15,13 +17,26 @@ CHANNEL_LAYERS = {
     },
 }
 
-# Use SQLite for testing
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": ":memory:",
+# SQLite in memory by default. Set TEST_DB_ENGINE=postgres to run the suite on PostgreSQL (what prod runs);
+# connection comes from POSTGRES_DB/USER/PASSWORD/HOST/PORT, as in base.py. CI runs both.
+if os.environ.get("TEST_DB_ENGINE", "sqlite").lower() in ("postgres", "postgresql"):
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": os.environ.get("POSTGRES_DB", "meshflow"),
+            "USER": os.environ.get("POSTGRES_USER", "meshflow"),
+            "PASSWORD": os.environ.get("POSTGRES_PASSWORD", "meshflow"),
+            "HOST": os.environ.get("POSTGRES_HOST", "localhost"),
+            "PORT": os.environ.get("POSTGRES_PORT", "5432"),
+        }
     }
-}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": ":memory:",
+        }
+    }
 
 # Disable password hashing for faster tests
 PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
