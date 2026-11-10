@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('nodes', '0062_device_metrics_nullable'),
+        ('nodes', '0063_last_signed_at'),
     ]
 
     operations = [
