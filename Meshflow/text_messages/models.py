@@ -1,5 +1,6 @@
 import uuid
 
+from django.conf import settings
 from django.db import models
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
@@ -64,3 +65,23 @@ class TextMessage(models.Model):
         sender_label = self.sender.node_id_str if self.sender_id else "?"
         recipient = self.recipient_meshtastic_node_id or "^all"
         return f"{sender_label} -> {recipient}: {self.message_text[:10]}..."
+
+
+class MessageChannelReadState(models.Model):
+    """Per-user read cursor for a message channel (server-side unread state)."""
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="channel_read_states")
+    channel = models.ForeignKey("constellations.MessageChannel", on_delete=models.CASCADE, related_name="read_states")
+    last_read_at = models.DateTimeField(
+        help_text=_("Messages with sent_at after this instant count as unread for the user."),
+    )
+
+    class Meta:
+        verbose_name = _("Message channel read state")
+        verbose_name_plural = _("Message channel read states")
+        constraints = [
+            models.UniqueConstraint(fields=["user", "channel"], name="unique_user_channel_read_state"),
+        ]
+
+    def __str__(self):
+        return f"user={self.user_id} channel={self.channel_id} read_at={self.last_read_at}"
