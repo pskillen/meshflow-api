@@ -261,8 +261,8 @@ def test_observed_node_detail_bare_hex_ambiguous(create_observed_node, create_us
     create_observed_node(
         protocol=Protocol.MESHCORE,
         meshtastic_node_id=None,
-        mc_pubkey_prefix=hex8 + "cafebabe",
-        mc_pubkey=hex8 + "cafebabe" + "0" * 48,
+        mc_pubkey_prefix=hex8 + "cafe",
+        mc_pubkey=hex8 + "cafe" + "0" * 52,
         long_name="MC",
         short_name="MC",
     )

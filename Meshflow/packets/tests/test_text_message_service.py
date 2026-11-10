@@ -110,7 +110,7 @@ def test_authorize_node_claim_broadcast_message(
 ):
     """Test authorizing a node claim with a broadcast message."""
     service = TextMessagePacketService()
-    packet = create_message_packet(to_int=MESHTASTIC_BROADCAST_ID, to_str="!broadcast")
+    packet = create_message_packet(to_int=MESHTASTIC_BROADCAST_ID, to_str="!ffffffff")
     observer = create_managed_node()
     observation = create_packet_observation(packet=packet, observer=observer)
     user = create_user()
