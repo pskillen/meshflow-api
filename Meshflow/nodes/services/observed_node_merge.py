@@ -18,7 +18,7 @@ Rules, per duplicate set (each set merges in its own ``transaction.atomic()``):
 * **Relations**: every reverse relation in ``ObservedNode._meta.related_objects`` is re-pointed at the keeper.
   One-to-ones keep the keeper's row (else the row of the most recently heard duplicate moves across) and drop the
   rest. If re-pointing a foreign-key row would break a unique constraint on the related table, the keeper's row
-  wins and the duplicate's row is deleted.
+  wins and the duplicate's row is deleted (an identity link that staff confirmed displaces a weaker clashing one).
 
 Dry-run does the merge for real inside the set's transaction and rolls it back, so it reports exactly the numbers a
 real run writes (no dry-run that reads its own unwritten changes).
@@ -29,12 +29,12 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 
 from django.db import IntegrityError, transaction
-from django.db.models import Count
+from django.db.models import Count, Q
 
 from common.mesh_node_helpers import meshtastic_id_to_hex
 from common.meshtastic_identity import is_placeholder_name
 from common.protocol import Protocol
-from nodes.models import ObservedNode
+from nodes.models import ObservedNode, ObservedNodeIdentityLink
 from nodes.services.observed_nodes import KEEPER_ORDERING
 
 logger = logging.getLogger(__name__)
@@ -71,7 +71,7 @@ HANDLED_RELATIONS = frozenset(
         "nodes.HealthMetrics.node",
         "nodes.HostMetrics.node",
         "nodes.NodeLatestStatus.node",
-        "nodes.ObservedNodeIdentityLink.new_node",  # re-pointed; a clash with the keeper's link drops the duplicate's
+        "nodes.ObservedNodeIdentityLink.new_node",  # re-pointed; a clash drops the duplicate's, unless it is confirmed and the keeper's is not
         "nodes.ObservedNodeIdentityLink.old_node",
         "nodes.NodeOwnerClaim.node",
         "nodes.NodeRfProfile.observed_node",
@@ -189,9 +189,39 @@ def _repoint_foreign_key(related, keeper_pk, loser_pks) -> tuple[int, int]:
                 model._base_manager.filter(pk=pk).update(**{attname: keeper_pk})
             moved += 1
         except IntegrityError:
+            if _displace_for_confirmed_link(model, pk, attname, keeper_pk):
+                moved += 1
+                continue
             model._base_manager.filter(pk=pk).delete()
             dropped += 1
     return moved, dropped
+
+
+def _displace_for_confirmed_link(model, pk, attname, keeper_pk) -> bool:
+    """A staff-confirmed link that clashes with the keeper's weaker one wins: the weaker rows go, then it moves.
+
+    Only for identity links, only for ``confirmed``, and only against rows that are not themselves confirmed.
+    """
+    if model is not ObservedNodeIdentityLink:
+        return False
+    row = model._base_manager.filter(pk=pk).first()
+    if row is None or row.state != ObservedNodeIdentityLink.State.CONFIRMED:
+        return False
+    old_pk = keeper_pk if attname == "old_node_id" else row.old_node_id
+    new_pk = keeper_pk if attname == "new_node_id" else row.new_node_id
+    clash = (
+        Q(old_node_id=old_pk, new_node_id=new_pk)
+        | Q(state__in=ObservedNodeIdentityLink.LIVE_STATES, old_node_id=old_pk)
+        | Q(state__in=ObservedNodeIdentityLink.LIVE_STATES, new_node_id=new_pk)
+    )
+    weaker = model._base_manager.filter(clash).exclude(pk=pk).exclude(state=ObservedNodeIdentityLink.State.CONFIRMED)
+    try:
+        with transaction.atomic():
+            weaker.delete()
+            model._base_manager.filter(pk=pk).update(**{attname: keeper_pk})
+    except IntegrityError:
+        return False
+    return True
 
 
 def _repoint_one_to_one(related, keeper_pk, losers_by_heard) -> tuple[int, int]:
