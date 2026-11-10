@@ -38,6 +38,7 @@ class MtRawPacket(models.Model):
             models.Index(fields=["from_int"]),
             models.Index(fields=["from_int", "packet_id"]),
             models.Index(fields=["to_int"]),
+            models.Index(fields=["first_reported_time"], name="packets_mt_first_rep_idx"),
         ]
         verbose_name = _("Meshtastic raw packet")
         verbose_name_plural = _("Meshtastic raw packets")
@@ -344,4 +345,5 @@ class PacketObservation(models.Model):
         verbose_name_plural = _("Packet observations")
         indexes = [
             models.Index(fields=["observer", "upload_time"], name="packets_po_obs_upload_idx"),
+            models.Index(fields=["rx_time"], name="packets_po_rx_time_idx"),
         ]
