@@ -17,6 +17,11 @@ from .mc_channel_sender import bulk_mc_sender_candidates_by_label, parse_mc_chan
 from .models import TextMessage
 from .serializers import TextMessageSerializer, _normalize_path_segment
 
+# Messages the list endpoint treats as channel messages (MT broadcast, MC channel rows).
+CHANNEL_MESSAGE_Q = Q(protocol=Protocol.MESHTASTIC, recipient_meshtastic_node_id=MESHTASTIC_BROADCAST_ID) | Q(
+    protocol=Protocol.MESHCORE, sender__isnull=True, channel__isnull=False
+)
+
 
 class TextMessageViewSet(viewsets.ModelViewSet):
     serializer_class = TextMessageSerializer
@@ -63,10 +68,7 @@ class TextMessageViewSet(viewsets.ModelViewSet):
             elif key in ("meshcore", "mc", "2"):
                 queryset = queryset.filter(protocol=Protocol.MESHCORE)
 
-        queryset = queryset.filter(
-            Q(protocol=Protocol.MESHTASTIC, recipient_meshtastic_node_id=MESHTASTIC_BROADCAST_ID)
-            | Q(protocol=Protocol.MESHCORE, sender__isnull=True, channel__isnull=False)
-        )
+        queryset = queryset.filter(CHANNEL_MESSAGE_Q)
 
         mt_observation_qs = PacketObservation.objects.select_related("observer")
         mc_observation_qs = MeshCorePacketObservation.objects.select_related("observer")
