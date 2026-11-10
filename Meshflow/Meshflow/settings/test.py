@@ -19,7 +19,8 @@ CHANNEL_LAYERS = {
 
 # SQLite in memory by default. Set TEST_DB_ENGINE=postgres to run the suite on PostgreSQL (what prod runs);
 # connection comes from POSTGRES_DB/USER/PASSWORD/HOST/PORT, as in base.py. CI runs both.
-if os.environ.get("TEST_DB_ENGINE", "sqlite").lower() in ("postgres", "postgresql"):
+_TEST_DB_ENGINE = os.environ.get("TEST_DB_ENGINE", "sqlite").lower()
+if _TEST_DB_ENGINE in ("postgres", "postgresql"):
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.postgresql",
@@ -30,13 +31,16 @@ if os.environ.get("TEST_DB_ENGINE", "sqlite").lower() in ("postgres", "postgresq
             "PORT": os.environ.get("POSTGRES_PORT", "5432"),
         }
     }
-else:
+elif _TEST_DB_ENGINE == "sqlite":
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.sqlite3",
             "NAME": ":memory:",
         }
     }
+else:
+    # A typo must not silently fall back to SQLite and leave a "Postgres" run testing nothing new.
+    raise ValueError(f"Unknown TEST_DB_ENGINE {_TEST_DB_ENGINE!r}; use 'sqlite' (default) or 'postgres'")
 
 # Disable password hashing for faster tests
 PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
