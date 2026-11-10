@@ -82,9 +82,9 @@ def test_build_dx_message_respects_discord_length_limit(
     c = create_constellation()
     dest = create_observed_node()
     now = timezone.now()
-    long_meta = "x" * 5000
-    dest.long_name = long_meta
-    dest.save(update_fields=["long_name"])
+    # Deliberately not saved: long_name is a varchar(50) column and PostgreSQL rejects a longer value. The event
+    # holds this same instance, so the message builder still sees the oversized name.
+    dest.long_name = "x" * 5000
     event = DxEvent.objects.create(
         constellation=c,
         destination=dest,

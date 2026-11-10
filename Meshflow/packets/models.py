@@ -326,7 +326,8 @@ class PacketObservation(models.Model):
     channel = models.ForeignKey(MessageChannel, on_delete=models.CASCADE, null=True)
     hop_limit = models.SmallIntegerField(null=True)
     hop_start = models.SmallIntegerField(null=True)
-    # decoded.bitfield. Null = absent (not the same as 0). Sent by 2.8+ firmware.
+    # decoded.bitfield. Null = absent (not the same as 0). Sent by 2.8+ firmware. Also null when the feeder sent a
+    # value outside 0..2^31-1 (this column is a 32-bit integer; see the ingest serializer).
     bitfield = models.PositiveIntegerField(null=True)
 
     rx_time = models.DateTimeField(null=False)

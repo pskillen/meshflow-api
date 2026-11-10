@@ -76,8 +76,8 @@ def test_lookup_bare_hex_ambiguous(create_observed_node):
     mc = create_observed_node(
         protocol=Protocol.MESHCORE,
         meshtastic_node_id=None,
-        mc_pubkey_prefix=hex8 + "cafebabe",
-        mc_pubkey=hex8 + "cafebabe" + "0" * 48,
+        mc_pubkey_prefix=hex8 + "cafe",
+        mc_pubkey=hex8 + "cafe" + "0" * 52,
         long_name="MC amb",
         short_name="AMB",
     )

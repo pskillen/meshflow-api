@@ -41,7 +41,7 @@ def test_process_node_info_packet_same_node(
 
     # Create the from_node with different attributes, matching node_id as integer
     from_node = ObservedNode.objects.get_or_create(meshtastic_node_id=packet.from_int)[0]
-    from_node.short_name = "OLD_NAME"
+    from_node.short_name = "OLD"
     from_node.long_name = "Old Name"
     from_node.meshtastic_hw_model = "Old Model"
     from_node.meshtastic_role = RoleSource.CLIENT
@@ -104,14 +104,15 @@ def test_process_node_info_packet_different_node(
     service = NodeInfoPacketService()
 
     # Create a packet where the node_id is different from the from_int
-    packet = create_node_info_packet(node_id="!different")
+    # Any id other than the sender's works. Keep it 9 chars: the node_id column is varchar(9) ("!" + 8 hex)
+    packet = create_node_info_packet(node_id="!0ther123")
     observer = create_managed_node()
     observation = create_packet_observation(packet=packet, observer=observer)
     user = create_user()
 
     # Create the from_node with different attributes
     from_node = ObservedNode.objects.get_or_create(meshtastic_node_id=packet.from_int)[0]
-    from_node.short_name = "OLD_NAME"
+    from_node.short_name = "OLD"
     from_node.long_name = "Old Name"
     from_node.meshtastic_hw_model = "Old Model"
     from_node.meshtastic_role = RoleSource.CLIENT

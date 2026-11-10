@@ -57,6 +57,10 @@ jobs:
           flake8 .
         working-directory: Meshflow/
 
+      - name: Check the OpenAPI files parse
+        run: |
+          python -c "import yaml; [yaml.safe_load(open(f)) for f in ('openapi.yaml', 'openapi-m2m.yaml')]"
+
       - name: Run tests with coverage
         run: |
           mkdir -p reports
@@ -67,6 +71,62 @@ jobs:
         with:
           name: pytest
           path: reports/junit.xml
+          reporter: python-xunit
+        if: always()
+
+  # The same unit suite on PostgreSQL, which is what prod runs. SQLite hides length, range and ordering defects.
+  verify-postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: meshflow
+          POSTGRES_PASSWORD: meshflow
+          POSTGRES_DB: meshflow
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U meshflow"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DB_ENGINE: postgres
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: meshflow
+      POSTGRES_USER: meshflow
+      POSTGRES_PASSWORD: meshflow
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v10.3.3
+        with:
+          enable-cache: true
+          cache-dependency-glob: Meshflow/requirements*.txt
+
+      - name: Install dependencies
+        run: |
+          uv pip install --system -r Meshflow/requirements.dev.txt
+
+      - name: Run tests on PostgreSQL
+        run: |
+          mkdir -p reports
+          python -m pytest Meshflow/ -v --junit-xml=reports/junit-postgres.xml
+
+      - name: Test Report (PostgreSQL)
+        uses: dorny/test-reporter@v3
+        with:
+          name: pytest-postgres
+          path: reports/junit-postgres.xml
           reporter: python-xunit
         if: always()
 
