@@ -2815,6 +2815,153 @@ components:
           type: number
           nullable: true
 
+    DeviceMetricBucket:
+      type: object
+      description: >
+        Bucketed device metrics row (``bucket`` set). Aggregates of the raw DeviceMetrics fields; ``id`` and ``logged_time`` are omitted. ``voltage`` and ``battery_level`` ignore 0 (ingestion stores a missing reading as 0) and are null when every sample is 0; ``battery_level`` also ignores 101 (powered) unless every remaining sample is 101; ``uptime_seconds`` is the bucket maximum.
+      required: [node, reported_time, samples]
+      properties:
+        node:
+          type: integer
+          description: The ID of the node these metrics belong to
+        reported_time:
+          type: string
+          format: date-time
+          description: Start of the UTC bucket
+        samples:
+          type: integer
+          description: Number of raw rows rolled into the bucket
+        battery_level:
+          type: number
+          nullable: true
+        voltage:
+          type: number
+          nullable: true
+        meshtastic_channel_utilization:
+          type: number
+          nullable: true
+        meshtastic_air_util_tx:
+          type: number
+          nullable: true
+        uptime_seconds:
+          type: integer
+          nullable: true
+
+    EnvironmentMetricBucket:
+      type: object
+      description: >
+        Bucketed environment metrics row (``bucket`` set). Means of non-null values; ``wind_direction``, ``rainfall_1h`` and ``rainfall_24h`` are the latest non-null reading. ``id`` and ``logged_time`` are omitted.
+      required: [node, reported_time, samples]
+      properties:
+        node:
+          type: integer
+          description: The ID of the node these metrics belong to
+        reported_time:
+          type: string
+          format: date-time
+          description: Start of the UTC bucket
+        samples:
+          type: integer
+          description: Number of raw rows rolled into the bucket
+        temperature:
+          type: number
+          nullable: true
+        relative_humidity:
+          type: number
+          nullable: true
+        barometric_pressure:
+          type: number
+          nullable: true
+        gas_resistance:
+          type: number
+          nullable: true
+        iaq:
+          type: integer
+          nullable: true
+        lux:
+          type: number
+          nullable: true
+        wind_direction:
+          type: integer
+          nullable: true
+        wind_speed:
+          type: number
+          nullable: true
+        radiation:
+          type: number
+          nullable: true
+        rainfall_1h:
+          type: number
+          nullable: true
+        rainfall_24h:
+          type: number
+          nullable: true
+
+    PowerMetricBucket:
+      type: object
+      description: >
+        Bucketed power metrics row (``bucket`` set). Means of non-null values; ``id`` and ``logged_time`` are omitted.
+      required: [node, reported_time, samples]
+      properties:
+        node:
+          type: integer
+          description: The ID of the node these metrics belong to
+        reported_time:
+          type: string
+          format: date-time
+          description: Start of the UTC bucket
+        samples:
+          type: integer
+          description: Number of raw rows rolled into the bucket
+        ch1_voltage:
+          type: number
+          nullable: true
+        ch1_current:
+          type: number
+          nullable: true
+        ch2_voltage:
+          type: number
+          nullable: true
+        ch2_current:
+          type: number
+          nullable: true
+        ch3_voltage:
+          type: number
+          nullable: true
+        ch3_current:
+          type: number
+          nullable: true
+        ch4_voltage:
+          type: number
+          nullable: true
+        ch4_current:
+          type: number
+          nullable: true
+        ch5_voltage:
+          type: number
+          nullable: true
+        ch5_current:
+          type: number
+          nullable: true
+        ch6_voltage:
+          type: number
+          nullable: true
+        ch6_current:
+          type: number
+          nullable: true
+        ch7_voltage:
+          type: number
+          nullable: true
+        ch7_current:
+          type: number
+          nullable: true
+        ch8_voltage:
+          type: number
+          nullable: true
+        ch8_current:
+          type: number
+          nullable: true
+
     LatestAirQualityMetrics:
       type: object
       description: Latest air quality metrics from NodeLatestStatus
@@ -6162,6 +6309,15 @@ paths:
       description: >
         Meshtastic-only: path ``node_id`` is the Meshtastic numeric node number (``ObservedNode.internal_id``).
         Returns device metrics for that node with optional date filtering.
+        With ``bucket=1h|6h|1d`` the response is instead one aggregated row per populated UTC bucket (newest first),
+        with ``reported_time`` = bucket start (UTC-aligned; ``6h`` buckets start 00/06/12/18), ``samples`` = rows in
+        the bucket, ``node``, and each metric field. ``id`` and ``logged_time`` are omitted. Aggregation: mean of
+        non-null values; a field with no values in the bucket is null. ``voltage`` and ``battery_level`` also ignore
+        0 (ingestion stores a missing reading as 0), so a bucket where every value is 0 is null. ``battery_level``
+        averages real readings only (101 means powered and is ignored), returning 101 if every remaining sample is
+        101; ``uptime_seconds`` is the maximum. ``meshtastic_channel_utilization``, ``meshtastic_air_util_tx`` and
+        ``uptime_seconds`` keep 0 as a real value.
+        Without ``bucket`` the response is the raw rows, unchanged.
       tags: [Nodes]
       security:
         - BearerAuth: []
@@ -6172,15 +6328,24 @@ paths:
           schema:
             type: integer
         - $ref: '#/components/schemas/DateRangeQuery'
+        - name: bucket
+          in: query
+          required: false
+          description: Aggregate server-side into UTC buckets (``1h``, ``6h`` or ``1d``). Omit for raw rows.
+          schema:
+            type: string
+            enum: ['1h', '6h', '1d']
       responses:
         '200':
-          description: List of device metrics for the node
+          description: List of device metrics for the node (raw rows, or bucket aggregates when ``bucket`` is set)
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/DeviceMetrics'
+                  oneOf:
+                    - $ref: '#/components/schemas/DeviceMetrics'
+                    - $ref: '#/components/schemas/DeviceMetricBucket'
         '400':
           description: Invalid request parameters
           content:
@@ -6194,6 +6359,12 @@ paths:
       description: >
         Meshtastic-only: path ``node_id`` is the Meshtastic numeric node number (``ObservedNode.internal_id``).
         Returns environment metrics for that node with optional date filtering.
+        With ``bucket=1h|6h|1d`` the response is instead one aggregated row per populated UTC bucket (newest first),
+        with ``reported_time`` = bucket start (UTC-aligned; ``6h`` buckets start 00/06/12/18), ``samples`` = rows in
+        the bucket, ``node``, and each metric field. ``id`` and ``logged_time`` are omitted. Aggregation: mean of
+        non-null values; a field with no values in the bucket is null. ``wind_direction``, ``rainfall_1h`` and
+        ``rainfall_24h`` are the latest non-null reading in the bucket (angles are not averaged).
+        Without ``bucket`` the response is the raw rows, unchanged.
       tags: [Nodes]
       security:
         - BearerAuth: []
@@ -6204,15 +6375,24 @@ paths:
           schema:
             type: integer
         - $ref: '#/components/schemas/DateRangeQuery'
+        - name: bucket
+          in: query
+          required: false
+          description: Aggregate server-side into UTC buckets (``1h``, ``6h`` or ``1d``). Omit for raw rows.
+          schema:
+            type: string
+            enum: ['1h', '6h', '1d']
       responses:
         '200':
-          description: List of environment metrics for the node
+          description: List of environment metrics for the node (raw rows, or bucket aggregates when ``bucket`` is set)
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/EnvironmentMetrics'
+                  oneOf:
+                    - $ref: '#/components/schemas/EnvironmentMetrics'
+                    - $ref: '#/components/schemas/EnvironmentMetricBucket'
         '400':
           description: Invalid request parameters
           content:
@@ -6226,6 +6406,11 @@ paths:
       description: >
         Meshtastic-only: path ``node_id`` is the Meshtastic numeric node number (``ObservedNode.internal_id``).
         Returns power metrics for that node with optional date filtering.
+        With ``bucket=1h|6h|1d`` the response is instead one aggregated row per populated UTC bucket (newest first),
+        with ``reported_time`` = bucket start (UTC-aligned; ``6h`` buckets start 00/06/12/18), ``samples`` = rows in
+        the bucket, ``node``, and each metric field. ``id`` and ``logged_time`` are omitted. Aggregation: mean of
+        non-null values; a field with no values in the bucket is null.
+        Without ``bucket`` the response is the raw rows, unchanged.
       tags: [Nodes]
       security:
         - BearerAuth: []
@@ -6236,15 +6421,24 @@ paths:
           schema:
             type: integer
         - $ref: '#/components/schemas/DateRangeQuery'
+        - name: bucket
+          in: query
+          required: false
+          description: Aggregate server-side into UTC buckets (``1h``, ``6h`` or ``1d``). Omit for raw rows.
+          schema:
+            type: string
+            enum: ['1h', '6h', '1d']
       responses:
         '200':
-          description: List of power metrics for the node
+          description: List of power metrics for the node (raw rows, or bucket aggregates when ``bucket`` is set)
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/PowerMetrics'
+                  oneOf:
+                    - $ref: '#/components/schemas/PowerMetrics'
+                    - $ref: '#/components/schemas/PowerMetricBucket'
         '400':
           description: Invalid request parameters
           content:
