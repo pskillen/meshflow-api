@@ -24,4 +24,4 @@ Items **skipped**, **incomplete**, or **discovered during execution** — not th
 
 ## Bug (#365)
 
-- [x] MT `online_nodes` / `new_nodes` filter `protocol=MESHTASTIC`
+- [x] MT `new_nodes` filters `protocol=MESHTASTIC`; MT `online_nodes` is counted from Meshtastic raw packets, so it excludes MeshCore by construction
