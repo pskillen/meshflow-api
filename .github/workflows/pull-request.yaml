@@ -40,13 +40,16 @@ jobs:
         uses: actions/setup-python@v7
         with:
           python-version: "3.14"
-          cache: pip
-          cache-dependency-path: Meshflow/requirements*.txt
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v10.3.3
+        with:
+          enable-cache: true
+          cache-dependency-glob: Meshflow/requirements*.txt
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -r Meshflow/requirements.dev.txt
+          uv pip install --system -r Meshflow/requirements.dev.txt
 
       - name: Run linting
         run: |
@@ -124,12 +127,16 @@ jobs:
         uses: actions/setup-python@v7
         with:
           python-version: "3.14"
-          cache: pip
-          cache-dependency-path: tests/requirements-integration.txt
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v10.3.3
+        with:
+          enable-cache: true
+          cache-dependency-glob: tests/requirements-integration.txt
 
       - name: Run integration tests
         run: |
-          pip install -r tests/requirements-integration.txt
+          uv pip install --system -r tests/requirements-integration.txt
           mkdir -p reports
           pytest tests/integration/ -v --junit-xml=reports/integration-tests.xml
 
