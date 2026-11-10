@@ -1,6 +1,7 @@
 """Serializers for the packets app."""
 
 import json
+import logging
 from datetime import datetime, timedelta, timezone
 
 from django.conf import settings
@@ -50,6 +51,11 @@ from .models import (
     TrafficManagementStatsPacket,
 )
 from .replay import feeder_node_nums, is_replayed_shape, shape_detection_enabled
+
+logger = logging.getLogger(__name__)
+
+# PacketObservation.bitfield is a PositiveIntegerField: 0..2^31-1 on PostgreSQL.
+BITFIELD_MAX = 2**31 - 1
 
 
 def convert_timestamp(timestamp):
@@ -169,7 +175,12 @@ class BasePacketSerializer(serializers.Serializer):
         # decoded.bitfield (2.8+ firmware). Absent stays absent: null is not 0.
         bitfield = data["decoded"].get("bitfield") if isinstance(data.get("decoded"), dict) else None
         if isinstance(bitfield, int) and not isinstance(bitfield, bool):
-            validated_data["bitfield"] = bitfield
+            if 0 <= bitfield <= BITFIELD_MAX:
+                validated_data["bitfield"] = bitfield
+            else:
+                # The column is a 32-bit integer and nothing decodes the bits. Out of range (negative, or above
+                # 2^31-1) is stored as null rather than failing the ingest.
+                logger.debug("Dropping out-of-range decoded.bitfield %r (stored as null)", bitfield)
 
         validated_data["transport_mechanism"] = normalise_transport(data.get("transportMechanism"))
 

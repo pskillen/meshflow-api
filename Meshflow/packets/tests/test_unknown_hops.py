@@ -33,7 +33,11 @@ def _ingest(feeder, decoded, packet_id=7001, **extra):
     [
         ({"portnum": "TEXT_MESSAGE_APP", "text": "hi", "bitfield": 1}, 1),
         ({"portnum": "TEXT_MESSAGE_APP", "text": "hi", "bitfield": 0}, 0),
-        ({"portnum": "TEXT_MESSAGE_APP", "text": "hi", "bitfield": 4294967295}, 4294967295),
+        ({"portnum": "TEXT_MESSAGE_APP", "text": "hi", "bitfield": 2147483647}, 2147483647),
+        # Outside 0..2^31-1 (the column is a 32-bit integer): stored as null, never an error to the feeder.
+        ({"portnum": "TEXT_MESSAGE_APP", "text": "hi", "bitfield": 2147483648}, None),
+        ({"portnum": "TEXT_MESSAGE_APP", "text": "hi", "bitfield": 4294967295}, None),
+        ({"portnum": "TEXT_MESSAGE_APP", "text": "hi", "bitfield": -1}, None),
         ({"portnum": "TEXT_MESSAGE_APP", "text": "hi", "bitfield": 40000}, 40000),
         ({"portnum": "TEXT_MESSAGE_APP", "text": "hi"}, None),
         ({"portnum": "STORE_FORWARD_APP", "bitfield": 3}, 3),
