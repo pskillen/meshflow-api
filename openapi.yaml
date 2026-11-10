@@ -2818,7 +2818,7 @@ components:
     DeviceMetricBucket:
       type: object
       description: >
-        Bucketed device metrics row (``bucket`` set). Aggregates of the raw DeviceMetrics fields; ``id`` and ``logged_time`` are omitted. ``battery_level`` ignores 101 (powered) unless every sample is 101; ``uptime_seconds`` is the bucket maximum.
+        Bucketed device metrics row (``bucket`` set). Aggregates of the raw DeviceMetrics fields; ``id`` and ``logged_time`` are omitted. ``voltage`` and ``battery_level`` ignore 0 (ingestion stores a missing reading as 0) and are null when every sample is 0; ``battery_level`` also ignores 101 (powered) unless every remaining sample is 101; ``uptime_seconds`` is the bucket maximum.
       required: [node, reported_time, samples]
       properties:
         node:
@@ -6312,8 +6312,11 @@ paths:
         With ``bucket=1h|6h|1d`` the response is instead one aggregated row per populated UTC bucket (newest first),
         with ``reported_time`` = bucket start (UTC-aligned; ``6h`` buckets start 00/06/12/18), ``samples`` = rows in
         the bucket, ``node``, and each metric field. ``id`` and ``logged_time`` are omitted. Aggregation: mean of
-        non-null values; a field with no values in the bucket is null. ``battery_level`` averages real readings only
-        (101 means powered and is ignored), returning 101 if every sample is 101; ``uptime_seconds`` is the maximum.
+        non-null values; a field with no values in the bucket is null. ``voltage`` and ``battery_level`` also ignore
+        0 (ingestion stores a missing reading as 0), so a bucket where every value is 0 is null. ``battery_level``
+        averages real readings only (101 means powered and is ignored), returning 101 if every remaining sample is
+        101; ``uptime_seconds`` is the maximum. ``meshtastic_channel_utilization``, ``meshtastic_air_util_tx`` and
+        ``uptime_seconds`` keep 0 as a real value.
         Without ``bucket`` the response is the raw rows, unchanged.
       tags: [Nodes]
       security:
