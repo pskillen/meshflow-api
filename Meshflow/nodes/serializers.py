@@ -1262,6 +1262,8 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
     battery_alert_confirmed_at = serializers.SerializerMethodField()
     owner = OwnerSerializer(source="claimed_by", read_only=True)
     claim = serializers.SerializerMethodField()
+    meshtastic_v28_identity = serializers.BooleanField(read_only=True, allow_null=True)
+    meshtastic_known_signer = serializers.BooleanField(read_only=True)
 
     def get_fields(self):
         fields = super().get_fields()
@@ -1314,6 +1316,8 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
             "battery_alert_confirmed_at",
             "owner",
             "claim",
+            "meshtastic_v28_identity",
+            "meshtastic_known_signer",
         ]
         read_only_fields = [
             "internal_id",

@@ -193,6 +193,8 @@ def observation_snapshot(observation: PacketObservation) -> dict:
         "relay_node": observation.relay_node,
         "via_mqtt": observation.via_mqtt,
         "transport_mechanism": observation.transport_mechanism,
+        "xeddsa_signed": observation.xeddsa_signed,
+        "ack_proof_status": observation.ack_proof_status,
         "replayed": observation.replayed,
         "channel": _channel_index(observation),
     }

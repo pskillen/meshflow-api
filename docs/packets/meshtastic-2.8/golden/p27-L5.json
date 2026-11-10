@@ -17,6 +17,7 @@
   },
   "key": "p27-L5",
   "observation": {
+    "ack_proof_status": null,
     "bitfield": 1,
     "channel": 0,
     "hop_limit": 3,
@@ -28,7 +29,8 @@
     "rx_time": "2026-11-09T16:34:32Z",
     "rx_time_estimated": false,
     "transport_mechanism": "TRANSPORT_MULTICAST_UDP",
-    "via_mqtt": false
+    "via_mqtt": false,
+    "xeddsa_signed": null
   },
   "observed_node": {
     "environment_exposure": 0,
@@ -71,7 +73,8 @@
       "port_num": "STORE_FORWARD_APP",
       "telemetry_variant": null,
       "to_int": 4294967295,
-      "to_str": "^all"
+      "to_str": "^all",
+      "xeddsa_signature_present": null
     },
     "model": "GenericPacket"
   },

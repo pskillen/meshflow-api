@@ -22,6 +22,7 @@
   },
   "key": "x28f-L42",
   "observation": {
+    "ack_proof_status": null,
     "bitfield": 0,
     "channel": 0,
     "hop_limit": 1,
@@ -33,7 +34,8 @@
     "rx_time": "2026-11-08T14:41:20Z",
     "rx_time_estimated": false,
     "transport_mechanism": "TRANSPORT_LORA",
-    "via_mqtt": false
+    "via_mqtt": false,
+    "xeddsa_signed": null
   },
   "observed_node": {
     "environment_exposure": 0,
@@ -87,7 +89,8 @@
       "wind_direction": null,
       "wind_gust": null,
       "wind_lull": null,
-      "wind_speed": null
+      "wind_speed": null,
+      "xeddsa_signature_present": null
     },
     "model": "EnvironmentMetricsPacket"
   },

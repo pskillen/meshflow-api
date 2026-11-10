@@ -157,6 +157,14 @@ Dual-protocol `TextMessage.protocol` and CHECK constraints: `text_messages.model
 
 ---
 
+## Signing state (2.8)
+
+Each observation records whether its packet was XEdDSA-signed as a tri-state (`xeddsa_signed`: true, false, or null
+for unknown), plus the ack-proof status when non-zero. A body with no `xeddsaSigned` key is stored as unknown, never
+as unsigned; the bot sends `false` only for a feeder it knows runs 2.8 or later. Unsigned is the normal state, not a
+warning. A signature on the body marks the raw packet, and a signed non-replayed packet advances the sender's
+`meshtastic_last_signed_at`. Field details: [PACKET_FIELDS.md](PACKET_FIELDS.md#signing-state-28).
+
 ## Replayed packets (2.8)
 
 After `config_complete_id`, a 2.8 radio replays its stored per-node records to every client that asks for full
