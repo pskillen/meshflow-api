@@ -87,7 +87,7 @@ All decided in https://github.com/pskillen/meshflow-ui/issues/407.
 
 ## Known gaps
 
-- Missing device metrics are stored as 0: https://github.com/pskillen/meshflow-api/issues/524
+- Device metrics stored before null ingestion use 0 for a missing reading: https://github.com/pskillen/meshflow-api/issues/524
 - Packet stats `interval` other than 1 does nothing; `openapi.yaml` fails strict YAML parsers; node metric dates parse naive; `meshcore.md` still reads as a plan: https://github.com/pskillen/meshflow-api/issues/525
 - Live endpoints don't accept MeshCore identities.
 - `packet_volume` has no per-constellation snapshots.

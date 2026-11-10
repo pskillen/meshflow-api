@@ -2593,19 +2593,24 @@ components:
           description: The time the metrics were reported by the node
         battery_level:
           type: number
-          description: The battery level as a percentage
+          nullable: true
+          description: The battery level as a percentage; null when the device did not report it
         voltage:
           type: number
-          description: The battery voltage in volts
+          nullable: true
+          description: The battery voltage in volts; null when the device did not report it
         meshtastic_channel_utilization:
           type: number
-          description: The channel utilization as a percentage
+          nullable: true
+          description: The channel utilization as a percentage; null when the device did not report it
         meshtastic_air_util_tx:
           type: number
-          description: The air utilization for transmission
+          nullable: true
+          description: The air utilization for transmission; null when the device did not report it
         uptime_seconds:
           type: integer
-          description: The device uptime in seconds
+          nullable: true
+          description: The device uptime in seconds; null when the device did not report it
 
     LatestEnvironmentMetrics:
       type: object
@@ -2827,7 +2832,7 @@ components:
     DeviceMetricBucket:
       type: object
       description: >
-        Bucketed device metrics row (``bucket`` set). Aggregates of the raw DeviceMetrics fields; ``id`` and ``logged_time`` are omitted. ``voltage`` and ``battery_level`` ignore 0 (ingestion stores a missing reading as 0) and are null when every sample is 0; ``battery_level`` also ignores 101 (powered) unless every remaining sample is 101; ``uptime_seconds`` is the bucket maximum.
+        Bucketed device metrics row (``bucket`` set). Aggregates of the raw DeviceMetrics fields; ``id`` and ``logged_time`` are omitted. ``voltage`` and ``battery_level`` ignore 0 (rows stored before null ingestion use 0 for a missing reading) and are null when every sample is 0; ``battery_level`` also ignores 101 (powered) unless every remaining sample is 101; ``uptime_seconds`` is the bucket maximum.
       required: [node, reported_time, samples]
       properties:
         node:
@@ -6056,12 +6061,20 @@ paths:
                           format: date-time
                         battery_level:
                           type: number
+                          nullable: true
+                          description: null when the device did not report it
                         meshtastic_channel_utilization:
                           type: number
+                          nullable: true
+                          description: null when the device did not report it
                         voltage:
                           type: number
+                          nullable: true
+                          description: null when the device did not report it
                         uptime_seconds:
                           type: integer
+                          nullable: true
+                          description: null when the device did not report it
         '400':
           description: Invalid request (e.g. missing node_ids)
     post:
@@ -6334,7 +6347,7 @@ paths:
         with ``reported_time`` = bucket start (UTC-aligned; ``6h`` buckets start 00/06/12/18), ``samples`` = rows in
         the bucket, ``node``, and each metric field. ``id`` and ``logged_time`` are omitted. Aggregation: mean of
         non-null values; a field with no values in the bucket is null. ``voltage`` and ``battery_level`` also ignore
-        0 (ingestion stores a missing reading as 0), so a bucket where every value is 0 is null. ``battery_level``
+        0 (rows stored before null ingestion use 0 for a missing reading), so a bucket where every value is 0 is null. ``battery_level``
         averages real readings only (101 means powered and is ignored), returning 101 if every remaining sample is
         101; ``uptime_seconds`` is the maximum. ``meshtastic_channel_utilization``, ``meshtastic_air_util_tx`` and
         ``uptime_seconds`` keep 0 as a real value.

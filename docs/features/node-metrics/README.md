@@ -42,6 +42,23 @@ Constants are in [`nodes/metric_buckets.py`](../../../Meshflow/nodes/metric_buck
 - `parse_bucket`, `bucket_start`, `bucket_rows` in `nodes/metric_buckets.py`.
 - OpenAPI schemas `DeviceMetricBucket` and `EnvironmentMetricBucket` in [`openapi.yaml`](../../../openapi.yaml).
 
+## Null readings
+
+`DeviceMetrics` stores null for any field the device did not report. A value the device did report stays as reported, 0 included (a quiet channel really is 0% utilisation).
+
+| Field | null | 0 |
+|-------|------|---|
+| `battery_level` | not reported | reported 0 (old rows: also "missing") |
+| `voltage` | not reported | reported 0 (old rows: also "missing") |
+| `meshtastic_channel_utilization` | not reported | reported 0% |
+| `meshtastic_air_util_tx` | not reported | reported 0 |
+| `uptime_seconds` | not reported | reported 0 |
+
+- **Cut-over:** rows stored before this change use 0 for a missing reading. Bucketing keeps ignoring 0 voltage and 0 battery so old and new rows mix cleanly.
+- **Node upserts:** a feeder `device_metrics` block stores null for absent fields. A block with no metric values at all creates no `DeviceMetrics` row and leaves `NodeLatestStatus` metrics untouched. The bot still sends 0 for missing values until it is changed, so those rows keep a placeholder 0.
+- **MeshCore:** nothing writes `DeviceMetrics` for MeshCore, so nothing changes there.
+- **Battery alerts:** a null battery reading is skipped by mesh monitoring.
+
 ## Decisions
 
 All decided in https://github.com/pskillen/meshflow-ui/issues/407.
@@ -50,11 +67,11 @@ All decided in https://github.com/pskillen/meshflow-ui/issues/407.
 - Battery ignores 101 unless every reading is 101.
 - Uptime is the maximum; wind direction and rainfall take the latest reading.
 - Bucketed output is unpaginated.
-- 0 voltage and 0 battery are excluded from means because ingestion stores missing as 0.
+- 0 voltage and 0 battery are excluded from means because rows stored before null ingestion use 0 for a missing reading.
 
 ## Known gaps
 
-- Zeros stored for missing readings: https://github.com/pskillen/meshflow-api/issues/524
+- Rows stored before null ingestion still hold 0 for a missing reading, and node upserts from the bot still send 0 until the bot is changed: https://github.com/pskillen/meshflow-api/issues/524
 - Dates without an offset parse as naive datetimes and raise a RuntimeWarning: https://github.com/pskillen/meshflow-api/issues/525
 - Queries filter `reported_time` but the index is `(node, -logged_time)`. The owner judged this fine on production.
 
