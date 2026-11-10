@@ -1391,7 +1391,10 @@ class ManagedNodeViewSet(viewsets.ModelViewSet):
             return Response({"code": FeederRepointError.CODE_INVALID_NODE_ID}, status=status.HTTP_400_BAD_REQUEST)
         accept_key = request.data.get("accept_reported_key", False)
         if not isinstance(accept_key, bool):
-            return Response({"code": FeederRepointError.CODE_INVALID_NODE_ID}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"code": "invalid_accept_reported_key", "detail": "accept_reported_key must be true or false."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         try:
             if accept_key:
                 if new_number is not None and new_number != node.meshtastic_node_id:

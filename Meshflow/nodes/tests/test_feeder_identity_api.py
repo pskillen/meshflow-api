@@ -293,7 +293,7 @@ def test_later_manual_repoint_lifts_the_hold(feeder, staff, settings):
     assert response.status_code == 200
     feeder.refresh_from_db()
     event = apply_reported_identity(feeder, reported_node_num=NEW_NUM, reported_pubkey=KEY_HEX)
-    assert event.outcome == Outcome.AUTO_UPDATED
+    assert (event.outcome, event.reason) == (Outcome.AUTO_UPDATED, None)
     assert feeder.meshtastic_node_id == NEW_NUM
 
 
@@ -519,6 +519,19 @@ def test_accept_flag_must_be_a_boolean(feeder, staff):
     response = _client(staff).post(_repoint_url(feeder), {"accept_reported_key": "yes"}, format="json")
 
     assert response.status_code == 400
+    assert response.data["code"] == "invalid_accept_reported_key"
+
+
+@pytest.mark.django_db
+def test_accepted_key_is_trusted_at_once_for_the_auto_rekey(feeder, staff, settings):
+    settings.MESHTASTIC_FEEDER_AUTO_REKEY = True
+    _key_regenerated(feeder)
+    _client(staff).post(_repoint_url(feeder), {"accept_reported_key": True}, format="json")
+    feeder.refresh_from_db()
+
+    event = apply_reported_identity(feeder, reported_node_num=NEW_NUM, reported_pubkey=KEY_HEX)
+
+    assert (event.outcome, event.reason) == (Outcome.AUTO_UPDATED, None)
 
 
 # --- a receiver that raises -------------------------------------------------------------------------------------
