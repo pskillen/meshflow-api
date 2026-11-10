@@ -694,6 +694,24 @@ def test_device_metrics_offsetless_dates_read_as_utc_without_warning(create_obse
 
 
 @pytest.mark.django_db
+def test_positions_date_range_returns_in_range_rows(create_observed_node, metrics_client):
+    from nodes.models import Position
+
+    node = create_observed_node()
+    for day, hour in [(1, 12), (2, 23), (4, 1)]:
+        Position.objects.create(
+            node=node, latitude=1.0, longitude=2.0, reported_time=_utc(day, hour), logged_time=_utc(day, hour)
+        )
+    url = reverse("observed-node-positions", kwargs={"internal_id": node.internal_id})
+    response = metrics_client.get(url, {"start_date": "2026-03-01", "end_date": "2026-03-02"})
+    assert response.status_code == 200
+    assert len(response.data) == 2
+    response = metrics_client.get(url, {"end_date": "2026-03-02"})
+    assert response.status_code == 200
+    assert len(response.data) == 2
+
+
+@pytest.mark.django_db
 def test_metrics_bad_bucket_is_400(create_observed_node, metrics_client):
     node = create_observed_node()
     for name in ("device_metrics", "environment_metrics", "power_metrics"):

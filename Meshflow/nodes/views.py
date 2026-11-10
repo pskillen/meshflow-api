@@ -507,8 +507,6 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
                 end_datetime = timezone.datetime.strptime(end_date, "%Y-%m-%d")
                 # Set time to end of day
                 end_datetime = end_datetime.replace(hour=23, minute=59, second=59)
-                if timezone.is_naive(end_datetime):
-                    end_datetime = timezone.make_aware(end_datetime, dt_timezone.utc)
                 end_datetime = timezone.make_aware(end_datetime)
                 positions = positions.filter(reported_time__lte=end_datetime)
             except ValueError:
