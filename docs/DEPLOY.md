@@ -50,6 +50,7 @@ Run these once per environment after the deploy that introduces them. Back up th
 | Command | Since | What it does |
 | --- | --- | --- |
 | `python manage.py backfill_meshtastic_identity [--dry-run]` | 2.2.0 | Fills the normalised key and predicted 2.8 node id on observed and managed nodes ([details](features/packet-ingestion/meshtastic.md#identity-evidence-and-predicted-28-node-id)). |
+| `python manage.py detect_meshtastic_identity_links [--dry-run] [--batch-size N]` | unreleased | Links Meshtastic rows that are the same radio under two numbers (from stored public keys) and flags keys held by several nodes. Run after `backfill_meshtastic_identity`; the dry run reports the same numbers as the real one ([details](features/packet-ingestion/meshtastic.md#identity-links)). |
 | `python manage.py dedupe_observed_nodes [--dry-run] [--batch-size N]` | 2.2.3 | Merges duplicate Meshtastic `ObservedNode` rows (same node number) into the oldest row and re-points their related rows. Sets whose rows have different `claimed_by` owners are skipped and listed: resolve those by hand, then re-run. The unique-constraint migration (`nodes` 0059) runs the same merge first, so any duplicates left over are merged when you migrate; it stops with an error naming the nodes if a set has two different `claimed_by` owners, and changes nothing ([recovery](#unique-constraint-migration-stopped-on-a-claim-conflict)). Still useful as a check after a restore. |
 
 ## Unique-constraint migration stopped on a claim conflict

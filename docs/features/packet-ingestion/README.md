@@ -32,7 +32,7 @@ stops at "signal emitted".
 | [DEDUPLICATION.md](DEDUPLICATION.md) | MT dedup window; MC see [adr/0004](adr/0004-mc-dedup-key.md) |
 | [signals.md](signals.md) | MT post-processing signals (MC uses `meshcore_packet_received` in-app) |
 | **[meshtastic-2.8-upgrade-runbook.md](meshtastic-2.8-upgrade-runbook.md)** | **DRAFT**, planned: operator steps for upgrading a feeder to Meshtastic 2.8 |
-| [adr/](adr/README.md) | MC identity, channels, broadcast, dedup; MT feeder-scoped auth ([0005](adr/0005-feeder-scoped-auth.md), planned) and identity linking ([0006](adr/0006-meshtastic-identity-linking.md), planned) |
+| [adr/](adr/README.md) | MC identity, channels, broadcast, dedup; MT feeder-scoped auth ([0005](adr/0005-feeder-scoped-auth.md), planned) and identity linking ([0006](adr/0006-meshtastic-identity-linking.md), accepted) |
 
 Sample JSON: [docs/packets/](../../packets/) (MT by portnum), [docs/packets/meshcore/](../../packets/meshcore/README.md).
 
