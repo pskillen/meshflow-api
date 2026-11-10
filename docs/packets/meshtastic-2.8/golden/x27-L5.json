@@ -20,6 +20,7 @@
   },
   "key": "x27-L5",
   "observation": {
+    "ack_proof_status": null,
     "bitfield": 0,
     "channel": 0,
     "hop_limit": 4,
@@ -31,7 +32,8 @@
     "rx_time": "2026-11-08T12:53:03Z",
     "rx_time_estimated": false,
     "transport_mechanism": "TRANSPORT_LORA",
-    "via_mqtt": false
+    "via_mqtt": false,
+    "xeddsa_signed": null
   },
   "observed_node": {
     "environment_exposure": 0,
@@ -71,7 +73,8 @@
       "role": 2,
       "short_name": "NYA0",
       "to_int": 4294967295,
-      "to_str": "^all"
+      "to_str": "^all",
+      "xeddsa_signature_present": null
     },
     "model": "NodeInfoPacket"
   },

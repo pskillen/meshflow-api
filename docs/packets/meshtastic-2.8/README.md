@@ -46,6 +46,9 @@ bot's `MeshtasticPacketSerializer.serialise_raw_packet` with `time.time` patched
 - Setup per test: a fresh database, one `ManagedNode` registered with `0x1a83cf89` (the pre-upgrade number, as in
   production) on a single-feeder key. The wire body is POSTed to v4 with `X-Meshtastic-Feeder-Node-Num` set to the
   entry's `feeder_num`. One parity test posts `x27-L7` to the v3 URL and expects the same golden.
+- The observation golden carries `xeddsa_signed` and `ack_proof_status`, and the packet `xeddsa_signature_present`: null
+  everywhere except the signed `p28s-L16` entry. The wire generator builds the bot serialiser with no firmware callable,
+  so the goldens never show `xeddsa_signed: false`; that case is covered by unit tests only.
 - Volatile values never appear: `upload_time`, `first_reported_time`, `last_heard`, ids, UUIDs, and the `*_at` /
   `*_reported_time` stamps. Effects are booleans and counts measured against a snapshot taken before the POST.
 - `nls` holds the sender's `NodeLatestStatus` fields that changed. `observed_node` is the sender's row (non-time

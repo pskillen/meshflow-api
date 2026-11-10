@@ -169,9 +169,7 @@ def _process(
 def test_unsigned_and_unknown_leave_last_signed_alone(
     signed, create_managed_node, create_message_packet, create_packet_observation, create_user
 ):
-    node = _process(
-        create_managed_node, create_message_packet, create_packet_observation, create_user, signed=signed
-    )
+    node = _process(create_managed_node, create_message_packet, create_packet_observation, create_user, signed=signed)
     assert node.meshtastic_last_signed_at is None
     assert node.meshtastic_known_signer is False
 

@@ -1660,6 +1660,19 @@ components:
           description: >
             The current user's claim for this node, if any. Only present for authenticated requests.
             Null when the user has no claim. Use accepted_at to distinguish pending vs accepted claims.
+        meshtastic_v28_identity:
+          type: boolean
+          nullable: true
+          readOnly: true
+          description: >
+            Meshtastic only. True when the node number is the crc32 of the stored public key (a 2.8 identity), false
+            when it is not, null when there is no usable key. Derived, not stored
+        meshtastic_known_signer:
+          type: boolean
+          readOnly: true
+          description: >
+            True once a signed (non-replayed) packet from this node has been seen. False means none seen yet, which
+            is normal: unsigned is the default state on 2.8
 
     RfProfile:
       type: object
@@ -3269,6 +3282,19 @@ components:
           description: >
             How the packet reached the feeder (e.g. TRANSPORT_LORA, TRANSPORT_MQTT). Null for rows from before this
             field and for the feeder's own packets. A non-RF transport gives hop_count null and direct_from_sender false
+        xeddsa_signed:
+          type: boolean
+          nullable: true
+          description: >
+            Whether the packet was XEdDSA-signed (Meshtastic 2.8+). True: signed. False: not signed, reported by a
+            feeder known to run 2.8 or later; this is the normal state, since the default policy does not sign. Null:
+            unknown (a 2.7 feeder, an older bot, or unreadable firmware). Null is never the same as false
+        ack_proof_status:
+          type: string
+          nullable: true
+          description: >
+            Ack-proof status name when the packet carried a non-zero one (ACK_PROOF_VALID, ACK_PROOF_INVALID,
+            ACK_PROOF_NO_KEY). Null when absent
         rx_snr:
           type: number
           format: float

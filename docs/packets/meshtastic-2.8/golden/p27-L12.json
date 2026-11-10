@@ -23,6 +23,7 @@
   },
   "key": "p27-L12",
   "observation": {
+    "ack_proof_status": null,
     "bitfield": 1,
     "channel": 0,
     "hop_limit": 4,
@@ -34,7 +35,8 @@
     "rx_time": "2026-11-09T16:36:43Z",
     "rx_time_estimated": false,
     "transport_mechanism": "TRANSPORT_MULTICAST_UDP",
-    "via_mqtt": false
+    "via_mqtt": false,
+    "xeddsa_signed": null
   },
   "observed_node": {
     "environment_exposure": 0,
@@ -71,7 +73,8 @@
       "to_int": 4294967295,
       "to_str": "^all",
       "uptime_seconds": 15319284,
-      "voltage": 3.823
+      "voltage": 3.823,
+      "xeddsa_signature_present": null
     },
     "model": "DeviceMetricsPacket"
   },

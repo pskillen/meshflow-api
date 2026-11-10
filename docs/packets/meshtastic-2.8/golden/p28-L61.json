@@ -17,6 +17,7 @@
   },
   "key": "p28-L61",
   "observation": {
+    "ack_proof_status": null,
     "bitfield": null,
     "channel": 0,
     "hop_limit": 6,
@@ -28,7 +29,8 @@
     "rx_time": "2026-11-09T18:23:04Z",
     "rx_time_estimated": false,
     "transport_mechanism": "TRANSPORT_LORA",
-    "via_mqtt": false
+    "via_mqtt": false,
+    "xeddsa_signed": null
   },
   "observed_node": null,
   "packet": {
@@ -44,7 +46,8 @@
       "to_int": 4294967295,
       "to_str": "^all",
       "uptime_seconds": 66,
-      "voltage": 3.659
+      "voltage": 3.659,
+      "xeddsa_signature_present": null
     },
     "model": "DeviceMetricsPacket"
   },
