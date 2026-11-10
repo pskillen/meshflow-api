@@ -84,6 +84,28 @@ def is_blank_mac(mac: str | None) -> bool:
     return len(raw) == 6 and not any(raw)
 
 
+def mac_node_number(mac: str | None) -> int | None:
+    """The node number a 2.7 radio derives from its MAC: the last four bytes, big-endian. None for a bad/blank MAC.
+
+    Accepts colon/dash separated hex, plain 12-digit hex or the base64 of the 6 raw bytes. Never raises.
+    """
+    if is_blank_mac(mac):
+        return None
+    value = mac.strip()
+    raw = None
+    compact = re.sub(r"[:\-. ]", "", value)
+    if re.fullmatch(r"[0-9a-fA-F]{12}", compact):
+        raw = bytes.fromhex(compact)
+    else:
+        try:
+            raw = base64.b64decode(value, validate=True)
+        except binascii.Error, ValueError:
+            return None
+    if len(raw) != 6:
+        return None
+    return int.from_bytes(raw[2:], "big")
+
+
 def is_truncated_long_name(incoming: str | None, stored: str | None) -> bool:
     """True if ``incoming`` is only ``stored`` cut to 24 UTF-8 bytes (a different, shorter value).
 
