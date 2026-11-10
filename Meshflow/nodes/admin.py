@@ -4,7 +4,7 @@ from django import forms
 from django.contrib import admin, messages
 from django.contrib.admin.widgets import FilteredSelectMultiple
 from django.core.exceptions import ObjectDoesNotExist
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import Q
 from django.urls import reverse
 from django.utils import timezone
@@ -38,6 +38,7 @@ from .models import (
     NodeAuth,
     NodeLatestStatus,
     ObservedNode,
+    ObservedNodeIdentityLink,
 )
 
 
@@ -1040,6 +1041,79 @@ class ObservedNodeAdmin(admin.ModelAdmin):
             "meshtastic_public_key_hex",
             "predicted_node_id_str",
         ]
+
+
+class IdentityLinkAdminForm(forms.ModelForm):
+    class Meta:
+        model = ObservedNodeIdentityLink
+        fields = ("state",)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if "state" in self.fields:
+            # A link is never turned into a flagged shared-key row (which has no nodes).
+            self.fields["state"].choices = [
+                choice for choice in ObservedNodeIdentityLink.State.choices if choice[0] != "flagged"
+            ]
+
+
+@admin.register(ObservedNodeIdentityLink)
+class ObservedNodeIdentityLinkAdmin(admin.ModelAdmin):
+    """Identity links between the Meshtastic numbers of one radio (ADR-0006). Staff confirm or reject by state."""
+
+    form = IdentityLinkAdminForm
+    list_display = ("created_at", "old_number", "new_number", "evidence", "confidence", "state", "reviewed_by")
+    list_filter = ("state", "evidence", "confidence")
+    list_select_related = ("old_node", "new_node", "reviewed_by")
+    search_fields = ("public_key_hex",)
+    date_hierarchy = "created_at"
+
+    @admin.display(description=_("Old number"), ordering="old_node__meshtastic_node_id")
+    def old_number(self, obj):
+        return obj.old_node.node_id_str if obj.old_node_id else "-"
+
+    @admin.display(description=_("New number"), ordering="new_node__meshtastic_node_id")
+    def new_number(self, obj):
+        return obj.new_node.node_id_str if obj.new_node_id else "-"
+
+    def get_search_results(self, request, queryset, search_term):
+        found, use_distinct = super().get_search_results(request, queryset, search_term)
+        term = (search_term or "").strip()
+        numbers = []
+        if term:
+            try:
+                numbers.append(meshtastic_hex_to_int(term) if term.startswith("!") else int(term, 16))
+            except ValueError:
+                pass
+            if term.isdigit():
+                numbers.append(int(term))
+        if numbers:
+            match = Q(old_node__meshtastic_node_id__in=numbers) | Q(new_node__meshtastic_node_id__in=numbers)
+            found = queryset.filter(Q(pk__in=found.values("pk")) | match)
+        return found, use_distinct
+
+    def get_readonly_fields(self, request, obj=None):
+        fields = [f.name for f in self.model._meta.fields if f.name != "state"]
+        if obj is not None and obj.state == ObservedNodeIdentityLink.State.FLAGGED:
+            fields.append("state")
+        return fields
+
+    def has_add_permission(self, request):
+        return False
+
+    def save_model(self, request, obj, form, change):
+        if change and "state" in form.changed_data:
+            obj.reviewed_by = request.user
+            obj.reviewed_at = timezone.now()
+        try:
+            with transaction.atomic():
+                super().save_model(request, obj, form, change)
+        except IntegrityError:
+            self.message_user(
+                request,
+                _("Another live link already uses the old or new node; change that one first."),
+                level=messages.ERROR,
+            )
 
 
 # NOTE: You need to create the template file for NodeIdDatalistWidget at:

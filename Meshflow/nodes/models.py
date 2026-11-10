@@ -479,6 +479,7 @@ class ObservedNode(models.Model):
         max_length=20,
         null=True,
         blank=True,
+        db_index=True,
         help_text=_("Meshtastic nodeinfo MAC when protocol is Meshtastic; usually null for MeshCore."),
     )
     long_name = models.CharField(
@@ -501,6 +502,7 @@ class ObservedNode(models.Model):
         max_length=64,
         null=True,
         blank=True,
+        db_index=True,
         help_text=_("meshtastic_public_key normalised to 64-char lowercase hex; null when absent or malformed."),
     )
     meshtastic_key_node_id = models.BigIntegerField(
@@ -619,6 +621,94 @@ class ObservedNode(models.Model):
         if not self.pk:
             return None
         return NodeRfPropagationRender.objects.filter(observed_node=self).order_by("-created_at").first()
+
+
+class ObservedNodeIdentityLink(models.Model):
+    """The same radio seen under two Meshtastic node numbers (ADR-0006).
+
+    ``old_node`` is the row that went quiet, ``new_node`` the row that replaced it. Rows are never merged and no
+    packet's ``from_int`` is rewritten, so rolling back is deleting link rows. A ``flagged`` row is not a link: it
+    records a public key held by several nodes (``public_key_hex``, holders in ``detail``) that must never be
+    auto-linked, and has no old or new node.
+    """
+
+    class Evidence(models.TextChoices):
+        PUBLIC_KEY = "public_key", _("Public key")
+        FEEDER_REKEY = "feeder_rekey", _("Managed feeder re-key")
+        MAC = "mac", _("MAC address")
+
+    class Confidence(models.TextChoices):
+        STRONG = "strong", _("Strong")
+        MEDIUM = "medium", _("Medium")
+
+    class State(models.TextChoices):
+        AUTO = "auto", _("Auto")
+        SUGGESTED = "suggested", _("Suggested")
+        CONFIRMED = "confirmed", _("Confirmed")
+        REJECTED = "rejected", _("Rejected")
+        FLAGGED = "flagged", _("Flagged (shared key)")
+
+    LIVE_STATES = (State.AUTO, State.CONFIRMED)
+
+    old_node = models.ForeignKey(
+        ObservedNode, null=True, blank=True, on_delete=models.CASCADE, related_name="successor_links"
+    )
+    new_node = models.ForeignKey(
+        ObservedNode, null=True, blank=True, on_delete=models.CASCADE, related_name="predecessor_links"
+    )
+    evidence = models.CharField(max_length=16, choices=Evidence.choices, db_index=True)
+    confidence = models.CharField(max_length=8, choices=Confidence.choices)
+    state = models.CharField(max_length=10, choices=State.choices, db_index=True)
+    public_key_hex = models.CharField(
+        max_length=64, null=True, blank=True, db_index=True, help_text=_("The key the evidence rests on, 64-char hex.")
+    )
+    detail = models.JSONField(default=dict, blank=True, help_text=_("Evidence detail; the holders of a flagged key."))
+    reviewed_by = models.ForeignKey("users.User", null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = _("Observed node identity link")
+        verbose_name_plural = _("Observed node identity links")
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(state="flagged", old_node__isnull=True, new_node__isnull=True)
+                    | (
+                        ~models.Q(state="flagged")
+                        & models.Q(old_node__isnull=False, new_node__isnull=False)
+                        & ~models.Q(old_node=models.F("new_node"))
+                    )
+                ),
+                name="nodes_identitylink_shape",
+            ),
+            models.UniqueConstraint(
+                fields=["old_node", "new_node"],
+                condition=models.Q(old_node__isnull=False),
+                name="nodes_identitylink_unique_pair",
+            ),
+            models.UniqueConstraint(
+                fields=["old_node"],
+                condition=models.Q(state__in=["auto", "confirmed"]),
+                name="nodes_identitylink_one_live_successor",
+            ),
+            models.UniqueConstraint(
+                fields=["new_node"],
+                condition=models.Q(state__in=["auto", "confirmed"]),
+                name="nodes_identitylink_one_live_predecessor",
+            ),
+            models.UniqueConstraint(
+                fields=["public_key_hex"],
+                condition=models.Q(state="flagged"),
+                name="nodes_identitylink_one_flag_per_key",
+            ),
+        ]
+
+    def __str__(self):
+        if self.state == self.State.FLAGGED:
+            return f"shared key {(self.public_key_hex or '')[:8]}... ({self.state})"
+        return f"{self.old_node.node_id_str} -> {self.new_node.node_id_str} ({self.evidence}, {self.state})"
 
 
 class NodeLatestStatus(models.Model):
