@@ -71,6 +71,8 @@ HANDLED_RELATIONS = frozenset(
         "nodes.HealthMetrics.node",
         "nodes.HostMetrics.node",
         "nodes.NodeLatestStatus.node",
+        "nodes.ObservedNodeIdentityLink.new_node",  # re-pointed; a clash with the keeper's link drops the duplicate's
+        "nodes.ObservedNodeIdentityLink.old_node",
         "nodes.NodeOwnerClaim.node",
         "nodes.NodeRfProfile.observed_node",
         "nodes.NodeRfPropagationRender.observed_node",
