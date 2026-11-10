@@ -56,6 +56,8 @@ Constants are in [`nodes/metric_buckets.py`](../../../Meshflow/nodes/metric_buck
 
 - **Cut-over:** rows stored before this change use 0 for a missing reading. Bucketing keeps ignoring 0 voltage and 0 battery so old and new rows mix cleanly.
 - **Cleaning old rows:** the owner runs `python manage.py null_placeholder_device_metrics` after deploy. Run it with `--dry-run --before <deploy time>` first, then for real off-peak. It nulls placeholder zeros in `DeviceMetrics` and `NodeLatestStatus` and is idempotent.
+- **Options:** `--dry-run` writes nothing and prints the counts a real run would produce. `--batch-size` (default 5000) is the id range per transaction; each batch is one `UPDATE`, so a row is rewritten once. `--before` takes an ISO datetime and filters `logged_time` on `DeviceMetrics` and `metrics_reported_time` on `NodeLatestStatus` (rows with no reported time are skipped). Use the null-ingestion deploy time as the cutoff: the command finds the id range of matching rows first, and an old cutoff that matches few rows scans most of the table.
+- **Without `--before`**, the command also nulls any all-zero or zero-voltage rows posted since the deploy, which is the bot still sending 0 for a missing value.
 
 | Field | Nulled when it is 0 and |
 |---|---|
@@ -64,7 +66,7 @@ Constants are in [`nodes/metric_buckets.py`](../../../Meshflow/nodes/metric_buck
 | `uptime_seconds` | always |
 | `meshtastic_channel_utilization`, `meshtastic_air_util_tx` | both are 0 and battery, voltage and uptime are 0 too (an all-zero placeholder row); otherwise a 0 is a real reading and stays |
 
-- Bucketing still ignores 0 voltage and 0 battery, so rows the command has not reached (or run with `--before`) mix cleanly. Dropping that exclusion is a later change, once the command has run on production.
+- Bucketing still ignores 0 voltage and 0 battery, so rows the command has not yet cleaned, or skipped via `--before`, mix cleanly with null ones. Dropping that exclusion is a later change, once the command has run on production.
 - **Node upserts:** a feeder `device_metrics` block stores null for absent fields. A block with no metric values at all creates no `DeviceMetrics` row and leaves `NodeLatestStatus` metrics untouched. The bot still sends 0 for missing values until it is changed, so those rows keep a placeholder 0.
 - **Telemetry packets:** a packet whose `deviceMetrics` carries none of the five fields creates no `DeviceMetrics` row, leaves `NodeLatestStatus` untouched and sends no `device_metrics_recorded` signal (the sender's `last_heard` still advances). A partial packet stores null for the missing fields, and `NodeLatestStatus` takes those nulls too.
 - **MeshCore:** nothing writes `DeviceMetrics` for MeshCore, so nothing changes there.
