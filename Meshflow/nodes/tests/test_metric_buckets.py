@@ -68,6 +68,17 @@ def test_zero_battery_level_is_missing_not_averaged():
     assert bucket_rows(both, ["battery_level"], "1d")[0]["battery_level"] == 101
 
 
+def test_mixed_old_zero_new_null_and_real_rows():
+    real = [_row(_t(3), battery_level=80, voltage=4.0), _row(_t(4), battery_level=60, voltage=3.8)]
+    legacy_zero = [_row(_t(1), battery_level=0, voltage=0)]
+    new_null = [_row(_t(2), battery_level=None, voltage=None)]
+    fields = ["battery_level", "voltage"]
+    (expected,) = bucket_rows(real, fields, "1d")
+    (mixed,) = bucket_rows(legacy_zero + new_null + real, fields, "1d")
+    assert mixed["battery_level"] == expected["battery_level"] == 70
+    assert mixed["voltage"] == expected["voltage"]
+
+
 def test_zero_kept_for_other_fields():
     rows = [
         _row(_t(1), meshtastic_channel_utilization=0, uptime_seconds=0),

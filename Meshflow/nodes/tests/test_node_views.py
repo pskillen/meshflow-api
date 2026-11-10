@@ -664,6 +664,19 @@ def test_device_metrics_unbucketed_unchanged(create_observed_node, metrics_clien
 
 
 @pytest.mark.django_db
+def test_device_metrics_unbucketed_returns_null_fields(create_observed_node, metrics_client):
+    node = create_observed_node()
+    _device(node, _utc(1, 1), battery_level=None, voltage=None, uptime_seconds=None, meshtastic_air_util_tx=0)
+    response = metrics_client.get(_metric_url("device_metrics", node))
+    assert response.status_code == 200
+    row = response.data[0]
+    assert row["battery_level"] is None
+    assert row["voltage"] is None
+    assert row["uptime_seconds"] is None
+    assert row["meshtastic_air_util_tx"] == 0
+
+
+@pytest.mark.django_db
 def test_metrics_bad_bucket_is_400(create_observed_node, metrics_client):
     node = create_observed_node()
     for name in ("device_metrics", "environment_metrics", "power_metrics"):
