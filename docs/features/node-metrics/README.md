@@ -55,6 +55,16 @@ Constants are in [`nodes/metric_buckets.py`](../../../Meshflow/nodes/metric_buck
 | `uptime_seconds` | not reported | reported 0 |
 
 - **Cut-over:** rows stored before this change use 0 for a missing reading. Bucketing keeps ignoring 0 voltage and 0 battery so old and new rows mix cleanly.
+- **Cleaning old rows:** the owner runs `python manage.py null_placeholder_device_metrics` after deploy. Run it with `--dry-run --before <deploy time>` first, then for real off-peak. It nulls placeholder zeros in `DeviceMetrics` and `NodeLatestStatus` and is idempotent.
+
+| Field | Nulled when it is 0 and |
+|---|---|
+| `voltage` | always |
+| `battery_level` | voltage is 0 or null (a flat battery still reports volts) |
+| `uptime_seconds` | always |
+| `meshtastic_channel_utilization`, `meshtastic_air_util_tx` | both are 0 and battery, voltage and uptime are 0 too (an all-zero placeholder row); otherwise a 0 is a real reading and stays |
+
+- Bucketing still ignores 0 voltage and 0 battery, so rows the command has not reached (or run with `--before`) mix cleanly. Dropping that exclusion is a later change, once the command has run on production.
 - **Node upserts:** a feeder `device_metrics` block stores null for absent fields. A block with no metric values at all creates no `DeviceMetrics` row and leaves `NodeLatestStatus` metrics untouched. The bot still sends 0 for missing values until it is changed, so those rows keep a placeholder 0.
 - **Telemetry packets:** a packet whose `deviceMetrics` carries none of the five fields creates no `DeviceMetrics` row, leaves `NodeLatestStatus` untouched and sends no `device_metrics_recorded` signal (the sender's `last_heard` still advances). A partial packet stores null for the missing fields, and `NodeLatestStatus` takes those nulls too.
 - **MeshCore:** nothing writes `DeviceMetrics` for MeshCore, so nothing changes there.
@@ -72,7 +82,7 @@ All decided in https://github.com/pskillen/meshflow-ui/issues/407.
 
 ## Known gaps
 
-- Rows stored before null ingestion still hold 0 for a missing reading, and node upserts from the bot still send 0 until the bot is changed: https://github.com/pskillen/meshflow-api/issues/524
+- Node upserts from the bot still send 0 for a missing reading until the bot is changed: https://github.com/pskillen/meshflow-bot/issues/170
 - Dates without an offset parse as naive datetimes and raise a RuntimeWarning: https://github.com/pskillen/meshflow-api/issues/525
 - Queries filter `reported_time` but the index is `(node, -logged_time)`. The owner judged this fine on production.
 
