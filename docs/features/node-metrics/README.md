@@ -30,7 +30,7 @@ Constants are in [`nodes/metric_buckets.py`](../../../Meshflow/nodes/metric_buck
 
 - One row per populated UTC bucket, newest first, **unpaginated**. `reported_time` is the bucket start, `node` is the node id, and `samples` is the number of raw rows in the bucket.
 - A field is the mean of its non-null readings, or null when there were none.
-- `voltage` and `battery_level` ignore 0 (`ZERO_MEANS_MISSING_FIELDS`), because ingestion stores a missing reading as 0.
+- `voltage` and `battery_level` ignore 0 (`ZERO_MEANS_MISSING_FIELDS`), because rows stored before null ingestion use 0 for a missing reading (see [Null readings](#null-readings)).
 - `battery_level` ignores 101 (`POWERED_BATTERY_LEVEL`, "powered") unless every remaining reading is 101, in which case it is 101.
 - `uptime_seconds` is the maximum (`MAX_FIELDS`).
 - `wind_direction`, `rainfall_1h` and `rainfall_24h` are the latest reading in the bucket (`LAST_READING_FIELDS`); ties on `reported_time` fall back to `id`.
@@ -56,6 +56,7 @@ Constants are in [`nodes/metric_buckets.py`](../../../Meshflow/nodes/metric_buck
 
 - **Cut-over:** rows stored before this change use 0 for a missing reading. Bucketing keeps ignoring 0 voltage and 0 battery so old and new rows mix cleanly.
 - **Node upserts:** a feeder `device_metrics` block stores null for absent fields. A block with no metric values at all creates no `DeviceMetrics` row and leaves `NodeLatestStatus` metrics untouched. The bot still sends 0 for missing values until it is changed, so those rows keep a placeholder 0.
+- **Telemetry packets:** a packet whose `deviceMetrics` carries none of the five fields creates no `DeviceMetrics` row, leaves `NodeLatestStatus` untouched and sends no `device_metrics_recorded` signal (the sender's `last_heard` still advances). A partial packet stores null for the missing fields, and `NodeLatestStatus` takes those nulls too.
 - **MeshCore:** nothing writes `DeviceMetrics` for MeshCore, so nothing changes there.
 - **Battery alerts:** a null battery reading is skipped by mesh monitoring.
 
