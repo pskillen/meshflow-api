@@ -33,8 +33,9 @@ TEST_DB_ENGINE=postgres python -m pytest -v --create-db
 ```
 
 The connection comes from `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_HOST` (default `localhost`)
-and `POSTGRES_PORT` (default `5432`), defaulting to the container above. Django creates and drops its own
-`test_<POSTGRES_DB>` database. Use `--create-db` after a schema change, since `pytest.ini` sets `--reuse-db`.
+and `POSTGRES_PORT` (default `5432`), defaulting to the container above. Django creates its own
+`test_<POSTGRES_DB>` database and, because `pytest.ini` sets `--reuse-db`, keeps it between runs. Pass `--create-db` to rebuild it
+(after a schema change, or when migrations were added). An unknown `TEST_DB_ENGINE` value is an error, not a fallback to SQLite.
 Test data must fit the real column sizes (for example `short_name` is `varchar(5)`).
 
 CI also checks that `openapi.yaml` and `openapi-m2m.yaml` parse as YAML.
