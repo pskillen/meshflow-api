@@ -1,6 +1,6 @@
 # Meshtastic 2.8 feeder upgrade runbook
 
-**Status:** Final · **Tracking:** [meshflow-api#437](https://github.com/pskillen/meshflow-api/issues/437)
+**Status:** Done · **Tracking:** [meshflow-api#437](https://github.com/pskillen/meshflow-api/issues/437)
 
 Part of [packet ingestion](README.md). Design background: [ADR-0005 feeder-scoped auth](adr/0005-feeder-scoped-auth.md) and [ADR-0006 identity linking](adr/0006-meshtastic-identity-linking.md).
 
@@ -9,13 +9,6 @@ Part of [packet ingestion](README.md). Design background: [ADR-0005 feeder-scope
 In Meshtastic 2.8 a node's number is `crc32(public key)`, so an upgraded feeder's number changes. A feeder that still posts under its old number on a legacy URL gets a 403 and stops ingesting without any visible error; that is why a v4-capable bot is a hard minimum below. A feeder on a v4 URL keeps ingesting (the API key identifies the feeder) and the API follows the number change. 2.8 also changes what the feeder radio passes to the bot (Traffic Management drops some packets before the bot, broadcast telemetry and public positions are switched off on upgrade, signing fields appear). The steps below keep ingest running and the node's history attached.
 
 The identity behaviour below was observed on hardware on 2026-11-08 and 2026-11-09 (a Xiao nRF52840 and a Heltec Wireless Paper, both on 2.8.2) and in pre-prod on 2026-11-10 (a real automatic re-key of the Heltec feeder). 2.8.1 and 2.8.2 are both Alpha releases; the latest stable-track release is still 2.7.x. Decide separately whether a feeder should run an alpha.
-
-## Hardware plan for the first runs
-
-- The **production feeder stays on 2.7** until the gates below are met.
-- The **pre-prod feeder is upgraded first** (to 2.8.2).
-- A **spare radio** is upgraded as a 2.8 sender, to observe the sender-side identity change.
-- 2.7 senders come from the live mesh. There is no second 2.8 sender, so 2.8 to 2.8 cases are only seen if a live-mesh 2.8 node happens to be heard.
 
 ## 1. Gates
 
@@ -65,10 +58,10 @@ Do not upgrade a feeder until all of these hold. Each is checkable.
 
 | Flag | API | Owner |
 | --- | --- | --- |
-| On | The re-key is applied within 10 minutes of the feeder's report (the reported number is written at most every 10 minutes): `ManagedNode.meshtastic_node_id` moves, an `auto_updated` event is written, an identity link from the old row to the new one is recorded, and the owner's claim follows to the new `ObservedNode` when the stored key did not come from a report. | A Discord DM ("Your feeder ... changed node number: !old is now !new. It keeps its history and API key. Nothing to do.") and a "Feeder number changed" notice on My Nodes. If an earlier flagged event was never dismissed the owner also sees "Feeder review resolved" until both are dismissed. |
+| On | The re-key is applied within 10 minutes of the feeder's report (the reported number is written at most every 10 minutes): `ManagedNode.meshtastic_node_id` moves, an `auto_updated` event is written, an identity link from the old row to the new one is recorded, and the owner's claim follows to the new `ObservedNode` when the stored key did not come from a report. | A Discord DM, sent only to an owner with a verified Discord target ("Your feeder ... changed node number: !old is now !new. It keeps its history and API key. Nothing to do.") and a "Feeder number changed" notice on My Nodes. If an earlier flagged event was never dismissed the owner also sees "Feeder review resolved" until both are dismissed. |
 | Off | Flagged `auto_rekey_disabled`; the number is not changed. The feeder keeps ingesting with `identity_mismatch: true` until it is re-pointed. | A Discord DM (at most one flagged DM per feeder per 24 hours) and a My Nodes notice with a **Re-point** button that works when the proof holds. |
 
-In pre-prod the open flagged event was resolved and the `auto_updated` event written 5 minutes 20 seconds after the API restart with the flag on. The Discord DM was recorded as sent by the server; its display in Discord and the rendered My Nodes page were not checked by eye.
+In pre-prod the open flagged event was resolved and the `auto_updated` event written within minutes of the API restart with the flag on. The Discord DM was recorded as sent by the server; its display in Discord and the rendered My Nodes page were not checked by eye.
 
 **Flagged reasons and what to do.**
 
@@ -77,7 +70,7 @@ In pre-prod the open flagged event was resolved and the `auto_updated` event wri
 | `auto_rekey_disabled` | The proof holds but the flag is off (or a manual reversal is holding). | Re-point by hand (below), or turn the flag on. |
 | `key_not_reported` | The bot sent no public key. | Check the bot version and that the radio reports its key; the next report re-evaluates. |
 | `crc_mismatch` | `crc32(key)` is not the reported number. On a 2.7 radio the number is MAC-based, so this usually means a config copied to another radio. | Do not re-point until the cause is understood. |
-| `key_mismatch` | The key differs from the stored key, no key is stored, or the stored key was first recorded from a report **less than an hour ago** (the 1-hour settle). A later report re-evaluates, so a real feeder applies once the hour has passed. Also raised with the number unchanged when a 2.7 key regeneration changes the key but not the MAC-based number. | Wait an hour for the settle case. For an unchanged number with a new key, staff accept the reported key (`accept_reported_key` on the re-point endpoint). |
+| `key_mismatch` | The key differs from the stored key, no key is stored, a node at the reported number carries a different key, or the stored key was first recorded from a report **less than an hour ago** (the 1-hour settle). A later report re-evaluates, so a real feeder applies once the hour has passed. Also raised with the number unchanged when a 2.7 key regeneration changes the key but not the MAC-based number. | Wait an hour for the settle case. For an unchanged number with a new key, staff accept the reported key (`accept_reported_key` on the re-point endpoint). |
 | `shared_key` | Another node holds the same key (a cloned key). **Never automatic**: a crc32 match on a cloned key proves nothing. | Re-point by hand after checking which radio is the feeder. |
 | `number_collision` | The reported number is invalid, held by another active feeder, or claimed by someone else. | Staff resolve the collision first. |
 
@@ -104,7 +97,7 @@ Expect observation counts from a 2.8 feeder to differ from a 2.7 one even after 
 
 ## 6. Feeder telemetry
 
-The upgrade turns off all **broadcast** telemetry. The radio still hands the connected bot the feeder's own device metrics about once a minute, and the bot throttles its upload to one per 15 minutes (`0` disables; there is no server-side throttle).
+The upgrade turns off all **broadcast** telemetry. The radio still hands the connected bot the feeder's own device metrics about once a minute, and the bot throttles its upload to one per 15 minutes (`SELF_TELEMETRY_UPLOAD_INTERVAL_SECONDS`, default 900; `0` disables; there is no server-side throttle).
 
 - **Default: rely on the bot's upload of the feeder's own telemetry.**
 - **Optional: re-enable device telemetry broadcast** on the radio, per feeder. Other feeders then hear it and log it too, so it appears once from the feeder itself and again as an observation by neighbours.
@@ -123,7 +116,7 @@ After the bot reconnects:
 
 If ingest is not 200, check in this order: bot is on a v4 URL; key is the feeder's own (not `shared_api_key`); bot log for a number change; admin for a flagged event.
 
-If the API is held by its fail-closed start guard (for example a migration is pending), it ingests nothing, and what the bot sends during the hold is lost, not queued. In the pre-prod run the bot logged connection errors for about five hours and those packets were not recovered. Release the guard before an upgrade day. The bot reconnects by itself within about 15 seconds of an API restart.
+If the API is held by its fail-closed start guard (for example a migration is pending; see [the migration guard](../../ENV_VARS.md#13-migration-guard) and [DEPLOY.md](../../DEPLOY.md)), it ingests nothing, and what the bot sends during the hold is lost, not queued. In the pre-prod run the bot logged connection errors for the whole hold and those packets were not recovered. Release the guard before an upgrade day. The bot reconnects by itself within about 15 seconds of an API restart.
 
 ## 8. Rollback
 
