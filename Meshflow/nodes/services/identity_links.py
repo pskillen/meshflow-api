@@ -61,7 +61,7 @@ class Outcome(str, Enum):
         return self in (Outcome.FLAGGED_CREATED, Outcome.FLAGGED_UPDATED, Outcome.FLAGGED_UNCHANGED)
 
 
-def _send_live(link: ObservedNodeIdentityLink) -> None:
+def send_live(link: ObservedNodeIdentityLink) -> None:
     """Tell listeners a link became ``auto`` or ``confirmed``, once the surrounding transaction commits."""
 
     def send():
@@ -123,7 +123,7 @@ def record_link(
         )
         return Outcome.CONFLICT
     if state in Link.LIVE_STATES:
-        _send_live(link)
+        send_live(link)
     return Outcome.CREATED
 
 
@@ -160,7 +160,7 @@ def _fold(existing, evidence, confidence, state, public_key_hex, reviewer) -> Ou
         )
         return Outcome.CONFLICT
     if not was_live and state in Link.LIVE_STATES:
-        _send_live(existing)
+        send_live(existing)
     return Outcome.PROMOTED
 
 
@@ -216,7 +216,20 @@ def evaluate_holders(key_hex: str, holders: list[ObservedNode]) -> Outcome:
         if outcome != Outcome.CONFLICT:
             Link.objects.filter(state=State.FLAGGED, public_key_hex=key_hex).delete()  # it is linkable now
         return outcome
+    _retire_shared_key_links(key_hex)
     return _flag_key(key_hex, holders)
+
+
+def _retire_shared_key_links(key_hex: str) -> None:
+    """A key that has become shared is no evidence of one device: drop its ``auto`` key links to ``suggested``.
+
+    The row and its history stay, but it leaves the live set. ``confirmed`` (staff) links are left alone, and so
+    is any link whose evidence is not the key itself (a feeder re-key stays live).
+    """
+    for link in Link.objects.filter(state=State.AUTO, evidence=Evidence.PUBLIC_KEY, public_key_hex=key_hex):
+        link.state = State.SUGGESTED
+        link.detail = {**link.detail, "key_now_shared": True}
+        link.save(update_fields=["state", "detail", "updated_at"])
 
 
 def evaluate_key(key_hex: str) -> Outcome:

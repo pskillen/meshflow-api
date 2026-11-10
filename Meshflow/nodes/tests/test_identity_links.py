@@ -521,3 +521,89 @@ def test_admin_lists_filters_searches_and_staff_can_change_state(make_node, admi
     link.refresh_from_db()
     assert link.state == State.REJECTED and link.reviewed_by == admin_user and link.reviewed_at
     assert old and new
+
+
+@pytest.mark.django_db
+def test_admin_confirming_a_link_sends_the_live_signal(make_node, admin_client, django_capture_on_commit_callbacks):
+    old = make_node(0x70000001)
+    new = make_node(0x70000002)
+    link = identity_links.record_link(old, new, evidence=Evidence.MAC, confidence="medium", state=State.SUGGESTED)
+    assert link == Outcome.CREATED
+    row = links().get()
+    seen = []
+
+    def listener(sender, link, **kwargs):
+        seen.append((link.pk, link.state))
+
+    identity_link_live.connect(listener, weak=False)
+    try:
+        base = "/admin/nodes/observednodeidentitylink/"
+        with django_capture_on_commit_callbacks(execute=True):
+            assert admin_client.post(f"{base}{row.pk}/change/", {"state": "confirmed"}).status_code == 302
+        assert seen == [(row.pk, State.CONFIRMED)]
+        with django_capture_on_commit_callbacks(execute=True):
+            admin_client.post(f"{base}{row.pk}/change/", {"state": "rejected"})
+        assert len(seen) == 1  # leaving the live set sends nothing
+    finally:
+        identity_link_live.disconnect(listener)
+
+
+@pytest.mark.django_db
+def test_admin_rejecting_a_suggestion_sends_nothing(make_node, admin_client, django_capture_on_commit_callbacks):
+    old = make_node(0x70000001)
+    new = make_node(0x70000002)
+    identity_links.record_link(old, new, evidence=Evidence.MAC, confidence="medium", state=State.SUGGESTED)
+    row = links().get()
+    seen = []
+    listener = lambda sender, link, **kw: seen.append(link.pk)  # noqa: E731
+    identity_link_live.connect(listener, weak=False)
+    try:
+        with django_capture_on_commit_callbacks(execute=True):
+            admin_client.post(f"/admin/nodes/observednodeidentitylink/{row.pk}/change/", {"state": "rejected"})
+        assert seen == []
+    finally:
+        identity_link_live.disconnect(listener)
+
+
+# --- a key that becomes shared after it was linked ---------------------------------------------------------------
+
+
+@pytest.mark.django_db
+def test_auto_key_link_is_retired_when_the_key_gains_a_third_holder(make_node):
+    new = make_node(PDYT_NEW, PDYT_KEY)
+    make_node(PDYT_OLD, PDYT_KEY)
+    detect_after_key_write(new)
+    assert links().get().state == State.AUTO
+
+    third = make_node(0x11111111, PDYT_KEY)
+    assert detect_after_key_write(third) == Outcome.FLAGGED_CREATED
+
+    link = links().get()
+    assert link.state == State.SUGGESTED and link.detail["key_now_shared"] is True
+    assert not Link.objects.filter(state__in=Link.LIVE_STATES).exists()
+    assert flags().count() == 1
+
+
+@pytest.mark.django_db
+def test_confirmed_key_link_survives_the_key_becoming_shared(make_node):
+    new = make_node(PDYT_NEW, PDYT_KEY)
+    make_node(PDYT_OLD, PDYT_KEY)
+    detect_after_key_write(new)
+    Link.objects.update(state=State.CONFIRMED)
+
+    third = make_node(0x11111111, PDYT_KEY)
+    detect_after_key_write(third)
+
+    assert links().get().state == State.CONFIRMED
+    assert flags().count() == 1
+
+
+@pytest.mark.django_db
+def test_feeder_rekey_link_survives_the_key_becoming_shared(make_node):
+    new = make_node(PDYT_NEW, PDYT_KEY)
+    make_node(PDYT_OLD, PDYT_KEY)
+    identity_links.link_feeder_rekey(PDYT_OLD, PDYT_NEW, manual=False)
+    third = make_node(0x11111111, PDYT_KEY)
+    detect_after_key_write(third)
+    assert links().get().state == State.AUTO and links().get().evidence == Evidence.FEEDER_REKEY
+    assert new

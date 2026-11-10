@@ -40,6 +40,7 @@ from .models import (
     ObservedNode,
     ObservedNodeIdentityLink,
 )
+from .services.identity_links import send_live
 
 
 class ManagedNodeActiveFilter(admin.SimpleListFilter):
@@ -1109,12 +1110,19 @@ class ObservedNodeIdentityLinkAdmin(admin.ModelAdmin):
         return False
 
     def save_model(self, request, obj, form, change):
+        became_live = False
         if change and "state" in form.changed_data:
             obj.reviewed_by = request.user
             obj.reviewed_at = timezone.now()
+            was = form.initial.get("state")
+            became_live = (
+                obj.state in ObservedNodeIdentityLink.LIVE_STATES and was not in ObservedNodeIdentityLink.LIVE_STATES
+            )
         try:
             with transaction.atomic():
                 super().save_model(request, obj, form, change)
+            if became_live:
+                send_live(obj)
         except IntegrityError:
             self.message_user(
                 request,
