@@ -110,6 +110,8 @@ where the code deviates from openapi.yaml, the OpenAPI spec is often correct. Ch
 When asked to create a pull request description, follow the template at
 .github/pull_request_template.md, and output a markdown file named `tmp/PR.md`
 
+PR CI runs on every pull request whatever its base, so stacked PRs get the `verify`, `build-and-smoke` and `contract` checks. Required checks are enforced only for PRs into `main`.
+
 ## Plan mode
 
 When creating a plan, Include that we should branch from the latest origin/main, do the work, commit, push, and open a PR. Use the `gh` CLI for all GitHub work.
