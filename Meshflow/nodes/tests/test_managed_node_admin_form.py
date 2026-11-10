@@ -107,3 +107,11 @@ def test_managed_node_admin_add_fieldsets_meshtastic_show_node_id_and_channels()
     assert "MeshCore identity" not in titles
     feeder = next(section for section in fieldsets if section[0] == "Feeder")
     assert "meshtastic_node_id" in feeder[1]["fields"]
+
+
+@pytest.mark.django_db
+def test_managed_node_admin_number_is_read_only_for_an_existing_meshtastic_feeder(create_managed_node):
+    admin = ManagedNodeAdmin(ManagedNode, None)
+    node = create_managed_node()
+    assert "meshtastic_node_id" in admin.get_readonly_fields(None, node)
+    assert "meshtastic_node_id" not in admin.get_readonly_fields(None, None)

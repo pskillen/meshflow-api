@@ -15,7 +15,7 @@ from rest_framework.test import APIClient
 import nodes.tests.conftest  # noqa: F401
 from common.meshtastic_identity import key_node_id, normalise_pubkey
 from common.protocol import Protocol
-from nodes.models import ManagedNodeIdentityEvent, ObservedNode
+from nodes.models import ManagedNode, ManagedNodeIdentityEvent, ObservedNode
 from nodes.services.feeder_identity import apply_reported_identity
 from nodes.signals import feeder_identity_changed
 
@@ -293,7 +293,7 @@ def test_later_manual_repoint_lifts_the_hold(feeder, staff, settings):
     assert response.status_code == 200
     feeder.refresh_from_db()
     event = apply_reported_identity(feeder, reported_node_num=NEW_NUM, reported_pubkey=KEY_HEX)
-    assert event.outcome == Outcome.AUTO_UPDATED
+    assert (event.outcome, event.reason) == (Outcome.AUTO_UPDATED, None)
     assert feeder.meshtastic_node_id == NEW_NUM
 
 
@@ -375,12 +375,194 @@ def test_owner_update_to_an_active_feeders_number_is_ignored(feeder, owner, crea
 
 
 @pytest.mark.django_db
-def test_staff_update_can_still_change_the_number(feeder, staff):
-    response = _client(staff).patch(_detail_url(feeder), {"meshtastic_node_id": NEW_NUM}, format="json")
+@pytest.mark.parametrize("method", ["patch", "put"])
+def test_staff_update_changes_the_number_through_the_audited_path(feeder, staff, received, method):
+    flagged = _event(feeder, outcome=Outcome.FLAGGED, reason=Reason.AUTO_REKEY_DISABLED)
+    body = {"meshtastic_node_id": NEW_NUM, "name": "Renamed", "constellation_id": feeder.constellation_id}
+
+    response = getattr(_client(staff), method)(_detail_url(feeder), body, format="json")
+
+    assert response.status_code == 200, response.data
+    feeder.refresh_from_db()
+    assert (feeder.meshtastic_node_id, feeder.name) == (NEW_NUM, "Renamed")
+    manual = feeder.identity_events.get(outcome=Outcome.MANUAL)
+    assert (manual.old_meshtastic_node_id, manual.new_meshtastic_node_id) == (OLD_NUM, NEW_NUM)
+    assert manual.acknowledged_by == staff
+    flagged.refresh_from_db()
+    assert flagged.resolved_at is not None
+    assert ObservedNode.objects.filter(protocol=Protocol.MESHTASTIC, meshtastic_node_id=NEW_NUM).exists()
+    assert len(received) == 1
+
+
+@pytest.mark.django_db
+def test_staff_update_with_the_same_number_writes_no_event(feeder, staff):
+    response = _client(staff).patch(_detail_url(feeder), {"meshtastic_node_id": OLD_NUM, "name": "Same"}, format="json")
 
     assert response.status_code == 200
+    assert not feeder.identity_events.exists()
+
+
+@pytest.mark.django_db
+def test_staff_update_to_an_active_feeders_number_is_409_and_changes_nothing(feeder, staff, create_managed_node):
+    create_managed_node(meshtastic_node_id=NEW_NUM, name="Taken")
+
+    response = _client(staff).patch(_detail_url(feeder), {"meshtastic_node_id": NEW_NUM, "name": "X"}, format="json")
+
+    assert response.status_code == 409
+    assert response.data["code"] == "number_collision"
+    feeder.refresh_from_db()
+    assert (feeder.meshtastic_node_id, feeder.name) == (OLD_NUM, "Hill")
+    assert not feeder.identity_events.exists()
+
+
+@pytest.mark.django_db
+def test_staff_update_constraint_race_is_409_not_500(feeder, staff, create_managed_node):
+    """The pre-check misses a feeder that took the number a moment ago: the unique index answers, not a 500."""
+    create_managed_node(meshtastic_node_id=NEW_NUM, name="Taken")
+    with patch("nodes.services.feeder_identity._number_held_by_another_feeder", return_value=False):
+        response = _client(staff).patch(_detail_url(feeder), {"meshtastic_node_id": NEW_NUM}, format="json")
+
+    assert response.status_code == 409
+    assert response.data["code"] == "number_collision"
+    feeder.refresh_from_db()
+    assert feeder.meshtastic_node_id == OLD_NUM
+
+
+@pytest.mark.django_db
+def test_staff_update_with_an_invalid_number_is_400(feeder, staff):
+    response = _client(staff).patch(_detail_url(feeder), {"meshtastic_node_id": 2}, format="json")
+
+    assert response.status_code == 400
+    feeder.refresh_from_db()
+    assert feeder.meshtastic_node_id == OLD_NUM
+
+
+# --- staff accept a reported key for the unchanged number --------------------------------------------------------
+
+
+def _key_regenerated(feeder):
+    """The 2.7 case: the MAC-derived number stays, the owner regenerated the key, the feeder reports the new one."""
+    ManagedNode.objects.filter(pk=feeder.pk).update(meshtastic_public_key=OTHER_KEY_HEX)
+    feeder.refresh_from_db()
+    return apply_reported_identity(feeder, reported_node_num=OLD_NUM, reported_pubkey=KEY_HEX)
+
+
+@pytest.mark.django_db
+def test_key_regeneration_sequence_end_to_end(feeder, staff, received):
+    flagged = _key_regenerated(feeder)
+    assert (flagged.outcome, flagged.reason) == (Outcome.FLAGGED, Reason.KEY_MISMATCH)
+
+    response = _client(staff).post(_repoint_url(feeder), {"accept_reported_key": True}, format="json")
+
+    assert response.status_code == 200, response.data
+    assert response.data["outcome"] == "key_accepted"
+    assert response.data["old_meshtastic_node_id"] == response.data["new_meshtastic_node_id"] == OLD_NUM
+    feeder.refresh_from_db()
+    assert feeder.meshtastic_node_id == OLD_NUM
+    assert feeder.meshtastic_public_key == KEY_HEX
+    assert feeder.meshtastic_key_node_id == key_node_id(KEY_HEX)
+    flagged.refresh_from_db()
+    assert flagged.resolved_at is not None and flagged.acknowledged_by == staff
+    audit = feeder.identity_events.get(outcome=Outcome.KEY_ACCEPTED)
+    assert audit.reported_public_key == KEY_HEX and audit.acknowledged_by == staff
+    assert not received
+
+    before = feeder.identity_events.count()
+    assert apply_reported_identity(feeder, reported_node_num=OLD_NUM, reported_pubkey=KEY_HEX) is None
+    assert feeder.identity_events.count() == before
+
+
+@pytest.mark.django_db
+def test_owner_cannot_accept_a_reported_key(feeder, owner):
+    _key_regenerated(feeder)
+
+    response = _client(owner).post(_repoint_url(feeder), {"accept_reported_key": True}, format="json")
+
+    assert response.status_code == 403
+    assert response.data["code"] == "staff_only"
+    feeder.refresh_from_db()
+    assert feeder.meshtastic_public_key == OTHER_KEY_HEX
+
+
+@pytest.mark.django_db
+def test_accept_without_a_waiting_key_is_400(feeder, staff):
+    response = _client(staff).post(_repoint_url(feeder), {"accept_reported_key": True}, format="json")
+
+    assert response.status_code == 400
+    assert response.data["code"] == "no_key_to_accept"
+
+
+@pytest.mark.django_db
+def test_accept_ignores_a_flagged_row_for_another_reason(feeder, staff):
+    _event(feeder, outcome=Outcome.FLAGGED, reason=Reason.AUTO_REKEY_DISABLED)
+
+    response = _client(staff).post(_repoint_url(feeder), {"accept_reported_key": True}, format="json")
+
+    assert response.status_code == 400
+    assert response.data["code"] == "no_key_to_accept"
+
+
+@pytest.mark.django_db
+def test_accept_with_another_number_is_400(feeder, staff):
+    _key_regenerated(feeder)
+    body = {"accept_reported_key": True, "meshtastic_node_id": NEW_NUM}
+
+    response = _client(staff).post(_repoint_url(feeder), body, format="json")
+
+    assert response.status_code == 400
+    feeder.refresh_from_db()
+    assert feeder.meshtastic_public_key == OTHER_KEY_HEX and feeder.meshtastic_node_id == OLD_NUM
+
+
+@pytest.mark.django_db
+def test_accept_flag_must_be_a_boolean(feeder, staff):
+    response = _client(staff).post(_repoint_url(feeder), {"accept_reported_key": "yes"}, format="json")
+
+    assert response.status_code == 400
+    assert response.data["code"] == "invalid_accept_reported_key"
+
+
+@pytest.mark.django_db
+def test_accepted_key_is_trusted_at_once_for_the_auto_rekey(feeder, staff, settings):
+    settings.MESHTASTIC_FEEDER_AUTO_REKEY = True
+    _key_regenerated(feeder)
+    _client(staff).post(_repoint_url(feeder), {"accept_reported_key": True}, format="json")
+    feeder.refresh_from_db()
+
+    event = apply_reported_identity(feeder, reported_node_num=NEW_NUM, reported_pubkey=KEY_HEX)
+
+    assert (event.outcome, event.reason) == (Outcome.AUTO_UPDATED, None)
+
+
+# --- a receiver that raises -------------------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+def test_raising_receiver_leaves_the_repoint_applied_and_the_response_200(feeder, owner):
+    def broken(sender, **kwargs):
+        raise RuntimeError("boom")
+
+    feeder_identity_changed.connect(broken)
+    try:
+        response = _client(owner).post(_repoint_url(feeder), {}, format="json")
+    finally:
+        feeder_identity_changed.disconnect(broken)
+
+    assert response.status_code == 200, response.data
     feeder.refresh_from_db()
     assert feeder.meshtastic_node_id == NEW_NUM
+    assert feeder.identity_events.filter(outcome=Outcome.MANUAL).exists()
+
+
+@pytest.mark.django_db
+def test_failing_ensure_leaves_the_repoint_applied_and_the_response_200(feeder, owner, received):
+    with patch("nodes.services.feeder_identity.ensure_observed_node_for_managed_node", side_effect=RuntimeError("x")):
+        response = _client(owner).post(_repoint_url(feeder), {}, format="json")
+
+    assert response.status_code == 200, response.data
+    feeder.refresh_from_db()
+    assert feeder.meshtastic_node_id == NEW_NUM
+    assert len(received) == 1
 
 
 @pytest.mark.django_db

@@ -7,10 +7,11 @@ See docs/features/packet-ingestion/adr/0006-meshtastic-identity-linking.md.
 from collections import defaultdict
 
 from django.core.management.base import BaseCommand
+from django.db import transaction
 
 from common.meshtastic_identity import identity_fields, key_node_id, normalise_pubkey
 from common.protocol import Protocol
-from nodes.models import ManagedNode, ObservedNode
+from nodes.models import ManagedNode, ManagedNodeIdentityEvent, ObservedNode
 from packets.models import NodeInfoPacket
 
 OBSERVED_FIELDS = ("meshtastic_public_key_hex", "meshtastic_key_node_id")
@@ -113,6 +114,7 @@ class Command(BaseCommand):
                 break
             last_pk = batch[-1].pk
             to_update = []
+            events = []
             for node in batch:
                 stats["scanned"] += 1
                 key_hex = index.key_for_number(node.meshtastic_node_id)
@@ -126,12 +128,26 @@ class Command(BaseCommand):
                 predicted = key_node_id(key_hex)
                 if node.meshtastic_public_key == key_hex and node.meshtastic_key_node_id == predicted:
                     continue
+                if not node.meshtastic_public_key:
+                    # A blank key filled from the client-writable observed row: date it like a key recorded from a
+                    # feeder report, so it is not trusted to back a number change for the first hour (FIRST_KEY_SETTLE).
+                    events.append(
+                        ManagedNodeIdentityEvent(
+                            managed_node=node,
+                            old_meshtastic_node_id=node.meshtastic_node_id,
+                            new_meshtastic_node_id=node.meshtastic_node_id,
+                            reported_public_key=key_hex,
+                            outcome=ManagedNodeIdentityEvent.Outcome.KEY_CHANGED,
+                        )
+                    )
                 node.meshtastic_public_key = key_hex
                 node.meshtastic_key_node_id = predicted
                 to_update.append(node)
                 stats["updated"] += 1
             if to_update and not dry_run:
-                ManagedNode.objects.bulk_update(to_update, ["meshtastic_public_key", "meshtastic_key_node_id"])
+                with transaction.atomic():
+                    ManagedNode.objects.bulk_update(to_update, ["meshtastic_public_key", "meshtastic_key_node_id"])
+                    ManagedNodeIdentityEvent.objects.bulk_create(events)
         return stats
 
     def _report_shared_keys(self, index):
