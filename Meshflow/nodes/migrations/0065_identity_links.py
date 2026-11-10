@@ -8,7 +8,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('nodes', '0062_device_metrics_nullable'),
+        ('nodes', '0064_managed_node_identity_event_key_accepted'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
