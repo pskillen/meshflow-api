@@ -251,11 +251,11 @@ def test_detection_never_raises(make_node, caplog):
 
 
 @pytest.mark.django_db
-def test_key_write_with_no_other_holder_costs_one_query(make_node):
+def test_key_write_with_no_other_holder_costs_two_queries(make_node):  # the holders lookup and the predicted-link check
     node = make_node(PDYT_NEW, PDYT_KEY)
     with CaptureQueriesContext(connection) as queries:
         detect_after_key_write(node)
-    assert len(queries) == 1
+    assert len(queries) == 2
 
 
 @pytest.mark.django_db
@@ -607,3 +607,263 @@ def test_feeder_rekey_link_survives_the_key_becoming_shared(make_node):
     detect_after_key_write(third)
     assert links().get().state == State.AUTO and links().get().evidence == Evidence.FEEDER_REKEY
     assert new
+
+
+# --- a new number that an older row's key predicted (link at the first packet) ------------------------------------
+
+
+@pytest.mark.django_db
+def test_prediction_links_the_old_row_to_the_unkeyed_new_row(make_node):
+    old, new = make_node(PDYT_OLD, PDYT_KEY), make_node(PDYT_NEW)
+    assert identity_links.link_by_prediction(new) == Outcome.CREATED
+    link = links().get()
+    assert (link.old_node, link.new_node) == (old, new)
+    assert (link.evidence, link.confidence, link.state) == (Evidence.PREDICTED_NUMBER, "medium", State.AUTO)
+    assert link.public_key_hex == PDYT_KEY and link.detail == {"predicted_from": "!433b82f0"}
+
+
+@pytest.mark.django_db
+def test_prediction_needs_the_new_row_to_have_no_key(make_node):
+    make_node(PDYT_OLD, PDYT_KEY)
+    new = make_node(PDYT_NEW, OTHER_KEY)
+    assert identity_links.link_by_prediction(new) == Outcome.NONE
+    assert not Link.objects.exists()
+
+
+@pytest.mark.django_db
+def test_prediction_by_two_rows_is_ambiguous(make_node):
+    make_node(PDYT_OLD, PDYT_KEY)
+    make_node(0x11111111, OTHER_KEY)
+    ObservedNode.objects.filter(meshtastic_node_id=0x11111111).update(meshtastic_key_node_id=PDYT_NEW)
+    new = make_node(PDYT_NEW)
+    assert identity_links.link_by_prediction(new) == Outcome.NONE
+    assert not Link.objects.exists()
+
+
+@pytest.mark.django_db
+def test_prediction_ignores_a_shared_key(make_node):
+    make_node(PDYT_OLD, PDYT_KEY)
+    make_node(0x11111111, PDYT_KEY)
+    ObservedNode.objects.filter(meshtastic_node_id=0x11111111).update(meshtastic_key_node_id=None)
+    new = make_node(PDYT_NEW)
+    assert identity_links.link_by_prediction(new) == Outcome.NONE
+    assert not Link.objects.exists()
+
+
+@pytest.mark.django_db
+def test_prediction_ignores_a_flagged_key(make_node):
+    make_node(PDYT_OLD, PDYT_KEY)
+    Link.objects.create(evidence=Evidence.PUBLIC_KEY, confidence="strong", state=State.FLAGGED, public_key_hex=PDYT_KEY)
+    new = make_node(PDYT_NEW)
+    assert identity_links.link_by_prediction(new) == Outcome.NONE
+    assert not links().exists()
+
+
+@pytest.mark.django_db
+def test_prediction_ignores_a_row_already_numbered_by_its_own_key(make_node):
+    make_node(PDYT_NEW, PDYT_KEY)  # the 2.8 row itself holds the key; nothing predicted from another row
+    other = make_node(0x22222222)
+    assert identity_links.link_by_prediction(other) == Outcome.NONE
+
+
+@pytest.mark.django_db
+def test_prediction_conflicts_when_the_old_row_already_has_a_live_successor(make_node):
+    old = make_node(PDYT_OLD, PDYT_KEY)
+    other = make_node(0x33333333)
+    identity_links.record_link(old, other, evidence=Evidence.FEEDER_REKEY, confidence="strong", state=State.AUTO)
+    new = make_node(PDYT_NEW)
+    assert identity_links.link_by_prediction(new) == Outcome.CONFLICT
+    assert links().count() == 1
+
+
+@pytest.mark.django_db
+def test_detect_at_first_packet_never_raises(make_node, caplog):
+    new = make_node(PDYT_NEW)
+    with mock.patch.object(identity_links, "link_by_prediction", side_effect=RuntimeError("boom")):
+        assert identity_links.detect_at_first_packet(new) == Outcome.NONE
+    assert "prediction failed" in caplog.text
+
+
+# --- stronger evidence replaces a predicted link; a different key demotes it ------------------------------------
+
+
+def _predicted_pair(make_node):
+    old, new = make_node(PDYT_OLD, PDYT_KEY), make_node(PDYT_NEW)
+    assert identity_links.link_by_prediction(new) == Outcome.CREATED
+    return old, new
+
+
+def _give_key(node, key):
+    for field, value in identity_fields(key).items():
+        setattr(node, field, value)
+    node.meshtastic_public_key = normalise_pubkey(key)
+    node.save()
+
+
+@pytest.mark.django_db
+def test_the_same_key_replaces_predicted_evidence_without_a_second_signal(
+    make_node, django_capture_on_commit_callbacks
+):
+    old, new = _predicted_pair(make_node)
+    seen = []
+    listener = lambda sender, link, **kw: seen.append(link.pk)  # noqa: E731
+    identity_link_live.connect(listener, weak=False)
+    try:
+        _give_key(new, PDYT_KEY)
+        with django_capture_on_commit_callbacks(execute=True):
+            assert detect_after_key_write(new) == Outcome.PROMOTED
+    finally:
+        identity_link_live.disconnect(listener)
+    link = links().get()
+    assert (link.old_node, link.new_node) == (old, new)
+    assert (link.evidence, link.confidence, link.state) == (Evidence.PUBLIC_KEY, "strong", State.AUTO)
+    assert link.detail["earlier"] == Evidence.PREDICTED_NUMBER
+    assert seen == []
+
+
+@pytest.mark.django_db
+def test_feeder_rekey_replaces_predicted_evidence(make_node):
+    _predicted_pair(make_node)
+    assert identity_links.link_feeder_rekey(PDYT_OLD, PDYT_NEW, manual=False) == Outcome.PROMOTED
+    link = links().get()
+    assert (link.evidence, link.confidence, link.state) == (Evidence.FEEDER_REKEY, "strong", State.AUTO)
+    assert link.detail["earlier"] == Evidence.PREDICTED_NUMBER
+
+
+@pytest.mark.django_db
+def test_a_confirmed_feeder_rekey_over_a_predicted_link_is_confirmed_and_signals_nothing_new(make_node):
+    _predicted_pair(make_node)
+    assert identity_links.link_feeder_rekey(PDYT_OLD, PDYT_NEW, manual=True) == Outcome.PROMOTED
+    assert links().get().state == State.CONFIRMED
+
+
+@pytest.mark.django_db
+def test_a_different_key_demotes_the_predicted_link(make_node):
+    _, new = _predicted_pair(make_node)
+    _give_key(new, OTHER_KEY)
+    assert detect_after_key_write(new) == Outcome.NONE
+    link = links().get()
+    assert (link.state, link.evidence) == (State.SUGGESTED, Evidence.PREDICTED_NUMBER)
+    assert link.detail["key_differs"] is True
+    assert not Link.objects.filter(state__in=Link.LIVE_STATES).exists()
+
+
+@pytest.mark.django_db
+def test_a_confirmed_predicted_link_is_not_demoted_by_a_different_key(make_node):
+    _, new = _predicted_pair(make_node)
+    Link.objects.update(state=State.CONFIRMED)
+    _give_key(new, OTHER_KEY)
+    detect_after_key_write(new)
+    assert links().get().state == State.CONFIRMED
+
+
+@pytest.mark.django_db
+def test_the_old_key_becoming_shared_retires_the_predicted_link(make_node):
+    _predicted_pair(make_node)
+    third = make_node(0x11111111, PDYT_KEY)
+    assert detect_after_key_write(third) == Outcome.FLAGGED_CREATED
+    link = links().get()
+    assert link.state == State.SUGGESTED and link.detail["key_now_shared"] is True
+    assert not Link.objects.filter(state__in=Link.LIVE_STATES).exists()
+
+
+@pytest.mark.django_db
+def test_a_rejected_predicted_pair_is_never_recreated(make_node):
+    old, new = _predicted_pair(make_node)
+    Link.objects.update(state=State.REJECTED)
+    assert identity_links.link_by_prediction(new) == Outcome.REJECTED
+    _give_key(new, PDYT_KEY)
+    assert detect_after_key_write(new) == Outcome.REJECTED
+    link = links().get()
+    assert (link.state, link.evidence) == (State.REJECTED, Evidence.PREDICTED_NUMBER)
+
+
+# --- the --predicted backfill pass and the feeder event id ------------------------------------------------------
+
+
+def _seed_predicted(make_node):
+    make_node(PDYT_OLD, PDYT_KEY)
+    make_node(PDYT_NEW)
+    make_node(0x55555555)  # unrelated unkeyed row: nothing predicts it
+
+
+@pytest.mark.django_db
+def test_command_without_predicted_leaves_unkeyed_rows_alone(make_node):
+    _seed_predicted(make_node)
+    out = _run()
+    assert not Link.objects.exists()
+    assert "Predicted-number" not in out
+
+
+@pytest.mark.django_db
+def test_command_predicted_dry_run_equals_real_run(make_node):
+    _seed_predicted(make_node)
+    dry = _run("--predicted", "--dry-run")
+    assert not Link.objects.exists()
+    real = _run("--predicted")
+    assert dry.replace("[dry-run] ", "") == real
+    assert "Predicted-number links created 1, skipped 0" in real
+    link = links().get()
+    assert (link.evidence, link.state, link.new_node.meshtastic_node_id) == (
+        Evidence.PREDICTED_NUMBER,
+        State.AUTO,
+        PDYT_NEW,
+    )
+    assert "auto 1" in real
+
+
+@pytest.mark.django_db
+def test_command_predicted_second_run_changes_nothing(make_node):
+    _seed_predicted(make_node)
+    _run("--predicted")
+    before = list(Link.objects.order_by("pk").values_list("pk", "state", "evidence", "updated_at"))
+    second = _run("--predicted")
+    assert list(Link.objects.order_by("pk").values_list("pk", "state", "evidence", "updated_at")) == before
+    assert "Predicted-number links created 0, skipped 1" in second
+
+
+@pytest.mark.django_db
+def test_command_predicted_skips_ambiguous_and_shared(make_node):
+    make_node(PDYT_OLD, PDYT_KEY)
+    make_node(0x11111111, OTHER_KEY)
+    ObservedNode.objects.filter(meshtastic_node_id=0x11111111).update(meshtastic_key_node_id=PDYT_NEW)
+    make_node(PDYT_NEW)
+    out = _run("--predicted")
+    assert not links().exists()
+    assert "Predicted-number links created 0, skipped 1" in out
+
+
+@pytest.mark.django_db
+def test_feeder_receiver_writes_the_event_id_on_the_link(make_node, feeder_event):
+    make_node(PDYT_OLD)
+    make_node(PDYT_NEW)
+    feeder, event = feeder_event(ManagedNodeIdentityEvent.Outcome.AUTO_UPDATED)
+    with mock.patch("nodes.services.feeder_identity_notify.queue_owner_notification"):
+        _send(feeder, event)
+    assert links().get().detail["feeder_event_id"] == event.pk
+
+
+@pytest.mark.django_db
+def test_feeder_rekey_adds_the_event_id_to_an_existing_key_link(make_node, feeder_event):
+    make_node(PDYT_OLD, PDYT_KEY)
+    new = make_node(PDYT_NEW, PDYT_KEY)
+    detect_after_key_write(new)
+    assert "feeder_event_id" not in links().get().detail
+    feeder, event = feeder_event(ManagedNodeIdentityEvent.Outcome.AUTO_UPDATED)
+    with mock.patch("nodes.services.feeder_identity_notify.queue_owner_notification"):
+        _send(feeder, event)
+    link = links().get()
+    assert (link.evidence, link.state) == (Evidence.PUBLIC_KEY, State.AUTO)
+    assert link.detail["feeder_event_id"] == event.pk
+    assert link.detail["also"] == [Evidence.FEEDER_REKEY]
+
+
+@pytest.mark.django_db
+def test_feeder_event_id_is_not_overwritten_or_added_to_a_rejected_link(make_node):
+    make_node(PDYT_OLD), make_node(PDYT_NEW)
+    identity_links.link_feeder_rekey(PDYT_OLD, PDYT_NEW, manual=False, event_id=1)
+    identity_links.link_feeder_rekey(PDYT_OLD, PDYT_NEW, manual=False, event_id=2)
+    assert links().get().detail["feeder_event_id"] == 1
+    Link.objects.update(state=State.REJECTED, detail={})
+    identity_links.link_feeder_rekey(PDYT_OLD, PDYT_NEW, manual=False, event_id=3)
+    assert links().get().detail == {}

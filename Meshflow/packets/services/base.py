@@ -7,6 +7,7 @@ from django.utils import timezone
 
 from common.mesh_node_helpers import meshtastic_id_to_hex
 from nodes.models import ManagedNode, ObservedNode
+from nodes.services.identity_links import detect_at_first_packet
 from nodes.services.observed_nodes import get_or_create_meshtastic_observed_node
 from packets.hops import update_inferred_max_hops
 from packets.models import MtRawPacket, PacketObservation
@@ -70,6 +71,7 @@ class BasePacketService(abc.ABC):
             if created:
                 self._dx_previous_last_heard = None
                 self._dx_from_node_created = True
+                detect_at_first_packet(self.from_node)
                 new_node_observed.send(sender=self, node=self.from_node, observer=self.observer)
             else:
                 self._dx_previous_last_heard = self.from_node.last_heard

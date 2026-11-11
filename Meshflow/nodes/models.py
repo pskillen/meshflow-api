@@ -656,6 +656,8 @@ class ObservedNodeIdentityLink(models.Model):
         PUBLIC_KEY = "public_key", _("Public key")
         FEEDER_REKEY = "feeder_rekey", _("Managed feeder re-key")
         MAC = "mac", _("MAC address")
+        PREDICTED_NUMBER = "predicted_number", _("Predicted 2.8 number")
+        DECLARED = "declared", _("Declared by a person")
 
     class Confidence(models.TextChoices):
         STRONG = "strong", _("Strong")

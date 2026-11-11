@@ -10,6 +10,9 @@ Evidence, strongest first:
   A key held by more than one candidate is a cloned key and can never be linked: one ``flagged`` row names every holder.
 * **managed feeder re-key** -- the feeder re-key service moved a feeder's number: ``auto`` (automatic) or
   ``confirmed`` (a person did it).
+* **predicted number** -- a row with no stored key whose number is the one an older row's key predicts
+  (``meshtastic_key_node_id``), when that key is held by nothing else: ``auto``, medium, made at the new row's first
+  packet. Key evidence replaces it; a different key demotes it to ``suggested``.
 * **MAC** (on-air NodeInfo only; NodeDB uploads zero other nodes' MACs on 2.8): a row numbered by the MAC's last four
   bytes, or holding the same MAC, whose key differs: ``suggested``, medium confidence, never promoted by MAC alone.
 
@@ -42,6 +45,10 @@ Confidence = Link.Confidence
 
 # A state only ever moves up this ladder (rejected is outside it: it is never promoted).
 _RANK = {State.SUGGESTED: 1, State.AUTO: 2, State.CONFIRMED: 3}
+
+# Evidence that only hints at the pair, and the evidence that supersedes it when it arrives.
+_HINT_EVIDENCE = (Evidence.MAC, Evidence.PREDICTED_NUMBER)
+_STRONGER_EVIDENCE = (Evidence.PUBLIC_KEY, Evidence.FEEDER_REKEY, Evidence.DECLARED)
 
 
 class Outcome(str, Enum):
@@ -91,8 +98,9 @@ def record_link(
     """Create the link ``old -> new`` or fold this evidence into the one that exists.
 
     A new state only replaces an existing one when it ranks higher (suggested < auto < confirmed); a rejected row is
-    never touched. When evidence replaces a suggestion the earlier evidence is kept under ``detail["earlier"]``;
-    otherwise extra evidence for a live link is noted under ``detail["also"]``.
+    never touched. Stronger evidence (key, feeder re-key, declared) replaces a MAC or predicted-number link's evidence
+    even at an equal state, the earlier evidence kept under ``detail["earlier"]``; otherwise extra evidence for a live
+    link is noted under ``detail["also"]``.
     """
     if old.pk == new.pk:
         return Outcome.NONE
@@ -133,19 +141,21 @@ def _fold(existing, evidence, confidence, state, public_key_hex, reviewer) -> Ou
         return Outcome.REJECTED
     detail = dict(existing.detail)
     also = list(detail.get("also", []))
-    if _RANK.get(state, 0) <= _RANK.get(existing.state, 0):
+    supersedes = existing.evidence in _HINT_EVIDENCE and evidence in _STRONGER_EVIDENCE
+    if not supersedes and _RANK.get(state, 0) <= _RANK.get(existing.state, 0):
         if evidence != existing.evidence and evidence not in also:
             detail["also"] = [*also, evidence]
             existing.detail = detail
             existing.save(update_fields=["detail", "updated_at"])
         return Outcome.UNCHANGED
     was_live = existing.state in Link.LIVE_STATES
-    if existing.evidence == Evidence.MAC and evidence != Evidence.MAC:
-        detail["earlier"] = existing.evidence  # a MAC suggestion promoted by stronger evidence
+    if supersedes:
+        detail["earlier"] = existing.evidence  # a MAC or predicted-number hint replaced by stronger evidence
         existing.evidence, existing.confidence = evidence, confidence
     elif evidence != existing.evidence and evidence not in also:
         detail["also"] = [*also, evidence]
-    existing.state = state
+    if _RANK.get(state, 0) > _RANK.get(existing.state, 0):
+        existing.state = state
     existing.detail = detail
     if public_key_hex and not existing.public_key_hex:
         existing.public_key_hex = public_key_hex
@@ -223,12 +233,30 @@ def evaluate_holders(key_hex: str, holders: list[ObservedNode]) -> Outcome:
 def _retire_shared_key_links(key_hex: str) -> None:
     """A key that has become shared is no evidence of one device: drop its ``auto`` key links to ``suggested``.
 
+    A predicted-number link rests on the old row's key too, so it goes the same way.
+
     The row and its history stay, but it leaves the live set. ``confirmed`` (staff) links are left alone, and so
     is any link whose evidence is not the key itself (a feeder re-key stays live).
     """
-    for link in Link.objects.filter(state=State.AUTO, evidence=Evidence.PUBLIC_KEY, public_key_hex=key_hex):
+    for link in Link.objects.filter(
+        state=State.AUTO, evidence__in=[Evidence.PUBLIC_KEY, Evidence.PREDICTED_NUMBER], public_key_hex=key_hex
+    ):
         link.state = State.SUGGESTED
         link.detail = {**link.detail, "key_now_shared": True}
+        link.save(update_fields=["state", "detail", "updated_at"])
+
+
+def _demote_predicted_if_key_differs(node: ObservedNode, key_hex: str) -> None:
+    """``node`` learned its key: an ``auto`` predicted-number link that rests on another key was wrong.
+
+    An explicit exception to "states only move up" (like ``_retire_shared_key_links``): the link stays as a
+    ``suggested`` row with ``detail["key_differs"]``. A ``confirmed`` link is a person's decision and is left alone.
+    """
+    for link in Link.objects.filter(new_node=node, evidence=Evidence.PREDICTED_NUMBER, state=State.AUTO).exclude(
+        public_key_hex=key_hex
+    ):
+        link.state = State.SUGGESTED
+        link.detail = {**link.detail, "key_differs": True}
         link.save(update_fields=["state", "detail", "updated_at"])
 
 
@@ -282,8 +310,52 @@ def link_by_mac(node: ObservedNode, mac: str | None) -> Outcome:
     )
 
 
-def link_feeder_rekey(old_number: int, new_number: int, *, manual: bool, reviewer=None) -> Outcome:
-    """Link a re-keyed feeder's old row to its new one (merging with an existing key link)."""
+def link_by_prediction(node: ObservedNode) -> Outcome:
+    """Link ``node`` to the one row whose key predicted its number, at the node's first packet.
+
+    Records nothing unless ``node`` has no stored key, exactly one other row predicted its number from a stored key
+    that gives that row a different number, and that key is held by that row alone and is not flagged.
+    """
+    if node.protocol != Protocol.MESHTASTIC or node.meshtastic_node_id is None or node.meshtastic_public_key_hex:
+        return Outcome.NONE
+    candidates = [
+        row
+        for row in ObservedNode.objects.filter(
+            protocol=Protocol.MESHTASTIC,
+            meshtastic_key_node_id=node.meshtastic_node_id,
+            meshtastic_public_key_hex__isnull=False,
+        )
+        .exclude(pk=node.pk)
+        .exclude(meshtastic_node_id=node.meshtastic_node_id)
+        .order_by("pk")[:2]
+    ]
+    if len(candidates) != 1:
+        return Outcome.NONE
+    old = candidates[0]
+    old_key = old.meshtastic_public_key_hex
+    if [h.pk for h in _key_holders(old_key)] != [old.pk]:
+        return Outcome.NONE
+    if Link.objects.filter(state=State.FLAGGED, public_key_hex=old_key).exists():
+        return Outcome.NONE
+    return record_link(
+        old,
+        node,
+        evidence=Evidence.PREDICTED_NUMBER,
+        confidence=Confidence.MEDIUM,
+        state=State.AUTO,
+        public_key_hex=old_key,
+        detail={"predicted_from": old.node_id_str},
+    )
+
+
+def link_feeder_rekey(
+    old_number: int, new_number: int, *, manual: bool, reviewer=None, event_id: int | None = None
+) -> Outcome:
+    """Link a re-keyed feeder's old row to its new one (merging with an existing key link).
+
+    ``event_id`` is the ``ManagedNodeIdentityEvent`` that moved the feeder; it is recorded as
+    ``detail["feeder_event_id"]`` on a new link, and added to an existing link that lacks it (nothing else changes).
+    """
     rows = {
         row.meshtastic_node_id: row
         for row in ObservedNode.objects.filter(
@@ -293,15 +365,27 @@ def link_feeder_rekey(old_number: int, new_number: int, *, manual: bool, reviewe
     old, new = rows.get(old_number), rows.get(new_number)
     if old is None or new is None:
         return Outcome.NONE
-    return record_link(
+    outcome = record_link(
         old,
         new,
         evidence=Evidence.FEEDER_REKEY,
         confidence=Confidence.STRONG,
         state=State.CONFIRMED if manual else State.AUTO,
         public_key_hex=new.meshtastic_public_key_hex,
+        detail={"feeder_event_id": event_id} if event_id is not None else None,
         reviewer=reviewer,
     )
+    if event_id is not None:
+        _note_feeder_event(old, new, event_id)
+    return outcome
+
+
+def _note_feeder_event(old: ObservedNode, new: ObservedNode, event_id: int) -> None:
+    """Add ``feeder_event_id`` to an existing, non-rejected link that does not carry it yet."""
+    link = Link.objects.filter(old_node=old, new_node=new).exclude(state=State.REJECTED).first()
+    if link is not None and "feeder_event_id" not in link.detail:
+        link.detail = {**link.detail, "feeder_event_id": event_id}
+        link.save(update_fields=["detail", "updated_at"])
 
 
 # --- Entry points for ingest and signals: never raise -------------------------------------------------------
@@ -313,12 +397,22 @@ def detect_after_key_write(node: ObservedNode) -> Outcome:
         key_hex = node.meshtastic_public_key_hex
         if not key_hex or node.protocol != Protocol.MESHTASTIC:
             return Outcome.NONE
+        _demote_predicted_if_key_differs(node, key_hex)
         holders = _key_holders(key_hex)
         if len(holders) < 2:
             return Outcome.NONE
         return evaluate_holders(key_hex, holders)
     except Exception:
         logger.exception("Identity link detection failed for node %s", getattr(node, "meshtastic_node_id", None))
+        return Outcome.NONE
+
+
+def detect_at_first_packet(node: ObservedNode) -> Outcome:
+    """After a new row was created from a packet: link it when its number was predicted. Never raises."""
+    try:
+        return link_by_prediction(node)
+    except Exception:
+        logger.exception("Identity link prediction failed for node %s", getattr(node, "meshtastic_node_id", None))
         return Outcome.NONE
 
 
@@ -335,10 +429,12 @@ def detect_after_nodeinfo(node: ObservedNode, mac: str | None, *, key_written: b
     return outcome
 
 
-def detect_after_feeder_rekey(old_number: int, new_number: int, *, manual: bool, reviewer=None) -> Outcome:
+def detect_after_feeder_rekey(
+    old_number: int, new_number: int, *, manual: bool, reviewer=None, event_id: int | None = None
+) -> Outcome:
     """Receiver body for ``feeder_identity_changed``. Never raises."""
     try:
-        return link_feeder_rekey(old_number, new_number, manual=manual, reviewer=reviewer)
+        return link_feeder_rekey(old_number, new_number, manual=manual, reviewer=reviewer, event_id=event_id)
     except Exception:
         logger.exception("Identity link from feeder re-key %s -> %s failed", old_number, new_number)
         return Outcome.NONE
