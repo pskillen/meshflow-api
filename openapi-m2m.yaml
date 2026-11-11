@@ -79,19 +79,11 @@ paths:
         "200":
           description: >
             Paginated infra nodes. Opted-out nodes are omitted, and so are the later numbers of an opted-out radio
-            (an opt-out on an old number follows the radio's live identity links forward). Every row also carries
-            `replaced_by_id` and `previous_id`.
+            (an opt-out on an old number follows the radio's live identity links forward).
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  count: {type: integer}
-                  page: {type: integer}
-                  page_size: {type: integer}
-                  results:
-                    type: array
-                    items: {$ref: "#/components/schemas/InfraNodeIdentity"}
+                $ref: "#/components/schemas/InfraNodePage"
   /v1/meshcore/summary:
     get:
       tags: [M2M]
@@ -116,17 +108,34 @@ paths:
       responses:
         "200":
           description: >
-            Infra nodes. health is null. Rows carry `replaced_by_id` and `previous_id` (see the Meshtastic list);
-            an opt-out follows the radio's later numbers.
+            Paginated infra nodes, same envelope as the Meshtastic list. health is null. An opt-out follows the
+            radio's later numbers.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/InfraNodePage"}
 components:
   schemas:
-    InfraNodeIdentity:
+    InfraNodePage:
       type: object
-      description: >
-        The identity fields every infra-node row carries, on both protocols (other row fields are as described
-        in the feature docs). Both are always present.
+      required: [count, page, page_size, results]
+      properties:
+        count: {type: integer}
+        page: {type: integer}
+        page_size: {type: integer}
+        results: {type: array, items: {$ref: "#/components/schemas/InfraNode"}}
+    InfraNode:
+      description: One infrastructure node row. The Meshtastic and MeshCore rows share these fields.
+      type: object
+      required: [id, long_name, short_name, last_heard, meshflow_url, health, replaced_by_id, previous_id]
       properties:
         id: {type: string}
+        long_name: {type: [string, "null"]}
+        short_name: {type: [string, "null"]}
+        last_heard: {type: [string, "null"], format: date-time}
+        meshflow_url: {type: string}
+        health:
+          type: [object, "null"]
+          description: Latest device metrics. Always null on MeshCore.
         replaced_by_id:
           type: [string, "null"]
           description: >
@@ -135,8 +144,22 @@ components:
         previous_id:
           type: [string, "null"]
           description: >
-            Id of the node's direct live predecessor (an older number of the same radio), else null. Always null when
-            that node has opted out of M2M.
+            Id of the node's direct live predecessor (an older number of the same radio), else null. A claim from the
+            identity link, not proof of replacement: it can rest on an unconfirmed predicted-number link, so use
+            `replaced_by_id` where proof matters. A predecessor that opted out hides this row, so it is never named.
+      oneOf:
+        - type: object
+          title: Meshtastic row
+          required: [role, role_deprecated, hw_model]
+          properties:
+            role: {type: string}
+            role_deprecated: {type: boolean}
+            hw_model: {type: [string, "null"]}
+        - type: object
+          title: MeshCore row
+          required: [type]
+          properties:
+            type: {type: string}
   securitySchemes:
     M2MKey:
       type: apiKey
