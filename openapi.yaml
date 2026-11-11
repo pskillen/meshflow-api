@@ -1988,6 +1988,107 @@ components:
           nullable: true
           readOnly: true
 
+    NodeIdentityRef:
+      type: object
+      description: A reference to another identity (ObservedNode row) of the same radio.
+      required: [internal_id, protocol, meshtastic_node_id, node_id_str]
+      properties:
+        internal_id:
+          type: string
+          format: uuid
+        protocol:
+          type: integer
+          description: 1 Meshtastic, 2 MeshCore
+        meshtastic_node_id:
+          type: integer
+          nullable: true
+          description: Meshtastic node number; null for MeshCore
+        node_id_str:
+          type: string
+          description: Display id (!hex8 or mc:prefix12)
+
+    NodeIdentityChainEntry:
+      description: One other identity of a node, with the live link that joins it to the previous one in the walk.
+      allOf:
+        - $ref: '#/components/schemas/NodeIdentityRef'
+        - type: object
+          required: [long_name, short_name, last_heard, evidence, confidence, state, linked_at]
+          properties:
+            long_name:
+              type: string
+              nullable: true
+            short_name:
+              type: string
+              nullable: true
+            last_heard:
+              type: string
+              format: date-time
+              nullable: true
+            evidence:
+              type: string
+              enum: [public_key, feeder_rekey, mac]
+            confidence:
+              type: string
+              enum: [strong, medium]
+            state:
+              type: string
+              enum: [auto, confirmed]
+              description: Only live link states are shown.
+            linked_at:
+              type: string
+              format: date-time
+              description: When the link was created.
+
+    NodeIdentityChain:
+      type: object
+      description: >
+        The other identities of one radio (ADR-0006), read from live (auto or confirmed) identity links only.
+        Each list is nearest first, stops after 10 steps or at a node already seen, and never includes the node itself.
+      required: [previous, next]
+      properties:
+        previous:
+          type: array
+          items:
+            $ref: '#/components/schemas/NodeIdentityChainEntry'
+          description: Identities this node replaced, nearest first.
+        next:
+          type: array
+          items:
+            $ref: '#/components/schemas/NodeIdentityChainEntry'
+          description: Identities that took over from this node, nearest first.
+
+    ObservedNodeDetail:
+      description: >
+        ObservedNode plus the node's other identities. ``replaced_by`` is non-null exactly when the node has a live
+        successor S and (the node has never been heard, or S has been heard and S.last_heard >= the node's
+        last_heard); on detail it names the **newest** identity (the last ``identity_chain.next`` entry). An old row
+        heard after its successor keeps ``replaced_by`` null although ``identity_chain.next`` is non-empty.
+      allOf:
+        - $ref: '#/components/schemas/ObservedNode'
+        - type: object
+          required: [replaced_by, identity_chain]
+          properties:
+            replaced_by:
+              nullable: true
+              allOf:
+                - $ref: '#/components/schemas/NodeIdentityRef'
+            identity_chain:
+              $ref: '#/components/schemas/NodeIdentityChain'
+
+    ObservedNodeListItem:
+      description: >
+        ObservedNode as listed (list and mine) plus ``replaced_by``: the **direct** successor under the same rule as
+        ObservedNodeDetail, or null. No ``identity_chain`` here.
+      allOf:
+        - $ref: '#/components/schemas/ObservedNode'
+        - type: object
+          required: [replaced_by]
+          properties:
+            replaced_by:
+              nullable: true
+              allOf:
+                - $ref: '#/components/schemas/NodeIdentityRef'
+
     ObservedNodeSearch:
       type: object
       description: >
@@ -2018,6 +2119,11 @@ components:
           format: date-time
           description: The timestamp when the node was last heard from
           nullable: true
+        replaced_by:
+          nullable: true
+          description: The direct live successor when this node is replaced (see ObservedNodeListItem), else null.
+          allOf:
+            - $ref: '#/components/schemas/NodeIdentityRef'
         owner:
           type: object
           description: The owner of the node (if the node has been claimed by a user in the system)
@@ -5764,6 +5870,14 @@ paths:
             type: string
             format: date-time
           description: ISO 8601 timestamp; only nodes heard on or after this time
+        - name: replaced
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: ['false']
+          description: >
+            ``false`` excludes rows whose ``replaced_by`` would be non-null. Any other value is ignored.
       responses:
         '200':
           description: List of observed nodes
@@ -5777,7 +5891,7 @@ paths:
                       results:
                         type: array
                         items:
-                          $ref: '#/components/schemas/ObservedNode'
+                          $ref: '#/components/schemas/ObservedNodeListItem'
 
     post:
       summary: Create observed node
@@ -5820,7 +5934,7 @@ paths:
                       results:
                         type: array
                         items:
-                          $ref: '#/components/schemas/ObservedNode'
+                          $ref: '#/components/schemas/ObservedNodeListItem'
 
   /nodes/observed-nodes/infrastructure/:
     get:
@@ -6289,7 +6403,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ObservedNode'
+                $ref: '#/components/schemas/ObservedNodeDetail'
         '300':
           description: Multiple nodes match a bare-hex lookup (pick a protocol-specific id)
           content:
