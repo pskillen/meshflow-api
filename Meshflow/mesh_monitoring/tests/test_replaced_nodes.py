@@ -268,7 +268,8 @@ def predicted_pair(replaced_pair):
     user, old, new, link = replaced_pair
     link.evidence = Link.Evidence.PREDICTED_NUMBER
     link.confidence = Link.Confidence.MEDIUM
-    link.save(update_fields=["evidence", "confidence"])
+    link.public_key_hex = "ab" * 32
+    link.save(update_fields=["evidence", "confidence", "public_key_hex"])
     return user, old, new, link
 
 
