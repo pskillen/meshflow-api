@@ -260,3 +260,41 @@ def test_raising_send_keeps_mark_and_task_finishes(replaced_pair, verified):
     assert result["replaced"] == 1
     link.refresh_from_db()
     assert "watchers_notified" in link.detail
+
+
+@pytest.fixture
+def predicted_pair(replaced_pair):
+    """The replaced_pair, but the link rests only on a predicted number and the new row's key is unheard."""
+    user, old, new, link = replaced_pair
+    link.evidence = Link.Evidence.PREDICTED_NUMBER
+    link.confidence = Link.Confidence.MEDIUM
+    link.save(update_fields=["evidence", "confidence"])
+    return user, old, new, link
+
+
+@pytest.mark.django_db
+def test_predicted_only_link_does_not_pause_or_dm(predicted_pair, verified):
+    _, old, _, link = predicted_pair
+    with patch("push_notifications.discord_audit.send_dm"):
+        with patch("mesh_monitoring.tasks._dispatch_monitoring_round"):
+            result = process_node_watch_presence()
+    assert result["replaced"] == 0 and result["watched"] == 1
+    assert not DiscordNotificationAudit.objects.filter(kind=DiscordNotificationKind.NODE_REPLACED).exists()
+    link.refresh_from_db()
+    assert "watchers_notified" not in link.detail
+
+
+@pytest.mark.django_db
+def test_predicted_only_link_does_not_skip_learned_thresholds(predicted_pair):
+    assert update_learned_offline_thresholds() == {"updated": 1, "failed": 0}
+
+
+@pytest.mark.django_db
+def test_predicted_link_pauses_and_dms_once_key_is_heard(predicted_pair, verified):
+    _, old, new, link = predicted_pair
+    new.meshtastic_public_key_hex = "ab" * 32
+    new.save(update_fields=["meshtastic_public_key_hex"])
+    with patch("push_notifications.discord_audit.send_dm") as send_dm:
+        result = process_node_watch_presence()
+    assert result == {"watched": 0, "replaced": 1}
+    assert send_dm.call_count == 1

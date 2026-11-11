@@ -58,7 +58,7 @@ Any packet that advances **`last_heard`** should clear **`offline_confirmed_at`*
 
 ### Replaced numbers
 
-On Meshtastic 2.8 a firmware upgrade or re-key can give a radio a new node number, so a new `ObservedNode` row appears and the old one goes quiet (see the node identity chain). A row is **replaced** when it has a live identity link (`auto` or `confirmed`) to a successor **and** either it has never been heard or the successor was heard at least as recently as it was. For a replaced row, monitoring:
+On Meshtastic 2.8 a firmware upgrade or re-key can give a radio a new node number, so a new `ObservedNode` row appears and the old one goes quiet (see the node identity chain). A row is **replaced** when it has a live identity link (`auto` or `confirmed`) to a successor **and** either it has never been heard or the successor was heard at least as recently as it was. A link whose only evidence is a predicted number, while the new row's key has not been heard, does not count (G59): the old row is processed as usual until the matching key arrives. For a replaced row, monitoring:
 
 - **pauses offline checks**: no silence detection, no verification traceroutes, no offline DM, and the daily learned-threshold job skips it;
 - **leaves its `NodePresence` as it is** (a row already confirmed offline stays that way and resumes when the row stops being replaced);

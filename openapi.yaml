@@ -2063,7 +2063,8 @@ components:
         ObservedNode plus the node's other identities. ``replaced_by`` is non-null exactly when the node has a live
         successor S and (the node has never been heard, or S has been heard and S.last_heard >= the node's
         last_heard); on detail it names the **newest** identity (the last ``identity_chain.next`` entry). An old row
-        heard after its successor keeps ``replaced_by`` null although ``identity_chain.next`` is non-empty.
+        heard after its successor keeps ``replaced_by`` null although ``identity_chain.next`` is non-empty. So does a link
+        whose only evidence is ``predicted_number`` while the successor has no stored public key (not yet confirmed).
       allOf:
         - $ref: '#/components/schemas/ObservedNode'
         - type: object
@@ -2079,7 +2080,7 @@ components:
     ObservedNodeListItem:
       description: >
         ObservedNode as listed (list and mine) plus ``replaced_by``: the **direct** successor under the same rule as
-        ObservedNodeDetail, or null. No ``identity_chain`` here.
+        ObservedNodeDetail (including the predicted-only exception), or null. No ``identity_chain`` here.
       allOf:
         - $ref: '#/components/schemas/ObservedNode'
         - type: object
@@ -2122,7 +2123,7 @@ components:
           nullable: true
         replaced_by:
           nullable: true
-          description: The direct live successor when this node is replaced (see ObservedNodeListItem), else null.
+          description: The direct live successor when this node is replaced (see ObservedNodeListItem; a predicted-only link does not count), else null.
           allOf:
             - $ref: '#/components/schemas/NodeIdentityRef'
         owner:
