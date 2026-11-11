@@ -26,7 +26,7 @@ Implementation: **`mesh_monitoring.services.notify_watchers_verification_started
 
 ## Replaced-number DMs
 
-Kind **`node_replaced`** ("Watched node now uses a new number"). When a watched node has taken a new number, each watcher with verified Discord gets one DM from **`notify_watchers_node_replaced`**: "Meshflow mesh monitoring: <old label> now uses node <new node id>. Its old number won't send offline alerts. Watch the new number: <url of the new node>". It is sent from **`process_node_watch_presence`** on the first run that sees the row replaced, at most once per identity link, and not at all when the old row was last heard more than 7 days ago. Unverified watchers get a skip audit row as for offline DMs.
+Kind **`node_replaced`** ("Watched node now uses a new number"). When a watched node has taken a new number, each watcher with verified Discord gets one DM from **`notify_watchers_node_replaced`**: `Meshflow mesh monitoring: <old label> now uses node <new node id>. Its old number won't send offline alerts. Watch the new number: <url of the new node>`. It is sent from **`process_node_watch_presence`** on the first run that sees the row replaced and silent past its own offline threshold (never against a node that is still being heard), at most once per identity link, and not at all when the old row was last heard more than 7 days ago. Unverified watchers get a skip audit row as for offline DMs.
 
 ## Low-battery DMs
 
