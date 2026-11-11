@@ -46,6 +46,10 @@ Confidence = Link.Confidence
 # A state only ever moves up this ladder (rejected is outside it: it is never promoted).
 _RANK = {State.SUGGESTED: 1, State.AUTO: 2, State.CONFIRMED: 3}
 
+# Evidence that only hints at the pair, and the evidence that supersedes it when it arrives.
+_HINT_EVIDENCE = (Evidence.MAC, Evidence.PREDICTED_NUMBER)
+_STRONGER_EVIDENCE = (Evidence.PUBLIC_KEY, Evidence.FEEDER_REKEY, Evidence.DECLARED)
+
 
 class Outcome(str, Enum):
     NONE = "none"  # nothing to record
@@ -94,8 +98,9 @@ def record_link(
     """Create the link ``old -> new`` or fold this evidence into the one that exists.
 
     A new state only replaces an existing one when it ranks higher (suggested < auto < confirmed); a rejected row is
-    never touched. When evidence replaces a suggestion the earlier evidence is kept under ``detail["earlier"]``;
-    otherwise extra evidence for a live link is noted under ``detail["also"]``.
+    never touched. Stronger evidence (key, feeder re-key, declared) replaces a MAC or predicted-number link's evidence
+    even at an equal state, the earlier evidence kept under ``detail["earlier"]``; otherwise extra evidence for a live
+    link is noted under ``detail["also"]``.
     """
     if old.pk == new.pk:
         return Outcome.NONE
@@ -136,19 +141,21 @@ def _fold(existing, evidence, confidence, state, public_key_hex, reviewer) -> Ou
         return Outcome.REJECTED
     detail = dict(existing.detail)
     also = list(detail.get("also", []))
-    if _RANK.get(state, 0) <= _RANK.get(existing.state, 0):
+    supersedes = existing.evidence in _HINT_EVIDENCE and evidence in _STRONGER_EVIDENCE
+    if not supersedes and _RANK.get(state, 0) <= _RANK.get(existing.state, 0):
         if evidence != existing.evidence and evidence not in also:
             detail["also"] = [*also, evidence]
             existing.detail = detail
             existing.save(update_fields=["detail", "updated_at"])
         return Outcome.UNCHANGED
     was_live = existing.state in Link.LIVE_STATES
-    if existing.evidence == Evidence.MAC and evidence != Evidence.MAC:
-        detail["earlier"] = existing.evidence  # a MAC suggestion promoted by stronger evidence
+    if supersedes:
+        detail["earlier"] = existing.evidence  # a MAC or predicted-number hint replaced by stronger evidence
         existing.evidence, existing.confidence = evidence, confidence
     elif evidence != existing.evidence and evidence not in also:
         detail["also"] = [*also, evidence]
-    existing.state = state
+    if _RANK.get(state, 0) > _RANK.get(existing.state, 0):
+        existing.state = state
     existing.detail = detail
     if public_key_hex and not existing.public_key_hex:
         existing.public_key_hex = public_key_hex
@@ -226,12 +233,30 @@ def evaluate_holders(key_hex: str, holders: list[ObservedNode]) -> Outcome:
 def _retire_shared_key_links(key_hex: str) -> None:
     """A key that has become shared is no evidence of one device: drop its ``auto`` key links to ``suggested``.
 
+    A predicted-number link rests on the old row's key too, so it goes the same way.
+
     The row and its history stay, but it leaves the live set. ``confirmed`` (staff) links are left alone, and so
     is any link whose evidence is not the key itself (a feeder re-key stays live).
     """
-    for link in Link.objects.filter(state=State.AUTO, evidence=Evidence.PUBLIC_KEY, public_key_hex=key_hex):
+    for link in Link.objects.filter(
+        state=State.AUTO, evidence__in=[Evidence.PUBLIC_KEY, Evidence.PREDICTED_NUMBER], public_key_hex=key_hex
+    ):
         link.state = State.SUGGESTED
         link.detail = {**link.detail, "key_now_shared": True}
+        link.save(update_fields=["state", "detail", "updated_at"])
+
+
+def _demote_predicted_if_key_differs(node: ObservedNode, key_hex: str) -> None:
+    """``node`` learned its key: an ``auto`` predicted-number link that rests on another key was wrong.
+
+    An explicit exception to "states only move up" (like ``_retire_shared_key_links``): the link stays as a
+    ``suggested`` row with ``detail["key_differs"]``. A ``confirmed`` link is a person's decision and is left alone.
+    """
+    for link in Link.objects.filter(new_node=node, evidence=Evidence.PREDICTED_NUMBER, state=State.AUTO).exclude(
+        public_key_hex=key_hex
+    ):
+        link.state = State.SUGGESTED
+        link.detail = {**link.detail, "key_differs": True}
         link.save(update_fields=["state", "detail", "updated_at"])
 
 
@@ -354,6 +379,7 @@ def detect_after_key_write(node: ObservedNode) -> Outcome:
         key_hex = node.meshtastic_public_key_hex
         if not key_hex or node.protocol != Protocol.MESHTASTIC:
             return Outcome.NONE
+        _demote_predicted_if_key_differs(node, key_hex)
         holders = _key_holders(key_hex)
         if len(holders) < 2:
             return Outcome.NONE
@@ -368,9 +394,7 @@ def detect_at_first_packet(node: ObservedNode) -> Outcome:
     try:
         return link_by_prediction(node)
     except Exception:
-        logger.exception(
-            "Identity link prediction failed for node %s", getattr(node, "meshtastic_node_id", None)
-        )
+        logger.exception("Identity link prediction failed for node %s", getattr(node, "meshtastic_node_id", None))
         return Outcome.NONE
 
 

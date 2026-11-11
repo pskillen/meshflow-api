@@ -251,11 +251,11 @@ def test_detection_never_raises(make_node, caplog):
 
 
 @pytest.mark.django_db
-def test_key_write_with_no_other_holder_costs_one_query(make_node):
+def test_key_write_with_no_other_holder_costs_two_queries(make_node):  # the holders lookup and the predicted-link check
     node = make_node(PDYT_NEW, PDYT_KEY)
     with CaptureQueriesContext(connection) as queries:
         detect_after_key_write(node)
-    assert len(queries) == 1
+    assert len(queries) == 2
 
 
 @pytest.mark.django_db
@@ -682,3 +682,97 @@ def test_detect_at_first_packet_never_raises(make_node, caplog):
     with mock.patch.object(identity_links, "link_by_prediction", side_effect=RuntimeError("boom")):
         assert identity_links.detect_at_first_packet(new) == Outcome.NONE
     assert "prediction failed" in caplog.text
+
+
+# --- stronger evidence replaces a predicted link; a different key demotes it ------------------------------------
+
+
+def _predicted_pair(make_node):
+    old, new = make_node(PDYT_OLD, PDYT_KEY), make_node(PDYT_NEW)
+    assert identity_links.link_by_prediction(new) == Outcome.CREATED
+    return old, new
+
+
+def _give_key(node, key):
+    for field, value in identity_fields(key).items():
+        setattr(node, field, value)
+    node.meshtastic_public_key = normalise_pubkey(key)
+    node.save()
+
+
+@pytest.mark.django_db
+def test_the_same_key_replaces_predicted_evidence_without_a_second_signal(
+    make_node, django_capture_on_commit_callbacks
+):
+    old, new = _predicted_pair(make_node)
+    seen = []
+    listener = lambda sender, link, **kw: seen.append(link.pk)  # noqa: E731
+    identity_link_live.connect(listener, weak=False)
+    try:
+        _give_key(new, PDYT_KEY)
+        with django_capture_on_commit_callbacks(execute=True):
+            assert detect_after_key_write(new) == Outcome.PROMOTED
+    finally:
+        identity_link_live.disconnect(listener)
+    link = links().get()
+    assert (link.old_node, link.new_node) == (old, new)
+    assert (link.evidence, link.confidence, link.state) == (Evidence.PUBLIC_KEY, "strong", State.AUTO)
+    assert link.detail["earlier"] == Evidence.PREDICTED_NUMBER
+    assert seen == []
+
+
+@pytest.mark.django_db
+def test_feeder_rekey_replaces_predicted_evidence(make_node):
+    _predicted_pair(make_node)
+    assert identity_links.link_feeder_rekey(PDYT_OLD, PDYT_NEW, manual=False) == Outcome.PROMOTED
+    link = links().get()
+    assert (link.evidence, link.confidence, link.state) == (Evidence.FEEDER_REKEY, "strong", State.AUTO)
+    assert link.detail["earlier"] == Evidence.PREDICTED_NUMBER
+
+
+@pytest.mark.django_db
+def test_a_confirmed_feeder_rekey_over_a_predicted_link_is_confirmed_and_signals_nothing_new(make_node):
+    _predicted_pair(make_node)
+    assert identity_links.link_feeder_rekey(PDYT_OLD, PDYT_NEW, manual=True) == Outcome.PROMOTED
+    assert links().get().state == State.CONFIRMED
+
+
+@pytest.mark.django_db
+def test_a_different_key_demotes_the_predicted_link(make_node):
+    _, new = _predicted_pair(make_node)
+    _give_key(new, OTHER_KEY)
+    assert detect_after_key_write(new) == Outcome.NONE
+    link = links().get()
+    assert (link.state, link.evidence) == (State.SUGGESTED, Evidence.PREDICTED_NUMBER)
+    assert link.detail["key_differs"] is True
+    assert not Link.objects.filter(state__in=Link.LIVE_STATES).exists()
+
+
+@pytest.mark.django_db
+def test_a_confirmed_predicted_link_is_not_demoted_by_a_different_key(make_node):
+    _, new = _predicted_pair(make_node)
+    Link.objects.update(state=State.CONFIRMED)
+    _give_key(new, OTHER_KEY)
+    detect_after_key_write(new)
+    assert links().get().state == State.CONFIRMED
+
+
+@pytest.mark.django_db
+def test_the_old_key_becoming_shared_retires_the_predicted_link(make_node):
+    _predicted_pair(make_node)
+    third = make_node(0x11111111, PDYT_KEY)
+    assert detect_after_key_write(third) == Outcome.FLAGGED_CREATED
+    link = links().get()
+    assert link.state == State.SUGGESTED and link.detail["key_now_shared"] is True
+    assert not Link.objects.filter(state__in=Link.LIVE_STATES).exists()
+
+
+@pytest.mark.django_db
+def test_a_rejected_predicted_pair_is_never_recreated(make_node):
+    old, new = _predicted_pair(make_node)
+    Link.objects.update(state=State.REJECTED)
+    assert identity_links.link_by_prediction(new) == Outcome.REJECTED
+    _give_key(new, PDYT_KEY)
+    assert detect_after_key_write(new) == Outcome.REJECTED
+    link = links().get()
+    assert (link.state, link.evidence) == (State.REJECTED, Evidence.PREDICTED_NUMBER)
