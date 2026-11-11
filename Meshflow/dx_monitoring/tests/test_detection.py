@@ -733,7 +733,7 @@ def _link(old, new, state="auto", evidence="public_key"):
 def _far_position(
     number, packet_id, create_managed_node, create_packet_observation, create_user, create_position_packet
 ):
-    """A direct, far position packet (London) from ``number`` heard by an Edinburgh observer; returns the queries run."""
+    """A far position packet (London) from ``number`` heard by an Edinburgh observer; returns the queries run."""
     from django.db import connection
     from django.test.utils import CaptureQueriesContext
 
