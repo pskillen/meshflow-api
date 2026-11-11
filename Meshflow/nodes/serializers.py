@@ -1,4 +1,5 @@
 import secrets
+from types import SimpleNamespace
 
 from django.urls import reverse
 
@@ -39,6 +40,7 @@ from .permission_helpers import (
     user_can_edit_observed_node_rf_profile,
 )
 from .positioning import managed_node_default_position_data
+from .services import identity_chain
 from .services.feeder_identity import REPOINT_HTTP_STATUS, FeederRepointError, repoint_feeder
 
 
@@ -1634,7 +1636,95 @@ class ObservedNodeSerializer(serializers.ModelSerializer):
         }
 
 
-class ObservedNodeSearchSerializer(ObservedNodeSerializer):
+def _identity_ref(node) -> dict:
+    """The identity ref shape: ``internal_id``, ``protocol``, ``meshtastic_node_id``, ``node_id_str``."""
+    return {
+        "internal_id": str(node.internal_id),
+        "protocol": int(node.protocol),
+        "meshtastic_node_id": node.meshtastic_node_id,
+        "node_id_str": observed_node_id_str(node),
+    }
+
+
+class NodeIdentityChainEntrySerializer(serializers.Serializer):
+    """One identity in ``identity_chain``: an identity ref plus the node's names and the link that joins it.
+
+    Takes a ``nodes.services.identity_chain.ChainStep``.
+    """
+
+    def to_representation(self, step):
+        node, link = step.node, step.link
+        return {
+            **_identity_ref(node),
+            "long_name": node.long_name,
+            "short_name": node.short_name,
+            "last_heard": serializers.DateTimeField().to_representation(node.last_heard) if node.last_heard else None,
+            "evidence": link.evidence,
+            "confidence": link.confidence,
+            "state": link.state,
+            "linked_at": serializers.DateTimeField().to_representation(link.created_at),
+        }
+
+
+class ReplacedByAnnotationMixin(serializers.Serializer):
+    """``replaced_by`` for list-shaped payloads: the direct successor, read from ``annotate_replaced_by`` annotations.
+
+    Never queries. A queryset that was not annotated is a programming error and raises ``AttributeError``.
+    """
+
+    replaced_by = serializers.SerializerMethodField()
+
+    def get_replaced_by(self, obj):
+        internal_id = obj.replaced_by_internal_id
+        if internal_id is None:
+            return None
+        return _identity_ref(
+            SimpleNamespace(
+                internal_id=internal_id,
+                protocol=obj.replaced_by_protocol,
+                meshtastic_node_id=obj.replaced_by_meshtastic_node_id,
+                mc_pubkey=obj.replaced_by_mc_pubkey,
+                mc_pubkey_prefix=obj.replaced_by_mc_pubkey_prefix,
+            )
+        )
+
+
+class ObservedNodeListSerializer(ReplacedByAnnotationMixin, ObservedNodeSerializer):
+    """Observed node list and ``mine`` items: ``ObservedNode`` plus ``replaced_by`` (direct successor or null)."""
+
+    class Meta(ObservedNodeSerializer.Meta):
+        fields = ObservedNodeSerializer.Meta.fields + ["replaced_by"]
+
+
+class ObservedNodeDetailSerializer(ObservedNodeSerializer):
+    """Observed node detail: ``ObservedNode`` plus ``replaced_by`` (newest identity or null) and ``identity_chain``."""
+
+    replaced_by = serializers.SerializerMethodField()
+    identity_chain = serializers.SerializerMethodField()
+
+    def _chain(self, obj):
+        cached = getattr(obj, "_identity_chain", None)
+        if cached is None:
+            cached = obj._identity_chain = identity_chain.chain(obj)
+        return cached
+
+    def get_replaced_by(self, obj):
+        newest = identity_chain.replaced_by(obj, self._chain(obj))
+        return _identity_ref(newest) if newest is not None else None
+
+    def get_identity_chain(self, obj):
+        chain_ = self._chain(obj)
+        entry = NodeIdentityChainEntrySerializer()
+        return {
+            "previous": [entry.to_representation(step) for step in chain_.previous],
+            "next": [entry.to_representation(step) for step in chain_.next],
+        }
+
+    class Meta(ObservedNodeSerializer.Meta):
+        fields = ObservedNodeSerializer.Meta.fields + ["replaced_by", "identity_chain"]
+
+
+class ObservedNodeSearchSerializer(ReplacedByAnnotationMixin, ObservedNodeSerializer):
     """Simplified serializer for observed nodes search results."""
 
     class Meta:
@@ -1648,6 +1738,7 @@ class ObservedNodeSearchSerializer(ObservedNodeSerializer):
             "meshtastic_public_key",
             "last_heard",
             "owner",
+            "replaced_by",
         ]
 
 

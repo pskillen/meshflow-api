@@ -281,7 +281,13 @@ The owner is told by Discord DM on `auto_updated` and on a new `flagged` row, at
 
 ### Identity links
 
-When the same radio is seen under two numbers (an upgrade, a re-key or a full erase), the API records one `ObservedNodeIdentityLink` from the old `ObservedNode` row to the new one ([ADR-0006](adr/0006-meshtastic-identity-linking.md)). Rows are never merged and no packet's `from_int` is rewritten, so rolling back is deleting link rows. Nothing consumes links yet except a signal, `nodes.signals.identity_link_live`, sent after commit when a link becomes `auto` or `confirmed`.
+When the same radio is seen under two numbers (an upgrade, a re-key or a full erase), the API records one `ObservedNodeIdentityLink` from the old `ObservedNode` row to the new one ([ADR-0006](adr/0006-meshtastic-identity-linking.md)). Rows are never merged and no packet's `from_int` is rewritten, so rolling back is deleting link rows. A signal, `nodes.signals.identity_link_live`, is sent after commit when a link becomes `auto` or `confirmed`.
+
+Links are shown in the API, read-only and in live states only (`auto`, `confirmed`; `suggested`, `rejected` and `flagged` are never shown), through `nodes/services/identity_chain.py`:
+
+- **Detail** (`GET /nodes/observed-nodes/{id}/`, any lookup form) adds `identity_chain` (`previous` and `next`, each nearest first, capped at 10 steps, stopping at a node already seen) and `replaced_by`.
+- **List, mine and search** add `replaced_by` only (the direct successor, no extra queries). `?replaced=false` on the list drops replaced rows.
+- **`replaced_by`** is non-null when the node has a live successor and either the node has never been heard or the successor has been heard at least as recently. On detail it names the newest identity in the chain; on lists, the direct successor. An old row heard after its successor keeps `replaced_by` null while its `identity_chain.next` still shows the link.
 
 | Evidence | When | State |
 | --- | --- | --- |

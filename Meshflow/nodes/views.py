@@ -90,7 +90,9 @@ from nodes.serializers import (
     NodeRfProfileSerializer,
     NodeRfProfileUpdateSerializer,
     NodeRfPropagationRenderSerializer,
+    ObservedNodeDetailSerializer,
     ObservedNodeEnvironmentSettingsSerializer,
+    ObservedNodeListSerializer,
     ObservedNodeSearchSerializer,
     ObservedNodeSerializer,
     OwnedManagedNodeSerializer,
@@ -100,6 +102,7 @@ from nodes.serializers import (
 from nodes.services.device_metrics import get_device_metrics_bulk
 from nodes.services.environment_metrics import get_environment_metrics_bulk
 from nodes.services.feeder_identity import REPOINT_HTTP_STATUS, FeederRepointError, accept_reported_key, repoint_feeder
+from nodes.services.identity_chain import annotate_replaced_by, replaced_q
 from nodes.services.nearby_infrastructure import (
     NearbyParamError,
     get_nearby_infrastructure_cached,
@@ -284,6 +287,13 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
     queryset = ObservedNode.objects.all().order_by("meshtastic_node_id")
     serializer_class = ObservedNodeSerializer
 
+    def get_serializer_class(self):
+        if self.action == "retrieve":
+            return ObservedNodeDetailSerializer
+        if self.action in ("list", "mine"):
+            return ObservedNodeListSerializer
+        return super().get_serializer_class()
+
     def get_permissions(self):
         # ``action`` is None for methods the route does not map (e.g. POST); match on the URL name
         # so those get 405 rather than an auth error.
@@ -354,6 +364,9 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
         )
         # Apply last_heard_after filter only for list action
         if self.action == "list":
+            qs = annotate_replaced_by(qs)
+            if self.request.query_params.get("replaced") == "false":
+                qs = qs.exclude(replaced_q())
             protocol_param = self.request.query_params.get("protocol")
             if protocol_param:
                 from common.protocol import Protocol
@@ -392,6 +405,7 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
             .order_by("protocol", "-last_heard", "meshtastic_node_id", "mc_pubkey_prefix")
             .select_related("latest_status")
         )
+        nodes = annotate_replaced_by(nodes)
 
         page = self.paginate_queryset(nodes)
         if page is not None:
@@ -447,7 +461,7 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
         conditions = observed_node_search_conditions(query)
 
         # Search for nodes matching the query
-        nodes = ObservedNode.objects.filter(conditions).order_by("meshtastic_node_id")
+        nodes = annotate_replaced_by(ObservedNode.objects.filter(conditions)).order_by("meshtastic_node_id")
 
         serializer = ObservedNodeSearchSerializer(nodes, many=True)
         return Response(serializer.data)
