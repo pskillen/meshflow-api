@@ -151,6 +151,49 @@ def test_first_run_dms_watcher_once_and_marks_link(replaced_pair, verified):
 
 
 @pytest.mark.django_db
+def test_replaced_but_old_heard_inside_threshold_sends_no_dm(replaced_pair, verified):
+    _, old, _, link = replaced_pair
+    _heard(old, timedelta(seconds=30))  # threshold 60 s, successor heard 5 s ago
+    with patch("push_notifications.discord_audit.send_dm") as send_dm:
+        result = process_node_watch_presence()
+    assert result["replaced"] == 1
+    send_dm.assert_not_called()
+    link.refresh_from_db()
+    assert "watchers_notified" not in link.detail
+
+
+@pytest.mark.django_db
+def test_dm_fires_once_when_old_goes_silent_past_threshold(replaced_pair, verified):
+    _, old, _, link = replaced_pair
+    _heard(old, timedelta(seconds=30))
+    with patch("push_notifications.discord_audit.send_dm") as send_dm:
+        process_node_watch_presence()
+        send_dm.assert_not_called()
+        _heard(old, timedelta(seconds=120))  # now silent past its 60 s threshold, still replaced
+        process_node_watch_presence()
+        process_node_watch_presence()
+    assert send_dm.call_count == 1
+    link.refresh_from_db()
+    assert link.detail["watchers_notified"]["sent"] == 1
+
+
+@pytest.mark.django_db
+def test_spoof_old_heard_again_before_threshold_never_dms(replaced_pair, verified):
+    _, old, new, link = replaced_pair
+    _heard(old, timedelta(seconds=30))
+    _heard(new, timedelta(seconds=5))
+    with patch("push_notifications.discord_audit.send_dm") as send_dm:
+        process_node_watch_presence()
+        _heard(old, timedelta(seconds=1))  # the real radio transmits again: newer than the spoofed row
+        result = process_node_watch_presence()
+    assert result["replaced"] == 0  # no longer replaced, processed as today
+    send_dm.assert_not_called()
+    assert not DiscordNotificationAudit.objects.filter(kind=DiscordNotificationKind.NODE_REPLACED).exists()
+    link.refresh_from_db()
+    assert "watchers_notified" not in link.detail
+
+
+@pytest.mark.django_db
 def test_two_watchers_two_dms(replaced_pair, create_user, verified):
     _, old, _, _ = replaced_pair
     NodeWatch.objects.bulk_create([NodeWatch(user=create_user(username="second"), observed_node=old)])  # skips clean()
