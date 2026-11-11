@@ -217,6 +217,19 @@ components:
         meshtastic_public_key:
           type: string
           description: Optional reported public key (v4 only); treated like X-Meshtastic-Feeder-Pubkey
+        meshtastic_region:
+          type: string
+          maxLength: 32
+          description: >-
+            Optional LoRa region (recorded on Meshtastic feeders; enum name as in config.proto, unknown numbers as
+            REGION_<n>). When present, meshtastic_modem_preset is recorded with it; a missing preset means custom
+            modem settings.
+        meshtastic_modem_preset:
+          type: string
+          maxLength: 32
+          description: >-
+            Optional modem preset (recorded on Meshtastic feeders; enum name as in config.proto, unknown numbers as
+            MODEM_PRESET_<n>). Only stored together with meshtastic_region.
     FeederBotVersionRecorded:
       type: object
       properties:
@@ -2459,6 +2472,22 @@ components:
           format: date-time
           nullable: true
           description: When reported_firmware_version was last written
+          readOnly: true
+        meshtastic_region:
+          type: string
+          nullable: true
+          description: LoRa region the bot last reported, e.g. EU_868 (Meshtastic feeders only)
+          readOnly: true
+        meshtastic_modem_preset:
+          type: string
+          nullable: true
+          description: Modem preset the bot last reported, e.g. LONG_FAST; null with a region set means custom modem settings
+          readOnly: true
+        radio_config_reported_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When meshtastic_region and meshtastic_modem_preset were last written
           readOnly: true
         last_packet_ingested_at:
           type: string

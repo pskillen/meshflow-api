@@ -473,6 +473,9 @@ class ManagedNodeSerializer(serializers.ModelSerializer):
             "bot_version",
             "bot_version_reported_at",
             "reported_firmware_version",
+            "meshtastic_region",
+            "meshtastic_modem_preset",
+            "radio_config_reported_at",
             "firmware_reported_at",
             "mc_channels_synced_at",
             "position",
@@ -501,6 +504,9 @@ class ManagedNodeSerializer(serializers.ModelSerializer):
             "bot_version",
             "bot_version_reported_at",
             "reported_firmware_version",
+            "meshtastic_region",
+            "meshtastic_modem_preset",
+            "radio_config_reported_at",
             "firmware_reported_at",
         ]
 
