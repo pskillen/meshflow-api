@@ -56,6 +56,8 @@ sequenceDiagram
 
 ## Silence detection (simplified)
 
+Before any of this, each tick splits the watched rows: **replaced** rows (live identity link to a successor heard at least as recently, or never heard themselves) skip silence detection entirely. They only get the one-off "new number" DM (see [README](README.md#replaced-numbers)).
+
 ```mermaid
 flowchart TD
   start[Periodic_task_tick]
