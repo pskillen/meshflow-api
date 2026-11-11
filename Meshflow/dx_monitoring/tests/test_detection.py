@@ -792,6 +792,27 @@ def test_chain_exclusion_applies_to_the_third_number(
     )
 
     assert not DxEvent.objects.exists()
+    # The exclusion read returns before a metadata row is made; without it the third number would get one.
+    assert not DxNodeMetadata.objects.filter(observed_node=c).exists()
+
+
+@pytest.mark.django_db
+@override_settings(**_SUCC_SETTINGS)
+@pytest.mark.parametrize("state", ["suggested", "rejected"])
+def test_non_live_link_does_not_count_as_a_successor_or_inherit_exclusion(
+    state, create_observed_node, create_managed_node, create_packet_observation, create_user, create_position_packet
+):
+    old = create_observed_node(meshtastic_node_id=0xBEEF0361)
+    new = create_observed_node(meshtastic_node_id=0xBEEF0362)
+    DxNodeMetadata.objects.create(observed_node=old, exclude_from_detection=True)
+    _link(old, new, state=state)
+
+    _far_position(
+        0xBEEF0362, 950010, create_managed_node, create_packet_observation, create_user, create_position_packet
+    )
+
+    # Not a successor, so it is a plain new distant node, and the earlier number's exclusion is not inherited.
+    assert DxEvent.objects.filter(reason_code=DxReasonCode.NEW_DISTANT_NODE, destination=new).count() == 1
 
 
 @pytest.mark.django_db
