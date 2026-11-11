@@ -34,9 +34,10 @@ from django.utils import timezone
 from common.mesh_node_helpers import meshtastic_id_to_hex
 from common.meshtastic_identity import is_blank_mac, key_node_id, mac_node_number
 from common.protocol import Protocol
-from nodes.models import ObservedNode, ObservedNodeIdentityLink
+from nodes.models import NodeOwnerClaim, ObservedNode, ObservedNodeIdentityLink
 from nodes.services.identity_chain import reaches
 from nodes.signals import identity_link_live
+from nodes.utils import generate_claim_key
 
 logger = logging.getLogger(__name__)
 
@@ -456,6 +457,9 @@ class IdentityLinkError(Exception):
     CODE_NOT_FOUND = "not_found"
     CODE_AMBIGUOUS = "ambiguous_node"
     CODE_CYCLE = "link_cycle"
+    CODE_ALREADY_CLAIMED = "already_claimed"
+    CODE_NO_PREVIOUS = "no_previous"
+    CODE_EVIDENCE_TOO_WEAK = "evidence_too_weak"
 
     def __init__(self, code: str, message: str = ""):
         super().__init__(message or code)
@@ -469,6 +473,9 @@ IDENTITY_LINK_HTTP_STATUS = {
     IdentityLinkError.CODE_INVALID_STATE: 409,
     IdentityLinkError.CODE_NOT_FOUND: 404,
     IdentityLinkError.CODE_CYCLE: 409,
+    IdentityLinkError.CODE_ALREADY_CLAIMED: 409,
+    IdentityLinkError.CODE_NO_PREVIOUS: 404,
+    IdentityLinkError.CODE_EVIDENCE_TOO_WEAK: 409,
 }
 
 
@@ -644,3 +651,60 @@ def declare_link_changed(old: ObservedNode, new: ObservedNode, actor) -> tuple[O
             link.reviewed_by, link.reviewed_at = actor, timezone.now()
             link.save(update_fields=["reviewed_by", "reviewed_at", "updated_at"])
     return link, changed
+
+
+# --- One-tap claim of a node's new number ---------------------------------------------------------------------------
+
+# Evidence that proves the same radio on its own; anything else needs a person to have confirmed the link.
+_STRONG_EVIDENCE = (Evidence.PUBLIC_KEY, Evidence.FEEDER_REKEY)
+
+
+def claim_from_previous(node: ObservedNode, user) -> tuple[NodeOwnerClaim, bool]:
+    """Claim ``node`` (the new row) for ``user``, who owns its live direct predecessor. Returns ``(claim, created)``.
+
+    Needs a live predecessor link whose old row the user owns and a strong link (key or feeder re-key evidence, or a
+    person confirmed it). The new row is locked, so two taps cannot both win. ``created`` is False when the user
+    already holds the row (the call is idempotent). Raises :class:`IdentityLinkError` otherwise.
+    """
+    from nodes.ws_notify import notify_node_claim_accepted
+
+    with transaction.atomic():
+        locked = ObservedNode.objects.select_for_update().get(pk=node.pk)
+        link = (
+            Link.objects.select_related("old_node")
+            .filter(new_node=locked, state__in=Link.LIVE_STATES)
+            .order_by("-pk")
+            .first()
+        )
+        if link is None:
+            raise IdentityLinkError(IdentityLinkError.CODE_NO_PREVIOUS, "This node has no previous number.")
+        if not _owns(user, link.old_node):
+            raise IdentityLinkError(
+                IdentityLinkError.CODE_NOT_OWNER, "You need to own the node's previous number to claim this one."
+            )
+        if locked.claimed_by_id == user.pk:
+            claim = NodeOwnerClaim.objects.filter(node=locked, user=user).order_by("-pk").first()
+            if claim is None:
+                claim = NodeOwnerClaim.objects.create(
+                    node=locked, user=user, claim_key=generate_claim_key(), accepted_at=timezone.now()
+                )
+            return claim, False
+        if locked.claimed_by_id is not None:
+            raise IdentityLinkError(IdentityLinkError.CODE_ALREADY_CLAIMED, "This node is claimed by someone else.")
+        if link.evidence not in _STRONG_EVIDENCE and link.state != State.CONFIRMED:
+            raise IdentityLinkError(
+                IdentityLinkError.CODE_EVIDENCE_TOO_WEAK,
+                "The link to your previous node is not strong enough; ask staff to confirm it, or claim by message.",
+            )
+        now = timezone.now()
+        locked.claimed_by = user
+        locked.save(update_fields=["claimed_by"])
+        # A claim the user started earlier (not yet accepted) is the one that gets accepted.
+        claim = NodeOwnerClaim.objects.filter(node=locked, user=user, accepted_at__isnull=True).order_by("-pk").first()
+        if claim is None:
+            claim = NodeOwnerClaim(node=locked, user=user, claim_key=generate_claim_key())
+        claim.accepted_at = now
+        claim.save()
+        transaction.on_commit(lambda: notify_node_claim_accepted(claim=claim, node=locked))
+    node.claimed_by = user
+    return claim, True

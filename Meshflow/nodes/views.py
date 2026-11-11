@@ -378,6 +378,23 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
             status=status.HTTP_201_CREATED if changed else status.HTTP_200_OK,
         )
 
+    @action(detail=True, methods=["post"], url_path="claim-from-previous")
+    def claim_from_previous(self, request, internal_id=None):
+        """One-tap claim of this (new) node by the owner of its live predecessor on strong evidence.
+
+        201 with the accepted claim; 200 when the user already holds the node. Errors ``{code, detail}``:
+        ``no_previous`` (404), ``not_owner`` (403), ``already_claimed`` and ``evidence_too_weak`` (409).
+        """
+        node = self.get_object()
+        try:
+            claim, created = identity_links.claim_from_previous(node, request.user)
+        except IdentityLinkError as exc:
+            return _identity_link_error_response(exc)
+        return Response(
+            NodeOwnerClaimSerializer(claim).data,
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
+
     @staticmethod
     def _resolve_declared_node(request):
         lookup = request.data.get("new_node") if isinstance(request.data, Mapping) else None
