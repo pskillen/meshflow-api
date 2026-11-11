@@ -6,6 +6,7 @@ from nodes.views import (
     APIKeyViewSet,
     DeviceMetricsBulkView,
     EnvironmentMetricsBulkView,
+    IdentityLinkViewSet,
     ManagedNodeIdentityEventViewSet,
     ManagedNodeViewSet,
     ObservedNodeClaimView,
@@ -21,6 +22,7 @@ router.register(r"managed-nodes", ManagedNodeViewSet, basename="managed-nodes")
 router.register(
     r"managed-node-identity-events", ManagedNodeIdentityEventViewSet, basename="managed-node-identity-events"
 )
+router.register(r"identity-links", IdentityLinkViewSet, basename="identity-links")
 router.register(r"api-keys", APIKeyViewSet, basename="api-keys")
 
 # The API URLs are now determined automatically by the router

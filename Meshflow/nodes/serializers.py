@@ -40,7 +40,7 @@ from .permission_helpers import (
     user_can_edit_observed_node_rf_profile,
 )
 from .positioning import managed_node_default_position_data
-from .services import identity_chain
+from .services import identity_chain, identity_links
 from .services.feeder_identity import REPOINT_HTTP_STATUS, FeederRepointError, repoint_feeder
 
 
@@ -1650,6 +1650,38 @@ def _identity_ref(node) -> dict:
         "meshtastic_node_id": node.meshtastic_node_id,
         "node_id_str": observed_node_id_str(node),
     }
+
+
+def _identity_ref_with_names(node) -> dict:
+    return {
+        **_identity_ref(node),
+        "long_name": node.long_name,
+        "short_name": node.short_name,
+        "last_heard": serializers.DateTimeField().to_representation(node.last_heard) if node.last_heard else None,
+    }
+
+
+class IdentityLinkSerializer(serializers.Serializer):
+    """One identity link for the review endpoints; needs ``request`` in the context for the ``can_*`` flags.
+
+    Read from a queryset with ``select_related("old_node", "new_node")``.
+    """
+
+    def to_representation(self, link):
+        user = self.context["request"].user
+        date = serializers.DateTimeField()
+        return {
+            "id": link.pk,
+            "old": _identity_ref_with_names(link.old_node),
+            "new": _identity_ref_with_names(link.new_node),
+            "evidence": link.evidence,
+            "confidence": link.confidence,
+            "state": link.state,
+            "created_at": date.to_representation(link.created_at),
+            "reviewed_at": date.to_representation(link.reviewed_at) if link.reviewed_at else None,
+            "can_confirm": identity_links.can_confirm_link(user, link),
+            "can_reject": identity_links.can_reject_link(user, link),
+        }
 
 
 class NodeIdentityChainEntrySerializer(serializers.Serializer):
