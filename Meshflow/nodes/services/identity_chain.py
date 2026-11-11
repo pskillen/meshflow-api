@@ -174,10 +174,11 @@ def annotate_replaced_by_m2m_opt_out(queryset: QuerySet) -> QuerySet:
 
 
 def annotate_previous(queryset: QuerySet) -> QuerySet:
-    """Annotate the direct live predecessor of rows as ``previous_*`` (null when none), plus ``previous_m2m_opt_out``.
+    """Annotate the direct live predecessor of rows as ``previous_*`` (null when none).
 
     Unlike :func:`annotate_replaced_by` this ignores the replaced rule and the predicted-number rule: a row with a live
-    predecessor link names it whether or not the old row is still the one heard. No extra queries.
+    predecessor link names it whether or not the old row is still the one heard. No extra queries. There is no opt-out
+    guard: a row whose live predecessor has opted out is excluded by :func:`opted_out_successors`, so never listed.
     """
     links = Link.objects.filter(new_node=OuterRef("pk"), state__in=Link.LIVE_STATES).order_by("-created_at", "-pk")
 
@@ -190,23 +191,23 @@ def annotate_previous(queryset: QuerySet) -> QuerySet:
         previous_meshtastic_node_id=_prev("meshtastic_node_id"),
         previous_mc_pubkey=_prev("mc_pubkey"),
         previous_mc_pubkey_prefix=_prev("mc_pubkey_prefix"),
-        previous_m2m_opt_out=_prev("m2m_opt_out"),
     )
 
 
-def opted_out_successors(protocol: str, *, limit: int = DEFAULT_LIMIT) -> set:
+def opted_out_successors(protocol: str, *, limit: int | None = None) -> set:
     """Pks of rows that inherit an M2M opt-out: later numbers of an opted-out radio (read through, nothing copied).
 
     Starts from the ``m2m_opt_out`` rows of ``protocol`` and follows live successor links forward, one query per step
-    (at most ``limit`` steps), never revisiting a row. The opted-out rows themselves are not in the result.
+    until no new row is found (or ``limit`` steps, when given), never revisiting a row, so cycles end the walk. It is
+    unbounded by default on purpose: a cap would leave rows past it listed, naming a hidden row as their predecessor. The opted-out rows themselves are not in the result.
     """
     start = set(ObservedNode.objects.filter(protocol=protocol, m2m_opt_out=True).values_list("pk", flat=True))
     seen = set(start)
     inherited: set = set()
     frontier = start
-    for _ in range(limit):
-        if not frontier:
-            break
+    steps = 0
+    while frontier and (limit is None or steps < limit):
+        steps += 1
         found = set(
             Link.objects.filter(old_node_id__in=frontier, state__in=Link.LIVE_STATES).values_list(
                 "new_node_id", flat=True

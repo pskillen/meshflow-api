@@ -350,12 +350,57 @@ def test_infra_opt_out_follows_the_radio_to_later_numbers(create_user, create_ob
     assert set(rows) == {other.node_id_str}
 
 
-def test_infra_suggested_link_does_not_hide_successor(create_user, create_observed_node):
+@pytest.mark.parametrize("state", ["suggested", "rejected"])
+def test_infra_non_live_link_does_not_hide_successor(create_user, create_observed_node, state):
     client = _infra_client(create_user)
     a = _router(create_observed_node, 1044, 5, m2m_opt_out=True)
     b = _router(create_observed_node, 1045, 1)
-    _live_link(a, b, state="suggested")
+    _live_link(a, b, state=state)
     assert b.node_id_str in _infra_rows(client)
+
+
+def test_infra_flagged_link_does_not_hide_successor(create_user, create_observed_node):
+    # A flagged (shared key) row joins no nodes by constraint, so it can never reach the walk.
+    client = _infra_client(create_user)
+    a = _router(create_observed_node, 1064, 5, m2m_opt_out=True)
+    b = _router(create_observed_node, 1065, 1)
+    ObservedNodeIdentityLink.objects.create(
+        old_node=None,
+        new_node=None,
+        state=ObservedNodeIdentityLink.State.FLAGGED,
+        evidence=ObservedNodeIdentityLink.Evidence.PUBLIC_KEY,
+        confidence=ObservedNodeIdentityLink.Confidence.STRONG,
+        public_key_hex="ef" * 32,
+    )
+    assert b.node_id_str in _infra_rows(client)
+    assert a.node_id_str not in _infra_rows(client)
+
+
+@pytest.mark.parametrize("state", ["auto", "confirmed"])
+def test_infra_live_link_hides_successor(create_user, create_observed_node, state):
+    client = _infra_client(create_user)
+    a = _router(create_observed_node, 1060, 5, m2m_opt_out=True)
+    b = _router(create_observed_node, 1061, 1)
+    _live_link(a, b, state=state)
+    assert b.node_id_str not in _infra_rows(client)
+
+
+def test_infra_key_mismatched_predicted_link_still_hides_successor(create_user, create_observed_node):
+    client = _infra_client(create_user)
+    a = _router(create_observed_node, 1062, 5, m2m_opt_out=True)
+    b = _router(create_observed_node, 1063, 1, public_key="cd" * 32)
+    _live_link(a, b, evidence=ObservedNodeIdentityLink.Evidence.PREDICTED_NUMBER, key="ab" * 32)
+    assert b.node_id_str not in _infra_rows(client)
+
+
+def test_infra_chain_longer_than_ten_steps_hides_every_later_number(create_user, create_observed_node):
+    client = _infra_client(create_user)
+    nodes = [_router(create_observed_node, 1100 + i, 1, m2m_opt_out=(i == 0)) for i in range(14)]
+    for old, new in zip(nodes, nodes[1:]):
+        _live_link(old, new)
+    other = _router(create_observed_node, 1200, 1)
+    rows = _infra_rows(client)
+    assert set(rows) == {other.node_id_str}
 
 
 def test_infra_successor_own_opt_out_still_works(create_user, create_observed_node):
@@ -377,7 +422,7 @@ def test_opted_out_successors_is_bounded_by_limit(create_observed_node):
         result = opted_out_successors(Protocol.MESHTASTIC, limit=3)
     assert result == {n.pk for n in nodes[1:4]}
     assert len(ctx) == 4  # the opted-out rows, then one per step
-    assert opted_out_successors(Protocol.MESHTASTIC) == {n.pk for n in nodes[1:]}
+    assert opted_out_successors(Protocol.MESHTASTIC) == {n.pk for n in nodes[1:]}  # unbounded by default
 
 
 def test_infra_meshcore_rows_carry_null_identity_fields(create_user, create_observed_node):

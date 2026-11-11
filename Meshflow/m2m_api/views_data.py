@@ -349,8 +349,12 @@ class MeshCoreInfraNodesView(InfraNodesView):
 
 
 def _linked_id(node, prefix):
-    """The id string of the linked node annotated as ``<prefix>_*``, or None (also None when it opted out of M2M)."""
-    if getattr(node, f"{prefix}_protocol") is None or getattr(node, f"{prefix}_m2m_opt_out"):
+    """The id string of the linked node annotated as ``<prefix>_*``, or None.
+
+    Also None when it opted out of M2M; only ``replaced_by`` carries that flag. A live predecessor that opted out hides
+    this row altogether (``opted_out_successors``), so ``previous`` never needs the check.
+    """
+    if getattr(node, f"{prefix}_protocol") is None or getattr(node, f"{prefix}_m2m_opt_out", False):
         return None
     return observed_node_id_str(
         SimpleNamespace(
