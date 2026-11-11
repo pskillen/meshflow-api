@@ -199,7 +199,8 @@ def opted_out_successors(protocol: str, *, limit: int | None = None) -> set:
 
     Starts from the ``m2m_opt_out`` rows of ``protocol`` and follows live successor links forward, one query per step
     until no new row is found (or ``limit`` steps, when given), never revisiting a row, so cycles end the walk. It is
-    unbounded by default on purpose: a cap would leave rows past it listed, naming a hidden row as their predecessor. The opted-out rows themselves are not in the result.
+    unbounded by default on purpose: a cap would leave rows past it listed, naming a hidden row as their predecessor.
+    The opted-out rows themselves are not in the result.
     """
     start = set(ObservedNode.objects.filter(protocol=protocol, m2m_opt_out=True).values_list("pk", flat=True))
     seen = set(start)
