@@ -2021,6 +2021,73 @@ components:
           type: string
           description: Display id (!hex8 or mc:prefix12)
 
+    IdentityLinkError:
+      type: object
+      required: [code, detail]
+      properties:
+        code:
+          type: string
+          enum: [link_conflict, not_owner, cross_protocol, same_node, invalid_state, not_found, ambiguous_node]
+          description: >-
+            `link_conflict` (409): another live link, the reverse link, or a rejected pair is in the way.
+            `not_owner` (403). `cross_protocol` (400). `same_node` (400). `invalid_state` (409): the link's state does
+            not allow the action. `not_found` (404): a bad `new_node` (or a link the caller may not see).
+            `ambiguous_node` (400): `new_node` matched both protocols; send the UUID.
+        detail:
+          type: string
+
+    IdentityLinkNode:
+      description: One end of an identity link.
+      allOf:
+        - $ref: '#/components/schemas/NodeIdentityRef'
+        - type: object
+          required: [long_name, short_name, last_heard]
+          properties:
+            long_name:
+              type: string
+              nullable: true
+            short_name:
+              type: string
+              nullable: true
+            last_heard:
+              type: string
+              format: date-time
+              nullable: true
+
+    IdentityLink:
+      type: object
+      description: >-
+        Two Meshtastic identities recorded as the same radio (`old` went quiet, `new` replaced it). `can_confirm` and
+        `can_reject` say what the caller may do now. Live states are `auto` and `confirmed`.
+      required: [id, old, new, evidence, confidence, state, created_at, reviewed_at, can_confirm, can_reject]
+      properties:
+        id:
+          type: integer
+        old:
+          $ref: '#/components/schemas/IdentityLinkNode'
+        new:
+          $ref: '#/components/schemas/IdentityLinkNode'
+        evidence:
+          type: string
+          enum: [public_key, feeder_rekey, mac, predicted_number, declared]
+        confidence:
+          type: string
+          enum: [strong, medium]
+        state:
+          type: string
+          enum: [auto, suggested, confirmed, rejected]
+        created_at:
+          type: string
+          format: date-time
+        reviewed_at:
+          type: string
+          format: date-time
+          nullable: true
+        can_confirm:
+          type: boolean
+        can_reject:
+          type: boolean
+
     NodeIdentityChainEntry:
       description: One other identity of a node, with the live link that joins it to the previous one in the walk.
       allOf:
@@ -9008,6 +9075,179 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/NodeOwnerClaim'
+
+  /nodes/observed-nodes/{internal_id}/identity-links/:
+    get:
+      summary: List a node's identity links
+      description: >-
+        Every non-flagged link touching the node, newest first. Everyone signed in sees live links (`auto`,
+        `confirmed`); the owner of either row of a link, and staff, also see its `suggested` and `rejected` states.
+        Flagged rows are never listed.
+      tags: [Nodes]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: internal_id
+          in: path
+          required: true
+          description: UUID, `!hex` or `mt:`/`mc:` id of the node
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Links, newest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/IdentityLink'
+        '401':
+          description: Not signed in
+    post:
+      summary: Declare that another node replaced this one
+      description: >-
+        For the owner of both rows, or staff (any pair of one protocol). Records a `confirmed` link with `declared`
+        evidence from this node (old) to `new_node`. A pair that was rejected before is refused (`link_conflict`);
+        staff undo a reject in the Django admin.
+      tags: [Nodes]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: internal_id
+          in: path
+          required: true
+          description: UUID, `!hex` or `mt:`/`mc:` id of the node
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [new_node]
+              properties:
+                new_node:
+                  type: string
+                  description: UUID or `!hex` id of the replacing node
+      responses:
+        '201':
+          description: The declared link
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IdentityLink'
+        '400':
+          description: '`cross_protocol`, `same_node` or `ambiguous_node`'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IdentityLinkError'
+        '401':
+          description: Not signed in
+        '403':
+          description: Not allowed; `code` is `not_owner`
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IdentityLinkError'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IdentityLinkError'
+        '409':
+          description: Refused; `code` is `link_conflict` or `invalid_state`
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IdentityLinkError'
+
+  /nodes/identity-links/{id}/confirm/:
+    post:
+      summary: Confirm a suggested identity link
+      description: >-
+        `suggested` to `confirmed`. Staff, or the owner of one row when the other is theirs or unclaimed. A link the caller cannot see is a 404; a link in another state is `invalid_state`.
+      tags: [Nodes]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: The updated link
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IdentityLink'
+        '401':
+          description: Not signed in
+        '403':
+          description: Not allowed; `code` is `not_owner`
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IdentityLinkError'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IdentityLinkError'
+        '409':
+          description: Refused; `code` is `link_conflict` or `invalid_state`
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IdentityLinkError'
+
+  /nodes/identity-links/{id}/reject/:
+    post:
+      summary: Reject an identity link
+      description: >-
+        Any link that is not `rejected` or flagged becomes `rejected` (sticky: detection never recreates it, and only staff in the Django admin can undo it). Staff, or the owner of either row.
+      tags: [Nodes]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: The updated link
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IdentityLink'
+        '401':
+          description: Not signed in
+        '403':
+          description: Not allowed; `code` is `not_owner`
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IdentityLinkError'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IdentityLinkError'
+        '409':
+          description: Refused; `code` is `link_conflict` or `invalid_state`
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IdentityLinkError'
 
   /nodes/observed-nodes/{internal_id}/claim/:
     get:
