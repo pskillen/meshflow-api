@@ -2027,12 +2027,14 @@ components:
       properties:
         code:
           type: string
-          enum: [link_conflict, not_owner, cross_protocol, same_node, invalid_state, not_found, ambiguous_node]
+          enum: [link_conflict, not_owner, cross_protocol, same_node, invalid_state, not_found, ambiguous_node, link_cycle]
           description: >-
             `link_conflict` (409): another live link, the reverse link, or a rejected pair is in the way.
             `not_owner` (403). `cross_protocol` (400). `same_node` (400). `invalid_state` (409): the link's state does
-            not allow the action. `not_found` (404): a bad `new_node` (or a link the caller may not see).
-            `ambiguous_node` (400): `new_node` matched both protocols; send the UUID.
+            not allow the action. `not_found` (404): a bad `new_node`, or a link that does not exist or the caller may not see (the
+            same body for both, so a stranger cannot tell them apart).
+            `ambiguous_node` (400): `new_node` matched both protocols; send the UUID. `link_cycle` (409): the new
+            node already reaches the old one through live links, so the link would make a loop.
         detail:
           type: string
 
@@ -9102,8 +9104,16 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/IdentityLink'
+        '300':
+          description: The id matches more than one node (a bare hex id on both protocols); use the UUID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObservedNodeLookupAmbiguous'
         '401':
           description: Not signed in
+        '404':
+          description: No node matches the id
     post:
       summary: Declare that another node replaced this one
       description: >-
@@ -9132,12 +9142,24 @@ paths:
                   type: string
                   description: UUID or `!hex` id of the replacing node
       responses:
-        '201':
-          description: The declared link
+        '200':
+          description: The pair was already linked and nothing changed; the existing link
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/IdentityLink'
+        '201':
+          description: A link was created, or an existing one promoted to `confirmed`; the declared link
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IdentityLink'
+        '300':
+          description: The id matches more than one node (a bare hex id on both protocols); use the UUID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObservedNodeLookupAmbiguous'
         '400':
           description: '`cross_protocol`, `same_node` or `ambiguous_node`'
           content:
@@ -9159,7 +9181,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/IdentityLinkError'
         '409':
-          description: Refused; `code` is `link_conflict` or `invalid_state`
+          description: Refused; `code` is `link_conflict`, `link_cycle` or `invalid_state`
           content:
             application/json:
               schema:
@@ -9201,7 +9223,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/IdentityLinkError'
         '409':
-          description: Refused; `code` is `link_conflict` or `invalid_state`
+          description: Refused; `code` is `link_conflict`, `link_cycle` or `invalid_state`
           content:
             application/json:
               schema:
@@ -9243,7 +9265,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/IdentityLinkError'
         '409':
-          description: Refused; `code` is `link_conflict` or `invalid_state`
+          description: Refused; `code` is `link_conflict`, `link_cycle` or `invalid_state`
           content:
             application/json:
               schema:
