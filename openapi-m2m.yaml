@@ -76,7 +76,22 @@ paths:
           in: query
           schema: {type: integer}
       responses:
-        "200": {description: Paginated infra nodes. Opted-out nodes are omitted.}
+        "200":
+          description: >
+            Paginated infra nodes. Opted-out nodes are omitted, and so are the later numbers of an opted-out radio
+            (an opt-out on an old number follows the radio's live identity links forward). Every row also carries
+            `replaced_by_id` and `previous_id`.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count: {type: integer}
+                  page: {type: integer}
+                  page_size: {type: integer}
+                  results:
+                    type: array
+                    items: {$ref: "#/components/schemas/InfraNodeIdentity"}
   /v1/meshcore/summary:
     get:
       tags: [M2M]
@@ -99,8 +114,29 @@ paths:
       summary: MeshCore repeaters and rooms
       security: [{M2MKey: []}]
       responses:
-        "200": {description: Infra nodes. health is null.}
+        "200":
+          description: >
+            Infra nodes. health is null. Rows carry `replaced_by_id` and `previous_id` (see the Meshtastic list);
+            an opt-out follows the radio's later numbers.
 components:
+  schemas:
+    InfraNodeIdentity:
+      type: object
+      description: >
+        The identity fields every infra-node row carries, on both protocols (other row fields are as described
+        in the feature docs). Both are always present.
+      properties:
+        id: {type: string}
+        replaced_by_id:
+          type: [string, "null"]
+          description: >
+            Id of the node's direct successor when the radio now uses a newer number heard at least as recently,
+            else null. Always null when that node has opted out of M2M.
+        previous_id:
+          type: [string, "null"]
+          description: >
+            Id of the node's direct live predecessor (an older number of the same radio), else null. Always null when
+            that node has opted out of M2M.
   securitySchemes:
     M2MKey:
       type: apiKey
