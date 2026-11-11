@@ -192,3 +192,27 @@ def annotate_previous(queryset: QuerySet) -> QuerySet:
         previous_mc_pubkey_prefix=_prev("mc_pubkey_prefix"),
         previous_m2m_opt_out=_prev("m2m_opt_out"),
     )
+
+
+def opted_out_successors(protocol: str, *, limit: int = DEFAULT_LIMIT) -> set:
+    """Pks of rows that inherit an M2M opt-out: later numbers of an opted-out radio (read through, nothing copied).
+
+    Starts from the ``m2m_opt_out`` rows of ``protocol`` and follows live successor links forward, one query per step
+    (at most ``limit`` steps), never revisiting a row. The opted-out rows themselves are not in the result.
+    """
+    start = set(ObservedNode.objects.filter(protocol=protocol, m2m_opt_out=True).values_list("pk", flat=True))
+    seen = set(start)
+    inherited: set = set()
+    frontier = start
+    for _ in range(limit):
+        if not frontier:
+            break
+        found = set(
+            Link.objects.filter(old_node_id__in=frontier, state__in=Link.LIVE_STATES).values_list(
+                "new_node_id", flat=True
+            )
+        )
+        frontier = found - seen
+        seen |= frontier
+        inherited |= frontier
+    return inherited

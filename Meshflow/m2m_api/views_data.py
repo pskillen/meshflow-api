@@ -24,6 +24,7 @@ from nodes.services.identity_chain import (
     annotate_previous,
     annotate_replaced_by,
     annotate_replaced_by_m2m_opt_out,
+    opted_out_successors,
 )
 from stats.models import StatsSnapshot
 
@@ -321,6 +322,7 @@ class InfraNodesView(M2MView):
         since = timezone.now() - HEARD_WINDOWS[heard]
         qs = (
             ObservedNode.objects.filter(protocol=self.protocol, m2m_opt_out=False, last_heard__gte=since)
+            .exclude(pk__in=opted_out_successors(self.protocol))
             .select_related("latest_status")
         )
         qs = annotate_replaced_by_m2m_opt_out(annotate_previous(annotate_replaced_by(qs)))

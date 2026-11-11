@@ -323,19 +323,61 @@ def test_infra_predicted_only_link_names_previous_but_not_replaced_by(create_use
     assert rows[new.node_id_str]["previous_id"] == old.node_id_str
 
 
-def test_infra_opted_out_neighbour_is_never_named(create_user, create_observed_node):
+def test_infra_opted_out_neighbour_is_never_named_or_listed(create_user, create_observed_node):
     client = _infra_client(create_user)
     old = _router(create_observed_node, 1010, 5, m2m_opt_out=True)
     new = _router(create_observed_node, 1011, 1)
     _live_link(old, new)
     rows = _infra_rows(client)
     assert old.node_id_str not in rows
-    assert rows[new.node_id_str]["previous_id"] is None
+    assert new.node_id_str not in rows  # the opt-out follows the radio
 
     old2 = _router(create_observed_node, 1012, 5)
     new2 = _router(create_observed_node, 1013, 1, m2m_opt_out=True)
     _live_link(old2, new2)
     assert _infra_rows(client)[old2.node_id_str]["replaced_by_id"] is None
+
+
+def test_infra_opt_out_follows_the_radio_to_later_numbers(create_user, create_observed_node):
+    client = _infra_client(create_user)
+    a = _router(create_observed_node, 1040, 9, m2m_opt_out=True)
+    b = _router(create_observed_node, 1041, 5)
+    c = _router(create_observed_node, 1042, 1)
+    other = _router(create_observed_node, 1043, 1)
+    _live_link(a, b)
+    _live_link(b, c)
+    rows = _infra_rows(client)
+    assert set(rows) == {other.node_id_str}
+
+
+def test_infra_suggested_link_does_not_hide_successor(create_user, create_observed_node):
+    client = _infra_client(create_user)
+    a = _router(create_observed_node, 1044, 5, m2m_opt_out=True)
+    b = _router(create_observed_node, 1045, 1)
+    _live_link(a, b, state="suggested")
+    assert b.node_id_str in _infra_rows(client)
+
+
+def test_infra_successor_own_opt_out_still_works(create_user, create_observed_node):
+    client = _infra_client(create_user)
+    a = _router(create_observed_node, 1046, 5)
+    b = _router(create_observed_node, 1047, 1, m2m_opt_out=True)
+    _live_link(a, b)
+    rows = _infra_rows(client)
+    assert a.node_id_str in rows and b.node_id_str not in rows
+
+
+def test_opted_out_successors_is_bounded_by_limit(create_observed_node):
+    from nodes.services.identity_chain import opted_out_successors
+
+    nodes = [_router(create_observed_node, 1050 + i, 1, m2m_opt_out=(i == 0)) for i in range(6)]
+    for old, new in zip(nodes, nodes[1:]):
+        _live_link(old, new)
+    with CaptureQueriesContext(connection) as ctx:
+        result = opted_out_successors(Protocol.MESHTASTIC, limit=3)
+    assert result == {n.pk for n in nodes[1:4]}
+    assert len(ctx) == 4  # the opted-out rows, then one per step
+    assert opted_out_successors(Protocol.MESHTASTIC) == {n.pk for n in nodes[1:]}
 
 
 def test_infra_meshcore_rows_carry_null_identity_fields(create_user, create_observed_node):
