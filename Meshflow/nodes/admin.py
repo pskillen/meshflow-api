@@ -4,7 +4,7 @@ from django import forms
 from django.contrib import admin, messages
 from django.contrib.admin.widgets import FilteredSelectMultiple
 from django.core.exceptions import ObjectDoesNotExist
-from django.db import IntegrityError, transaction
+from django.db import transaction
 from django.db.models import Q
 from django.urls import reverse
 from django.utils import timezone
@@ -40,7 +40,7 @@ from .models import (
     ObservedNode,
     ObservedNodeIdentityLink,
 )
-from .services.identity_links import send_live
+from .services.identity_links import IdentityLinkError, set_link_state
 
 
 class ManagedNodeActiveFilter(admin.SimpleListFilter):
@@ -1110,25 +1110,12 @@ class ObservedNodeIdentityLinkAdmin(admin.ModelAdmin):
         return False
 
     def save_model(self, request, obj, form, change):
-        became_live = False
-        if change and "state" in form.changed_data:
-            obj.reviewed_by = request.user
-            obj.reviewed_at = timezone.now()
-            was = form.initial.get("state")
-            became_live = (
-                obj.state in ObservedNodeIdentityLink.LIVE_STATES and was not in ObservedNodeIdentityLink.LIVE_STATES
-            )
+        if not (change and "state" in form.changed_data):
+            return super().save_model(request, obj, form, change)
         try:
-            with transaction.atomic():
-                super().save_model(request, obj, form, change)
-            if became_live:
-                send_live(obj)
-        except IntegrityError:
-            self.message_user(
-                request,
-                _("Another live link already uses the old or new node; change that one first."),
-                level=messages.ERROR,
-            )
+            set_link_state(obj, obj.state, request.user)
+        except IdentityLinkError as exc:
+            self.message_user(request, str(exc), level=messages.ERROR)
 
 
 # NOTE: You need to create the template file for NodeIdDatalistWidget at:

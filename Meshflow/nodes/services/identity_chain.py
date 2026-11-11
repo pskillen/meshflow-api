@@ -81,6 +81,14 @@ def _walk(node: ObservedNode, *, forward: bool, limit: int) -> list[ChainStep]:
     return steps
 
 
+CYCLE_LIMIT = 100
+
+
+def reaches(start: ObservedNode, target: ObservedNode, *, limit: int = CYCLE_LIMIT) -> bool:
+    """Whether ``target`` is reachable from ``start`` by following live links forward (``start`` is not counted)."""
+    return any(step.node.pk == target.pk for step in _walk(start, forward=True, limit=limit))
+
+
 def chain(node: ObservedNode, *, limit: int = DEFAULT_LIMIT) -> Chain:
     """Walk live links back (``previous``) and forward (``next``) from ``node``: nearest first, ``limit`` each."""
     return Chain(

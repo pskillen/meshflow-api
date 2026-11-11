@@ -66,6 +66,7 @@ from nodes.models import (
     NodeRfProfile,
     NodeRfPropagationRender,
     ObservedNode,
+    ObservedNodeIdentityLink,
     Position,
     PowerMetrics,
     RoleSource,
@@ -84,6 +85,7 @@ from nodes.serializers import (
     DeviceMetricsSerializer,
     EnvironmentMetricsBulkSerializer,
     EnvironmentMetricsSerializer,
+    IdentityLinkSerializer,
     ManagedNodeIdentityEventSerializer,
     ManagedNodeSerializer,
     NodeOwnerClaimSerializer,
@@ -99,10 +101,12 @@ from nodes.serializers import (
     PositionSerializer,
     PowerMetricsSerializer,
 )
+from nodes.services import identity_links
 from nodes.services.device_metrics import get_device_metrics_bulk
 from nodes.services.environment_metrics import get_environment_metrics_bulk
 from nodes.services.feeder_identity import REPOINT_HTTP_STATUS, FeederRepointError, accept_reported_key, repoint_feeder
 from nodes.services.identity_chain import annotate_replaced_by, replaced_q
+from nodes.services.identity_links import IDENTITY_LINK_HTTP_STATUS, IdentityLinkError
 from nodes.services.nearby_infrastructure import (
     NearbyParamError,
     get_nearby_infrastructure_cached,
@@ -341,6 +345,52 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
         node = result.node
         self.check_object_permissions(self.request, node)
         return node
+
+    @action(detail=True, methods=["get", "post"], url_path="identity-links")
+    def identity_links(self, request, internal_id=None):
+        """Identity links touching a node (GET), or declare that another node replaced it (POST).
+
+        GET: every non-flagged link, newest first; ``suggested`` and ``rejected`` links only for the owner of either
+        row and staff. POST ``{"new_node": "<uuid or !hex>"}``: owner of both rows, or staff; 201 with the
+        link when one was created or promoted, 200 when it already stood.
+        """
+        node = self.get_object()
+        if request.method == "GET":
+            links = (
+                ObservedNodeIdentityLink.objects.filter(Q(old_node=node) | Q(new_node=node))
+                .exclude(state=ObservedNodeIdentityLink.State.FLAGGED)
+                .select_related("old_node", "new_node")
+                .order_by("-created_at", "-pk")
+            )
+            visible = [link for link in links if identity_links.can_see_link(request.user, link)]
+            return Response(IdentityLinkSerializer(visible, many=True, context={"request": request}).data)
+        try:
+            if not identity_links.may_declare_from(request.user, node):
+                raise IdentityLinkError(
+                    IdentityLinkError.CODE_NOT_OWNER, "You need to own both nodes to declare a replacement."
+                )
+            target = self._resolve_declared_node(request)
+            link, changed = identity_links.declare_link_changed(node, target, request.user)
+        except IdentityLinkError as exc:
+            return _identity_link_error_response(exc)
+        return Response(
+            IdentityLinkSerializer(link, context={"request": request}).data,
+            status=status.HTTP_201_CREATED if changed else status.HTTP_200_OK,
+        )
+
+    @staticmethod
+    def _resolve_declared_node(request):
+        lookup = request.data.get("new_node") if isinstance(request.data, Mapping) else None
+        if not isinstance(lookup, str) or not lookup.strip():
+            raise IdentityLinkError(IdentityLinkError.CODE_NOT_FOUND, "new_node is required (a UUID or !hex id).")
+        result = resolve_observed_node_lookup(lookup)
+        if isinstance(result, ObservedNodeLookupAmbiguous):
+            raise IdentityLinkError(
+                IdentityLinkError.CODE_AMBIGUOUS, "new_node matches more than one node; use its UUID."
+            )
+        if isinstance(result, ObservedNodeLookupNotFound):
+            raise IdentityLinkError(IdentityLinkError.CODE_NOT_FOUND, "No such node.")
+        return result.node
 
     def retrieve(self, request, *args, **kwargs):
         result = self._resolve_detail_lookup()
@@ -1423,6 +1473,66 @@ class ManagedNodeViewSet(viewsets.ModelViewSet):
             http_status = REPOINT_HTTP_STATUS.get(exc.code, status.HTTP_400_BAD_REQUEST)
             return Response({"code": exc.code, "detail": str(exc)}, status=http_status)
         return Response(ManagedNodeIdentityEventSerializer(event).data)
+
+
+def _identity_link_error_response(exc: IdentityLinkError) -> Response:
+    http_status = IDENTITY_LINK_HTTP_STATUS.get(exc.code, status.HTTP_400_BAD_REQUEST)
+    return Response({"code": exc.code, "detail": str(exc)}, status=http_status)
+
+
+class IdentityLinkViewSet(viewsets.GenericViewSet):
+    """Review an identity link: ``POST {pk}/confirm/`` and ``POST {pk}/reject/`` (owners of either row, and staff).
+
+    A link the caller may not see (a ``suggested`` or ``rejected`` one they have no part in, or a flagged row) gets the
+    same 404 body as a link that does not exist.
+    """
+
+    queryset = ObservedNodeIdentityLink.objects.select_related("old_node", "new_node")
+    permission_classes = [IsAuthenticatedUser]
+    pagination_class = None
+
+    def _visible_link(self, request, pk):
+        try:
+            link = self.get_queryset().filter(pk=int(pk)).first()
+        except TypeError, ValueError:
+            return None
+        return link if link is not None and identity_links.can_see_link(request.user, link) else None
+
+    def _review(self, request, pk, can, do, wrong_state_is_invalid):
+        link = self._visible_link(request, pk)
+        if link is None:
+            return _identity_link_error_response(IdentityLinkError(IdentityLinkError.CODE_NOT_FOUND, "Not found."))
+        if not identity_links.may_review_link(request.user, link):
+            return _identity_link_error_response(
+                IdentityLinkError(
+                    IdentityLinkError.CODE_NOT_OWNER, "Only an owner of either node, or staff, can review a link."
+                )
+            )
+        if not can(request.user, link):
+            # An owner, but the link is in the wrong state, or (confirm) the other row is someone else's.
+            wrong_state = wrong_state_is_invalid(link)
+            code = IdentityLinkError.CODE_INVALID_STATE if wrong_state else IdentityLinkError.CODE_NOT_OWNER
+            message = "The link is not in a state that allows that." if wrong_state else "The other node is claimed."
+            return _identity_link_error_response(IdentityLinkError(code, message))
+        try:
+            link = do(link, request.user)
+        except IdentityLinkError as exc:
+            return _identity_link_error_response(exc)
+        return Response(IdentityLinkSerializer(link, context={"request": request}).data)
+
+    @action(detail=True, methods=["post"])
+    def confirm(self, request, pk=None):
+        return self._review(
+            request,
+            pk,
+            identity_links.can_confirm_link,
+            identity_links.confirm_link,
+            lambda link: link.state != ObservedNodeIdentityLink.State.SUGGESTED,
+        )
+
+    @action(detail=True, methods=["post"])
+    def reject(self, request, pk=None):
+        return self._review(request, pk, identity_links.can_reject_link, identity_links.reject_link, lambda link: True)
 
 
 class ManagedNodeIdentityEventViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):

@@ -29,11 +29,13 @@ from enum import Enum
 
 from django.db import IntegrityError, transaction
 from django.db.models import Q
+from django.utils import timezone
 
 from common.mesh_node_helpers import meshtastic_id_to_hex
 from common.meshtastic_identity import is_blank_mac, key_node_id, mac_node_number
 from common.protocol import Protocol
 from nodes.models import ObservedNode, ObservedNodeIdentityLink
+from nodes.services.identity_chain import reaches
 from nodes.signals import identity_link_live
 
 logger = logging.getLogger(__name__)
@@ -438,3 +440,207 @@ def detect_after_feeder_rekey(
     except Exception:
         logger.exception("Identity link from feeder re-key %s -> %s failed", old_number, new_number)
         return Outcome.NONE
+
+
+# --- Review by people: one path for the admin and the API ---------------------------------------------------
+
+
+class IdentityLinkError(Exception):
+    """A review action was refused; ``code`` is one of the ``CODE_*`` values (the API's ``code`` field)."""
+
+    CODE_LINK_CONFLICT = "link_conflict"
+    CODE_NOT_OWNER = "not_owner"
+    CODE_CROSS_PROTOCOL = "cross_protocol"
+    CODE_SAME_NODE = "same_node"
+    CODE_INVALID_STATE = "invalid_state"
+    CODE_NOT_FOUND = "not_found"
+    CODE_AMBIGUOUS = "ambiguous_node"
+    CODE_CYCLE = "link_cycle"
+
+    def __init__(self, code: str, message: str = ""):
+        super().__init__(message or code)
+        self.code = code
+
+
+# HTTP status for each refusal; any code not listed is a 400.
+IDENTITY_LINK_HTTP_STATUS = {
+    IdentityLinkError.CODE_LINK_CONFLICT: 409,
+    IdentityLinkError.CODE_NOT_OWNER: 403,
+    IdentityLinkError.CODE_INVALID_STATE: 409,
+    IdentityLinkError.CODE_NOT_FOUND: 404,
+    IdentityLinkError.CODE_CYCLE: 409,
+}
+
+
+def _is_staff(user) -> bool:
+    return bool(user and user.is_authenticated and user.is_staff)
+
+
+def _owns(user, node: ObservedNode) -> bool:
+    return bool(user and user.is_authenticated and node.claimed_by_id == user.pk)
+
+
+def _free_for(user, node: ObservedNode) -> bool:
+    """The node is the user's or nobody's."""
+    return node.claimed_by_id is None or node.claimed_by_id == user.pk
+
+
+def can_see_link(user, link: ObservedNodeIdentityLink) -> bool:
+    """Live links are public; ``suggested`` and ``rejected`` go to either row's owner and staff; never ``flagged``."""
+    if link.state == State.FLAGGED or link.old_node_id is None:
+        return False
+    if link.state in Link.LIVE_STATES:
+        return True
+    return _is_staff(user) or _owns(user, link.old_node) or _owns(user, link.new_node)
+
+
+def may_review_link(user, link: ObservedNodeIdentityLink) -> bool:
+    """Who may act on a link at all, whatever its state: staff, or an owner of one row (see ``can_confirm``)."""
+    return _is_staff(user) or _owns(user, link.old_node) or _owns(user, link.new_node)
+
+
+def can_confirm_link(user, link: ObservedNodeIdentityLink) -> bool:
+    """Staff, or the owner of one row when the other is theirs or unclaimed; only for a ``suggested`` link."""
+    if link.state != State.SUGGESTED or link.old_node_id is None:
+        return False
+    if _is_staff(user):
+        return True
+    return (_owns(user, link.old_node) and _free_for(user, link.new_node)) or (
+        _owns(user, link.new_node) and _free_for(user, link.old_node)
+    )
+
+
+def can_reject_link(user, link: ObservedNodeIdentityLink) -> bool:
+    """Staff, or the owner of either row; any state but ``rejected`` and ``flagged``."""
+    if link.state in (State.REJECTED, State.FLAGGED) or link.old_node_id is None:
+        return False
+    return may_review_link(user, link)
+
+
+def may_declare_from(user, old: ObservedNode) -> bool:
+    """The cheap half of :func:`can_declare_link`: staff, or the owner of ``old`` (declaring needs it)."""
+    return _is_staff(user) or _owns(user, old)
+
+
+def can_declare_link(user, old: ObservedNode, new: ObservedNode) -> bool:
+    """Staff (any pair), or someone who owns both rows."""
+    return _is_staff(user) or (_owns(user, old) and _owns(user, new))
+
+
+def _lock_nodes(*nodes: ObservedNode) -> None:
+    """Row-lock the nodes in pk order (one order everywhere, so two writers cannot deadlock). Call inside a transaction.
+
+    Two people linking the same nodes at once (A -> B and B -> A) take turns here, so the second one sees the first's
+    link when it checks for a cycle. No-op on SQLite.
+    """
+    pks = sorted({node.pk for node in nodes})
+    list(ObservedNode.objects.select_for_update().filter(pk__in=pks).order_by("pk").values_list("pk", flat=True))
+
+
+def _refuse_cycle(old: ObservedNode, new: ObservedNode) -> None:
+    """Refuse a live link ``old -> new`` when ``new`` already reaches ``old`` through live links."""
+    if reaches(new, old):
+        raise IdentityLinkError(
+            IdentityLinkError.CODE_CYCLE,
+            "That would make the nodes replace each other in a loop; reject the other link.",
+        )
+
+
+def set_link_state(
+    link: ObservedNodeIdentityLink, state: str, actor, *, allowed_from: tuple[str, ...] | None = None
+) -> ObservedNodeIdentityLink:
+    """Move a link to ``state``: stamp the reviewer, save atomically, tell listeners when it became live.
+
+    The one write path for the admin and the API (permissions are the caller's). The row is locked and its current
+    state re-read first, so a stale object cannot resurrect a link someone else has just moved. ``allowed_from``, when
+    given, lists the states the locked row may be in (the API's confirm and reject use it); the admin passes none and
+    may move a link between any two states. A ``flagged`` row is never changed. Making a link live is refused with
+    ``link_cycle`` when the new node already reaches the old one through live links, and a second live link on either
+    node is refused by the database and raised as ``link_conflict``.
+    """
+    if state not in State.values or state == State.FLAGGED:
+        raise IdentityLinkError(IdentityLinkError.CODE_INVALID_STATE, f"Cannot set a link to {state!r}.")
+    if link.old_node_id is None:
+        raise IdentityLinkError(IdentityLinkError.CODE_INVALID_STATE, "A flagged row is not a link.")
+    previous = link.state
+    try:
+        with transaction.atomic():
+            _lock_nodes(link.old_node, link.new_node)
+            locked = Link.objects.select_for_update(of=("self",)).select_related("old_node", "new_node").get(pk=link.pk)
+            previous = locked.state
+            if previous == State.FLAGGED:
+                raise IdentityLinkError(IdentityLinkError.CODE_INVALID_STATE, "A flagged row is not a link.")
+            if allowed_from is not None and previous not in allowed_from:
+                raise IdentityLinkError(
+                    IdentityLinkError.CODE_INVALID_STATE, f"The link is {previous}; that is not allowed from there."
+                )
+            if previous == state:
+                return locked
+            becomes_live = state in Link.LIVE_STATES and previous not in Link.LIVE_STATES
+            if becomes_live:
+                _refuse_cycle(locked.old_node, locked.new_node)
+            locked.state = state
+            locked.reviewed_by = actor
+            locked.reviewed_at = timezone.now()
+            locked.save()
+            if becomes_live:
+                send_live(locked)
+    except IntegrityError:
+        link.state = previous
+        raise IdentityLinkError(
+            IdentityLinkError.CODE_LINK_CONFLICT,
+            "Another live link already uses the old or new node; change that one first.",
+        )
+    link.state, link.reviewed_by, link.reviewed_at = locked.state, locked.reviewed_by, locked.reviewed_at
+    return locked
+
+
+def confirm_link(link: ObservedNodeIdentityLink, actor) -> ObservedNodeIdentityLink:
+    """``suggested`` -> ``confirmed``, checked on the locked row."""
+    return set_link_state(link, State.CONFIRMED, actor, allowed_from=(State.SUGGESTED,))
+
+
+def reject_link(link: ObservedNodeIdentityLink, actor) -> ObservedNodeIdentityLink:
+    """``suggested``, ``auto`` or ``confirmed`` -> ``rejected``; a rejected or flagged row is refused."""
+    return set_link_state(link, State.REJECTED, actor, allowed_from=(State.SUGGESTED, State.AUTO, State.CONFIRMED))
+
+
+def declare_link(old: ObservedNode, new: ObservedNode, actor) -> ObservedNodeIdentityLink:
+    """Record that a person says ``new`` replaced ``old``: ``declared`` evidence, strong, ``confirmed``."""
+    return declare_link_changed(old, new, actor)[0]
+
+
+def declare_link_changed(old: ObservedNode, new: ObservedNode, actor) -> tuple[ObservedNodeIdentityLink, bool]:
+    """:func:`declare_link`, also saying whether a link was created or promoted (``False``: nothing changed)."""
+    if not can_declare_link(actor, old, new):
+        raise IdentityLinkError(
+            IdentityLinkError.CODE_NOT_OWNER, "You need to own both nodes to declare a replacement."
+        )
+    if old.pk == new.pk:
+        raise IdentityLinkError(IdentityLinkError.CODE_SAME_NODE, "A node cannot replace itself.")
+    if old.protocol != new.protocol:
+        raise IdentityLinkError(IdentityLinkError.CODE_CROSS_PROTOCOL, "Both nodes must use the same protocol.")
+    with transaction.atomic():
+        _lock_nodes(old, new)
+        before = Link.objects.filter(old_node=old, new_node=new).first()
+        was_live = before is not None and before.state in Link.LIVE_STATES
+        outcome = record_link(
+            old, new, evidence=Evidence.DECLARED, confidence=Confidence.STRONG, state=State.CONFIRMED, reviewer=actor
+        )
+        if outcome == Outcome.REJECTED:
+            raise IdentityLinkError(
+                IdentityLinkError.CODE_LINK_CONFLICT, "This pair was rejected; staff can undo that in the admin."
+            )
+        if outcome in (Outcome.CONFLICT, Outcome.REVERSE, Outcome.NONE):
+            raise IdentityLinkError(
+                IdentityLinkError.CODE_LINK_CONFLICT,
+                "Another live link, or the reverse link, already uses one of these nodes.",
+            )
+        if not was_live:
+            _refuse_cycle(old, new)  # raising rolls the new or promoted row back
+        link = Link.objects.get(old_node=old, new_node=new)
+        changed = outcome in (Outcome.CREATED, Outcome.PROMOTED)
+        if changed and link.state == State.CONFIRMED:
+            link.reviewed_by, link.reviewed_at = actor, timezone.now()
+            link.save(update_fields=["reviewed_by", "reviewed_at", "updated_at"])
+    return link, changed
