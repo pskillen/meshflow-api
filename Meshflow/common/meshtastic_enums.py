@@ -110,6 +110,113 @@ def normalise_transport(value) -> "str | None":
     return result
 
 
+# Copied from firmware v2.8.2 ``config.proto`` ``Config.LoRaConfig.RegionCode``.
+REGION_NAMES: dict[int, str] = {
+    0: "UNSET",
+    1: "US",
+    2: "EU_433",
+    3: "EU_868",
+    4: "CN",
+    5: "JP",
+    6: "ANZ",
+    7: "KR",
+    8: "TW",
+    9: "RU",
+    10: "IN",
+    11: "NZ_865",
+    12: "TH",
+    13: "LORA_24",
+    14: "UA_433",
+    15: "UA_868",
+    16: "MY_433",
+    17: "MY_919",
+    18: "SG_923",
+    19: "PH_433",
+    20: "PH_868",
+    21: "PH_915",
+    22: "ANZ_433",
+    23: "KZ_433",
+    24: "KZ_863",
+    25: "NP_865",
+    26: "BR_902",
+    27: "ITU1_2M",
+    28: "ITU2_2M",
+    29: "EU_866",
+    30: "EU_874",
+    31: "EU_917",
+    32: "EU_N_868",
+    33: "ITU3_2M",
+    34: "ITU1_70CM",
+    35: "ITU2_70CM",
+    36: "ITU3_70CM",
+    37: "ITU2_125CM",
+}
+
+# Copied from firmware v2.8.2 ``config.proto`` ``Config.LoRaConfig.ModemPreset``.
+MODEM_PRESET_NAMES: dict[int, str] = {
+    0: "LONG_FAST",
+    1: "LONG_SLOW",
+    2: "VERY_LONG_SLOW",
+    3: "MEDIUM_SLOW",
+    4: "MEDIUM_FAST",
+    5: "SHORT_SLOW",
+    6: "SHORT_FAST",
+    7: "LONG_MODERATE",
+    8: "SHORT_TURBO",
+    9: "LONG_TURBO",
+    10: "LITE_FAST",
+    11: "LITE_SLOW",
+    12: "NARROW_FAST",
+    13: "NARROW_SLOW",
+    14: "TINY_FAST",
+    15: "TINY_SLOW",
+    16: "MEDIUM_TURBO",
+}
+
+RADIO_CONFIG_NAME_MAX_LENGTH = 32  # ``ManagedNode.meshtastic_region`` / ``meshtastic_modem_preset`` column width
+
+
+def _normalise_enum_name(value, names: "dict[int, str]", unknown_prefix: str) -> "str | None":
+    """Shared body of ``normalise_region`` / ``normalise_modem_preset``.
+
+    A name passes through (a name the table lacks is a newer firmware). An int, a digit string or the bot's
+    ``UNKNOWN_<n>`` maps to the name, or ``<unknown_prefix><n>`` when the number is unknown. None, blank, over-long
+    and non-printable values are None.
+    """
+    if value is None or isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        number = value
+    elif isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return None
+        if text.startswith("UNKNOWN_"):
+            text = text[len("UNKNOWN_") :]
+        if text.isascii() and text.isdigit():
+            if len(text) > 9:
+                return None
+            number = int(text)
+        else:
+            return text if len(text) <= RADIO_CONFIG_NAME_MAX_LENGTH and text.isprintable() else None
+    else:
+        return None
+    result = names.get(number, f"{unknown_prefix}{number}")
+    if len(result) > RADIO_CONFIG_NAME_MAX_LENGTH or not result.isprintable():
+        return None
+    return result
+
+
+def normalise_region(value) -> "str | None":
+    """Return the ``RegionCode`` name for a name, an int, a digit string or ``UNKNOWN_<n>``; see the helper."""
+    return _normalise_enum_name(value, REGION_NAMES, "REGION_")
+
+
+def normalise_modem_preset(value) -> "str | None":
+    """Return the ``ModemPreset`` name for a name, an int, a digit string or ``UNKNOWN_<n>``; see the helper."""
+    return _normalise_enum_name(value, MODEM_PRESET_NAMES, "MODEM_PRESET_")
+
+
 # Copied from v2.8.2 ``mesh.proto`` ``HardwareModel``; 141-152 are new in 2.8.
 HARDWARE_MODEL_NAMES: dict[int, str] = {
     0: "UNSET",

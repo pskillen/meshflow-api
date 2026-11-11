@@ -466,3 +466,38 @@ def test_service_exception_does_not_change_ingest(settings, rekey_feeder):
 
     assert response.status_code == 201, response.content
     assert PacketObservation.objects.count() == 1
+
+
+@pytest.mark.django_db
+def test_bot_version_v4_stores_region_and_preset(single_feeder):
+    node, api_key = single_feeder
+
+    response = _call(
+        "feeder-v4-bot-version",
+        api_key,
+        method="put",
+        data={"bot_version": "2.4.0", "meshtastic_region": "3", "meshtastic_modem_preset": 9},
+    )
+
+    assert response.status_code == 200
+    node.refresh_from_db()
+    assert node.meshtastic_region == "EU_868"
+    assert node.meshtastic_modem_preset == "LONG_TURBO"
+
+
+@pytest.mark.django_db
+def test_bot_version_v4_meshcore_feeder_stores_no_radio_config(meshcore_feeder):
+    node, api_key = meshcore_feeder
+
+    response = _call(
+        "feeder-v4-bot-version",
+        api_key,
+        method="post",
+        data={"bot_version": "2.4.0", "meshtastic_region": "EU_868", "meshtastic_modem_preset": "LONG_FAST"},
+    )
+
+    assert response.status_code == 200
+    node.refresh_from_db()
+    assert node.meshtastic_region is None
+    assert node.meshtastic_modem_preset is None
+    assert node.radio_config_reported_at is None

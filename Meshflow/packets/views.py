@@ -8,6 +8,8 @@ from rest_framework.views import APIView
 
 from common.feeder_metrics import FeederApiUsageMixin
 from common.mesh_node_helpers import meshtastic_hex_to_int, meshtastic_id_to_hex
+from common.meshtastic_enums import normalise_modem_preset, normalise_region
+from common.protocol import Protocol
 from nodes.authentication import NodeAPIKeyAuthentication
 from nodes.permissions import NodeAuthorizationPermission
 from nodes.services.observed_nodes import get_meshtastic_observed_node
@@ -369,7 +371,14 @@ class ManagedNodeBotVersionView(FeederApiUsageMixin, APIView):
         now = timezone.now()
         managed_node.bot_version = bot_version
         managed_node.bot_version_reported_at = now
-        managed_node.save(update_fields=["bot_version", "bot_version_reported_at"])
+        update_fields = ["bot_version", "bot_version_reported_at"]
+        # Region and preset ride only in the bot-version body (sent on connect); a bad value is stored as None.
+        if managed_node.protocol == Protocol.MESHTASTIC and "meshtastic_region" in request.data:
+            managed_node.meshtastic_region = normalise_region(request.data.get("meshtastic_region"))
+            managed_node.meshtastic_modem_preset = normalise_modem_preset(request.data.get("meshtastic_modem_preset"))
+            managed_node.radio_config_reported_at = now
+            update_fields += ["meshtastic_region", "meshtastic_modem_preset", "radio_config_reported_at"]
+        managed_node.save(update_fields=update_fields)
 
         return Response(
             {

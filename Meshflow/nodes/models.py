@@ -263,6 +263,29 @@ class ManagedNode(models.Model):
         blank=True,
         help_text=_("When reported_firmware_version was last written."),
     )
+    meshtastic_region = models.CharField(
+        max_length=32,
+        null=True,
+        blank=True,
+        help_text=_(
+            "LoRa region the bot last reported, e.g. EU_868 (protobuf RegionCode name; UNSET when the radio has "
+            "none). Meshtastic feeders only."
+        ),
+    )
+    meshtastic_modem_preset = models.CharField(
+        max_length=32,
+        null=True,
+        blank=True,
+        help_text=_(
+            "Modem preset the bot last reported, e.g. LONG_FAST (protobuf ModemPreset name); null with a region "
+            "set means custom modem settings. Meshtastic feeders only."
+        ),
+    )
+    radio_config_reported_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text=_("When meshtastic_region and meshtastic_modem_preset were last written."),
+    )
 
     class Meta:
         """Model metadata."""
