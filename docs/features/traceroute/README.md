@@ -30,7 +30,7 @@ Meshtastic sections below remain the reference for the **active** traceroute sys
 | 3 | Monitoring | Periodic scheduler (`trigger_source` e.g. `scheduler`); replaces historical string `auto`. |
 | 4 | Node Watch | Mesh monitoring verification round (`trigger_source` e.g. `mesh_monitoring`); replaces historical string `monitor`. |
 | 5 | DX Watch | Reserved for future DX Monitoring exploration (no scheduler behaviour yet). |
-| 6 | New node baseline | Queued once per target when an `ObservedNode` row is first created from packet ingestion (baseline route evidence; not DX Monitoring). |
+| 6 | New node baseline | Queued once per target when an `ObservedNode` row is first created from packet ingestion (baseline route evidence; not DX Monitoring). Not queued for a node's new number (a row with a live predecessor link). |
 
 **Not the same thing:** `target_strategy` values `dx_across` and `dx_same_side` are **hypothesis-driven target selection** labels used by the scheduler when choosing an `ObservedNode` to trace. They are unrelated to trigger type **5 (DX Watch)** or **6 (New node baseline)**.
 
