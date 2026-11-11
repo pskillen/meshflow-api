@@ -265,7 +265,8 @@ To add later: a `nodes_by_role` snapshot type for charting role mix over time.
 - **Meshtastic:** reuse `nodes.constants.INFRASTRUCTURE_ROLES` (ROUTER, ROUTER_CLIENT, REPEATER, ROUTER_LATE). Mesh
   monitoring and the UI's `INFRASTRUCTURE_ROLE_IDS` use the same set. `CLIENT_BASE` is excluded.
 - **MeshCore:** `meshcore_adv_type IN (2 repeater, 3 room)`.
-- Excludes opted-out nodes. Default filter is heard in the last 7 days (`?heard_within=24h|7d|30d`).
+- Excludes opted-out nodes, and the later numbers of an opted-out radio (see [Node opt-out](#node-opt-out)). Default
+  filter is heard in the last 7 days (`?heard_within=24h|7d|30d`).
 - Paginated with the standard `page_size` param.
 
 ```json
@@ -286,6 +287,14 @@ To add later: a `nodes_by_role` snapshot type for charting role mix over time.
 }
 ```
 
+- **Identity ids (both protocols, always present, null when nothing applies):** a radio that took a new number
+  appears as two rows for up to a week; these two fields say they are one radio. `replaced_by_id` is the node's direct
+  successor when the radio now uses a newer number heard at least as recently (a predicted-only link does not count
+  until its key is heard). `previous_id` is the direct live predecessor, whether or not the old row is still the one
+  heard. It is a claim from the link, not proof of replacement: it can rest on an unconfirmed predicted-number link
+  (a forged first packet can make a row name a real node), so use `replaced_by_id` where proof matters. Only live links (`auto`, `confirmed`) count. An id is null when the node it names has opted out, so the list
+  never names an opted-out node. Example: `"replaced_by_id": "!8959691b", "previous_id": null`. Nothing is copied
+  between the rows; counts in the summary may still count an upgraded radio twice for up to a week.
 - `health` comes from `NodeLatestStatus` (latest values only). History from `DeviceMetrics` is a later phase.
 - **No position, owner or claim fields.**
 - **MeshCore:** `channel_utilization` / `air_util_tx` are Meshtastic columns, so the MeshCore `health` block will have
@@ -307,6 +316,11 @@ A single field on **`ObservedNode`**: `m2m_opt_out` (bool, default `false`).
 - **Effect in v1:** excluded from `infra-nodes` and any future per-node M2M output. Still counted in aggregates.
   Feeders are aggregate-only in v1, so for a feeder that isn't an infra node the flag has no visible effect yet. It's
   stored now so per-node feeder data can come later without a consent gap.
+- **Follows the radio:** an opt-out on an old number also hides its later numbers (live identity links followed
+  forward to the end of the chain, read at request time and written nowhere). A `predicted_number` link counts even
+  before its key is heard. `suggested`, `rejected` and `flagged` links do not. Setting an opt-out, or rejecting the
+  link, takes up to the 5-minute response cache to apply, and `Cache-Control: max-age=300` can add up to 5 more
+  minutes in a downstream cache.
 
 ## Rate limiting and caching
 

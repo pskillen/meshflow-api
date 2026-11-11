@@ -4,6 +4,7 @@ import hashlib
 import json
 from datetime import datetime, timedelta
 from datetime import timezone as dt_timezone
+from types import SimpleNamespace
 
 from django.conf import settings
 from django.core.cache import cache
@@ -14,10 +15,17 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from common.mesh_node_helpers import observed_node_id_str
 from common.protocol import Protocol
 from constellations.models import Constellation
 from nodes.constants import INFRASTRUCTURE_ROLES, MC_INFRA
 from nodes.models import ManagedNode, ManagedNodeStatus, ObservedNode, RoleSource
+from nodes.services.identity_chain import (
+    annotate_previous,
+    annotate_replaced_by,
+    annotate_replaced_by_m2m_opt_out,
+    opted_out_successors,
+)
 from stats.models import StatsSnapshot
 
 from .authentication import M2MApiKeyAuthentication
@@ -312,9 +320,12 @@ class InfraNodesView(M2MView):
         if cached is not None:
             return Response(cached)
         since = timezone.now() - HEARD_WINDOWS[heard]
-        qs = ObservedNode.objects.filter(
-            protocol=self.protocol, m2m_opt_out=False, last_heard__gte=since
-        ).select_related("latest_status")
+        qs = (
+            ObservedNode.objects.filter(protocol=self.protocol, m2m_opt_out=False, last_heard__gte=since)
+            .exclude(pk__in=opted_out_successors(self.protocol))
+            .select_related("latest_status")
+        )
+        qs = annotate_replaced_by_m2m_opt_out(annotate_previous(annotate_replaced_by(qs)))
         if self.protocol == Protocol.MESHTASTIC:
             qs = qs.filter(meshtastic_role__in=INFRASTRUCTURE_ROLES)
         else:
@@ -337,7 +348,26 @@ class MeshCoreInfraNodesView(InfraNodesView):
     protocol = Protocol.MESHCORE
 
 
+def _linked_id(node, prefix):
+    """The id string of the linked node annotated as ``<prefix>_*``, or None.
+
+    Also None when it opted out of M2M; only ``replaced_by`` carries that flag. A live predecessor that opted out hides
+    this row altogether (``opted_out_successors``), so ``previous`` never needs the check.
+    """
+    if getattr(node, f"{prefix}_protocol") is None or getattr(node, f"{prefix}_m2m_opt_out", False):
+        return None
+    return observed_node_id_str(
+        SimpleNamespace(
+            protocol=getattr(node, f"{prefix}_protocol"),
+            meshtastic_node_id=getattr(node, f"{prefix}_meshtastic_node_id"),
+            mc_pubkey=getattr(node, f"{prefix}_mc_pubkey"),
+            mc_pubkey_prefix=getattr(node, f"{prefix}_mc_pubkey_prefix"),
+        )
+    )
+
+
 def _infra_row(node):
+    identity = {"replaced_by_id": _linked_id(node, "replaced_by"), "previous_id": _linked_id(node, "previous")}
     status = getattr(node, "latest_status", None)
     if node.protocol == Protocol.MESHTASTIC:
         role = RoleSource(node.meshtastic_role).label if node.meshtastic_role is not None else "unknown"
@@ -361,6 +391,7 @@ def _infra_row(node):
             "last_heard": node.last_heard,
             "meshflow_url": _meshflow_url(node.node_id_str),
             "health": health,
+            **identity,
         }
     return {
         "id": node.node_id_str,
@@ -370,4 +401,5 @@ def _infra_row(node):
         "last_heard": node.last_heard,
         "meshflow_url": _meshflow_url(node.node_id_str),
         "health": None,
+        **identity,
     }
