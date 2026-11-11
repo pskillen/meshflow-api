@@ -6,6 +6,7 @@ observed-node resolution when MeshCore rows share this pipeline.
 
 from __future__ import annotations
 
+import logging
 from datetime import timedelta
 from typing import Any
 
@@ -25,9 +26,12 @@ from dx_monitoring.models import (
     DxReasonCode,
 )
 from nodes.models import ManagedNode, NodeLatestStatus, ObservedNode
+from nodes.services.identity_chain import has_live_predecessor, predecessors
 from packets.hops import observation_is_direct
 from packets.models import MtRawPacket, PacketObservation, TraceroutePacket
 from traceroute.models import AutoTraceRoute
+
+logger = logging.getLogger(__name__)
 
 
 def is_direct_packet_observation(observation: PacketObservation) -> bool:
@@ -314,6 +318,18 @@ def maybe_detect_dx_candidate(
     obs_lat, obs_lon = _observer_coords(observer)
     footprint = _cluster_footprint(constellation.id)
 
+    # A node's new number is not a new node: an exclusion on an earlier number applies, and it is not a
+    # "new distant node" (read through the link, nothing is copied).
+    successor = has_live_predecessor(from_node)
+    if (
+        successor
+        and DxNodeMetadata.objects.filter(
+            observed_node__in=predecessors(from_node), exclude_from_detection=True
+        ).exists()
+    ):
+        logger.debug("dx: %s skipped, an earlier number of this node is excluded", from_node.node_id_str)
+        return
+
     meta, _ = DxNodeMetadata.objects.get_or_create(observed_node=from_node)
     if meta.exclude_from_detection:
         return
@@ -328,7 +344,7 @@ def maybe_detect_dx_candidate(
             if not meta.cluster_position_evaluated_for_dx:
                 meta.cluster_position_evaluated_for_dx = True
                 meta.save(update_fields=["cluster_position_evaluated_for_dx", "updated_at"])
-            if _exceeds_threshold(min_cluster_km, dest_uncertainty_km, cluster_km):
+            if not successor and _exceeds_threshold(min_cluster_km, dest_uncertainty_km, cluster_km):
                 _get_or_create_active_event(
                     constellation=constellation,
                     destination=from_node,
