@@ -346,6 +346,13 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
         self.check_object_permissions(self.request, node)
         return node
 
+    def _get_node_or_error(self):
+        """``get_object`` for the identity-link actions: an unknown node is ``{code: "not_found", detail}``."""
+        try:
+            return self.get_object()
+        except Http404:
+            raise IdentityLinkError(IdentityLinkError.CODE_NOT_FOUND, "Not found.")
+
     @action(detail=True, methods=["get", "post"], url_path="identity-links")
     def identity_links(self, request, internal_id=None):
         """Identity links touching a node (GET), or declare that another node replaced it (POST).
@@ -354,7 +361,10 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
         row and staff. POST ``{"new_node": "<uuid or !hex>"}``: owner of both rows, or staff; 201 with the
         link when one was created or promoted, 200 when it already stood.
         """
-        node = self.get_object()
+        try:
+            node = self._get_node_or_error()
+        except IdentityLinkError as exc:
+            return _identity_link_error_response(exc)
         if request.method == "GET":
             links = (
                 ObservedNodeIdentityLink.objects.filter(Q(old_node=node) | Q(new_node=node))
@@ -376,6 +386,24 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
         return Response(
             IdentityLinkSerializer(link, context={"request": request}).data,
             status=status.HTTP_201_CREATED if changed else status.HTTP_200_OK,
+        )
+
+    @action(detail=True, methods=["post"], url_path="claim-from-previous")
+    def claim_from_previous(self, request, internal_id=None):
+        """One-tap claim of this (new) node by the owner of its live predecessor on strong evidence.
+
+        201 with the accepted claim; 200 when the user already holds the node. Errors ``{code, detail}``:
+        ``not_found`` and ``no_previous`` (404), ``not_owner`` (403), ``already_claimed`` and ``evidence_too_weak``
+        (409). A link counts only when the claimant could not have set up the evidence themselves.
+        """
+        try:
+            node = self._get_node_or_error()
+            claim, created = identity_links.claim_from_previous(node, request.user)
+        except IdentityLinkError as exc:
+            return _identity_link_error_response(exc)
+        return Response(
+            NodeOwnerClaimSerializer(claim).data,
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
         )
 
     @staticmethod
