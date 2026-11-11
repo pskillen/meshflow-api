@@ -196,7 +196,7 @@ def _notify_replaced_once(old: ObservedNode, now) -> None:
     if "watchers_notified" in (link.detail or {}):
         return
     # Wait until the old number has been silent past its own offline threshold (the one presence uses), so a
-    # forged "predicted number" packet against a live node never DMs its watchers (G59).
+    # forged "predicted number" packet against a live node never DMs its watchers.
     if old.last_heard is not None:
         threshold = timedelta(seconds=int(_effective_last_heard_offline_after_seconds(old)))
         if old.last_heard >= now - threshold:
