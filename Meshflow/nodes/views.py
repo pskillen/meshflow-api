@@ -351,7 +351,8 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
         """Identity links touching a node (GET), or declare that another node replaced it (POST).
 
         GET: every non-flagged link, newest first; ``suggested`` and ``rejected`` links only for the owner of either
-        row and staff. POST ``{"new_node": "<uuid or !hex>"}``: owner of both rows, or staff; 201 with the link.
+        row and staff. POST ``{"new_node": "<uuid or !hex>"}``: owner of both rows, or staff; 201 with the
+        link when one was created or promoted, 200 when it already stood.
         """
         node = self.get_object()
         if request.method == "GET":
@@ -364,11 +365,18 @@ class ObservedNodeViewSet(viewsets.ModelViewSet):
             visible = [link for link in links if identity_links.can_see_link(request.user, link)]
             return Response(IdentityLinkSerializer(visible, many=True, context={"request": request}).data)
         try:
+            if not identity_links.may_declare_from(request.user, node):
+                raise IdentityLinkError(
+                    IdentityLinkError.CODE_NOT_OWNER, "You need to own both nodes to declare a replacement."
+                )
             target = self._resolve_declared_node(request)
-            link = identity_links.declare_link(node, target, request.user)
+            link, changed = identity_links.declare_link_changed(node, target, request.user)
         except IdentityLinkError as exc:
             return _identity_link_error_response(exc)
-        return Response(IdentityLinkSerializer(link, context={"request": request}).data, status=status.HTTP_201_CREATED)
+        return Response(
+            IdentityLinkSerializer(link, context={"request": request}).data,
+            status=status.HTTP_201_CREATED if changed else status.HTTP_200_OK,
+        )
 
     @staticmethod
     def _resolve_declared_node(request):
@@ -1475,17 +1483,25 @@ def _identity_link_error_response(exc: IdentityLinkError) -> Response:
 class IdentityLinkViewSet(viewsets.GenericViewSet):
     """Review an identity link: ``POST {pk}/confirm/`` and ``POST {pk}/reject/`` (owners of either row, and staff).
 
-    A link the caller may not see (a ``suggested`` or ``rejected`` one they have no part in, or a flagged row) is a 404.
+    A link the caller may not see (a ``suggested`` or ``rejected`` one they have no part in, or a flagged row) gets the
+    same 404 body as a link that does not exist.
     """
 
     queryset = ObservedNodeIdentityLink.objects.select_related("old_node", "new_node")
     permission_classes = [IsAuthenticatedUser]
     pagination_class = None
 
-    def _review(self, request, can, do, wrong_state_is_invalid):
-        link = self.get_object()
-        if not identity_links.can_see_link(request.user, link):
-            raise Http404
+    def _visible_link(self, request, pk):
+        try:
+            link = self.get_queryset().filter(pk=int(pk)).first()
+        except TypeError, ValueError:
+            return None
+        return link if link is not None and identity_links.can_see_link(request.user, link) else None
+
+    def _review(self, request, pk, can, do, wrong_state_is_invalid):
+        link = self._visible_link(request, pk)
+        if link is None:
+            return _identity_link_error_response(IdentityLinkError(IdentityLinkError.CODE_NOT_FOUND, "Not found."))
         if not identity_links.may_review_link(request.user, link):
             return _identity_link_error_response(
                 IdentityLinkError(
@@ -1508,6 +1524,7 @@ class IdentityLinkViewSet(viewsets.GenericViewSet):
     def confirm(self, request, pk=None):
         return self._review(
             request,
+            pk,
             identity_links.can_confirm_link,
             identity_links.confirm_link,
             lambda link: link.state != ObservedNodeIdentityLink.State.SUGGESTED,
@@ -1515,7 +1532,7 @@ class IdentityLinkViewSet(viewsets.GenericViewSet):
 
     @action(detail=True, methods=["post"])
     def reject(self, request, pk=None):
-        return self._review(request, identity_links.can_reject_link, identity_links.reject_link, lambda link: True)
+        return self._review(request, pk, identity_links.can_reject_link, identity_links.reject_link, lambda link: True)
 
 
 class ManagedNodeIdentityEventViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):

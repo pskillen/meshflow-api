@@ -1,4 +1,4 @@
-"""Review of identity links by people: the service, its permission table and the endpoints (brief 158, part A)."""
+"""Review of identity links by people: the service, its permission table and the endpoints."""
 
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
@@ -306,7 +306,9 @@ def test_list_shows_live_links_to_everyone_and_hides_the_rest(users, make_link, 
     Link.objects.create(
         old_node=rejected_old, new_node=node, evidence=Evidence.MAC, confidence="medium", state=State.REJECTED
     )
-    Link.objects.create(evidence=Evidence.PUBLIC_KEY, confidence="strong", state=State.FLAGGED, public_key_hex="ef" * 32)
+    Link.objects.create(
+        evidence=Evidence.PUBLIC_KEY, confidence="strong", state=State.FLAGGED, public_key_hex="ef" * 32
+    )
 
     def states(user, target=node):
         resp = api(user).get(_list_url(target))
@@ -416,7 +418,8 @@ def test_confirm_errors(users, make_link):
     resp = api(users["owner_old"]).post(_act_url(other_claimed, "confirm"))
     assert (resp.status_code, resp.data["code"]) == (403, "not_owner")
     # a stranger cannot see a suggestion at all
-    assert api(users["stranger"]).post(_act_url(other_claimed, "confirm")).status_code == 404
+    hidden = api(users["stranger"]).post(_act_url(other_claimed, "confirm"))
+    assert (hidden.status_code, hidden.data["code"]) == (404, "not_found")
     # a live link owned by a stranger's view: not_owner
     live = make_link(state=State.AUTO, old_n=OTHER, new_n=OTHER + 1)
     resp = api(users["stranger"]).post(_act_url(live, "confirm"))
@@ -478,6 +481,162 @@ def test_flagged_rows_and_missing_links_are_404(users):
 
 
 @pytest.mark.django_db
+@pytest.mark.parametrize("action", ["confirm", "reject"])
+def test_a_hidden_link_and_a_missing_link_get_the_same_404_body(users, make_link, action):
+    hidden = make_link(old_owner=users["owner_old"], new_owner=users["owner_new"])  # suggested: a stranger can't see it
+    stranger = api(users["stranger"])
+    seen = stranger.post(_act_url(hidden, action))
+    missing = stranger.post(reverse(f"identity-links-{action}", kwargs={"pk": 999999}))
+    assert seen.status_code == missing.status_code == 404
+    assert seen.json() == missing.json() == {"code": "not_found", "detail": "Not found."}
+    hidden.refresh_from_db()
+    assert hidden.state == State.SUGGESTED
+
+
+@pytest.mark.django_db
+def test_a_stale_object_cannot_resurrect_a_rejected_link(users, make_link):
+    link = make_link()
+    stale = Link.objects.get(pk=link.pk)  # read before the rejection
+    identity_links.reject_link(link, users["staff"])
+    with pytest.raises(IdentityLinkError) as exc:
+        identity_links.confirm_link(stale, users["staff"])
+    assert exc.value.code == "invalid_state"
+    link.refresh_from_db()
+    assert link.state == State.REJECTED
+
+
+@pytest.mark.django_db
+def test_a_stale_reject_is_refused_from_rejected(users, make_link):
+    link = make_link()
+    stale = Link.objects.get(pk=link.pk)
+    Link.objects.filter(pk=link.pk).update(state=State.REJECTED)
+    with pytest.raises(IdentityLinkError) as exc:
+        identity_links.reject_link(stale, users["staff"])
+    assert exc.value.code == "invalid_state"
+    assert Link.objects.get(pk=link.pk).state == State.REJECTED
+
+
+@pytest.mark.django_db
+def test_a_stale_confirm_over_a_state_that_moved_is_refused_and_the_admin_path_still_moves_states(users, make_link):
+    link = make_link()
+    stale = Link.objects.get(pk=link.pk)
+    Link.objects.filter(pk=link.pk).update(state=State.AUTO)
+    with pytest.raises(IdentityLinkError):
+        identity_links.confirm_link(stale, users["staff"])
+    # the admin's own transitions (no allowed_from) are unchanged: a rejected link can be put back
+    Link.objects.filter(pk=link.pk).update(state=State.REJECTED)
+    moved = identity_links.set_link_state(Link.objects.get(pk=link.pk), State.SUGGESTED, users["staff"])
+    assert moved.state == State.SUGGESTED
+
+
+@pytest.mark.django_db
+def test_confirming_a_key_mismatched_predicted_link_keeps_it_from_counting(users, make_link):
+    from nodes.services.identity_chain import link_counts
+
+    link = make_link(evidence=Evidence.PREDICTED_NUMBER)
+    link.public_key_hex = "ab" * 32
+    link.save()
+    link.new_node.meshtastic_public_key_hex = "cd" * 32  # a different key was heard
+    link.new_node.save()
+    confirmed = identity_links.confirm_link(link, users["staff"])
+    assert confirmed.state == State.CONFIRMED and confirmed.evidence == Evidence.PREDICTED_NUMBER
+    assert link_counts(confirmed, confirmed.new_node) is False  # still waits for the key
+
+
+@pytest.mark.django_db
+def test_declaring_over_a_key_mismatched_predicted_link_makes_it_count(users, make_link):
+    from nodes.services.identity_chain import link_counts
+
+    link = make_link(state=State.CONFIRMED, evidence=Evidence.PREDICTED_NUMBER)
+    link.public_key_hex = "ab" * 32
+    link.save()
+    link.new_node.meshtastic_public_key_hex = "cd" * 32
+    link.new_node.save()
+    declared = identity_links.declare_link(link.old_node, link.new_node, users["staff"])
+    assert declared.pk == link.pk and declared.evidence == Evidence.DECLARED
+    assert link_counts(declared, declared.new_node) is True  # a deliberate owner or staff act
+
+
+@pytest.fixture
+def three_nodes(create_observed_node):
+    return [create_observed_node(meshtastic_node_id=n) for n in (OLD, NEW, OTHER)]
+
+
+def _live(old, new, state=State.AUTO):
+    return Link.objects.create(
+        old_node=old, new_node=new, evidence=Evidence.PUBLIC_KEY, confidence="strong", state=state
+    )
+
+
+@pytest.mark.django_db
+def test_declare_refuses_a_cycle_through_live_links(users, three_nodes):
+    a, b, c = three_nodes
+    _live(a, b)
+    _live(b, c)
+    with pytest.raises(IdentityLinkError) as exc:
+        identity_links.declare_link(c, a, users["staff"])  # a -> b -> c already; c -> a closes the loop
+    assert exc.value.code == "link_cycle"
+    assert not Link.objects.filter(old_node=c, new_node=a).exists()
+    resp = api(users["staff"]).post(_list_url(c), {"new_node": str(a.internal_id)}, format="json")
+    assert (resp.status_code, resp.data["code"]) == (409, "link_cycle")
+
+
+@pytest.mark.django_db
+def test_declare_refuses_a_cycle_made_of_a_promoted_suggestion(users, three_nodes):
+    a, b, c = three_nodes
+    _live(a, b)
+    _live(b, c)
+    suggested = _live(c, a, state=State.SUGGESTED)
+    with pytest.raises(IdentityLinkError) as exc:
+        identity_links.declare_link(c, a, users["staff"])
+    assert exc.value.code == "link_cycle"
+    suggested.refresh_from_db()
+    assert suggested.state == State.SUGGESTED  # rolled back
+
+
+@pytest.mark.django_db
+def test_confirm_refuses_a_cycle_through_live_links(users, three_nodes):
+    a, b, c = three_nodes
+    _live(a, b)
+    _live(b, c)
+    suggested = _live(c, a, state=State.SUGGESTED)
+    with pytest.raises(IdentityLinkError) as exc:
+        identity_links.confirm_link(suggested, users["staff"])
+    assert exc.value.code == "link_cycle"
+    suggested.refresh_from_db()
+    assert suggested.state == State.SUGGESTED
+    resp = api(users["staff"]).post(_act_url(suggested, "confirm"))
+    assert (resp.status_code, resp.data["code"]) == (409, "link_cycle")
+
+
+@pytest.mark.django_db
+def test_a_chain_that_is_not_a_cycle_is_still_allowed(users, three_nodes):
+    a, b, c = three_nodes
+    _live(a, b)
+    link = identity_links.declare_link(b, c, users["staff"])
+    assert link.state == State.CONFIRMED
+
+
+@pytest.mark.django_db
+def test_declaring_checks_ownership_before_looking_up_the_new_node(users, create_observed_node):
+    old = create_observed_node(meshtastic_node_id=OLD)
+    resp = api(users["stranger"]).post(_list_url(old), {"new_node": "!deadbeef"}, format="json")
+    assert (resp.status_code, resp.data["code"]) == (403, "not_owner")  # not 404 not_found
+    resp = api(users["stranger"]).post(_list_url(old), {}, format="json")
+    assert (resp.status_code, resp.data["code"]) == (403, "not_owner")
+
+
+@pytest.mark.django_db
+def test_declare_returns_201_when_a_suggestion_is_promoted_then_200(users, make_link):
+    link = make_link(old_owner=users["owner_both"], new_owner=users["owner_both"])
+    client = api(users["owner_both"])
+    body = {"new_node": str(link.new_node.internal_id)}
+    first = client.post(_list_url(link.old_node), body, format="json")
+    assert first.status_code == 201 and first.data["state"] == "confirmed"
+    assert client.post(_list_url(link.old_node), body, format="json").status_code == 200
+
+
+@pytest.mark.django_db
 def test_declare_endpoint(users, create_observed_node):
     old = create_observed_node(meshtastic_node_id=OLD, claimed_by=users["owner_both"])
     new = create_observed_node(meshtastic_node_id=NEW, claimed_by=users["owner_both"])
@@ -489,9 +648,10 @@ def test_declare_endpoint(users, create_observed_node):
     assert resp.data["old"]["node_id_str"] == f"!{OLD:08x}"
     assert Link.objects.get(old_node=old, new_node=new).reviewed_by == users["owner_both"]
 
-    # same pair again: not a second row, a conflict-free repeat is still 201 with the same link
+    # same pair again: nothing changed, so 200 with the same link and no second row
     again = api(users["staff"]).post(_list_url(old), {"new_node": f"!{NEW:08x}"}, format="json")
-    assert again.status_code == 201 and again.data["id"] == resp.data["id"]
+    assert again.status_code == 200 and again.data["id"] == resp.data["id"]
+    assert Link.objects.filter(old_node=old, new_node=new).count() == 1
 
     # owner of only one row
     mine = create_observed_node(meshtastic_node_id=OTHER + 1, claimed_by=users["owner_old"])
