@@ -9,6 +9,7 @@ from django.utils import timezone
 
 from nodes.managed_node_liveness import is_managed_node_eligible_traceroute_source
 from nodes.models import ManagedNode, ObservedNode
+from nodes.services.identity_chain import has_live_predecessor
 from traceroute.dispatch import TRACEROUTE_MAX_PENDING_PER_SOURCE, pending_count_for_source
 from traceroute.lifecycle import create_pending_auto_traceroute
 from traceroute.models import AutoTraceRoute
@@ -23,6 +24,7 @@ RESULT_QUEUED = "queued"
 RESULT_DUPLICATE = "duplicate"
 RESULT_NO_ELIGIBLE_SOURCE = "no_eligible_source"
 RESULT_SOURCE_QUEUE_FULL = "source_queue_full"
+RESULT_SUCCESSOR = "successor"
 
 
 def _ordered_source_candidates(observer: ManagedNode) -> list[ManagedNode]:
@@ -50,6 +52,8 @@ def enqueue_new_node_baseline(observed_node: ObservedNode, observer: ManagedNode
     """
     Create at most one pending AutoTraceRoute per target with trigger NEW_NODE_BASELINE.
 
+    A node's new number (a row with a live predecessor link) is not new: nothing is queued.
+
     Uses the shared dispatch queue (per-source cap and pacing). Does not send WebSocket
     commands from the request path.
     """
@@ -58,6 +62,14 @@ def enqueue_new_node_baseline(observed_node: ObservedNode, observer: ManagedNode
         trigger_type=AutoTraceRoute.TRIGGER_TYPE_NEW_NODE_BASELINE,
     ).exists():
         return RESULT_DUPLICATE
+
+    if has_live_predecessor(observed_node):
+        logger.info(
+            "new_node_baseline: skipped, %s is a new number of an earlier node (observer=%s)",
+            observed_node.node_id_str,
+            observer.node_id_str,
+        )
+        return RESULT_SUCCESSOR
 
     candidates = _ordered_source_candidates(observer)
     if not candidates:

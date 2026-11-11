@@ -18,6 +18,13 @@ writes anything.
   its alerts. When the new row's key is heard, the link is superseded by key evidence (counts) or demoted (does not).
   :func:`link_counts` and
   :func:`counting_links_q` are the one definition; every consumer goes through them.
+* **A successor is not new.** A row with a live predecessor link (:func:`has_live_predecessor`, any evidence, a
+  ``predicted_number`` link whose key has not been heard yet included) is a successor. Callers use that to skip the
+  noise a brand-new number would make: the baseline traceroute and the ``new_distant_node`` DX event. This is looser
+  than the replaced rule on purpose: the replaced rule hides and pauses things, while here the only effect is skipping
+  noise, and at a new number's first packet a predicted link is the only link there can be. A forged first packet
+  costs one skipped baseline and one skipped ``new_distant_node`` event for the forged row. Read through the link,
+  nothing is copied or written.
 * :func:`replaced_by` returns the newest identity in the chain (the last ``next`` step); the list-side annotation
   (:func:`annotate_replaced_by`) names the direct successor, so that lists cost no extra queries.
 """
@@ -80,6 +87,16 @@ def chain(node: ObservedNode, *, limit: int = DEFAULT_LIMIT) -> Chain:
         previous=_walk(node, forward=False, limit=limit),
         next=_walk(node, forward=True, limit=limit),
     )
+
+
+def has_live_predecessor(node: ObservedNode) -> bool:
+    """Whether ``node`` is a successor: one ``EXISTS`` on its live predecessor links (see module docstring)."""
+    return Link.objects.filter(new_node=node, state__in=Link.LIVE_STATES).exists()
+
+
+def predecessors(node: ObservedNode, *, limit: int = DEFAULT_LIMIT) -> list[ObservedNode]:
+    """The earlier identities of ``node``, nearest first (the ``previous`` walk). Never writes."""
+    return [step.node for step in _walk(node, forward=False, limit=limit)]
 
 
 def _norm_key(key: str | None) -> str:
