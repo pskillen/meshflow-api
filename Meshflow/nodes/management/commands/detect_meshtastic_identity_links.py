@@ -1,6 +1,8 @@
 """Link Meshtastic rows that are the same radio under two numbers, from the keys already in the database.
 
-Idempotent: a second run changes nothing. The whole run is one transaction. ``--dry-run`` does the same work and
+Idempotent: a second run changes nothing. ``--predicted`` adds a pass over unkeyed rows whose number an older
+row's key predicted (the link normally made at a new number's first packet). The whole run is one transaction.
+``--dry-run`` does the same work and
 rolls it back, so it reports exactly the numbers a real run would. Only key evidence is used here (MAC evidence needs a
 live on-air NodeInfo). Keys held by several nodes are never linked: each gets one flagged row naming every holder.
 Run it after the deploy that adds the link table, pre-prod first. See
@@ -11,11 +13,11 @@ from collections import Counter
 
 from django.core.management.base import BaseCommand
 from django.db import transaction
-from django.db.models import Count
+from django.db.models import Count, Subquery
 
 from common.protocol import Protocol
 from nodes.models import ObservedNode, ObservedNodeIdentityLink
-from nodes.services.identity_links import Outcome, evaluate_key
+from nodes.services.identity_links import Outcome, evaluate_key, link_by_prediction
 
 
 class _Rollback(Exception):
@@ -30,6 +32,11 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument("--dry-run", action="store_true", help="Report what would change; write nothing.")
+        parser.add_argument(
+            "--predicted",
+            action="store_true",
+            help="Also link unkeyed rows whose number an older row's stored key predicted.",
+        )
         parser.add_argument(
             "--batch-size",
             type=int,
@@ -53,6 +60,7 @@ class Command(BaseCommand):
         )
 
         results = Counter()
+        predicted = Counter()
         flagged_keys = []
         state_counts = {}
         try:
@@ -63,6 +71,18 @@ class Command(BaseCommand):
                         results[outcome] += 1
                         if outcome.flagged:
                             flagged_keys.append((key_hex, holders))
+                if options["predicted"]:
+                    predicted_numbers = ObservedNode.objects.filter(
+                        protocol=Protocol.MESHTASTIC, meshtastic_key_node_id__isnull=False
+                    ).values("meshtastic_key_node_id")
+                    unkeyed = ObservedNode.objects.filter(
+                        protocol=Protocol.MESHTASTIC,
+                        meshtastic_public_key_hex__isnull=True,
+                        meshtastic_node_id__in=Subquery(predicted_numbers),
+                    ).order_by("pk")
+                    for row in unkeyed.iterator(chunk_size=batch_size):
+                        outcome = link_by_prediction(row)
+                        predicted["created" if outcome == Outcome.CREATED else "skipped"] += 1
                 state_counts = dict(
                     ObservedNodeIdentityLink.objects.values_list("state").annotate(n=Count("pk")).order_by("state")
                 )
@@ -84,6 +104,10 @@ class Command(BaseCommand):
             f"{prefix}Flagged rows created {results[Outcome.FLAGGED_CREATED]}, "
             f"updated {results[Outcome.FLAGGED_UPDATED]}"
         )
+        if options["predicted"]:
+            self.stdout.write(
+                f"{prefix}Predicted-number links created {predicted['created']}, skipped {predicted['skipped']}"
+            )
         self.stdout.write(f"{prefix}Unlinkable (shared) keys: {len(flagged_keys)}")
         for key_hex, holders in flagged_keys[:20]:
             self.stdout.write(f"  {key_hex[:16]}...: {holders} holders")

@@ -35,7 +35,11 @@ def link_rows_of_rekeyed_feeder(sender, managed_node=None, event=None, old_node_
             return
         manual = event.outcome == ManagedNodeIdentityEvent.Outcome.MANUAL
         detect_after_feeder_rekey(
-            old_node_id, new_node_id, manual=manual, reviewer=event.acknowledged_by if manual else None
+            old_node_id,
+            new_node_id,
+            manual=manual,
+            reviewer=event.acknowledged_by if manual else None,
+            event_id=event.pk,
         )
     except Exception:
         logger.exception("Identity link receiver failed for feeder re-key %s -> %s", old_node_id, new_node_id)

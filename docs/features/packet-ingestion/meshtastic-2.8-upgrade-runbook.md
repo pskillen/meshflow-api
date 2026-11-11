@@ -16,6 +16,7 @@ Do not upgrade a feeder until all of these hold. Each is checkable.
 
 - [ ] **API:** the target environment runs an api release that includes signing state, identity links and the re-point audit (it also carries `accept_reported_key` and the backfill's first-key event; api 2.5.0, the re-key itself, is not enough). Migrations applied. Check each:
   - `python manage.py backfill_meshtastic_identity` has been run (idempotent; a second run changes nothing);
+  - `python manage.py detect_meshtastic_identity_links --predicted --dry-run` has been run, then without `--dry-run` (links unkeyed rows whose number an older row's key predicted; a second run changes nothing);
   - null-island cleanup is applied: `python manage.py cleanup_null_island_positions` (dry-run, no `--apply`) reports zero rows;
   - the learned offline thresholds have been computed. The task is the Celery beat task `update_learned_offline_thresholds` (daily 03:30 UTC, see [RECENCY.md](../../RECENCY.md)), not a management command. Run it once with `echo 'from mesh_monitoring.tasks import update_learned_offline_thresholds as t; print(t())' | python manage.py shell`, then confirm in admin that `NodePresence.learned_offline_computed_at` is set for a watched node. This matters for the false-offline warning in Known limitations.
 - [ ] **UI:** a ui release that shows the My Nodes notices "Feeder number changed", "Feeder needs review" and "Feeder review resolved" (ui 2.4.0 or later). Check: the built bundle contains the string "Feeder needs review".
