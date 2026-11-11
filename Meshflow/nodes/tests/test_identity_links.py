@@ -103,6 +103,25 @@ def test_key_link_when_the_old_rows_key_arrives_after_the_new_row_exists(make_no
 
 
 @pytest.mark.django_db
+def test_key_link_records_which_side_triggered_detection(make_node):
+    old = make_node(PDYT_OLD, PDYT_KEY)
+    new = make_node(PDYT_NEW, PDYT_KEY)
+    detect_after_key_write(new)
+    assert links().get().detail["trigger"] == "new_row"
+    Link.objects.all().delete()
+    detect_after_key_write(old)
+    assert links().get().detail["trigger"] == "old_row"
+
+
+@pytest.mark.django_db
+def test_key_link_records_no_trigger_when_the_caller_cannot_say(make_node):
+    make_node(PDYT_OLD, PDYT_KEY)
+    make_node(PDYT_NEW, PDYT_KEY)
+    evaluate_key(PDYT_KEY)
+    assert "trigger" not in links().get().detail
+
+
+@pytest.mark.django_db
 def test_detection_is_idempotent(make_node):
     make_node(PDYT_OLD, PDYT_KEY)
     new = make_node(PDYT_NEW, PDYT_KEY)

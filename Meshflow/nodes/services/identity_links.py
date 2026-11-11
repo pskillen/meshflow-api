@@ -209,8 +209,18 @@ def _key_holders(key_hex: str) -> list[ObservedNode]:
     )
 
 
-def evaluate_holders(key_hex: str, holders: list[ObservedNode]) -> Outcome:
-    """Decide what the holders of one key mean: a link, a flag, or nothing."""
+TRIGGER_NEW_ROW = "new_row"
+TRIGGER_OLD_ROW = "old_row"
+
+
+def evaluate_holders(key_hex: str, holders: list[ObservedNode], *, trigger: ObservedNode | None = None) -> Outcome:
+    """Decide what the holders of one key mean: a link, a flag, or nothing.
+
+    ``trigger`` is the row whose key write started this evaluation. When it is known, a new link records
+    ``detail["trigger"]``: ``"new_row"`` (the row numbered by the key appeared holding it) or ``"old_row"`` (the old row
+    announced a key a newer row holds). Callers that cannot say which side triggered (the backfill command) pass
+    nothing and record nothing.
+    """
     if len(holders) < 2:
         return Outcome.NONE
     predicted = key_node_id(key_hex)
@@ -218,6 +228,9 @@ def evaluate_holders(key_hex: str, holders: list[ObservedNode]) -> Outcome:
     if len(holders) == 2 and len(numbered_by_key) == 1:
         new = numbered_by_key[0]
         old = next(h for h in holders if h.pk != new.pk)
+        link_detail = None
+        if trigger is not None:
+            link_detail = {"trigger": TRIGGER_NEW_ROW if trigger.pk == new.pk else TRIGGER_OLD_ROW}
         outcome = record_link(
             old,
             new,
@@ -225,6 +238,7 @@ def evaluate_holders(key_hex: str, holders: list[ObservedNode]) -> Outcome:
             confidence=Confidence.STRONG,
             state=State.AUTO,
             public_key_hex=key_hex,
+            detail=link_detail,
         )
         if outcome != Outcome.CONFLICT:
             Link.objects.filter(state=State.FLAGGED, public_key_hex=key_hex).delete()  # it is linkable now
@@ -404,7 +418,7 @@ def detect_after_key_write(node: ObservedNode) -> Outcome:
         holders = _key_holders(key_hex)
         if len(holders) < 2:
             return Outcome.NONE
-        return evaluate_holders(key_hex, holders)
+        return evaluate_holders(key_hex, holders, trigger=node)
     except Exception:
         logger.exception("Identity link detection failed for node %s", getattr(node, "meshtastic_node_id", None))
         return Outcome.NONE
@@ -655,23 +669,44 @@ def declare_link_changed(old: ObservedNode, new: ObservedNode, actor) -> tuple[O
 
 # --- One-tap claim of a node's new number ---------------------------------------------------------------------------
 
-# Evidence that proves the same radio on its own; anything else needs a person to have confirmed the link.
-_STRONG_EVIDENCE = (Evidence.PUBLIC_KEY, Evidence.FEEDER_REKEY)
+
+def link_is_strong_for_claim(link: ObservedNodeIdentityLink) -> bool:
+    """Whether a link lets the old row's owner claim the new row in one tap.
+
+    Only evidence the claimant could not have set up themselves counts: a feeder re-key; ``declared`` (needs both rows
+    owned, or staff); a link staff confirmed (an owner's own confirm, or any non-staff confirm, never counts); or a key
+    link created because the new row appeared holding the old row's key (``detail["trigger"] == "new_row"``). A key link
+    made because the old row announced a key a newer row holds, and any link with no recorded trigger, does not count.
+    """
+    if link.evidence in (Evidence.FEEDER_REKEY, Evidence.DECLARED):
+        return True
+    reviewer = link.reviewed_by
+    if link.state == State.CONFIRMED and reviewer is not None and reviewer.is_staff:
+        return True
+    return link.evidence == Evidence.PUBLIC_KEY and (link.detail or {}).get("trigger") == TRIGGER_NEW_ROW
 
 
 def claim_from_previous(node: ObservedNode, user) -> tuple[NodeOwnerClaim, bool]:
     """Claim ``node`` (the new row) for ``user``, who owns its live direct predecessor. Returns ``(claim, created)``.
 
-    Needs a live predecessor link whose old row the user owns and a strong link (key or feeder re-key evidence, or a
-    person confirmed it). The new row is locked, so two taps cannot both win. ``created`` is False when the user
-    already holds the row (the call is idempotent). Raises :class:`IdentityLinkError` otherwise.
+    Needs a live predecessor link whose old row the user owns and that passes :func:`link_is_strong_for_claim`. The new
+    row is locked, so two taps cannot both win. ``created`` is False when the user already holds the row (the call is
+    idempotent, and checked first, so the holder need not still own the old row). Another user's pending claim on the
+    row is left in place. Raises :class:`IdentityLinkError` otherwise.
     """
     from nodes.ws_notify import notify_node_claim_accepted
 
     with transaction.atomic():
         locked = ObservedNode.objects.select_for_update().get(pk=node.pk)
+        if locked.claimed_by_id == user.pk:
+            claim = NodeOwnerClaim.objects.filter(node=locked, user=user).order_by("-pk").first()
+            if claim is None:
+                claim = NodeOwnerClaim.objects.create(
+                    node=locked, user=user, claim_key=generate_claim_key(), accepted_at=timezone.now()
+                )
+            return claim, False
         link = (
-            Link.objects.select_related("old_node")
+            Link.objects.select_related("old_node", "reviewed_by")
             .filter(new_node=locked, state__in=Link.LIVE_STATES)
             .order_by("-pk")
             .first()
@@ -682,19 +717,13 @@ def claim_from_previous(node: ObservedNode, user) -> tuple[NodeOwnerClaim, bool]
             raise IdentityLinkError(
                 IdentityLinkError.CODE_NOT_OWNER, "You need to own the node's previous number to claim this one."
             )
-        if locked.claimed_by_id == user.pk:
-            claim = NodeOwnerClaim.objects.filter(node=locked, user=user).order_by("-pk").first()
-            if claim is None:
-                claim = NodeOwnerClaim.objects.create(
-                    node=locked, user=user, claim_key=generate_claim_key(), accepted_at=timezone.now()
-                )
-            return claim, False
         if locked.claimed_by_id is not None:
             raise IdentityLinkError(IdentityLinkError.CODE_ALREADY_CLAIMED, "This node is claimed by someone else.")
-        if link.evidence not in _STRONG_EVIDENCE and link.state != State.CONFIRMED:
+        if not link_is_strong_for_claim(link):
             raise IdentityLinkError(
                 IdentityLinkError.CODE_EVIDENCE_TOO_WEAK,
-                "The link to your previous node is not strong enough; ask staff to confirm it, or claim by message.",
+                "This link is not strong enough to claim in one tap; claim this node the normal way, "
+                "by proving the radio with a message.",
             )
         now = timezone.now()
         locked.claimed_by = user
