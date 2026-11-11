@@ -2026,7 +2026,8 @@ components:
               nullable: true
             evidence:
               type: string
-              enum: [public_key, feeder_rekey, mac]
+              enum: [public_key, feeder_rekey, mac, predicted_number, declared]
+              description: How the link was found. An open set: clients must tolerate values they do not know.
             confidence:
               type: string
               enum: [strong, medium]
