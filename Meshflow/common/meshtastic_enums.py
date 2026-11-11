@@ -1,5 +1,7 @@
 """Meshtastic enum maps copied from the protobufs (reference: v2.8.2 ``portnums.proto`` and ``mesh.proto``)."""
 
+import re
+
 # ``PortNum.MAX`` (511) is a sentinel, not a port, and is left out.
 PORTNUM_NAMES: dict[int, str] = {
     0: "UNKNOWN_APP",
@@ -173,6 +175,7 @@ MODEM_PRESET_NAMES: dict[int, str] = {
     16: "MEDIUM_TURBO",
 }
 
+_ENUM_NAME_RE = re.compile(r"[A-Z0-9_]+")
 RADIO_CONFIG_NAME_MAX_LENGTH = 32  # ``ManagedNode.meshtastic_region`` / ``meshtastic_modem_preset`` column width
 
 
@@ -188,17 +191,18 @@ def _normalise_enum_name(value, names: "dict[int, str]", unknown_prefix: str) ->
     if isinstance(value, int):
         number = value
     elif isinstance(value, str):
-        text = value.strip()
-        if not text:
+        text = value.strip().upper()
+        if not text or text == "UNKNOWN_":
             return None
-        if text.startswith("UNKNOWN_"):
-            text = text[len("UNKNOWN_") :]
-        if text.isascii() and text.isdigit():
-            if len(text) > 9:
+        remainder = text[len("UNKNOWN_") :] if text.startswith("UNKNOWN_") else text
+        if remainder.isascii() and remainder.isdigit():
+            if len(remainder) > 9:
                 return None
-            number = int(text)
+            number = int(remainder)
+        elif len(text) <= RADIO_CONFIG_NAME_MAX_LENGTH and _ENUM_NAME_RE.fullmatch(text):
+            return text
         else:
-            return text if len(text) <= RADIO_CONFIG_NAME_MAX_LENGTH and text.isprintable() else None
+            return None
     else:
         return None
     result = names.get(number, f"{unknown_prefix}{number}")
@@ -208,8 +212,13 @@ def _normalise_enum_name(value, names: "dict[int, str]", unknown_prefix: str) ->
 
 
 def normalise_region(value) -> "str | None":
-    """Return the ``RegionCode`` name for a name, an int, a digit string or ``UNKNOWN_<n>``; see the helper."""
-    return _normalise_enum_name(value, REGION_NAMES, "REGION_")
+    """Return the ``RegionCode`` name for a name, an int, a digit string or ``UNKNOWN_<n>``; see the helper.
+
+    ``UNSET`` (name or 0) gives None: the radio reports no region set.
+    """
+    region = _normalise_enum_name(value, REGION_NAMES, "REGION_")
+    # ``UNSET`` (0) means the radio reports no region; None so it never overwrites a known region.
+    return None if region == "UNSET" else region
 
 
 def normalise_modem_preset(value) -> "str | None":
