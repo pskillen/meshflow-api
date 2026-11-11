@@ -776,3 +776,94 @@ def test_a_rejected_predicted_pair_is_never_recreated(make_node):
     assert detect_after_key_write(new) == Outcome.REJECTED
     link = links().get()
     assert (link.state, link.evidence) == (State.REJECTED, Evidence.PREDICTED_NUMBER)
+
+
+# --- the --predicted backfill pass and the feeder event id ------------------------------------------------------
+
+
+def _seed_predicted(make_node):
+    make_node(PDYT_OLD, PDYT_KEY)
+    make_node(PDYT_NEW)
+    make_node(0x55555555)  # unrelated unkeyed row: nothing predicts it
+
+
+@pytest.mark.django_db
+def test_command_without_predicted_leaves_unkeyed_rows_alone(make_node):
+    _seed_predicted(make_node)
+    out = _run()
+    assert not Link.objects.exists()
+    assert "Predicted-number" not in out
+
+
+@pytest.mark.django_db
+def test_command_predicted_dry_run_equals_real_run(make_node):
+    _seed_predicted(make_node)
+    dry = _run("--predicted", "--dry-run")
+    assert not Link.objects.exists()
+    real = _run("--predicted")
+    assert dry.replace("[dry-run] ", "") == real
+    assert "Predicted-number links created 1, skipped 0" in real
+    link = links().get()
+    assert (link.evidence, link.state, link.new_node.meshtastic_node_id) == (
+        Evidence.PREDICTED_NUMBER,
+        State.AUTO,
+        PDYT_NEW,
+    )
+    assert "auto 1" in real
+
+
+@pytest.mark.django_db
+def test_command_predicted_second_run_changes_nothing(make_node):
+    _seed_predicted(make_node)
+    _run("--predicted")
+    before = list(Link.objects.order_by("pk").values_list("pk", "state", "evidence", "updated_at"))
+    second = _run("--predicted")
+    assert list(Link.objects.order_by("pk").values_list("pk", "state", "evidence", "updated_at")) == before
+    assert "Predicted-number links created 0, skipped 1" in second
+
+
+@pytest.mark.django_db
+def test_command_predicted_skips_ambiguous_and_shared(make_node):
+    make_node(PDYT_OLD, PDYT_KEY)
+    make_node(0x11111111, OTHER_KEY)
+    ObservedNode.objects.filter(meshtastic_node_id=0x11111111).update(meshtastic_key_node_id=PDYT_NEW)
+    make_node(PDYT_NEW)
+    out = _run("--predicted")
+    assert not links().exists()
+    assert "Predicted-number links created 0, skipped 1" in out
+
+
+@pytest.mark.django_db
+def test_feeder_receiver_writes_the_event_id_on_the_link(make_node, feeder_event):
+    make_node(PDYT_OLD)
+    make_node(PDYT_NEW)
+    feeder, event = feeder_event(ManagedNodeIdentityEvent.Outcome.AUTO_UPDATED)
+    with mock.patch("nodes.services.feeder_identity_notify.queue_owner_notification"):
+        _send(feeder, event)
+    assert links().get().detail["feeder_event_id"] == event.pk
+
+
+@pytest.mark.django_db
+def test_feeder_rekey_adds_the_event_id_to_an_existing_key_link(make_node, feeder_event):
+    make_node(PDYT_OLD, PDYT_KEY)
+    new = make_node(PDYT_NEW, PDYT_KEY)
+    detect_after_key_write(new)
+    assert "feeder_event_id" not in links().get().detail
+    feeder, event = feeder_event(ManagedNodeIdentityEvent.Outcome.AUTO_UPDATED)
+    with mock.patch("nodes.services.feeder_identity_notify.queue_owner_notification"):
+        _send(feeder, event)
+    link = links().get()
+    assert (link.evidence, link.state) == (Evidence.PUBLIC_KEY, State.AUTO)
+    assert link.detail["feeder_event_id"] == event.pk
+    assert link.detail["also"] == [Evidence.FEEDER_REKEY]
+
+
+@pytest.mark.django_db
+def test_feeder_event_id_is_not_overwritten_or_added_to_a_rejected_link(make_node):
+    make_node(PDYT_OLD), make_node(PDYT_NEW)
+    identity_links.link_feeder_rekey(PDYT_OLD, PDYT_NEW, manual=False, event_id=1)
+    identity_links.link_feeder_rekey(PDYT_OLD, PDYT_NEW, manual=False, event_id=2)
+    assert links().get().detail["feeder_event_id"] == 1
+    Link.objects.update(state=State.REJECTED, detail={})
+    identity_links.link_feeder_rekey(PDYT_OLD, PDYT_NEW, manual=False, event_id=3)
+    assert links().get().detail == {}

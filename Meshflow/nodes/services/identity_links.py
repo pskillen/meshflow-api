@@ -348,8 +348,14 @@ def link_by_prediction(node: ObservedNode) -> Outcome:
     )
 
 
-def link_feeder_rekey(old_number: int, new_number: int, *, manual: bool, reviewer=None) -> Outcome:
-    """Link a re-keyed feeder's old row to its new one (merging with an existing key link)."""
+def link_feeder_rekey(
+    old_number: int, new_number: int, *, manual: bool, reviewer=None, event_id: int | None = None
+) -> Outcome:
+    """Link a re-keyed feeder's old row to its new one (merging with an existing key link).
+
+    ``event_id`` is the ``ManagedNodeIdentityEvent`` that moved the feeder; it is recorded as
+    ``detail["feeder_event_id"]`` on a new link, and added to an existing link that lacks it (nothing else changes).
+    """
     rows = {
         row.meshtastic_node_id: row
         for row in ObservedNode.objects.filter(
@@ -359,15 +365,27 @@ def link_feeder_rekey(old_number: int, new_number: int, *, manual: bool, reviewe
     old, new = rows.get(old_number), rows.get(new_number)
     if old is None or new is None:
         return Outcome.NONE
-    return record_link(
+    outcome = record_link(
         old,
         new,
         evidence=Evidence.FEEDER_REKEY,
         confidence=Confidence.STRONG,
         state=State.CONFIRMED if manual else State.AUTO,
         public_key_hex=new.meshtastic_public_key_hex,
+        detail={"feeder_event_id": event_id} if event_id is not None else None,
         reviewer=reviewer,
     )
+    if event_id is not None:
+        _note_feeder_event(old, new, event_id)
+    return outcome
+
+
+def _note_feeder_event(old: ObservedNode, new: ObservedNode, event_id: int) -> None:
+    """Add ``feeder_event_id`` to an existing, non-rejected link that does not carry it yet."""
+    link = Link.objects.filter(old_node=old, new_node=new).exclude(state=State.REJECTED).first()
+    if link is not None and "feeder_event_id" not in link.detail:
+        link.detail = {**link.detail, "feeder_event_id": event_id}
+        link.save(update_fields=["detail", "updated_at"])
 
 
 # --- Entry points for ingest and signals: never raise -------------------------------------------------------
@@ -411,10 +429,12 @@ def detect_after_nodeinfo(node: ObservedNode, mac: str | None, *, key_written: b
     return outcome
 
 
-def detect_after_feeder_rekey(old_number: int, new_number: int, *, manual: bool, reviewer=None) -> Outcome:
+def detect_after_feeder_rekey(
+    old_number: int, new_number: int, *, manual: bool, reviewer=None, event_id: int | None = None
+) -> Outcome:
     """Receiver body for ``feeder_identity_changed``. Never raises."""
     try:
-        return link_feeder_rekey(old_number, new_number, manual=manual, reviewer=reviewer)
+        return link_feeder_rekey(old_number, new_number, manual=manual, reviewer=reviewer, event_id=event_id)
     except Exception:
         logger.exception("Identity link from feeder re-key %s -> %s failed", old_number, new_number)
         return Outcome.NONE
