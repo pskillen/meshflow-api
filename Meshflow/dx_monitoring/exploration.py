@@ -261,10 +261,9 @@ def plan_event_exploration(event: DxEvent) -> dict:
         if event.state != DxEventState.ACTIVE or event.active_until <= now:
             return summary
 
-        if (
-            DxNodeMetadata.objects.filter(observed_node=dest, exclude_from_detection=True).exists()
-            or predecessor_excluded(dest)
-        ):
+        if DxNodeMetadata.objects.filter(
+            observed_node=dest, exclude_from_detection=True
+        ).exists() or predecessor_excluded(dest):
             _record_skip(event, DxEventTracerouteSkipReason.DESTINATION_EXCLUDED)
             summary["skipped"] += 1
             summary["actions"].append("destination_excluded")
