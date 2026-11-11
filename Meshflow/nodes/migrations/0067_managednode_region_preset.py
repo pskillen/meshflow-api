@@ -18,7 +18,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='managednode',
             name='meshtastic_region',
-            field=models.CharField(blank=True, help_text='LoRa region the bot last reported, e.g. EU_868 (protobuf RegionCode name; UNSET when the radio has none). Meshtastic feeders only.', max_length=32, null=True),
+            field=models.CharField(blank=True, help_text='LoRa region the bot last reported, e.g. EU_868 (protobuf RegionCode name; never UNSET: a radio with no region set leaves the stored value unchanged). Meshtastic feeders only.', max_length=32, null=True),
         ),
         migrations.AddField(
             model_name='managednode',

@@ -268,8 +268,8 @@ class ManagedNode(models.Model):
         null=True,
         blank=True,
         help_text=_(
-            "LoRa region the bot last reported, e.g. EU_868 (protobuf RegionCode name; UNSET when the radio has "
-            "none). Meshtastic feeders only."
+            "LoRa region the bot last reported, e.g. EU_868 (protobuf RegionCode name; never UNSET: a radio "
+            "with no region set leaves the stored value unchanged). Meshtastic feeders only."
         ),
     )
     meshtastic_modem_preset = models.CharField(

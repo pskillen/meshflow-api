@@ -151,6 +151,10 @@ def test_bot_version_unknown_numbers_normalised(create_managed_node, create_node
 @pytest.mark.parametrize("bad", ["", "x" * 40, "bad\nvalue", 3.5, ["EU_868"], {"a": 1}, True])
 def test_bot_version_garbage_radio_config_never_rejected(create_managed_node, create_node_api_key, bad):
     managed_node, api_key = _meshtastic_feeder(create_managed_node, create_node_api_key)
+    good = {"bot_version": "2.3.0", "meshtastic_region": "EU_868", "meshtastic_modem_preset": "LONG_FAST"}
+    assert _report(managed_node, api_key, good).status_code == 200
+    managed_node.refresh_from_db()
+    reported_at = managed_node.radio_config_reported_at
 
     response = _report(
         managed_node,
@@ -161,7 +165,47 @@ def test_bot_version_garbage_radio_config_never_rejected(create_managed_node, cr
     assert response.status_code == 200
     managed_node.refresh_from_db()
     assert managed_node.bot_version == "2.4.0"
-    assert managed_node.meshtastic_region is None
+    assert managed_node.meshtastic_region == "EU_868"
+    assert managed_node.meshtastic_modem_preset == "LONG_FAST"
+    assert managed_node.radio_config_reported_at == reported_at
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("unset", ["UNSET", 0, "0"])
+def test_bot_version_unset_region_does_not_overwrite(create_managed_node, create_node_api_key, unset):
+    managed_node, api_key = _meshtastic_feeder(create_managed_node, create_node_api_key)
+    _report(
+        managed_node,
+        api_key,
+        {"bot_version": "2.3.0", "meshtastic_region": "EU_868", "meshtastic_modem_preset": "LONG_FAST"},
+    )
+
+    response = _report(managed_node, api_key, {"bot_version": "2.4.0", "meshtastic_region": unset})
+
+    assert response.status_code == 200
+    managed_node.refresh_from_db()
+    assert managed_node.meshtastic_region == "EU_868"
+    assert managed_node.meshtastic_modem_preset == "LONG_FAST"
+
+
+@pytest.mark.django_db
+def test_bot_version_valid_region_junk_preset_stores_null_preset(create_managed_node, create_node_api_key):
+    managed_node, api_key = _meshtastic_feeder(create_managed_node, create_node_api_key)
+    _report(
+        managed_node,
+        api_key,
+        {"bot_version": "2.3.0", "meshtastic_region": "EU_868", "meshtastic_modem_preset": "LONG_FAST"},
+    )
+
+    response = _report(
+        managed_node,
+        api_key,
+        {"bot_version": "2.4.0", "meshtastic_region": "US", "meshtastic_modem_preset": "x" * 40},
+    )
+
+    assert response.status_code == 200
+    managed_node.refresh_from_db()
+    assert managed_node.meshtastic_region == "US"
     assert managed_node.meshtastic_modem_preset is None
 
 
