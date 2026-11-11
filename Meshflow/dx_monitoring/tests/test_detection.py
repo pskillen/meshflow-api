@@ -711,3 +711,170 @@ def test_mqtt_observation_does_not_emit_packet_ingest_dx(
     PositionPacketService().process_packet(pos, observer, obs, user)
 
     assert not DxEvent.objects.exists()
+
+
+# --- a node's new number is not a new distant node -----------------------------------------------------------------
+
+_SUCC_SETTINGS = dict(
+    DX_MONITORING_DETECTION_ENABLED=True,
+    DX_MONITORING_CLUSTER_DISTANCE_KM=150.0,
+    DX_MONITORING_DIRECT_DISTANCE_KM=5000.0,
+)
+
+
+def _link(old, new, state="auto", evidence="public_key"):
+    from nodes.models import ObservedNodeIdentityLink
+
+    return ObservedNodeIdentityLink.objects.create(
+        old_node=old, new_node=new, evidence=evidence, confidence="strong", state=state
+    )
+
+
+def _far_position(
+    number, packet_id, create_managed_node, create_packet_observation, create_user, create_position_packet
+):
+    """A far position packet (London) from ``number`` heard by an Edinburgh observer; returns the queries run."""
+    from django.db import connection
+    from django.test.utils import CaptureQueriesContext
+
+    observer = create_managed_node(
+        meshtastic_node_id=0xE2000100 + packet_id % 100,
+        default_location_latitude=55.95,
+        default_location_longitude=-3.19,
+    )
+    pos = create_position_packet(
+        packet_id=packet_id,
+        from_int=number,
+        from_str=meshtastic_id_to_hex(number),
+        latitude=51.5,
+        longitude=-0.12,
+    )
+    pos.first_reported_time = timezone.now()
+    pos.save(update_fields=["first_reported_time"])
+    obs = create_packet_observation(packet=pos, observer=observer)
+    with CaptureQueriesContext(connection) as ctx:
+        PositionPacketService().process_packet(pos, observer, obs, create_user())
+    return ctx
+
+
+@pytest.mark.django_db
+@override_settings(**_SUCC_SETTINGS)
+def test_successor_of_an_excluded_node_is_excluded(
+    create_observed_node, create_managed_node, create_packet_observation, create_user, create_position_packet
+):
+    old = create_observed_node(meshtastic_node_id=0xBEEF0301)
+    new = create_observed_node(meshtastic_node_id=0xBEEF0302)
+    DxNodeMetadata.objects.create(observed_node=old, exclude_from_detection=True)
+    _link(old, new)
+
+    _far_position(
+        0xBEEF0302, 950001, create_managed_node, create_packet_observation, create_user, create_position_packet
+    )
+
+    assert not DxEvent.objects.exists()
+    assert not DxNodeMetadata.objects.filter(observed_node=new).exists()
+
+
+@pytest.mark.django_db
+@override_settings(**_SUCC_SETTINGS)
+def test_chain_exclusion_applies_to_the_third_number(
+    create_observed_node, create_managed_node, create_packet_observation, create_user, create_position_packet
+):
+    a = create_observed_node(meshtastic_node_id=0xBEEF0311)
+    b = create_observed_node(meshtastic_node_id=0xBEEF0312)
+    c = create_observed_node(meshtastic_node_id=0xBEEF0313)
+    DxNodeMetadata.objects.create(observed_node=a, exclude_from_detection=True)
+    _link(a, b)
+    _link(b, c, evidence="feeder_rekey")
+
+    _far_position(
+        0xBEEF0313, 950002, create_managed_node, create_packet_observation, create_user, create_position_packet
+    )
+
+    assert not DxEvent.objects.exists()
+    # The exclusion read returns before a metadata row is made; without it the third number would get one.
+    assert not DxNodeMetadata.objects.filter(observed_node=c).exists()
+
+
+@pytest.mark.django_db
+@override_settings(**_SUCC_SETTINGS)
+@pytest.mark.parametrize("state", ["suggested", "rejected"])
+def test_non_live_link_does_not_count_as_a_successor_or_inherit_exclusion(
+    state, create_observed_node, create_managed_node, create_packet_observation, create_user, create_position_packet
+):
+    old = create_observed_node(meshtastic_node_id=0xBEEF0361)
+    new = create_observed_node(meshtastic_node_id=0xBEEF0362)
+    DxNodeMetadata.objects.create(observed_node=old, exclude_from_detection=True)
+    _link(old, new, state=state)
+
+    _far_position(
+        0xBEEF0362, 950010, create_managed_node, create_packet_observation, create_user, create_position_packet
+    )
+
+    # Not a successor, so it is a plain new distant node, and the earlier number's exclusion is not inherited.
+    assert DxEvent.objects.filter(reason_code=DxReasonCode.NEW_DISTANT_NODE, destination=new).count() == 1
+
+
+@pytest.mark.django_db
+@override_settings(**_SUCC_SETTINGS)
+def test_successor_of_a_non_excluded_node_gets_no_new_distant_node(
+    create_observed_node, create_managed_node, create_packet_observation, create_user, create_position_packet
+):
+    old = create_observed_node(meshtastic_node_id=0xBEEF0321)
+    new = create_observed_node(meshtastic_node_id=0xBEEF0322)
+    _link(old, new, evidence="predicted_number")
+
+    _far_position(
+        0xBEEF0322, 950003, create_managed_node, create_packet_observation, create_user, create_position_packet
+    )
+
+    assert not DxEvent.objects.filter(reason_code=DxReasonCode.NEW_DISTANT_NODE).exists()
+
+
+@pytest.mark.django_db
+@override_settings(**{**_SUCC_SETTINGS, "DX_MONITORING_DIRECT_DISTANCE_KM": 100.0})
+def test_successor_still_gets_distant_observation(
+    create_observed_node, create_managed_node, create_packet_observation, create_user, create_position_packet
+):
+    old = create_observed_node(meshtastic_node_id=0xBEEF0331)
+    new = create_observed_node(meshtastic_node_id=0xBEEF0332)
+    _link(old, new)
+
+    _far_position(
+        0xBEEF0332, 950004, create_managed_node, create_packet_observation, create_user, create_position_packet
+    )
+
+    assert not DxEvent.objects.filter(reason_code=DxReasonCode.NEW_DISTANT_NODE).exists()
+    assert DxEvent.objects.filter(reason_code=DxReasonCode.DISTANT_OBSERVATION).count() == 1
+
+
+@pytest.mark.django_db
+@override_settings(**_SUCC_SETTINGS)
+def test_plain_new_node_still_gets_new_distant_node(
+    create_observed_node, create_managed_node, create_packet_observation, create_user, create_position_packet
+):
+    create_observed_node(meshtastic_node_id=0xBEEF0341)
+    _far_position(
+        0xBEEF0341, 950005, create_managed_node, create_packet_observation, create_user, create_position_packet
+    )
+    assert DxEvent.objects.filter(reason_code=DxReasonCode.NEW_DISTANT_NODE).count() == 1
+
+
+@pytest.mark.django_db
+@override_settings(**_SUCC_SETTINGS)
+def test_no_link_path_costs_exactly_one_more_query(
+    create_observed_node, create_managed_node, create_packet_observation, create_user, create_position_packet
+):
+    from unittest.mock import patch
+
+    create_observed_node(meshtastic_node_id=0xBEEF0351)
+    create_observed_node(meshtastic_node_id=0xBEEF0352)
+
+    with patch("dx_monitoring.services.has_live_predecessor", return_value=False):
+        without = _far_position(
+            0xBEEF0351, 950006, create_managed_node, create_packet_observation, create_user, create_position_packet
+        )
+    with_check = _far_position(
+        0xBEEF0352, 950007, create_managed_node, create_packet_observation, create_user, create_position_packet
+    )
+    assert len(with_check) == len(without) + 1

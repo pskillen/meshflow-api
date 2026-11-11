@@ -6,6 +6,7 @@ observed-node resolution when MeshCore rows share this pipeline.
 
 from __future__ import annotations
 
+import logging
 from datetime import timedelta
 from typing import Any
 
@@ -16,6 +17,7 @@ from django.utils import timezone
 from common.geo import haversine_km, position_uncertainty_km
 from common.protocol import Protocol
 from constellations.models import Constellation
+from dx_monitoring.exclusion import excluded_mesh_node_ids, predecessor_excluded
 from dx_monitoring.exploration import exploration_links_auto_traceroute_to_destination
 from dx_monitoring.models import (
     DxEvent,
@@ -25,9 +27,12 @@ from dx_monitoring.models import (
     DxReasonCode,
 )
 from nodes.models import ManagedNode, NodeLatestStatus, ObservedNode
+from nodes.services.identity_chain import has_live_predecessor
 from packets.hops import observation_is_direct
 from packets.models import MtRawPacket, PacketObservation, TraceroutePacket
 from traceroute.models import AutoTraceRoute
+
+logger = logging.getLogger(__name__)
 
 
 def is_direct_packet_observation(observation: PacketObservation) -> bool:
@@ -314,6 +319,13 @@ def maybe_detect_dx_candidate(
     obs_lat, obs_lon = _observer_coords(observer)
     footprint = _cluster_footprint(constellation.id)
 
+    # A node's new number is not a new node: an exclusion on an earlier number applies, and it is not a
+    # "new distant node" (read through the link, nothing is copied).
+    successor = has_live_predecessor(from_node)
+    if successor and predecessor_excluded(from_node):
+        logger.debug("dx: %s skipped, an earlier number of this node is excluded", from_node.node_id_str)
+        return
+
     meta, _ = DxNodeMetadata.objects.get_or_create(observed_node=from_node)
     if meta.exclude_from_detection:
         return
@@ -328,7 +340,7 @@ def maybe_detect_dx_candidate(
             if not meta.cluster_position_evaluated_for_dx:
                 meta.cluster_position_evaluated_for_dx = True
                 meta.save(update_fields=["cluster_position_evaluated_for_dx", "updated_at"])
-            if _exceeds_threshold(min_cluster_km, dest_uncertainty_km, cluster_km):
+            if not successor and _exceeds_threshold(min_cluster_km, dest_uncertainty_km, cluster_km):
                 _get_or_create_active_event(
                     constellation=constellation,
                     destination=from_node,
@@ -421,9 +433,12 @@ def maybe_detect_dx_from_completed_traceroute(
     forward = _tr_forward_hop_pairs(src_id, tgt_id, auto_tr.route)
     backward = _tr_return_hop_pairs(tgt_id, src_id, auto_tr.route_back)
 
+    # Exclusion is read through identity links: an excluded node that upgraded stays excluded under its new number.
+    excluded_ids = excluded_mesh_node_ids({n for pair in (*forward, *backward) for n in pair})
+
     for direction, pairs in (("forward", forward), ("return", backward)):
         for hop_index, (a_id, b_id) in enumerate(pairs):
-            if is_node_suppressed_for_dx(a_id) or is_node_suppressed_for_dx(b_id):
+            if a_id in excluded_ids or b_id in excluded_ids:
                 continue
             la, loa, bits_a = _position_for_mesh_node(a_id, source)
             lb, lob, bits_b = _position_for_mesh_node(b_id, source)

@@ -2,12 +2,15 @@
 
 from unittest.mock import patch
 
-from django.db import IntegrityError
+from django.db import IntegrityError, connection
+from django.test.utils import CaptureQueriesContext
 
 import pytest
 
 import nodes.tests.conftest  # noqa: F401
 import users.tests.conftest  # noqa: F401
+from common.meshtastic_identity import identity_fields, normalise_pubkey
+from nodes.models import ObservedNode, ObservedNodeIdentityLink
 from packets.models import PacketObservation
 from packets.signals import packet_received
 from traceroute.dispatch import TRACEROUTE_MAX_PENDING_PER_SOURCE
@@ -17,6 +20,7 @@ from traceroute.new_node_baseline import (
     RESULT_NO_ELIGIBLE_SOURCE,
     RESULT_QUEUED,
     RESULT_SOURCE_QUEUE_FULL,
+    RESULT_SUCCESSOR,
     enqueue_new_node_baseline,
 )
 
@@ -175,3 +179,108 @@ def test_enqueue_integrity_error_returns_duplicate(
         side_effect=IntegrityError("duplicate baseline"),
     ):
         assert enqueue_new_node_baseline(target, observer) == RESULT_DUPLICATE
+
+
+# --- a node's new number is not a new node -------------------------------------------------------------------------
+
+Link = ObservedNodeIdentityLink
+KEY_HEX = normalise_pubkey("I9+3Izg6g7w+TIU+EXGyFVYbh9m9sioXeo6RZdlwnS8=")  # PDYt
+OLD, NEW = 0x433B82F0, 0x8959691B
+
+
+def _link(old, new, state, evidence=Link.Evidence.PUBLIC_KEY):
+    return Link.objects.create(
+        old_node=old,
+        new_node=new,
+        evidence=evidence,
+        confidence=Link.Confidence.STRONG,
+        state=state,
+        public_key_hex=KEY_HEX,
+    )
+
+
+@pytest.fixture
+def feeding_observer(create_managed_node, mark_managed_node_feeding):
+    observer = create_managed_node(allow_auto_traceroute=True)
+    mark_managed_node_feeding(observer, sending=True)
+    return observer
+
+
+def _first_packet(create_raw_packet, create_packet_observation, create_user, observer):
+    from packets.services.base import BasePacketService
+
+    class _Noop(BasePacketService):
+        def _process_packet(self) -> None:
+            pass
+
+    pkt = create_raw_packet(from_int=NEW, from_str="!8959691b")
+    obs = create_packet_observation(packet=pkt, observer=observer)
+    _Noop().process_packet(pkt, observer, obs, create_user())
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "state, evidence",
+    [
+        (Link.State.AUTO, Link.Evidence.PUBLIC_KEY),
+        (Link.State.CONFIRMED, Link.Evidence.PUBLIC_KEY),
+        (Link.State.AUTO, Link.Evidence.PREDICTED_NUMBER),
+    ],
+)
+def test_successor_gets_no_baseline(create_observed_node, feeding_observer, state, evidence):
+    old = create_observed_node(meshtastic_node_id=OLD)
+    new = create_observed_node(meshtastic_node_id=NEW)
+    _link(old, new, state, evidence)
+
+    assert enqueue_new_node_baseline(new, feeding_observer) == RESULT_SUCCESSOR
+    assert not AutoTraceRoute.objects.exists()
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("state", [Link.State.SUGGESTED, Link.State.REJECTED, None])
+def test_non_live_or_no_link_still_queues(create_observed_node, feeding_observer, state):
+    old = create_observed_node(meshtastic_node_id=OLD)
+    new = create_observed_node(meshtastic_node_id=NEW)
+    if state is not None:
+        _link(old, new, state)
+
+    assert enqueue_new_node_baseline(new, feeding_observer) == RESULT_QUEUED
+
+
+@pytest.mark.django_db
+def test_first_packet_of_a_predicted_number_queues_no_baseline(
+    create_raw_packet, create_packet_observation, create_user, feeding_observer
+):
+    ObservedNode.objects.create(
+        meshtastic_node_id=OLD,
+        long_name="old",
+        short_name="O",
+        meshtastic_public_key=KEY_HEX,
+        **identity_fields(KEY_HEX),
+    )
+    _first_packet(create_raw_packet, create_packet_observation, create_user, feeding_observer)
+
+    assert Link.objects.get().evidence == Link.Evidence.PREDICTED_NUMBER
+    assert not AutoTraceRoute.objects.exists()
+
+
+@pytest.mark.django_db
+def test_first_packet_of_an_ordinary_number_still_queues_a_baseline(
+    create_raw_packet, create_packet_observation, create_user, feeding_observer
+):
+    _first_packet(create_raw_packet, create_packet_observation, create_user, feeding_observer)
+
+    assert AutoTraceRoute.objects.filter(
+        target_node__meshtastic_node_id=NEW, trigger_type=AutoTraceRoute.TRIGGER_TYPE_NEW_NODE_BASELINE
+    ).exists()
+
+
+@pytest.mark.django_db
+def test_successor_check_is_one_exists_query(create_observed_node):
+    from nodes.services.identity_chain import has_live_predecessor
+
+    new = create_observed_node(meshtastic_node_id=NEW)
+    with CaptureQueriesContext(connection) as ctx:
+        assert has_live_predecessor(new) is False
+    assert len(ctx) == 1
+    assert "LIMIT 1" in ctx.captured_queries[0]["sql"].upper()

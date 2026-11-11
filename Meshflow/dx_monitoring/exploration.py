@@ -11,6 +11,7 @@ from django.db import transaction
 from django.db.models import Max, Q
 from django.utils import timezone
 
+from dx_monitoring.exclusion import predecessor_excluded
 from dx_monitoring.models import (
     DxEvent,
     DxEventState,
@@ -260,7 +261,9 @@ def plan_event_exploration(event: DxEvent) -> dict:
         if event.state != DxEventState.ACTIVE or event.active_until <= now:
             return summary
 
-        if DxNodeMetadata.objects.filter(observed_node=dest, exclude_from_detection=True).exists():
+        if DxNodeMetadata.objects.filter(
+            observed_node=dest, exclude_from_detection=True
+        ).exists() or predecessor_excluded(dest):
             _record_skip(event, DxEventTracerouteSkipReason.DESTINATION_EXCLUDED)
             summary["skipped"] += 1
             summary["actions"].append("destination_excluded")

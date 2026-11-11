@@ -187,6 +187,10 @@ managed monitoring nodes. A Central Belt Scotland node that merely learns about 
 Midlands node through normal mesh forwarding is expected behaviour; a Central
 Belt monitoring node hearing that Midlands node with zero hops is the candidate.
 
+A node's new number is not a new node. A row with a live predecessor link (the
+same radio after a firmware upgrade or re-key) never emits `new_distant_node`;
+its other reasons (for example `distant_observation`) run as usual.
+
 The first packet that created the `ObservedNode` may not be the packet that opens
 the DX event. A node can be created by node-info, text, or telemetry with no
 coordinates, then become eligible later when a position arrives. That later
@@ -300,6 +304,10 @@ bidirectionally:
   detection ignores the observation;
 - if the suppressed node appears in either side of a traceroute hop pair,
   traceroute-derived detection ignores that hop pair.
+
+An exclusion on an earlier number of the same radio applies too: a packet-ingest
+sender with a live predecessor link is ignored when any earlier number in its
+chain is excluded. Nothing is copied to the new row.
 
 The suppression record includes notes so operators can explain why the node is
 excluded, for example "mobile test node", "aircraft tracker", or "bad location
