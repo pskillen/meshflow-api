@@ -11,7 +11,9 @@ from common.meshtastic_identity import identity_fields, normalise_pubkey
 from nodes.models import ObservedNode, ObservedNodeIdentityLink
 from nodes.services import identity_links
 from packets.serializers import NodeSerializer
+from packets.services.base import BasePacketService
 from packets.services.node_info import NodeInfoPacketService
+from packets.signals import new_node_observed
 
 Link = ObservedNodeIdentityLink
 State = Link.State
@@ -216,3 +218,79 @@ def test_repeated_identical_nodedb_upload_costs_no_identity_queries():
         for _ in range(3):
             _upsert(node, id=NEW, meshtastic_public_key=KEY_B64)
     assert _identity_queries(queries) == []
+
+
+# --- first packet of a number an older row predicted ---------------------------------------------------------------
+
+
+class _NoopService(BasePacketService):
+    def _process_packet(self) -> None:
+        pass
+
+
+def _first_packet(create_raw_packet, create_managed_node, create_packet_observation, create_user, number):
+    pkt = create_raw_packet(from_int=number, from_str=f"!{number:08x}")
+    observer = create_managed_node()
+    observation = create_packet_observation(packet=pkt, observer=observer)
+    _NoopService().process_packet(pkt, observer, observation, create_user())
+
+
+@pytest.mark.django_db
+def test_first_packet_of_a_predicted_number_links_the_old_row(
+    create_raw_packet, create_managed_node, create_packet_observation, create_user
+):
+    old = _row(OLD, KEY_HEX)
+    _first_packet(create_raw_packet, create_managed_node, create_packet_observation, create_user, NEW)
+    link = Link.objects.get()
+    assert link.old_node == old and link.new_node.meshtastic_node_id == NEW
+    assert (link.evidence, link.confidence, link.state) == ("predicted_number", "medium", State.AUTO)
+
+
+@pytest.mark.django_db
+def test_first_packet_detection_runs_before_new_node_observed(
+    create_raw_packet, create_managed_node, create_packet_observation, create_user
+):
+    _row(OLD, KEY_HEX)
+    seen = []
+    listener = lambda sender, node, **kw: seen.append(Link.objects.filter(new_node=node).count())  # noqa: E731
+    new_node_observed.connect(listener, weak=False)
+    try:
+        _first_packet(create_raw_packet, create_managed_node, create_packet_observation, create_user, NEW)
+    finally:
+        new_node_observed.disconnect(listener)
+    assert seen == [1]
+
+
+@pytest.mark.django_db
+def test_first_packet_carries_on_when_detection_raises(
+    create_raw_packet, create_managed_node, create_packet_observation, create_user
+):
+    _row(OLD, KEY_HEX)
+    with mock.patch.object(identity_links, "link_by_prediction", side_effect=RuntimeError("boom")):
+        _first_packet(create_raw_packet, create_managed_node, create_packet_observation, create_user, NEW)
+    assert ObservedNode.objects.filter(meshtastic_node_id=NEW).exists()
+    assert not Link.objects.exists()
+
+
+@pytest.mark.django_db
+def test_first_packet_carries_on_when_the_old_row_already_has_a_successor(
+    create_raw_packet, create_managed_node, create_packet_observation, create_user
+):
+    old = _row(OLD, KEY_HEX)
+    other = _row(0x33333333)
+    identity_links.record_link(old, other, evidence="feeder_rekey", confidence="strong", state=State.AUTO)
+    _first_packet(create_raw_packet, create_managed_node, create_packet_observation, create_user, NEW)
+    assert ObservedNode.objects.filter(meshtastic_node_id=NEW).exists()
+    assert Link.objects.count() == 1
+
+
+@pytest.mark.django_db
+def test_packet_from_an_existing_row_makes_no_prediction_query(
+    create_raw_packet, create_managed_node, create_packet_observation, create_user
+):
+    _row(OLD, KEY_HEX)
+    _row(NEW)
+    with mock.patch.object(identity_links, "link_by_prediction") as spy:
+        _first_packet(create_raw_packet, create_managed_node, create_packet_observation, create_user, NEW)
+    spy.assert_not_called()
+    assert not Link.objects.exists()

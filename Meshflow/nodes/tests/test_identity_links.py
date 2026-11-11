@@ -607,3 +607,78 @@ def test_feeder_rekey_link_survives_the_key_becoming_shared(make_node):
     detect_after_key_write(third)
     assert links().get().state == State.AUTO and links().get().evidence == Evidence.FEEDER_REKEY
     assert new
+
+
+# --- a new number that an older row's key predicted (link at the first packet) ------------------------------------
+
+
+@pytest.mark.django_db
+def test_prediction_links_the_old_row_to_the_unkeyed_new_row(make_node):
+    old, new = make_node(PDYT_OLD, PDYT_KEY), make_node(PDYT_NEW)
+    assert identity_links.link_by_prediction(new) == Outcome.CREATED
+    link = links().get()
+    assert (link.old_node, link.new_node) == (old, new)
+    assert (link.evidence, link.confidence, link.state) == (Evidence.PREDICTED_NUMBER, "medium", State.AUTO)
+    assert link.public_key_hex == PDYT_KEY and link.detail == {"predicted_from": "!433b82f0"}
+
+
+@pytest.mark.django_db
+def test_prediction_needs_the_new_row_to_have_no_key(make_node):
+    make_node(PDYT_OLD, PDYT_KEY)
+    new = make_node(PDYT_NEW, OTHER_KEY)
+    assert identity_links.link_by_prediction(new) == Outcome.NONE
+    assert not Link.objects.exists()
+
+
+@pytest.mark.django_db
+def test_prediction_by_two_rows_is_ambiguous(make_node):
+    make_node(PDYT_OLD, PDYT_KEY)
+    make_node(0x11111111, OTHER_KEY)
+    ObservedNode.objects.filter(meshtastic_node_id=0x11111111).update(meshtastic_key_node_id=PDYT_NEW)
+    new = make_node(PDYT_NEW)
+    assert identity_links.link_by_prediction(new) == Outcome.NONE
+    assert not Link.objects.exists()
+
+
+@pytest.mark.django_db
+def test_prediction_ignores_a_shared_key(make_node):
+    make_node(PDYT_OLD, PDYT_KEY)
+    make_node(0x11111111, PDYT_KEY)
+    ObservedNode.objects.filter(meshtastic_node_id=0x11111111).update(meshtastic_key_node_id=None)
+    new = make_node(PDYT_NEW)
+    assert identity_links.link_by_prediction(new) == Outcome.NONE
+    assert not Link.objects.exists()
+
+
+@pytest.mark.django_db
+def test_prediction_ignores_a_flagged_key(make_node):
+    make_node(PDYT_OLD, PDYT_KEY)
+    Link.objects.create(evidence=Evidence.PUBLIC_KEY, confidence="strong", state=State.FLAGGED, public_key_hex=PDYT_KEY)
+    new = make_node(PDYT_NEW)
+    assert identity_links.link_by_prediction(new) == Outcome.NONE
+    assert not links().exists()
+
+
+@pytest.mark.django_db
+def test_prediction_ignores_a_row_already_numbered_by_its_own_key(make_node):
+    make_node(PDYT_NEW, PDYT_KEY)  # the 2.8 row itself holds the key; nothing predicted from another row
+    other = make_node(0x22222222)
+    assert identity_links.link_by_prediction(other) == Outcome.NONE
+
+
+@pytest.mark.django_db
+def test_prediction_conflicts_when_the_old_row_already_has_a_live_successor(make_node):
+    old = make_node(PDYT_OLD, PDYT_KEY)
+    other = make_node(0x33333333)
+    identity_links.record_link(old, other, evidence=Evidence.FEEDER_REKEY, confidence="strong", state=State.AUTO)
+    new = make_node(PDYT_NEW)
+    assert identity_links.link_by_prediction(new) == Outcome.CONFLICT
+    assert links().count() == 1
+
+
+@pytest.mark.django_db
+def test_detect_at_first_packet_never_raises(make_node, caplog):
+    new = make_node(PDYT_NEW)
+    with mock.patch.object(identity_links, "link_by_prediction", side_effect=RuntimeError("boom")):
+        assert identity_links.detect_at_first_packet(new) == Outcome.NONE
+    assert "prediction failed" in caplog.text

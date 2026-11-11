@@ -10,6 +10,9 @@ Evidence, strongest first:
   A key held by more than one candidate is a cloned key and can never be linked: one ``flagged`` row names every holder.
 * **managed feeder re-key** -- the feeder re-key service moved a feeder's number: ``auto`` (automatic) or
   ``confirmed`` (a person did it).
+* **predicted number** -- a row with no stored key whose number is the one an older row's key predicts
+  (``meshtastic_key_node_id``), when that key is held by nothing else: ``auto``, medium, made at the new row's first
+  packet. Key evidence replaces it; a different key demotes it to ``suggested``.
 * **MAC** (on-air NodeInfo only; NodeDB uploads zero other nodes' MACs on 2.8): a row numbered by the MAC's last four
   bytes, or holding the same MAC, whose key differs: ``suggested``, medium confidence, never promoted by MAC alone.
 
@@ -282,6 +285,44 @@ def link_by_mac(node: ObservedNode, mac: str | None) -> Outcome:
     )
 
 
+def link_by_prediction(node: ObservedNode) -> Outcome:
+    """Link ``node`` to the one row whose key predicted its number, at the node's first packet.
+
+    Records nothing unless ``node`` has no stored key, exactly one other row predicted its number from a stored key
+    that gives that row a different number, and that key is held by that row alone and is not flagged.
+    """
+    if node.protocol != Protocol.MESHTASTIC or node.meshtastic_node_id is None or node.meshtastic_public_key_hex:
+        return Outcome.NONE
+    candidates = [
+        row
+        for row in ObservedNode.objects.filter(
+            protocol=Protocol.MESHTASTIC,
+            meshtastic_key_node_id=node.meshtastic_node_id,
+            meshtastic_public_key_hex__isnull=False,
+        )
+        .exclude(pk=node.pk)
+        .exclude(meshtastic_node_id=node.meshtastic_node_id)
+        .order_by("pk")[:2]
+    ]
+    if len(candidates) != 1:
+        return Outcome.NONE
+    old = candidates[0]
+    old_key = old.meshtastic_public_key_hex
+    if [h.pk for h in _key_holders(old_key)] != [old.pk]:
+        return Outcome.NONE
+    if Link.objects.filter(state=State.FLAGGED, public_key_hex=old_key).exists():
+        return Outcome.NONE
+    return record_link(
+        old,
+        node,
+        evidence=Evidence.PREDICTED_NUMBER,
+        confidence=Confidence.MEDIUM,
+        state=State.AUTO,
+        public_key_hex=old_key,
+        detail={"predicted_from": old.node_id_str},
+    )
+
+
 def link_feeder_rekey(old_number: int, new_number: int, *, manual: bool, reviewer=None) -> Outcome:
     """Link a re-keyed feeder's old row to its new one (merging with an existing key link)."""
     rows = {
@@ -319,6 +360,17 @@ def detect_after_key_write(node: ObservedNode) -> Outcome:
         return evaluate_holders(key_hex, holders)
     except Exception:
         logger.exception("Identity link detection failed for node %s", getattr(node, "meshtastic_node_id", None))
+        return Outcome.NONE
+
+
+def detect_at_first_packet(node: ObservedNode) -> Outcome:
+    """After a new row was created from a packet: link it when its number was predicted. Never raises."""
+    try:
+        return link_by_prediction(node)
+    except Exception:
+        logger.exception(
+            "Identity link prediction failed for node %s", getattr(node, "meshtastic_node_id", None)
+        )
         return Outcome.NONE
 
 
