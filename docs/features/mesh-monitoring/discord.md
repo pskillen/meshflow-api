@@ -24,6 +24,10 @@ When mesh monitoring **first enters** a new verification episode (silence exceed
 
 Implementation: **`mesh_monitoring.services.notify_watchers_verification_started`**, wired from **`process_node_watch_presence`** / **`_process_one_observed_node`** only on **new** verification (not on every tick while already verifying). See [models.md](models.md) for **`NodePresence.last_verification_notify_at`**.
 
+## Replaced-number DMs
+
+Kind **`node_replaced`** ("Watched node now uses a new number"). When a watched node has taken a new number, each watcher with verified Discord gets one DM from **`notify_watchers_node_replaced`**: `Meshflow mesh monitoring: <old label> now uses node <new node id>. Its old number won't send offline alerts. Watch the new number: <url of the new node>`. It is sent from **`process_node_watch_presence`** on the first run that sees the row replaced and silent past its own offline threshold (never against a node that is still being heard), at most once per identity link, and not at all when the old row was last heard more than 7 days ago. Unverified watchers get a skip audit row as for offline DMs.
+
 ## Low-battery DMs
 
 When **`NodeMonitoringConfig.battery_alert_enabled`** is true and **`DeviceMetrics`** readings stay below the configured threshold for **N** consecutive reports, **`mesh_monitoring`** confirms a battery alert episode on **`NodePresence`** and may send **one** Discord DM per episode to watchers with **`battery_notifications_enabled=True`** (and verified Discord). Evaluation is triggered by the **`device_metrics_recorded`** signal from **`packets`** (see **`mesh_monitoring.receivers`**).

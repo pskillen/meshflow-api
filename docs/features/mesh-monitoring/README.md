@@ -56,6 +56,17 @@ The silence threshold is not always 6 h. A threshold the owner set on **`NodeMon
 
 Any packet that advances **`last_heard`** should clear **`offline_confirmed_at`** and **`verification_started_at`** on **`NodePresence`** (via a small hook from packet processing into **`mesh_monitoring.services`**). The node is then treated as **online** again for monitoring purposes.
 
+### Replaced numbers
+
+On Meshtastic 2.8 a firmware upgrade or re-key can give a radio a new node number, so a new `ObservedNode` row appears and the old one goes quiet (see the node identity chain). A row is **replaced** when it has a live identity link (`auto` or `confirmed`) to a successor **and** either it has never been heard or the successor was heard at least as recently as it was. For a replaced row, monitoring:
+
+- **pauses offline checks**: no silence detection, no verification traceroutes, no offline DM, and the daily learned-threshold job skips it;
+- **leaves its `NodePresence` as it is** (a row already confirmed offline stays that way and resumes when the row stops being replaced);
+- **tells each watcher once**: the first presence run that sees the row replaced **and silent past its own offline threshold** (the one presence checks it against) sends each watcher with verified Discord one DM naming the newest identity (kind `node_replaced`). The link records it (`detail.watchers_notified`), so it is never repeated. The wait is deliberate: a forged first packet from a node's predicted number can make a live node look replaced for a moment, and a DM cannot be taken back, so the DM only goes out when an offline alert would have. Until then there is no DM. If the old row was last heard more than 7 days ago, the link is marked `stale` and nothing is sent, so links found long after the fact stay quiet;
+- **does not copy watches**: the watcher chooses to watch the new number.
+
+It undoes itself: when the old number is heard again after its successor, or the link is rejected or becomes `suggested`, the row is processed as normal. Implementation: `process_node_watch_presence` in `mesh_monitoring/tasks.py`, rule in `nodes/services/identity_chain.py`.
+
 ## Documentation map
 
 | Doc | Contents |

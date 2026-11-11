@@ -22,6 +22,7 @@ __all__ = [
     "clear_presence_on_packet_from_node",
     "on_monitoring_traceroute_completed",
     "notify_watchers_node_offline",
+    "notify_watchers_node_replaced",
     "notify_watchers_verification_started",
     "notify_watchers_node_battery_low",
     "monitoring_traceroute_succeeded_since",
@@ -221,6 +222,76 @@ def notify_watchers_node_offline(observed_node: ObservedNode) -> int:
                 user.pk,
                 e,
             )
+    return attempted
+
+
+def notify_watchers_node_replaced(observed_node: ObservedNode, new_node: ObservedNode) -> int:
+    """
+    DM each distinct watcher of the old row that the radio now uses a new number (offline alerts are paused on the
+    old one). Returns number of send_dm attempts. Related object is the old row.
+    """
+    from django.contrib.auth import get_user_model
+
+    from .models import NodeWatch
+
+    User = get_user_model()
+    user_ids = (
+        NodeWatch.objects.filter(
+            observed_node=observed_node,
+            enabled=True,
+            offline_notifications_enabled=True,
+        )
+        .values_list("user_id", flat=True)
+        .distinct()
+    )
+    users = User.objects.filter(pk__in=user_ids)
+    text = (
+        f"Meshflow mesh monitoring: {_format_node_label(observed_node)} now uses node {new_node.node_id_str}. "
+        "Its old number won't send offline alerts."
+    )
+    url = _node_details_url(new_node)
+    if url:
+        text += f" Watch the new number: {url}"
+    else:
+        text += " Watch the new number in Meshflow."
+    attempted = 0
+    related_ctx = {
+        "observed_node_id": str(observed_node.pk),
+        "node_id_str": observed_node.node_id_str,
+        "new_observed_node_id": str(new_node.pk),
+        "new_node_id_str": new_node.node_id_str,
+    }
+    for user in users:
+        if not user_has_verified_discord_dm_target(user):
+            logger.info("mesh_monitoring: skip notify user=%s (Discord not verified)", user.pk)
+            record_discord_notification_skip(
+                feature=DiscordNotificationFeature.NODE_WATCH,
+                kind=DiscordNotificationKind.NODE_REPLACED,
+                user=user,
+                reason="Discord DM target not verified (missing or stale notification settings).",
+                message_preview_text=text,
+                discord_recipient_id=getattr(user, "discord_notify_user_id", "") or "",
+                related_app_label="nodes",
+                related_model_name="ObservedNode",
+                related_object_id=str(observed_node.pk),
+                related_context=related_ctx,
+            )
+            continue
+        attempted += 1
+        try:
+            send_discord_dm_with_audit(
+                feature=DiscordNotificationFeature.NODE_WATCH,
+                kind=DiscordNotificationKind.NODE_REPLACED,
+                user=user,
+                discord_user_id=user.discord_notify_user_id,
+                content=text,
+                related_app_label="nodes",
+                related_model_name="ObservedNode",
+                related_object_id=str(observed_node.pk),
+                related_context=related_ctx,
+            )
+        except DiscordSendError as e:
+            logger.warning("mesh_monitoring: Discord notify failed user=%s: %s", user.pk, e)
     return attempted
 
 

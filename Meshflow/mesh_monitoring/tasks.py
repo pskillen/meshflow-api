@@ -4,11 +4,13 @@ import logging
 from datetime import timedelta
 
 from django.core.exceptions import ObjectDoesNotExist
+from django.db import transaction
 from django.utils import timezone
 
 from celery import shared_task
 
-from nodes.models import ObservedNode
+from nodes.models import ObservedNode, ObservedNodeIdentityLink
+from nodes.services.identity_chain import chain, replaced_by, replaced_q
 from traceroute.dispatch import TRACEROUTE_MAX_PENDING_PER_SOURCE, pending_count_for_source
 from traceroute.lifecycle import create_pending_auto_traceroute
 from traceroute.models import AutoTraceRoute
@@ -26,10 +28,14 @@ from .selection import select_monitoring_sources
 from .services import (
     monitoring_traceroute_succeeded_since,
     notify_watchers_node_offline,
+    notify_watchers_node_replaced,
     notify_watchers_verification_started,
 )
 
 logger = logging.getLogger(__name__)
+
+# A replaced row last heard longer ago than this gets no "new number" DM (old links stay quiet).
+REPLACED_NOTIFY_MAX_AGE = timedelta(days=7)
 
 
 def _effective_last_heard_offline_after_seconds(obs: ObservedNode) -> int:
@@ -67,7 +73,9 @@ def update_learned_offline_thresholds() -> dict:
         .distinct()
     )
     updated = failed = 0
-    observed_qs = ObservedNode.objects.filter(pk__in=watched_ids, meshtastic_node_id__isnull=False)
+    observed_qs = ObservedNode.objects.filter(pk__in=watched_ids, meshtastic_node_id__isnull=False).exclude(
+        replaced_q()
+    )
     for obs in observed_qs.iterator(chunk_size=100):
         try:
             learned = learned_threshold_seconds(node_gaps(obs, now))
@@ -137,15 +145,73 @@ def process_node_watch_presence() -> dict:
         .distinct()
     )
     if not watched_ids:
-        return {"watched": 0}
+        return {"watched": 0, "replaced": 0}
 
-    observed_qs = ObservedNode.objects.filter(pk__in=watched_ids).select_related("latest_status", "mesh_presence")
+    # Replaced rows (live successor link, successor heard at least as recently) are paused: no presence change,
+    # no verification traceroutes, no offline DM. They get the one "new number" DM instead.
+    watched_qs = ObservedNode.objects.filter(pk__in=watched_ids)
+    observed_qs = watched_qs.exclude(replaced_q()).select_related("latest_status", "mesh_presence")
     processed = 0
     for obs in observed_qs.iterator(chunk_size=100):
         processed += 1
         _process_one_observed_node(obs, now, window)
 
-    return {"watched": processed}
+    replaced = 0
+    for old in watched_qs.filter(replaced_q()).iterator(chunk_size=100):
+        replaced += 1
+        try:
+            _notify_replaced_once(old, now)
+        except Exception:
+            logger.exception("mesh_monitoring: replaced-number notify failed for observed node %s", old.pk)
+
+    return {"watched": processed, "replaced": replaced}
+
+
+def _claim_replaced_notice(link_pk: int, now, old_last_heard) -> bool | None:
+    """
+    Atomically mark the link as handled. Returns None when already marked (nothing to do), True when the caller
+    should send, False when the row is stale (marked, send nothing).
+    """
+    with transaction.atomic():
+        link = ObservedNodeIdentityLink.objects.select_for_update().get(pk=link_pk)
+        detail = dict(link.detail or {})
+        if "watchers_notified" in detail:
+            return None
+        stale = old_last_heard is None or old_last_heard < now - REPLACED_NOTIFY_MAX_AGE
+        if stale:
+            detail["watchers_notified"] = {"at": now.isoformat(), "skipped": "stale"}
+        else:
+            detail["watchers_notified"] = {"at": now.isoformat(), "sent": 0}
+        link.detail = detail
+        link.save(update_fields=["detail", "updated_at"])
+        return not stale
+
+
+def _notify_replaced_once(old: ObservedNode, now) -> None:
+    ch = chain(old)
+    newest = replaced_by(old, ch)
+    if newest is None or not ch.next:
+        return
+    link = ch.next[0].link
+    if "watchers_notified" in (link.detail or {}):
+        return
+    # Wait until the old number has been silent past its own offline threshold (the one presence uses), so a
+    # forged "predicted number" packet against a live node never DMs its watchers (G59).
+    if old.last_heard is not None:
+        threshold = timedelta(seconds=int(_effective_last_heard_offline_after_seconds(old)))
+        if old.last_heard >= now - threshold:
+            return
+    if not _claim_replaced_notice(link.pk, now, old.last_heard):
+        return
+    try:
+        attempted = notify_watchers_node_replaced(old, newest)
+    except Exception:
+        logger.exception("mesh_monitoring: replaced-number notify raised for observed node %s", old.pk)
+        return
+    link.refresh_from_db(fields=["detail"])
+    ObservedNodeIdentityLink.objects.filter(pk=link.pk).update(
+        detail={**(link.detail or {}), "watchers_notified": {"at": now.isoformat(), "sent": attempted}}
+    )
 
 
 def _process_one_observed_node(obs: ObservedNode, now, window: timedelta) -> None:
