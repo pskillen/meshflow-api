@@ -15,7 +15,8 @@ writes anything.
 * **A predicted-only link does not count.** A link whose evidence is ``predicted_number`` counts only once the new
   row's stored key equals the key the link rests on. Until then it is recorded and shown in the chain but never makes
   its old row *replaced*: a single forged packet carrying a node's predicted number must not hide a live node or pause
-  its alerts. When the new row's key is heard, the link is superseded by key evidence (counts) or demoted (does not). :func:`link_counts` and
+  its alerts. When the new row's key is heard, the link is superseded by key evidence (counts) or demoted (does not).
+  :func:`link_counts` and
   :func:`counting_links_q` are the one definition; every consumer goes through them.
 * :func:`replaced_by` returns the newest identity in the chain (the last ``next`` step); the list-side annotation
   (:func:`annotate_replaced_by`) names the direct successor, so that lists cost no extra queries.
