@@ -783,6 +783,44 @@ class EnvironmentMetricsPacketSerializer(BasePacketSerializer):
                 rainfall24h = serializers.FloatField(source="rainfall_24h", required=False, allow_null=True)
                 soilMoisture = serializers.IntegerField(source="soil_moisture", required=False, allow_null=True)
                 soilTemperature = serializers.FloatField(source="soil_temperature", required=False, allow_null=True)
+                adcVoltageCh0 = serializers.FloatField(source="adc_voltage_ch0", required=False, allow_null=True)
+                adcVoltageCh1 = serializers.FloatField(source="adc_voltage_ch1", required=False, allow_null=True)
+                adcVoltageCh2 = serializers.FloatField(source="adc_voltage_ch2", required=False, allow_null=True)
+                adcVoltageCh3 = serializers.FloatField(source="adc_voltage_ch3", required=False, allow_null=True)
+                adcVoltageCh4 = serializers.FloatField(source="adc_voltage_ch4", required=False, allow_null=True)
+                adcVoltageCh5 = serializers.FloatField(source="adc_voltage_ch5", required=False, allow_null=True)
+                adcVoltageCh6 = serializers.FloatField(source="adc_voltage_ch6", required=False, allow_null=True)
+                adcVoltageCh7 = serializers.FloatField(source="adc_voltage_ch7", required=False, allow_null=True)
+                oneWireTemperatureCh0 = serializers.FloatField(
+                    source="one_wire_temperature_ch0", required=False, allow_null=True
+                )
+                oneWireTemperatureCh1 = serializers.FloatField(
+                    source="one_wire_temperature_ch1", required=False, allow_null=True
+                )
+                oneWireTemperatureCh2 = serializers.FloatField(
+                    source="one_wire_temperature_ch2", required=False, allow_null=True
+                )
+                oneWireTemperatureCh3 = serializers.FloatField(
+                    source="one_wire_temperature_ch3", required=False, allow_null=True
+                )
+                oneWireTemperatureCh4 = serializers.FloatField(
+                    source="one_wire_temperature_ch4", required=False, allow_null=True
+                )
+                oneWireTemperatureCh5 = serializers.FloatField(
+                    source="one_wire_temperature_ch5", required=False, allow_null=True
+                )
+                oneWireTemperatureCh6 = serializers.FloatField(
+                    source="one_wire_temperature_ch6", required=False, allow_null=True
+                )
+                oneWireTemperatureCh7 = serializers.FloatField(
+                    source="one_wire_temperature_ch7", required=False, allow_null=True
+                )
+                lightningStrikeCount1h = serializers.IntegerField(
+                    source="lightning_strike_count_1h", required=False, allow_null=True, min_value=0
+                )
+                lightningDistanceKm = serializers.FloatField(
+                    source="lightning_distance_km", required=False, allow_null=True
+                )
 
             environmentMetrics = EnvironmentMetricsSerializer()
             time = serializers.IntegerField(source="reading_time", required=False, allow_null=True)
@@ -845,6 +883,24 @@ class EnvironmentMetricsPacketSerializer(BasePacketSerializer):
             rainfall_24h=validated_data.get("rainfall_24h"),
             soil_moisture=validated_data.get("soil_moisture"),
             soil_temperature=validated_data.get("soil_temperature"),
+            adc_voltage_ch0=validated_data.get("adc_voltage_ch0"),
+            adc_voltage_ch1=validated_data.get("adc_voltage_ch1"),
+            adc_voltage_ch2=validated_data.get("adc_voltage_ch2"),
+            adc_voltage_ch3=validated_data.get("adc_voltage_ch3"),
+            adc_voltage_ch4=validated_data.get("adc_voltage_ch4"),
+            adc_voltage_ch5=validated_data.get("adc_voltage_ch5"),
+            adc_voltage_ch6=validated_data.get("adc_voltage_ch6"),
+            adc_voltage_ch7=validated_data.get("adc_voltage_ch7"),
+            one_wire_temperature_ch0=validated_data.get("one_wire_temperature_ch0"),
+            one_wire_temperature_ch1=validated_data.get("one_wire_temperature_ch1"),
+            one_wire_temperature_ch2=validated_data.get("one_wire_temperature_ch2"),
+            one_wire_temperature_ch3=validated_data.get("one_wire_temperature_ch3"),
+            one_wire_temperature_ch4=validated_data.get("one_wire_temperature_ch4"),
+            one_wire_temperature_ch5=validated_data.get("one_wire_temperature_ch5"),
+            one_wire_temperature_ch6=validated_data.get("one_wire_temperature_ch6"),
+            one_wire_temperature_ch7=validated_data.get("one_wire_temperature_ch7"),
+            lightning_strike_count_1h=validated_data.get("lightning_strike_count_1h"),
+            lightning_distance_km=validated_data.get("lightning_distance_km"),
         )
         self._create_observation(packet, validated_data)
         return packet
@@ -887,6 +943,9 @@ class AirQualityMetricsPacketSerializer(BasePacketSerializer):
                 pmVocIdx = serializers.FloatField(source="pm_voc_idx", required=False, allow_null=True)
                 pmNoxIdx = serializers.FloatField(source="pm_nox_idx", required=False, allow_null=True)
                 particlesTps = serializers.FloatField(source="particles_tps", required=False, allow_null=True)
+                pmStatusFlags = serializers.IntegerField(
+                    source="pm_status_flags", required=False, allow_null=True, min_value=0
+                )
 
             airQualityMetrics = AirQualityMetricsSerializer()
             time = serializers.IntegerField(source="reading_time", required=False, allow_null=True)
@@ -952,6 +1011,7 @@ class AirQualityMetricsPacketSerializer(BasePacketSerializer):
             pm_voc_idx=validated_data.get("pm_voc_idx"),
             pm_nox_idx=validated_data.get("pm_nox_idx"),
             particles_tps=validated_data.get("particles_tps"),
+            pm_status_flags=validated_data.get("pm_status_flags"),
         )
         self._create_observation(packet, validated_data)
         return packet

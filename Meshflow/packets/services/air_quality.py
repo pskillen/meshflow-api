@@ -43,6 +43,7 @@ class AirQualityMetricsPacketService(BasePacketService):
             pm_voc_idx=self.packet.pm_voc_idx,
             pm_nox_idx=self.packet.pm_nox_idx,
             particles_tps=self.packet.particles_tps,
+            pm_status_flags=self.packet.pm_status_flags,
         )
 
         NodeLatestStatus.objects.update_or_create(
