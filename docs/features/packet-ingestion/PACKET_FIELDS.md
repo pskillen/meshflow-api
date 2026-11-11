@@ -193,6 +193,28 @@ Telemetry packets contain device and sensor metrics. All TELEMETRY_APP packets s
 | decoded.telemetry.environmentMetrics.rainfall24h        | float     | Rainfall 24h             | - |
 | decoded.telemetry.environmentMetrics.soilMoisture       | integer   | Soil moisture            | - |
 | decoded.telemetry.environmentMetrics.soilTemperature    | float     | Soil temperature         | - |
+| decoded.telemetry.environmentMetrics.adcVoltageCh0 | float | ADC voltage, channel 0 | V |
+| decoded.telemetry.environmentMetrics.adcVoltageCh1 | float | ADC voltage, channel 1 | V |
+| decoded.telemetry.environmentMetrics.adcVoltageCh2 | float | ADC voltage, channel 2 | V |
+| decoded.telemetry.environmentMetrics.adcVoltageCh3 | float | ADC voltage, channel 3 | V |
+| decoded.telemetry.environmentMetrics.adcVoltageCh4 | float | ADC voltage, channel 4 | V |
+| decoded.telemetry.environmentMetrics.adcVoltageCh5 | float | ADC voltage, channel 5 | V |
+| decoded.telemetry.environmentMetrics.adcVoltageCh6 | float | ADC voltage, channel 6 | V |
+| decoded.telemetry.environmentMetrics.adcVoltageCh7 | float | ADC voltage, channel 7 | V |
+| decoded.telemetry.environmentMetrics.oneWireTemperatureCh0 | float | One-wire temperature, channel 0 | °C |
+| decoded.telemetry.environmentMetrics.oneWireTemperatureCh1 | float | One-wire temperature, channel 1 | °C |
+| decoded.telemetry.environmentMetrics.oneWireTemperatureCh2 | float | One-wire temperature, channel 2 | °C |
+| decoded.telemetry.environmentMetrics.oneWireTemperatureCh3 | float | One-wire temperature, channel 3 | °C |
+| decoded.telemetry.environmentMetrics.oneWireTemperatureCh4 | float | One-wire temperature, channel 4 | °C |
+| decoded.telemetry.environmentMetrics.oneWireTemperatureCh5 | float | One-wire temperature, channel 5 | °C |
+| decoded.telemetry.environmentMetrics.oneWireTemperatureCh6 | float | One-wire temperature, channel 6 | °C |
+| decoded.telemetry.environmentMetrics.oneWireTemperatureCh7 | float | One-wire temperature, channel 7 | °C |
+| decoded.telemetry.environmentMetrics.lightningStrikeCount1h | integer | Lightning strikes in the last hour | count per hour |
+| decoded.telemetry.environmentMetrics.lightningDistanceKm | float | Distance to the last lightning strike | km |
+
+The ADC, one-wire and lightning keys are Meshtastic 2.8 fields. They are stored as received but only arrive from a feeder whose bot library knows Meshtastic 2.8; older libraries drop them before upload, and the columns stay null. Packets are not rejected for lacking them. A negative `lightningStrikeCount1h` is a 400 for that packet.
+
+Telemetry variants Meshflow has no table for (for example `soilWaterMetrics`) are kept in `GenericPacket` with `telemetry_variant` set.
 
 #### 4. airQualityMetrics
 
@@ -223,6 +245,7 @@ Telemetry packets contain device and sensor metrics. All TELEMETRY_APP packets s
 | decoded.telemetry.airQualityMetrics.pmVocIdx               | float     | VOC index               | - |
 | decoded.telemetry.airQualityMetrics.pmNoxIdx               | float     | NOx index               | - |
 | decoded.telemetry.airQualityMetrics.particlesTps          | float     | Particles per second    | - |
+| decoded.telemetry.airQualityMetrics.pmStatusFlags         | integer   | PM sensor status flags (Meshtastic 2.8; needs a 2.8-aware feeder) | bit flags, unsigned 32-bit |
 
 #### 5. powerMetrics
 
