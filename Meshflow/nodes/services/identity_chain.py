@@ -12,6 +12,12 @@ writes anything.
 * **The replaced rule.** A node is *replaced* when it has a live successor S and either its ``last_heard`` is null or
   S has been heard at least as recently (S ``last_heard`` not null and ``>=`` the node's). An old row heard *after* its
   successor is not replaced: the link is still shown, but the old row is the live one.
+* **A predicted-only link does not count.** A link whose evidence is ``predicted_number`` counts only once the new
+  row's stored key equals the key the link rests on. Until then it is recorded and shown in the chain but never makes
+  its old row *replaced*: a single forged packet carrying a node's predicted number must not hide a live node or pause
+  its alerts. When the new row's key is heard, the link is superseded by key evidence (counts) or demoted (does not).
+  :func:`link_counts` and
+  :func:`counting_links_q` are the one definition; every consumer goes through them.
 * :func:`replaced_by` returns the newest identity in the chain (the last ``next`` step); the list-side annotation
   (:func:`annotate_replaced_by`) names the direct successor, so that lists cost no extra queries.
 """
@@ -76,8 +82,28 @@ def chain(node: ObservedNode, *, limit: int = DEFAULT_LIMIT) -> Chain:
     )
 
 
-def is_replaced_by(node: ObservedNode, successor: ObservedNode) -> bool:
-    """The replaced rule for one pair (see module docstring)."""
+def _norm_key(key: str | None) -> str:
+    return (key or "").strip().lower()
+
+
+def link_counts(link: ObservedNodeIdentityLink, successor: ObservedNode) -> bool:
+    """Whether a live link may make its old row replaced: a predicted-number link needs the new row to hold its key."""
+    if link.evidence != Link.Evidence.PREDICTED_NUMBER:
+        return True
+    link_key = _norm_key(link.public_key_hex)
+    return bool(link_key) and link_key == _norm_key(successor.meshtastic_public_key_hex)
+
+
+def counting_links_q() -> Q:
+    """The queryset twin of :func:`link_counts`, on ``ObservedNodeIdentityLink`` (no extra join: ``new_node`` is
+    already joined by the replaced rule). Stored keys are normalised lowercase hex, so equality is exact."""
+    return ~Q(evidence=Link.Evidence.PREDICTED_NUMBER) | Q(new_node__meshtastic_public_key_hex=F("public_key_hex"))
+
+
+def is_replaced_by(node: ObservedNode, successor: ObservedNode, link: ObservedNodeIdentityLink | None = None) -> bool:
+    """The replaced rule for one pair (see module docstring). ``link`` is the live link between them, when known."""
+    if link is not None and not link_counts(link, successor):
+        return False
     if node.last_heard is None:
         return True
     return successor.last_heard is not None and successor.last_heard >= node.last_heard
@@ -89,14 +115,16 @@ def replaced_by(node: ObservedNode, chain_: Chain | None = None) -> ObservedNode
         chain_ = chain(node)
     if not chain_.next:
         return None
-    if not is_replaced_by(node, chain_.next[0].node):
+    if not is_replaced_by(node, chain_.next[0].node, chain_.next[0].link):
         return None
     return chain_.next[-1].node
 
 
 def _replaced_links() -> QuerySet:
-    return Link.objects.filter(old_node=OuterRef("pk"), state__in=Link.LIVE_STATES).filter(
-        Q(old_node__last_heard__isnull=True) | Q(new_node__last_heard__gte=F("old_node__last_heard"))
+    return (
+        Link.objects.filter(old_node=OuterRef("pk"), state__in=Link.LIVE_STATES)
+        .filter(counting_links_q())
+        .filter(Q(old_node__last_heard__isnull=True) | Q(new_node__last_heard__gte=F("old_node__last_heard")))
     )
 
 

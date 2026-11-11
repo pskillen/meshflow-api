@@ -432,3 +432,79 @@ def test_other_payloads_have_no_replaced_by(client, create_observed_node, create
     # traceroute target_node and monitoring watch payloads reuse the base serializers
     assert "replaced_by" not in ObservedNodeSerializer(old).data
     assert "replaced_by" not in ObservedNodeWatchSummarySerializer(old).data
+
+
+# --- a predicted-only link does not count as replaced -----------------------------------------------------
+
+KEY = "ab" * 32
+
+
+@pytest.fixture
+def predicted_pair(create_user, create_observed_node):
+    user = create_user()
+    old = create_observed_node(meshtastic_node_id=0x500, long_name="p old", claimed_by=user, last_heard=NOW)
+    new = create_observed_node(meshtastic_node_id=0x600, long_name="p new", claimed_by=user, last_heard=NOW)
+    link = _link(old, new, evidence=Link.Evidence.PREDICTED_NUMBER, confidence=Link.Confidence.MEDIUM)
+    link.public_key_hex = KEY
+    link.save(update_fields=["public_key_hex"])
+    return user, old, new, link
+
+
+def _replaced_everywhere(user, old):
+    """The replaced_by seen on detail, list, mine and search, and whether ?replaced=false keeps the old row."""
+    api = APIClient()
+    api.force_authenticate(user=user)
+    detail = api.get(reverse("observed-node-detail", kwargs={"internal_id": old.internal_id})).data
+    key = str(old.internal_id)
+    lst = _by_id(api.get(reverse("observed-node-list")).data["results"])
+    mine = _by_id(api.get(reverse("observed-node-mine")).data["results"])
+    found = _by_id(api.get(reverse("observed-node-search"), {"q": "p old"}).data)
+    kept = {r["internal_id"] for r in api.get(reverse("observed-node-list"), {"replaced": "false"}).data["results"]}
+    refs = [detail["replaced_by"], lst[key]["replaced_by"], mine[key]["replaced_by"], found[key]["replaced_by"]]
+    return refs, key in kept, detail
+
+
+@pytest.mark.django_db
+def test_predicted_only_link_is_not_replaced_anywhere(predicted_pair):
+    user, old, new, link = predicted_pair
+    refs, kept, detail = _replaced_everywhere(user, old)
+    assert refs == [None, None, None, None]
+    assert kept
+    assert identity_chain.replaced_by(old) is None
+    # still recorded and still in identity_chain, with its evidence visible
+    entry = detail["identity_chain"]["next"][0]
+    assert entry["internal_id"] == str(new.internal_id)
+    assert entry["evidence"] == "predicted_number"
+
+
+@pytest.mark.django_db
+def test_predicted_link_counts_once_new_key_is_heard(predicted_pair):
+    user, old, new, link = predicted_pair
+    new.meshtastic_public_key_hex = KEY
+    new.save(update_fields=["meshtastic_public_key_hex"])
+    refs, kept, _ = _replaced_everywhere(user, old)
+    assert all(r and r["internal_id"] == str(new.internal_id) for r in refs)
+    assert not kept
+
+
+@pytest.mark.django_db
+def test_predicted_link_with_a_different_new_key_is_not_replaced(predicted_pair):
+    user, old, new, link = predicted_pair
+    # the new row holds some other key and demotion has not run: the link still must not count
+    new.meshtastic_public_key_hex = "cd" * 32
+    new.save(update_fields=["meshtastic_public_key_hex"])
+    refs, kept, _ = _replaced_everywhere(user, old)
+    assert refs == [None, None, None, None]
+    assert kept
+    assert identity_chain.replaced_by(old) is None
+
+
+@pytest.mark.django_db
+def test_other_evidence_without_key_still_counts(create_observed_node):
+    old = create_observed_node(last_heard=NOW - timedelta(hours=1))
+    new = create_observed_node(last_heard=NOW)
+    for evidence in (Link.Evidence.FEEDER_REKEY, Link.Evidence.DECLARED):
+        Link.objects.all().delete()
+        _link(old, new, evidence=evidence)
+        assert identity_chain.replaced_by(old) == new
+        assert not ObservedNode.objects.exclude(identity_chain.replaced_q()).filter(pk=old.pk).exists()
