@@ -9123,7 +9123,11 @@ paths:
         '401':
           description: Not signed in
         '404':
-          description: No node matches the id
+          description: No node matches the id (`code` is `not_found`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IdentityLinkError'
     post:
       summary: Declare that another node replaced this one
       description: >-
@@ -9185,7 +9189,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/IdentityLinkError'
         '404':
-          description: Not found
+          description: Not found; `code` is `not_found` (an unknown node, or an unknown `new_node`)
           content:
             application/json:
               schema:
@@ -9287,10 +9291,15 @@ paths:
       description: >-
         For the owner of a node's previous number. `internal_id` is the **new** node (UUID or `!hex`). Allowed when the
         node has a live predecessor link, its old row is claimed by the caller, the new row is unclaimed, and the link
-        is strong: `public_key` or `feeder_rekey` evidence, or `confirmed` by staff or an owner. `predicted_number` and
-        `mac` links that are only `auto` are `evidence_too_weak`. Sets `claimed_by` and records an already accepted
+        is one the claimant could not have set up themselves: `feeder_rekey` evidence; `declared` evidence; a link
+        confirmed by a staff user (an owner's own confirm never counts); or a `public_key` link made because the new
+        row appeared holding the old row's key (`detail.trigger` is `new_row`). Everything else, including every
+        `mac` or `predicted_number` link and any `public_key` link with no recorded trigger, is `evidence_too_weak`
+        (409): the user then claims the normal way, by proving the radio. Sets `claimed_by` and records an already accepted
         `NodeOwnerClaim`, then pushes `node_claim_accepted` over `ws/claims/`. The old row's claim is left alone; undo
-        with the claim `DELETE`. Repeating the call for a node the caller already holds is a 200.
+        with the claim `DELETE`. Repeating the call for a node the caller already holds is a 200, checked first, so
+        it works even when the caller no longer owns the old row. Another user's pending claim on the new row is
+        left in place.
       tags: [Nodes]
       security:
         - BearerAuth: []
@@ -9314,6 +9323,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/NodeOwnerClaim'
+        '300':
+          description: The id matches more than one node (a bare hex id on both protocols); use the UUID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObservedNodeLookupAmbiguous'
         '401':
           description: Not signed in
         '403':
@@ -9323,13 +9338,17 @@ paths:
               schema:
                 $ref: '#/components/schemas/ClaimFromPreviousError'
         '404':
-          description: Unknown node, or it has no live predecessor; `code` is `no_previous` or `not_found`
+          description: >-
+            Unknown node (`code` is `not_found`) or no live predecessor (`no_previous`); the body is always
+            `{code, detail}`
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ClaimFromPreviousError'
         '409':
-          description: Refused; `code` is `already_claimed` (someone else holds it) or `evidence_too_weak`
+          description: >-
+            Refused; `code` is `already_claimed` (someone else holds it) or `evidence_too_weak` (the link is not
+            strong enough for one tap; claim the normal way)
           content:
             application/json:
               schema:
