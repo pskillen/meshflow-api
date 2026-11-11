@@ -165,3 +165,30 @@ def annotate_replaced_by(queryset: QuerySet) -> QuerySet:
         replaced_by_mc_pubkey=_successor_field(links, "mc_pubkey"),
         replaced_by_mc_pubkey_prefix=_successor_field(links, "mc_pubkey_prefix"),
     )
+
+
+def annotate_replaced_by_m2m_opt_out(queryset: QuerySet) -> QuerySet:
+    """Annotate ``replaced_by_m2m_opt_out``: the direct successor's M2M opt-out flag (null when not replaced)."""
+    links = _replaced_links().order_by("-created_at", "-pk")
+    return queryset.annotate(replaced_by_m2m_opt_out=_successor_field(links, "m2m_opt_out"))
+
+
+def annotate_previous(queryset: QuerySet) -> QuerySet:
+    """Annotate the direct live predecessor of rows as ``previous_*`` (null when none), plus ``previous_m2m_opt_out``.
+
+    Unlike :func:`annotate_replaced_by` this ignores the replaced rule and the predicted-number rule: a row with a live
+    predecessor link names it whether or not the old row is still the one heard. No extra queries.
+    """
+    links = Link.objects.filter(new_node=OuterRef("pk"), state__in=Link.LIVE_STATES).order_by("-created_at", "-pk")
+
+    def _prev(name: str) -> Subquery:
+        field = ObservedNode._meta.get_field(name)
+        return Subquery(links.values(f"old_node__{name}")[:1], output_field=field.clone())
+
+    return queryset.annotate(
+        previous_protocol=_prev("protocol"),
+        previous_meshtastic_node_id=_prev("meshtastic_node_id"),
+        previous_mc_pubkey=_prev("mc_pubkey"),
+        previous_mc_pubkey_prefix=_prev("mc_pubkey_prefix"),
+        previous_m2m_opt_out=_prev("m2m_opt_out"),
+    )

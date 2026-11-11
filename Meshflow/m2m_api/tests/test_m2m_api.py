@@ -5,7 +5,9 @@ from datetime import timezone as dt_timezone
 
 from django.contrib.auth.models import Group
 from django.core.cache import cache
+from django.db import connection
 from django.test import override_settings
+from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 
 import pytest
@@ -14,7 +16,7 @@ from rest_framework.test import APIClient
 from common.access import M2M_API_GROUP_NAME
 from common.protocol import Protocol
 from m2m_api.models import M2MApiKey
-from nodes.models import RoleSource
+from nodes.models import ObservedNodeIdentityLink, RoleSource
 from stats.models import StatsSnapshot
 
 pytestmark = pytest.mark.django_db
@@ -233,3 +235,134 @@ def test_protocols_do_not_mix(create_user, create_observed_node):
     assert mc.node_id_str in mc_ids
     assert mt.node_id_str not in mc_ids
     assert mc_body[0]["health"] is None
+
+
+# --- identity ids on infra-node rows ---------------------------------------------------------------------------
+
+
+def _infra_client(create_user):
+    client = APIClient()
+    client.credentials(HTTP_X_API_KEY=_mint(APIClient(), _member(create_user)))
+    return client
+
+
+def _infra_rows(client, path="/api/m2m/v1/meshtastic/infra-nodes"):
+    cache.clear()
+    response = client.get(path)
+    assert response.status_code == 200
+    return {row["id"]: row for row in response.data["results"]}
+
+
+def _router(create_observed_node, node_id, heard_ago_hours, **extra):
+    return create_observed_node(
+        meshtastic_node_id=node_id,
+        meshtastic_role=RoleSource.ROUTER,
+        last_heard=timezone.now() - timedelta(hours=heard_ago_hours),
+        **extra,
+    )
+
+
+def _live_link(old, new, state=None, evidence=None, key=""):
+    return ObservedNodeIdentityLink.objects.create(
+        old_node=old,
+        new_node=new,
+        state=state or ObservedNodeIdentityLink.State.AUTO,
+        evidence=evidence or ObservedNodeIdentityLink.Evidence.PUBLIC_KEY,
+        confidence=ObservedNodeIdentityLink.Confidence.STRONG,
+        public_key_hex=key,
+    )
+
+
+def test_infra_identity_ids_null_without_links(create_user, create_observed_node):
+    client = _infra_client(create_user)
+    node = _router(create_observed_node, 1001, 1)
+    row = _infra_rows(client)[node.node_id_str]
+    assert row["replaced_by_id"] is None and row["previous_id"] is None
+
+
+def test_infra_identity_ids_for_a_live_link(create_user, create_observed_node):
+    client = _infra_client(create_user)
+    old = _router(create_observed_node, 1002, 5)
+    new = _router(create_observed_node, 1003, 1)
+    _live_link(old, new)
+    rows = _infra_rows(client)
+    assert rows[old.node_id_str]["replaced_by_id"] == new.node_id_str
+    assert rows[old.node_id_str]["previous_id"] is None
+    assert rows[new.node_id_str]["previous_id"] == old.node_id_str
+    assert rows[new.node_id_str]["replaced_by_id"] is None
+
+
+def test_infra_old_heard_after_new_is_not_replaced(create_user, create_observed_node):
+    client = _infra_client(create_user)
+    old = _router(create_observed_node, 1004, 1)
+    new = _router(create_observed_node, 1005, 5)
+    _live_link(old, new)
+    rows = _infra_rows(client)
+    assert rows[old.node_id_str]["replaced_by_id"] is None
+    assert rows[new.node_id_str]["previous_id"] == old.node_id_str
+
+
+@pytest.mark.parametrize("state", ["suggested", "rejected"])
+def test_infra_non_live_links_ignored(create_user, create_observed_node, state):
+    client = _infra_client(create_user)
+    old = _router(create_observed_node, 1006, 5)
+    new = _router(create_observed_node, 1007, 1)
+    _live_link(old, new, state=state)
+    rows = _infra_rows(client)
+    assert rows[old.node_id_str]["replaced_by_id"] is None
+    assert rows[new.node_id_str]["previous_id"] is None
+
+
+def test_infra_predicted_only_link_names_previous_but_not_replaced_by(create_user, create_observed_node):
+    client = _infra_client(create_user)
+    old = _router(create_observed_node, 1008, 5)
+    new = _router(create_observed_node, 1009, 1)
+    _live_link(old, new, evidence=ObservedNodeIdentityLink.Evidence.PREDICTED_NUMBER, key="ab" * 32)
+    rows = _infra_rows(client)
+    assert rows[old.node_id_str]["replaced_by_id"] is None
+    assert rows[new.node_id_str]["previous_id"] == old.node_id_str
+
+
+def test_infra_opted_out_neighbour_is_never_named(create_user, create_observed_node):
+    client = _infra_client(create_user)
+    old = _router(create_observed_node, 1010, 5, m2m_opt_out=True)
+    new = _router(create_observed_node, 1011, 1)
+    _live_link(old, new)
+    rows = _infra_rows(client)
+    assert old.node_id_str not in rows
+    assert rows[new.node_id_str]["previous_id"] is None
+
+    old2 = _router(create_observed_node, 1012, 5)
+    new2 = _router(create_observed_node, 1013, 1, m2m_opt_out=True)
+    _live_link(old2, new2)
+    assert _infra_rows(client)[old2.node_id_str]["replaced_by_id"] is None
+
+
+def test_infra_meshcore_rows_carry_null_identity_fields(create_user, create_observed_node):
+    client = _infra_client(create_user)
+    create_observed_node(
+        protocol=Protocol.MESHCORE,
+        meshtastic_node_id=None,
+        mc_pubkey="cd" * 32,
+        meshcore_adv_type=2,
+        last_heard=timezone.now(),
+    )
+    row = next(iter(_infra_rows(client, "/api/m2m/v1/meshcore/infra-nodes").values()))
+    assert row["replaced_by_id"] is None and row["previous_id"] is None
+
+
+def test_infra_query_count_does_not_grow_with_links(create_user, create_observed_node):
+    client = _infra_client(create_user)
+    _router(create_observed_node, 1020, 1)
+
+    def count():
+        cache.clear()
+        with CaptureQueriesContext(connection) as ctx:
+            assert client.get("/api/m2m/v1/meshtastic/infra-nodes").status_code == 200
+        return len(ctx)
+
+    count()  # warm-up: first request pays one-off lookups
+    baseline = count()
+    for i in range(4):
+        _live_link(_router(create_observed_node, 1030 + 2 * i, 5), _router(create_observed_node, 1031 + 2 * i, 1))
+    assert count() == baseline
