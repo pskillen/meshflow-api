@@ -566,7 +566,7 @@ def set_link_state(
     try:
         with transaction.atomic():
             _lock_nodes(link.old_node, link.new_node)
-            locked = Link.objects.select_for_update().select_related("old_node", "new_node").get(pk=link.pk)
+            locked = Link.objects.select_for_update(of=("self",)).select_related("old_node", "new_node").get(pk=link.pk)
             previous = locked.state
             if previous == State.FLAGGED:
                 raise IdentityLinkError(IdentityLinkError.CODE_INVALID_STATE, "A flagged row is not a link.")
