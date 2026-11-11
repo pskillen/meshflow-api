@@ -1031,6 +1031,24 @@ class EnvironmentMetrics(BaseNodeItem):
     rainfall_24h = models.FloatField(null=True, blank=True)
     soil_moisture = models.IntegerField(null=True, blank=True)
     soil_temperature = models.FloatField(null=True, blank=True)
+    adc_voltage_ch0 = models.FloatField(null=True, blank=True)
+    adc_voltage_ch1 = models.FloatField(null=True, blank=True)
+    adc_voltage_ch2 = models.FloatField(null=True, blank=True)
+    adc_voltage_ch3 = models.FloatField(null=True, blank=True)
+    adc_voltage_ch4 = models.FloatField(null=True, blank=True)
+    adc_voltage_ch5 = models.FloatField(null=True, blank=True)
+    adc_voltage_ch6 = models.FloatField(null=True, blank=True)
+    adc_voltage_ch7 = models.FloatField(null=True, blank=True)
+    one_wire_temperature_ch0 = models.FloatField(null=True, blank=True)
+    one_wire_temperature_ch1 = models.FloatField(null=True, blank=True)
+    one_wire_temperature_ch2 = models.FloatField(null=True, blank=True)
+    one_wire_temperature_ch3 = models.FloatField(null=True, blank=True)
+    one_wire_temperature_ch4 = models.FloatField(null=True, blank=True)
+    one_wire_temperature_ch5 = models.FloatField(null=True, blank=True)
+    one_wire_temperature_ch6 = models.FloatField(null=True, blank=True)
+    one_wire_temperature_ch7 = models.FloatField(null=True, blank=True)
+    lightning_strike_count_1h = models.BigIntegerField(null=True, blank=True)
+    lightning_distance_km = models.FloatField(null=True, blank=True)
 
     class Meta:
         verbose_name = _("Environment metrics")
@@ -1068,6 +1086,7 @@ class AirQualityMetrics(BaseNodeItem):
     pm_voc_idx = models.FloatField(null=True, blank=True)
     pm_nox_idx = models.FloatField(null=True, blank=True)
     particles_tps = models.FloatField(null=True, blank=True)
+    pm_status_flags = models.BigIntegerField(null=True, blank=True)
 
     class Meta:
         verbose_name = _("Air quality metrics")
