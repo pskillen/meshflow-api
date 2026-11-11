@@ -434,7 +434,7 @@ def test_other_payloads_have_no_replaced_by(client, create_observed_node, create
     assert "replaced_by" not in ObservedNodeWatchSummarySerializer(old).data
 
 
-# --- G59: a predicted-only link does not count as replaced -----------------------------------------------------
+# --- a predicted-only link does not count as replaced -----------------------------------------------------
 
 KEY = "ab" * 32
 
@@ -445,6 +445,8 @@ def predicted_pair(create_user, create_observed_node):
     old = create_observed_node(meshtastic_node_id=0x500, long_name="p old", claimed_by=user, last_heard=NOW)
     new = create_observed_node(meshtastic_node_id=0x600, long_name="p new", claimed_by=user, last_heard=NOW)
     link = _link(old, new, evidence=Link.Evidence.PREDICTED_NUMBER, confidence=Link.Confidence.MEDIUM)
+    link.public_key_hex = KEY
+    link.save(update_fields=["public_key_hex"])
     return user, old, new, link
 
 
@@ -483,6 +485,18 @@ def test_predicted_link_counts_once_new_key_is_heard(predicted_pair):
     refs, kept, _ = _replaced_everywhere(user, old)
     assert all(r and r["internal_id"] == str(new.internal_id) for r in refs)
     assert not kept
+
+
+@pytest.mark.django_db
+def test_predicted_link_with_a_different_new_key_is_not_replaced(predicted_pair):
+    user, old, new, link = predicted_pair
+    # the new row holds some other key and demotion has not run: the link still must not count
+    new.meshtastic_public_key_hex = "cd" * 32
+    new.save(update_fields=["meshtastic_public_key_hex"])
+    refs, kept, _ = _replaced_everywhere(user, old)
+    assert refs == [None, None, None, None]
+    assert kept
+    assert identity_chain.replaced_by(old) is None
 
 
 @pytest.mark.django_db

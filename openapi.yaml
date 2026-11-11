@@ -2064,7 +2064,7 @@ components:
         successor S and (the node has never been heard, or S has been heard and S.last_heard >= the node's
         last_heard); on detail it names the **newest** identity (the last ``identity_chain.next`` entry). An old row
         heard after its successor keeps ``replaced_by`` null although ``identity_chain.next`` is non-empty. So does a link
-        whose only evidence is ``predicted_number`` while the successor has no stored public key (not yet confirmed).
+        whose evidence is ``predicted_number`` until the successor stores the key the link rests on.
       allOf:
         - $ref: '#/components/schemas/ObservedNode'
         - type: object
