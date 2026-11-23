@@ -24,7 +24,7 @@ services:
       - meshflow_net
 
   postgres:
-    image: postgres:18-alpine
+    image: postgres:19-alpine
     restart: unless-stopped
     # TODO: always change these in a real working environment
     environment:
